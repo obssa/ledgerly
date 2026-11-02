@@ -1,0 +1,22 @@
+{
+  "country_code": "CI",
+  "name": "Côte d'Ivoire",
+  "base_currency": "XOF",
+  "framework": "syscohada",
+  "chart_template": "syscohada",
+  "calendars": ["gregorian"],
+  "default_calendar": "gregorian",
+  "default_fiscal_year_start_month": 1,
+  "languages": ["fr"],
+  "tax_id_label": "NCC",
+  "tax_id_pattern": "^[0-9A-Z]{7,12}$",
+  "_verify": "Starter pack to show an OHADA country running on the SYSCOHADA template. Tax rates, the tax-ID format and the e-invoicing regime must be researched and confirmed with a local adviser before launch in Côte d'Ivoire.",
+  "tax_rates": [
+    {"code": "TVA18", "name": "TVA 18%", "kind": "vat", "rate": "0.18", "effective_from": "1900-01-01"},
+    {"code": "TVA0", "name": "TVA exonérée", "kind": "vat", "rate": "0", "effective_from": "1900-01-01"}
+  ],
+  "extra_accounts": [],
+  "einvoicing": {"status": "To research before launch"},
+  "payment_methods": ["bank_transfer", "cash", "cheque", "mtn_momo", "orange_money", "wave", "card"],
+  "payroll": {"status": "todo", "note": "Load ITS and CNPS rules from current law as versioned rules."}
+}

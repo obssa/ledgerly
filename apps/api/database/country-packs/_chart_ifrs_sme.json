@@ -1,0 +1,255 @@
+{
+  "_about": "IFRS for SMEs chart template (East Africa, Nigeria). Country packs add statutory accounts. system_key values are looked up by code; never rename them.",
+  "accounts": [
+    {
+      "code": "1000",
+      "name": "Cash on hand",
+      "type": "asset",
+      "subtype": "cash",
+      "system_key": "cash_on_hand"
+    },
+    {
+      "code": "1010",
+      "name": "Petty cash",
+      "type": "asset",
+      "subtype": "cash"
+    },
+    {
+      "code": "1050",
+      "name": "Undeposited funds",
+      "type": "asset",
+      "subtype": "cash",
+      "system_key": "undeposited_funds"
+    },
+    {
+      "code": "1200",
+      "name": "Accounts receivable",
+      "type": "asset",
+      "subtype": "receivable",
+      "system_key": "accounts_receivable"
+    },
+    {
+      "code": "1250",
+      "name": "Withholding tax receivable",
+      "type": "asset",
+      "subtype": "tax_receivable",
+      "system_key": "withholding_receivable"
+    },
+    {
+      "code": "1300",
+      "name": "Inventory",
+      "type": "asset",
+      "subtype": "inventory",
+      "system_key": "inventory"
+    },
+    {
+      "code": "1350",
+      "name": "VAT receivable (input VAT)",
+      "type": "asset",
+      "subtype": "tax_receivable",
+      "system_key": "vat_receivable"
+    },
+    {
+      "code": "1400",
+      "name": "Prepaid expenses",
+      "type": "asset",
+      "subtype": "prepayment"
+    },
+    {
+      "code": "1500",
+      "name": "Property, plant and equipment",
+      "type": "asset",
+      "subtype": "fixed_asset"
+    },
+    {
+      "code": "1590",
+      "name": "Accumulated depreciation",
+      "type": "asset",
+      "subtype": "contra_asset"
+    },
+    {
+      "code": "2000",
+      "name": "Accounts payable",
+      "type": "liability",
+      "subtype": "payable",
+      "system_key": "accounts_payable"
+    },
+    {
+      "code": "2100",
+      "name": "Accrued expenses",
+      "type": "liability",
+      "subtype": "accrual"
+    },
+    {
+      "code": "2200",
+      "name": "Salaries payable",
+      "type": "liability",
+      "subtype": "payroll",
+      "system_key": "salaries_payable"
+    },
+    {
+      "code": "2210",
+      "name": "Employee income tax payable (PAYE)",
+      "type": "liability",
+      "subtype": "payroll",
+      "system_key": "paye_payable"
+    },
+    {
+      "code": "2300",
+      "name": "VAT payable (output VAT)",
+      "type": "liability",
+      "subtype": "tax_payable",
+      "system_key": "vat_payable"
+    },
+    {
+      "code": "2310",
+      "name": "Withholding tax payable",
+      "type": "liability",
+      "subtype": "tax_payable",
+      "system_key": "withholding_payable"
+    },
+    {
+      "code": "2400",
+      "name": "Customer deposits",
+      "type": "liability",
+      "subtype": "deposit",
+      "system_key": "customer_deposits"
+    },
+    {
+      "code": "2500",
+      "name": "Loans payable",
+      "type": "liability",
+      "subtype": "loan"
+    },
+    {
+      "code": "3000",
+      "name": "Share capital",
+      "type": "equity",
+      "subtype": "capital"
+    },
+    {
+      "code": "3100",
+      "name": "Retained earnings",
+      "type": "equity",
+      "subtype": "retained_earnings",
+      "system_key": "retained_earnings"
+    },
+    {
+      "code": "3200",
+      "name": "Opening balance equity",
+      "type": "equity",
+      "subtype": "opening_balance",
+      "system_key": "opening_balance_equity"
+    },
+    {
+      "code": "4000",
+      "name": "Sales",
+      "type": "income",
+      "subtype": "sales",
+      "system_key": "sales"
+    },
+    {
+      "code": "4100",
+      "name": "Service income",
+      "type": "income",
+      "subtype": "sales",
+      "system_key": "service_income"
+    },
+    {
+      "code": "4900",
+      "name": "Other income",
+      "type": "income",
+      "subtype": "other_income"
+    },
+    {
+      "code": "4950",
+      "name": "Foreign exchange gains and losses",
+      "type": "income",
+      "subtype": "fx",
+      "system_key": "fx_gain_loss"
+    },
+    {
+      "code": "5000",
+      "name": "Cost of goods sold",
+      "type": "expense",
+      "subtype": "cogs",
+      "system_key": "cogs"
+    },
+    {
+      "code": "6000",
+      "name": "Salaries and wages",
+      "type": "expense",
+      "subtype": "payroll",
+      "system_key": "salaries_expense"
+    },
+    {
+      "code": "6010",
+      "name": "Employer pension and social contributions",
+      "type": "expense",
+      "subtype": "payroll",
+      "system_key": "employer_contributions"
+    },
+    {
+      "code": "6100",
+      "name": "Rent",
+      "type": "expense",
+      "subtype": "operating"
+    },
+    {
+      "code": "6200",
+      "name": "Utilities",
+      "type": "expense",
+      "subtype": "operating"
+    },
+    {
+      "code": "6300",
+      "name": "Telephone and internet",
+      "type": "expense",
+      "subtype": "operating"
+    },
+    {
+      "code": "6400",
+      "name": "Vehicle and fuel",
+      "type": "expense",
+      "subtype": "operating"
+    },
+    {
+      "code": "6500",
+      "name": "Marketing",
+      "type": "expense",
+      "subtype": "operating"
+    },
+    {
+      "code": "6600",
+      "name": "Bank charges and payment fees",
+      "type": "expense",
+      "subtype": "operating",
+      "system_key": "bank_charges"
+    },
+    {
+      "code": "6700",
+      "name": "Depreciation",
+      "type": "expense",
+      "subtype": "depreciation",
+      "system_key": "depreciation"
+    },
+    {
+      "code": "6800",
+      "name": "Office supplies",
+      "type": "expense",
+      "subtype": "operating"
+    },
+    {
+      "code": "6900",
+      "name": "Professional fees",
+      "type": "expense",
+      "subtype": "operating"
+    },
+    {
+      "code": "7000",
+      "name": "Interest expense",
+      "type": "expense",
+      "subtype": "finance_cost"
+    }
+  ]
+}

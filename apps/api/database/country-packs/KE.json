@@ -1,0 +1,90 @@
+{
+  "country_code": "KE",
+  "name": "Kenya",
+  "base_currency": "KES",
+  "framework": "ifrs_sme",
+  "chart_template": "ifrs_sme",
+  "calendars": [
+    "gregorian"
+  ],
+  "default_calendar": "gregorian",
+  "default_fiscal_year_start_month": 1,
+  "languages": [
+    "en",
+    "sw"
+  ],
+  "tax_id_label": "KRA PIN",
+  "tax_id_pattern": "^[A-Z][0-9]{9}[A-Z]$",
+  "_verify": "Rates, codes and effective dates must be confirmed against the current VAT Act and KRA guidance with a tax adviser before go-live. effective_from 1900-01-01 means 'in force before the company's first period'.",
+  "tax_rates": [
+    {
+      "code": "VAT16",
+      "name": "VAT 16%",
+      "kind": "vat",
+      "rate": "0.16",
+      "effective_from": "1900-01-01"
+    },
+    {
+      "code": "VAT0",
+      "name": "VAT zero-rated",
+      "kind": "vat",
+      "rate": "0",
+      "effective_from": "1900-01-01"
+    },
+    {
+      "code": "EXEMPT",
+      "name": "VAT exempt",
+      "kind": "vat",
+      "rate": "0",
+      "effective_from": "1900-01-01"
+    },
+    {
+      "code": "WHVAT2",
+      "name": "VAT withholding 2%",
+      "kind": "withholding",
+      "rate": "0.02",
+      "effective_from": "1900-01-01"
+    }
+  ],
+  "extra_accounts": [
+    {
+      "code": "2220",
+      "name": "NSSF payable",
+      "type": "liability",
+      "subtype": "payroll",
+      "system_key": "nssf_payable"
+    },
+    {
+      "code": "2230",
+      "name": "SHIF payable",
+      "type": "liability",
+      "subtype": "payroll",
+      "system_key": "shif_payable"
+    },
+    {
+      "code": "2240",
+      "name": "Housing levy payable",
+      "type": "liability",
+      "subtype": "payroll",
+      "system_key": "housing_levy_payable"
+    }
+  ],
+  "einvoicing": {
+    "authority": "KE_KRA",
+    "system": "eTIMS (VSCU / OSCU system-to-system)",
+    "connector": "kenya_etims",
+    "status": "Mandatory"
+  },
+  "payment_methods": [
+    "bank_transfer",
+    "cash",
+    "cheque",
+    "mpesa",
+    "airtel_money",
+    "card"
+  ],
+  "payroll": {
+    "status": "todo",
+    "note": "Load PAYE bands, NSSF, SHIF and housing levy rates from current law as versioned rules."
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "country_code": "ET",
+  "name": "Ethiopia",
+  "base_currency": "ETB",
+  "framework": "ifrs_sme",
+  "chart_template": "ifrs_sme",
+  "calendars": [
+    "gregorian",
+    "ethiopian"
+  ],
+  "default_calendar": "gregorian",
+  "default_fiscal_year_start_month": 7,
+  "languages": [
+    "en",
+    "am",
+    "om"
+  ],
+  "tax_id_label": "TIN",
+  "tax_id_pattern": "^[0-9]{10}$",
+  "_verify": "Rates, codes and effective dates must be confirmed against the current VAT Proclamation, TOT rules and withholding rules with a tax adviser before go-live. effective_from 1900-01-01 means 'in force before the company's first period'.",
+  "tax_rates": [
+    {
+      "code": "VAT15",
+      "name": "VAT 15%",
+      "kind": "vat",
+      "rate": "0.15",
+      "effective_from": "1900-01-01"
+    },
+    {
+      "code": "VAT0",
+      "name": "VAT zero-rated",
+      "kind": "vat",
+      "rate": "0",
+      "effective_from": "1900-01-01"
+    },
+    {
+      "code": "EXEMPT",
+      "name": "VAT exempt",
+      "kind": "vat",
+      "rate": "0",
+      "effective_from": "1900-01-01"
+    },
+    {
+      "code": "TOT2",
+      "name": "Turnover tax 2% (goods)",
+      "kind": "tot",
+      "rate": "0.02",
+      "effective_from": "1900-01-01"
+    },
+    {
+      "code": "TOT10",
+      "name": "Turnover tax 10% (services)",
+      "kind": "tot",
+      "rate": "0.10",
+      "effective_from": "1900-01-01"
+    },
+    {
+      "code": "WHT3",
+      "name": "Withholding tax 3%",
+      "kind": "withholding",
+      "rate": "0.03",
+      "effective_from": "1900-01-01"
+    }
+  ],
+  "extra_accounts": [
+    {
+      "code": "2220",
+      "name": "Pension payable",
+      "type": "liability",
+      "subtype": "payroll",
+      "system_key": "pension_payable"
+    },
+    {
+      "code": "2320",
+      "name": "Turnover tax payable",
+      "type": "liability",
+      "subtype": "tax_payable",
+      "system_key": "tot_payable"
+    }
+  ],
+  "einvoicing": {
+    "authority": "ET_MOR",
+    "system": "Electronic Invoice Registration System (Ministry of Revenue)",
+    "connector": "ethiopia_mor",
+    "legal_basis": "Electronic Invoicing System Administration Directive No. 1142/2026",
+    "status": "Framework in force; technical specification and taxpayer rollout schedule to be published by the Ministry"
+  },
+  "payment_methods": [
+    "bank_transfer",
+    "cash",
+    "cheque",
+    "telebirr",
+    "cbe_birr",
+    "card"
+  ],
+  "payroll": {
+    "status": "todo",
+    "note": "Load income-tax bands and pension rates from current law as versioned rules."
+  }
+}
