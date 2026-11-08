@@ -33,6 +33,7 @@ Route::prefix('v1')->group(function () {
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show']);
             Route::put('invoices/{invoice}', [InvoiceController::class, 'update']);
             Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve']);
+            Route::get('invoices/{invoice}/history', [InvoiceController::class, 'history']);
 
             Route::post('banking/transfers', [BankingController::class, 'transfer']);
             Route::post('banking/deposits', [BankingController::class, 'deposit']);

@@ -32,18 +32,70 @@ final class SaveInvoiceDraft
     public function handle(array $data, ?Document $document = null, ?string $userId = null): Document
     {
         if ($document && ! $document->isEditable()) {
-            throw new LedgerException('Posted invoices cannot be edited; issue a credit note instead.');
+            throw new LedgerException('Posted invoices are edited through EditPostedInvoice, which keeps their history.');
         }
 
         return DB::transaction(function () use ($data, $document, $userId) {
-            $currency = $data['currency'];
-            $inclusive = (bool) ($data['prices_include_tax'] ?? false);
-            $rates = DB::table('tax_rates')
-                ->whereIn('id', array_filter(array_column($data['lines'], 'tax_rate_id')))
-                ->pluck('rate', 'id');
+            $calc = $this->calculate($data);
 
             $document ??= new Document(['type' => 'invoice', 'created_by' => $userId]);
-            $document->fill([
+            $document->fill($calc['header']);
+            $document->status = 'draft';
+            $document->forceFill($calc['totals']);
+            $document->amount_due = $calc['totals']['total'];
+            $document->save();
+
+            $document->lines()->delete();
+            $document->lines()->createMany($calc['lines']);
+
+            return $document->load('lines');
+        });
+    }
+
+    /**
+     * Server-side recalculation of an invoice from the submitted data. Shared by draft saving and by
+     * EditPostedInvoice, so a draft and an edited posted invoice always compute the same way.
+     *
+     * @return array{header: array<string, mixed>, lines: list<array<string, mixed>>, totals: array{subtotal: string, tax_total: string, total: string}}
+     */
+    public function calculate(array $data): array
+    {
+        $currency = $data['currency'];
+        $inclusive = (bool) ($data['prices_include_tax'] ?? false);
+        $rates = DB::table('tax_rates')
+            ->whereIn('id', array_filter(array_column($data['lines'], 'tax_rate_id')))
+            ->pluck('rate', 'id');
+
+        $amounts = [];
+        $lineRows = [];
+        foreach (array_values($data['lines']) as $i => $line) {
+            $rate = isset($line['tax_rate_id']) ? (string) ($rates[$line['tax_rate_id']] ?? '0') : '0';
+            $result = $this->tax->line(
+                Money::of($line['unit_price'], $currency),
+                (string) $line['quantity'],
+                (string) ($line['discount_rate'] ?? '0'),
+                $rate,
+                $inclusive,
+            );
+            $amounts[] = $result;
+            $lineRows[] = [
+                'line_no' => $i + 1,
+                'item_id' => $line['item_id'] ?? null,
+                'description' => $line['description'],
+                'quantity' => (string) $line['quantity'],
+                'unit_price' => (string) $line['unit_price'],
+                'discount_rate' => (string) ($line['discount_rate'] ?? '0'),
+                'tax_rate_id' => $line['tax_rate_id'] ?? null,
+                'account_id' => $line['account_id'],
+                'line_subtotal' => $result->subtotal->toDecimalString(),
+                'line_tax' => $result->tax->toDecimalString(),
+            ];
+        }
+
+        $totals = $this->tax->document($amounts, $currency);
+
+        return [
+            'header' => [
                 'contact_id' => $data['contact_id'],
                 'number' => $data['number'],
                 'issue_date' => $data['issue_date'],
@@ -53,46 +105,13 @@ final class SaveInvoiceDraft
                 'prices_include_tax' => $inclusive,
                 'language' => $data['language'] ?? 'en',
                 'notes' => $data['notes'] ?? null,
-            ]);
-            $document->status = 'draft';
-
-            $amounts = [];
-            $lineRows = [];
-            foreach (array_values($data['lines']) as $i => $line) {
-                $rate = isset($line['tax_rate_id']) ? (string) ($rates[$line['tax_rate_id']] ?? '0') : '0';
-                $result = $this->tax->line(
-                    Money::of($line['unit_price'], $currency),
-                    (string) $line['quantity'],
-                    (string) ($line['discount_rate'] ?? '0'),
-                    $rate,
-                    $inclusive,
-                );
-                $amounts[] = $result;
-                $lineRows[] = [
-                    'line_no' => $i + 1,
-                    'item_id' => $line['item_id'] ?? null,
-                    'description' => $line['description'],
-                    'quantity' => (string) $line['quantity'],
-                    'unit_price' => (string) $line['unit_price'],
-                    'discount_rate' => (string) ($line['discount_rate'] ?? '0'),
-                    'tax_rate_id' => $line['tax_rate_id'] ?? null,
-                    'account_id' => $line['account_id'],
-                    'line_subtotal' => $result->subtotal->toDecimalString(),
-                    'line_tax' => $result->tax->toDecimalString(),
-                ];
-            }
-
-            $totals = $this->tax->document($amounts, $currency);
-            $document->subtotal = $totals->subtotal->toDecimalString();
-            $document->tax_total = $totals->tax->toDecimalString();
-            $document->total = $totals->total->toDecimalString();
-            $document->amount_due = $totals->total->toDecimalString();
-            $document->save();
-
-            $document->lines()->delete();
-            $document->lines()->createMany($lineRows);
-
-            return $document->load('lines');
-        });
+            ],
+            'lines' => $lineRows,
+            'totals' => [
+                'subtotal' => $totals->subtotal->toDecimalString(),
+                'tax_total' => $totals->tax->toDecimalString(),
+                'total' => $totals->total->toDecimalString(),
+            ],
+        ];
     }
 }

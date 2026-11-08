@@ -205,5 +205,87 @@ DO $$ BEGIN
   END;
 END $$;
 
+-- T12: a posted document cannot change until its current version is saved to history
+DO $$ BEGIN
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal)
+  VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000d1', 1, 'Coffee', 1, 100, '00000000-0000-0000-0000-000000000a40', 100);
+  RAISE EXCEPTION 'FAIL T12a: line added to posted document without a saved version';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'PASS T12a lines of a posted document frozen until version saved';
+END $$;
+
+DO $$ BEGIN
+  -- the corrected entry the edit re-posts with
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type)
+    VALUES ('00000000-0000-0000-0000-00000000e012', app_company_id(), 12, '2026-11-02', 'ETB', 'invoice');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e012', 1, '00000000-0000-0000-0000-000000000a11', 400000, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e012', 2, '00000000-0000-0000-0000-000000000a40', 0, 400000);
+  BEGIN
+    UPDATE documents SET total = 400000, journal_entry_id = '00000000-0000-0000-0000-00000000e012'
+     WHERE id = '00000000-0000-0000-0000-0000000000d1';
+    RAISE EXCEPTION 'FAIL T12b: posted document edited without a saved version';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS T12b edit refused without a saved version';
+  END;
+
+  INSERT INTO document_versions (company_id, document_id, version, journal_entry_id, snapshot, reason, edited_by)
+  SELECT app_company_id(), d.id, 1, d.journal_entry_id, to_jsonb(d), 'Customer agreed a lower price', '00000000-0000-0000-0000-0000000000f1'
+    FROM documents d WHERE d.id = '00000000-0000-0000-0000-0000000000d1';
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal)
+  VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000d1', 1, 'Coffee', 1, 400000, '00000000-0000-0000-0000-000000000a40', 400000);
+  UPDATE documents SET total = 400000, journal_entry_id = '00000000-0000-0000-0000-00000000e012'
+   WHERE id = '00000000-0000-0000-0000-0000000000d1';
+  RAISE NOTICE 'PASS T12c edit allowed once version 1 is saved and re-posted';
+
+  BEGIN
+    UPDATE documents SET notes = 'second edit, no new version' WHERE id = '00000000-0000-0000-0000-0000000000d1';
+    RAISE EXCEPTION 'FAIL T12d: second edit skipped history';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS T12d every further edit needs its own saved version';
+  END;
+END $$;
+
+-- T13: document history cannot be changed or deleted
+DO $$ BEGIN
+  BEGIN
+    UPDATE document_versions SET reason = 'rewritten';
+    RAISE EXCEPTION 'FAIL T13a: history rewritten';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM document_versions;
+    RAISE EXCEPTION 'FAIL T13b: history deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T13 document history append-only';
+END $$;
+
+-- T14: the audit log is hash-chained and verifies
+DO $$
+DECLARE broken bigint;
+BEGIN
+  INSERT INTO audit_log (company_id, user_id, action, subject_type, before, after, reason)
+  VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'edited', 'invoice',
+          '{"total":"501745.0000"}', '{"total":"400000.0000"}', 'Customer agreed a lower price');
+  SELECT audit_log_verify(app_company_id()) INTO broken;
+  IF broken IS NOT NULL THEN RAISE EXCEPTION 'FAIL T14a: intact chain reported broken at %', broken; END IF;
+  IF EXISTS (SELECT 1 FROM audit_log WHERE company_id = app_company_id() AND row_hash IS NULL) THEN
+    RAISE EXCEPTION 'FAIL T14b: audit row without hash';
+  END IF;
+  RAISE NOTICE 'PASS T14 audit log hash chain intact';
+END $$;
+
 RESET ROLE;
+
+-- T15: tampering is detected (simulates someone with database superuser access bypassing the triggers)
+ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_changes;
+UPDATE audit_log SET after = '{"total":"1.0000"}' WHERE action = 'edited';
+ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_changes;
+DO $$
+DECLARE broken bigint;
+BEGIN
+  SELECT audit_log_verify('00000000-0000-0000-0000-00000000000a') INTO broken;
+  IF broken IS NULL THEN RAISE EXCEPTION 'FAIL T15: tampered audit row not detected'; END IF;
+  RAISE NOTICE 'PASS T15 tampered audit row detected at id %', broken;
+END $$;
+
 \echo 'All ledger guard tests passed.'

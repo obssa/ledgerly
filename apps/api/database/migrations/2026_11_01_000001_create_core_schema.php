@@ -16,6 +16,7 @@ return new class extends Migration
         '003_business.sql',
         '004_compliance_audit.sql',
         '005_rls.sql',
+        '006_history.sql',
     ];
 
     public function up(): void

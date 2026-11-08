@@ -55,7 +55,10 @@ cd apps/web && npm test && npm run lint && npm run build
 | Rule | Where |
 | --- | --- |
 | Every journal entry balances, at least two lines | `JournalDraft::assertBalanced` + deferred DB trigger |
-| Posted entries/lines immutable; fix with reversal | DB triggers + `PostingService::reverse` |
+| Posted documents editable while the year is open; closed year admin only (`periods.reopen`) | `EditPostedInvoice` |
+| Every edit keeps history: version snapshot, reversal + corrected entry, audited reason | `document_versions` + DB guard refuses edits that skip it |
+| Audit log append-only and tamper-evident (hash chain, `audit_log_verify()`) | `006_history.sql` |
+| Journal lines never changed in place; edits are reversals | DB triggers + `PostingService::reverse` |
 | Nothing posts into a closed period | `PostingService` + DB trigger |
 | Tenant isolation | Eloquent scope + PostgreSQL row-level security |
 | Exact money, never floats | `Money` (brick/math) and `src/lib/decimal.ts` (bigint), same rounding rules |
@@ -64,8 +67,8 @@ cd apps/web && npm test && npm run lint && npm run build
 
 ## Verified in the build sandbox (2 Nov 2026)
 
-- 31 API unit tests pass (run through a PHPUnit-compatible shim; Packagist was blocked there, so run `composer install && php artisan test` locally — the feature test `InvoiceFlowTest` has not run yet).
-- 15 database guard tests pass on PostgreSQL 16, as the restricted app role; report SQL (trial balance, P&L, balance sheet, bin card) checked against fixtures.
+- 31 API unit tests pass (run through a PHPUnit-compatible shim; Packagist was blocked there, so run `composer install && php artisan test` locally — the feature tests in `InvoiceFlowTest` (incl. edit-with-history and closed-year admin edit) have not run yet).
+- 22 database guard tests pass (incl. edit history, hash chain, tamper detection) on PostgreSQL 16, as the restricted app role; report SQL (trial balance, P&L, balance sheet, bin card) checked against fixtures.
 - Web: 8 unit tests, lint, production build, all 5 pages render.
 
 ## Before go-live (not done here)
