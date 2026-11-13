@@ -12,7 +12,15 @@ use Illuminate\Support\Str;
 
 /**
  * The ONLY code path that writes to journal_entries / journal_lines.
- * Modules (sales, purchases, payroll, banking) build a JournalDraft and hand it here.
+ * Modules (sales, purchases, banking, inventory) build a JournalDraft and hand it here.
+ *
+ * Locks, always in this order so two postings can never deadlock:
+ *   1. the company's period, SHARED: many postings run side by side; closing a period takes it
+ *      exclusively, so a posting and a close can never slip past each other
+ *   2. the company's journal number sequence row: the instant that makes numbers gapless
+ * The company row itself is never locked, so users of one company do not queue behind each other for
+ * anything except the number, and companies never wait for one another.
+ * The database keeps account_balances in step in the same transaction (002_ledger.sql).
  */
 final class PostingService
 {
@@ -21,16 +29,20 @@ final class PostingService
         $draft->assertBalanced();
 
         return DB::transaction(function () use ($draft, $userId) {
-            $company = DB::table('companies')->where('id', $draft->companyId)->lockForUpdate()->first(['books_closed_until']);
+            DB::select('select pg_advisory_xact_lock_shared(ledger_period_lock_key(?::uuid))', [$draft->companyId]);
+
+            // Read after the lock: a close that was in flight has committed by now. The database checks the
+            // same rule (and the subscription and company state) in its own trigger.
+            $closedUntil = DB::table('companies')->where('id', $draft->companyId)->value('books_closed_until');
             $date = $draft->date->format('Y-m-d');
 
-            if ($company?->books_closed_until !== null && $date <= $company->books_closed_until) {
-                throw PeriodLocked::until($company->books_closed_until, $date);
+            if ($closedUntil !== null && $date <= $closedUntil) {
+                throw PeriodLocked::until($closedUntil, $date);
             }
 
             $this->assertAccountsUsable($draft);
 
-            $entryId = (string) Str::uuid();
+            $entryId = (string) Str::uuid7(); // time-ordered: new rows land together in the index
             $number = $this->nextNumber($draft->companyId, 'journal');
 
             DB::table('journal_entries')->insert([
@@ -49,7 +61,7 @@ final class PostingService
             $rows = [];
             foreach ($draft->lines() as $i => $line) {
                 $rows[] = [
-                    'id' => (string) Str::uuid(),
+                    'id' => (string) Str::uuid7(),
                     'company_id' => $draft->companyId,
                     'journal_entry_id' => $entryId,
                     'line_no' => $i + 1,
@@ -64,7 +76,7 @@ final class PostingService
                     'project_id' => $line->dimensions['project_id'] ?? null,
                 ];
             }
-            DB::table('journal_lines')->insert($rows);
+            DB::table('journal_lines')->insert($rows); // one statement: the balances trigger runs once per entry
 
             DB::table('outbox_events')->insert([
                 'company_id' => $draft->companyId,
@@ -91,7 +103,7 @@ final class PostingService
                 'after' => json_encode(['number' => $number, 'memo' => $draft->memo], JSON_THROW_ON_ERROR),
             ]);
 
-            return JournalEntry::query()->with('lines')->findOrFail($entryId);
+            return JournalEntry::query()->with('lines')->where('company_id', $draft->companyId)->findOrFail($entryId);
         });
     }
 
@@ -123,7 +135,7 @@ final class PostingService
             }
 
             $posted = $this->post($reversal, $userId);
-            DB::table('journal_entries')->where('id', $entry->id)->update(['status' => 'reversed']);
+            DB::table('journal_entries')->where(['company_id' => $entry->company_id, 'id' => $entry->id])->update(['status' => 'reversed']);
 
             return $posted;
         });
@@ -144,7 +156,7 @@ final class PostingService
         }
     }
 
-    private function nextNumber(string $companyId, string $key): int
+    public function nextNumber(string $companyId, string $key): int
     {
         DB::statement(
             'insert into company_sequences (company_id, key, next_value) values (?, ?, 1) on conflict do nothing',

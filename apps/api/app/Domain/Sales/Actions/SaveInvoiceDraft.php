@@ -38,9 +38,17 @@ final class SaveInvoiceDraft
         return DB::transaction(function () use ($data, $document, $userId) {
             $calc = $this->calculate($data);
 
+            if ($document) {
+                $document = Document::query()->lockForUpdate()->findOrFail($document->getKey());
+                $document->assertVersion(isset($data['lock_version']) ? (int) $data['lock_version'] : null);
+                if (! $document->isEditable()) {
+                    throw new LedgerException('Posted invoices are edited through EditPostedInvoice, which keeps their history.');
+                }
+            }
+
             $document ??= new Document(['type' => 'invoice', 'created_by' => $userId]);
             $document->fill($calc['header']);
-            $document->status = 'draft';
+            $document->status = 'draft'; // a change while awaiting approval sends it back to draft
             $document->forceFill($calc['totals']);
             $document->amount_due = $calc['totals']['total'];
             $document->save();
@@ -48,7 +56,7 @@ final class SaveInvoiceDraft
             $document->lines()->delete();
             $document->lines()->createMany($calc['lines']);
 
-            return $document->load('lines');
+            return $document->refresh()->load('lines'); // refresh: the database bumped lock_version
         });
     }
 

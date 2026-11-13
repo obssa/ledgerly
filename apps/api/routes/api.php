@@ -5,34 +5,44 @@ use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
+use App\Http\Controllers\TaxRateController;
 use Illuminate\Support\Facades\Route;
 
 /*
 | Ledgerly public API v1. The Next.js app uses exactly this API, so every feature is API-first.
 | Company-scoped routes need the X-Company-Id header (see ResolveCompany).
+| Every authenticated request is one database transaction with the tenant set (RunInTenantTransaction).
+| POST and PUT requests may send an Idempotency-Key header and are then safe to repeat (Idempotency).
 */
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'tenant.tx'])->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
 
         Route::get('companies', [CompanyController::class, 'index']);
         Route::post('companies', [CompanyController::class, 'store']);
+        Route::get('company-options', [CompanyController::class, 'options']);
 
-        Route::middleware('company')->group(function () {
+        Route::middleware(['company', 'idempotent'])->group(function () {
             Route::get('accounts', [LedgerController::class, 'accounts']);
             Route::get('journal-entries', [LedgerController::class, 'entries']);
             Route::post('journal-entries', [LedgerController::class, 'storeEntry']);
             Route::post('journal-entries/{entry}/reverse', [LedgerController::class, 'reverse']);
 
+            Route::get('tax-rates', [TaxRateController::class, 'index']);
+            Route::post('tax-rates', [TaxRateController::class, 'store']);
+
             Route::get('invoices', [InvoiceController::class, 'index']);
             Route::post('invoices', [InvoiceController::class, 'store']);
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show']);
             Route::put('invoices/{invoice}', [InvoiceController::class, 'update']);
+            Route::post('invoices/{invoice}/submit', [InvoiceController::class, 'submit']);
+            Route::post('invoices/{invoice}/reject', [InvoiceController::class, 'reject']);
             Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve']);
+            Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void']);
             Route::get('invoices/{invoice}/history', [InvoiceController::class, 'history']);
 
             Route::post('banking/transfers', [BankingController::class, 'transfer']);

@@ -11,6 +11,7 @@ CREATE TABLE contacts (
     tax_id             text,        -- TIN / KRA PIN / NIN, validated per country
     email              text,
     phone              text,
+    website            text,
     currency           char(3),
     payment_terms_days integer     NOT NULL DEFAULT 30 CHECK (payment_terms_days >= 0),
     address            jsonb       NOT NULL DEFAULT '{}'::jsonb,
@@ -27,9 +28,9 @@ CREATE TABLE tax_rates (
     id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id     uuid         REFERENCES companies (id) ON DELETE CASCADE,
     country_code   char(2)      NOT NULL,
-    code           text         NOT NULL,    -- VAT15, VAT0, EXEMPT, TOT2, WHT3 ...
+    code           text         NOT NULL,    -- VAT15, VAT0, EXEMPT, TOT2, WHT3, GST10 ... (VAT and GST are kind 'vat')
     name           text         NOT NULL,
-    kind           text         NOT NULL CHECK (kind IN ('vat', 'tot', 'withholding', 'excise', 'other')),
+    kind           text         NOT NULL CHECK (kind IN ('vat', 'sales_tax', 'tot', 'withholding', 'excise', 'other')),
     rate           numeric(9,6) NOT NULL CHECK (rate >= 0 AND rate < 1), -- 0.15 = 15%
     effective_from date         NOT NULL,
     effective_to   date,
@@ -70,9 +71,9 @@ CREATE TABLE warehouses (
 
 -- Every stock movement, append-only. The bin card (stock card) is this table read in order per item and
 -- warehouse, with a running quantity and value. quantity is signed: + in (purchase, return in, count gain),
--- - out (sale, issue, count loss). A transfer is two rows sharing transfer_group.
+-- - out (sale, issue, count loss). A transfer is two rows sharing transfer_group. Hash-partitioned by company.
 CREATE TABLE stock_moves (
-    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id             uuid          NOT NULL DEFAULT gen_random_uuid(),
     company_id     uuid          NOT NULL REFERENCES companies (id),
     item_id        uuid          NOT NULL REFERENCES items (id),
     warehouse_id   uuid          NOT NULL REFERENCES warehouses (id),
@@ -86,8 +87,10 @@ CREATE TABLE stock_moves (
     transfer_group uuid,
     created_by     uuid          REFERENCES users (id),
     created_at     timestamptz   NOT NULL DEFAULT now(),
-    seq            bigserial     -- stable order for moves on the same day
-);
+    seq            bigserial,    -- stable order for moves on the same day
+    PRIMARY KEY (company_id, id)
+) PARTITION BY HASH (company_id);
+SELECT create_hash_partitions('stock_moves', 16);
 CREATE INDEX stock_moves_card_idx ON stock_moves (company_id, item_id, warehouse_id, moved_on, seq);
 
 CREATE FUNCTION stock_moves_append_only() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -111,21 +114,29 @@ CREATE TABLE documents (
     currency         char(3)       NOT NULL,
     fx_rate          numeric(18,6) NOT NULL DEFAULT 1 CHECK (fx_rate > 0),
     prices_include_tax boolean     NOT NULL DEFAULT false,
-    status           text          NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'approved', 'posted', 'void')),
+    -- State machines in 007_state_machines.sql. Invoices, bills, credit notes, cash sales:
+    --   draft -> awaiting_approval -> posted -> part_paid -> paid; void.   (part_paid / paid follow amount_due)
+    -- Quotes and orders: draft -> sent -> accepted | declined | expired -> converted.
+    status           text          NOT NULL DEFAULT 'draft'
+                     CHECK (status IN ('draft', 'awaiting_approval', 'posted', 'part_paid', 'paid', 'void',
+                                       'sent', 'accepted', 'declined', 'expired', 'converted')),
     subtotal         numeric(20,2) NOT NULL DEFAULT 0,
     tax_total        numeric(20,2) NOT NULL DEFAULT 0,
     total            numeric(20,2) NOT NULL DEFAULT 0,
     amount_due       numeric(20,2) NOT NULL DEFAULT 0,
     language         text          NOT NULL DEFAULT 'en',
     notes            text,
-    journal_entry_id uuid          REFERENCES journal_entries (id),
+    journal_entry_id uuid,
+    lock_version     integer       NOT NULL DEFAULT 1,  -- optimistic locking: a save must name the version it read
     location_id      uuid,
     custom_fields    jsonb         NOT NULL DEFAULT '{}'::jsonb,
     created_by       uuid          REFERENCES users (id),
     created_at       timestamptz   NOT NULL DEFAULT now(),
     updated_at       timestamptz   NOT NULL DEFAULT now(),
     UNIQUE (company_id, type, number),
-    CHECK (status <> 'posted' OR journal_entry_id IS NOT NULL)
+    FOREIGN KEY (company_id, journal_entry_id) REFERENCES journal_entries (company_id, id),
+    CHECK (status NOT IN ('posted', 'part_paid', 'paid') OR journal_entry_id IS NOT NULL),
+    CHECK (amount_due >= 0 AND amount_due <= total)
 );
 CREATE INDEX documents_contact_idx ON documents (company_id, contact_id);
 CREATE INDEX documents_open_idx    ON documents (company_id, type, due_date) WHERE amount_due > 0;
@@ -147,24 +158,7 @@ CREATE TABLE document_lines (
     UNIQUE (document_id, line_no)
 );
 
--- Posted documents are frozen: only status (to 'void'), amount_due (as payments are allocated) and
--- updated_at may change.
-CREATE FUNCTION documents_guard_posted() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-    IF OLD.status IN ('posted', 'void') THEN
-        IF TG_OP = 'DELETE' THEN
-            RAISE EXCEPTION 'Posted documents cannot be deleted; void them instead' USING ERRCODE = 'insufficient_privilege';
-        END IF;
-        IF (to_jsonb(NEW) - 'status' - 'amount_due' - 'updated_at') <> (to_jsonb(OLD) - 'status' - 'amount_due' - 'updated_at') THEN
-            RAISE EXCEPTION 'Posted documents are frozen' USING ERRCODE = 'insufficient_privilege';
-        END IF;
-    END IF;
-    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
-END $$;
-
-CREATE TRIGGER documents_frozen_when_posted
-    BEFORE UPDATE OR DELETE ON documents
-    FOR EACH ROW EXECUTE FUNCTION documents_guard_posted();
+-- The guards that freeze posted documents and enforce their state machine are in 006 and 007.
 
 CREATE TABLE payments (
     id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -173,17 +167,19 @@ CREATE TABLE payments (
     contact_id        uuid          REFERENCES contacts (id),
     account_id        uuid          NOT NULL REFERENCES accounts (id), -- bank, cash or wallet account
     payment_date      date          NOT NULL,
-    method            text          NOT NULL, -- bank_transfer, cash, cheque, card, telebirr, mpesa, mtn_momo, airtel_money ...
+    method            text          NOT NULL, -- bank_transfer, cash, cheque, card, mobile_money (telebirr, mpesa ...) ...
     reference         text,
     currency          char(3)       NOT NULL,
     fx_rate           numeric(18,6) NOT NULL DEFAULT 1,
     amount            numeric(20,2) NOT NULL CHECK (amount > 0),
     fee               numeric(20,2) NOT NULL DEFAULT 0 CHECK (fee >= 0),
     withholding       numeric(20,2) NOT NULL DEFAULT 0 CHECK (withholding >= 0),
-    journal_entry_id  uuid          REFERENCES journal_entries (id),
+    journal_entry_id  uuid,
+    status            text          NOT NULL DEFAULT 'posted' CHECK (status IN ('posted', 'reversed')), -- reversed: bounced or cancelled
     provider_txn_id   text,          -- id from the bank or mobile-money provider, for idempotency
     created_at        timestamptz   NOT NULL DEFAULT now(),
-    UNIQUE (company_id, method, provider_txn_id)
+    UNIQUE (company_id, method, provider_txn_id),
+    FOREIGN KEY (company_id, journal_entry_id) REFERENCES journal_entries (company_id, id)
 );
 
 CREATE TABLE payment_allocations (
@@ -205,10 +201,12 @@ CREATE TABLE bank_transactions (
     balance_after    numeric(20,2),
     source           text          NOT NULL CHECK (source IN ('feed', 'statement', 'manual', 'mobile_money_api')),
     external_id      text,
-    status           text          NOT NULL DEFAULT 'for_review' CHECK (status IN ('for_review', 'matched', 'categorised', 'excluded')),
-    journal_line_id  uuid          REFERENCES journal_lines (id),
+    status           text          NOT NULL DEFAULT 'imported'
+                     CHECK (status IN ('imported', 'matched', 'categorised', 'excluded', 'reconciled')),
+    journal_line_id  uuid,
     suggestion       jsonb,         -- best match or category with a confidence score
     created_at       timestamptz   NOT NULL DEFAULT now(),
-    UNIQUE (account_id, external_id)
+    UNIQUE (account_id, external_id),
+    FOREIGN KEY (company_id, journal_line_id) REFERENCES journal_lines (company_id, id)
 );
 CREATE INDEX bank_transactions_review_idx ON bank_transactions (company_id, account_id, status);

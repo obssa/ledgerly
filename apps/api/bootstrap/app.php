@@ -1,7 +1,11 @@
 <?php
 
 use App\Domain\Ledger\Exceptions\LedgerException;
+use App\Domain\Ledger\Exceptions\StaleDocument;
 use App\Domain\Tenancy\Http\ResolveCompany;
+use App\Http\Middleware\Idempotency;
+use App\Http\Middleware\RunInTenantTransaction;
+use App\Support\IllegalTransition;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,12 +19,28 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->alias(['company' => ResolveCompany::class]);
-        // The tenant must be set before route-model binding runs, or RLS hides the bound model (404).
+        $middleware->alias([
+            'tenant.tx' => RunInTenantTransaction::class,
+            'company' => ResolveCompany::class,
+            'idempotent' => Idempotency::class,
+        ]);
+        // Order matters: transaction → tenant → idempotency → route-model binding. The tenant must be set
+        // before binding runs, or row-level security hides the bound model (404).
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: RunInTenantTransaction::class);
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: ResolveCompany::class);
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: Idempotency::class);
         $middleware->throttleApi('120,1');
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Someone else saved the document first: the client reloads and tries again.
+        $exceptions->render(fn (StaleDocument $e, Request $request) => response()->json([
+            'message' => $e->getMessage(),
+            'type' => 'StaleDocument',
+        ], 409));
+        $exceptions->render(fn (IllegalTransition $e, Request $request) => response()->json([
+            'message' => $e->getMessage(),
+            'type' => 'IllegalTransition',
+        ], 422));
         // Ledger rule violations (unbalanced, locked period ...) are user errors, not server errors.
         $exceptions->render(fn (LedgerException $e, Request $request) => response()->json([
             'message' => $e->getMessage(),

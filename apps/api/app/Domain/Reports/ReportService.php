@@ -8,8 +8,12 @@ use App\Domain\Ledger\Money;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Financial statements read straight from journal_lines, so they always agree with the ledger.
- * Amounts stay decimal strings end to end (no floats).
+ * Ledger → trial balance → financial statements.
+ *
+ * Every statement is built from the trial_balance() database function, which reads whole months from
+ * account_balances (kept in step with each posting) and only the days of a part month from the ledger
+ * lines. A report therefore costs about the same for a company with a thousand lines or a hundred million,
+ * and works for any date range in either calendar. Amounts stay decimal strings end to end (no floats).
  */
 final class ReportService
 {
@@ -18,14 +22,11 @@ final class ReportService
     {
         return DB::select(<<<'SQL'
             SELECT a.id AS account_id, a.code, a.name, a.type,
-                   greatest(sum(l.debit) - sum(l.credit), 0)::numeric(20,2)::text AS debit,
-                   greatest(sum(l.credit) - sum(l.debit), 0)::numeric(20,2)::text AS credit
-              FROM journal_lines l
-              JOIN journal_entries e ON e.id = l.journal_entry_id
-              JOIN accounts a        ON a.id = l.account_id
-             WHERE l.company_id = ? AND e.entry_date <= ?
-             GROUP BY a.id, a.code, a.name, a.type
-            HAVING sum(l.debit) <> sum(l.credit)
+                   greatest(t.debit - t.credit, 0)::numeric(20,2)::text AS debit,
+                   greatest(t.credit - t.debit, 0)::numeric(20,2)::text AS credit
+              FROM trial_balance(?::uuid, ?::date) t
+              JOIN accounts a ON a.id = t.account_id
+             WHERE t.debit <> t.credit
              ORDER BY a.code
             SQL, [$companyId, $asOf]);
     }
@@ -91,12 +92,9 @@ final class ReportService
         // Each account's balance in its natural sign: assets debit-positive, the rest credit-positive.
         $rows = DB::select(<<<'SQL'
             SELECT a.code, a.name, a.type,
-                   (CASE WHEN a.type IN ('asset', 'expense') THEN sum(l.debit - l.credit) ELSE sum(l.credit - l.debit) END)::numeric(20,2)::text AS amount
-              FROM journal_lines l
-              JOIN journal_entries e ON e.id = l.journal_entry_id
-              JOIN accounts a        ON a.id = l.account_id
-             WHERE l.company_id = ? AND e.entry_date <= ?
-             GROUP BY a.code, a.name, a.type
+                   (CASE WHEN a.type IN ('asset', 'expense') THEN t.debit - t.credit ELSE t.credit - t.debit END)::numeric(20,2)::text AS amount
+              FROM trial_balance(?::uuid, ?::date) t
+              JOIN accounts a ON a.id = t.account_id
              ORDER BY a.code
             SQL, [$companyId, $asOf]);
 
@@ -151,17 +149,23 @@ final class ReportService
     /** @return array<string, object{name: string, type: string, subtype: ?string, amount: string}> keyed by account code */
     private function incomeStatementRows(string $companyId, string $from, string $to): array
     {
+        // Movement in a period = trial balance at its end minus trial balance the day before it starts.
         // Income shown as credit - debit; expenses as debit - credit: both positive in normal use.
         $rows = DB::select(<<<'SQL'
+            WITH movement AS (
+                SELECT account_id, sum(debit) AS debit, sum(credit) AS credit
+                  FROM (SELECT account_id, debit, credit FROM trial_balance(?::uuid, ?::date)
+                        UNION ALL
+                        SELECT account_id, -debit, -credit FROM trial_balance(?::uuid, (?::date - 1))) both_ends
+                 GROUP BY account_id
+            )
             SELECT a.code, a.name, a.type, a.subtype,
-                   (CASE WHEN a.type = 'income' THEN sum(l.credit - l.debit) ELSE sum(l.debit - l.credit) END)::numeric(20,2)::text AS amount
-              FROM journal_lines l
-              JOIN journal_entries e ON e.id = l.journal_entry_id
-              JOIN accounts a        ON a.id = l.account_id
-             WHERE l.company_id = ? AND e.entry_date BETWEEN ? AND ? AND a.type IN ('income', 'expense')
-             GROUP BY a.code, a.name, a.type, a.subtype
+                   (CASE WHEN a.type = 'income' THEN m.credit - m.debit ELSE m.debit - m.credit END)::numeric(20,2)::text AS amount
+              FROM movement m
+              JOIN accounts a ON a.id = m.account_id
+             WHERE a.type IN ('income', 'expense') AND (m.debit <> 0 OR m.credit <> 0)
              ORDER BY a.code
-            SQL, [$companyId, $from, $to]);
+            SQL, [$companyId, $to, $companyId, $from]);
 
         $keyed = [];
         foreach ($rows as $row) {

@@ -15,12 +15,20 @@ use App\Domain\Ledger\PostingService;
 use App\Domain\Sales\InvoicePostingBuilder;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Tenancy\Support\CurrentCompany;
+use App\Support\StateMachine;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Approve = post to the ledger + queue tax-authority clearance, in one transaction.
- * The clearance job runs after commit, retries on its own, and stores the registration number and QR.
+ * State machine: draft or awaiting_approval -> posted.
+ *
+ * The one optional approval step: when the company sets settings.approval.invoice_above, an invoice
+ * above that amount cannot be approved by the person who created it.
+ *
+ * The clearance job leaves only after the request's transaction commits, retries on its own, and stores
+ * the registration number and QR. The response therefore shows the submission as queued; the client
+ * reads the invoice again (or listens for the event) to see it cleared.
  */
 final class ApproveInvoice
 {
@@ -29,18 +37,32 @@ final class ApproveInvoice
         private readonly InvoicePostingBuilder $builder,
         private readonly PostingService $posting,
         private readonly ConnectorRegistry $connectors,
+        private readonly StateMachine $states,
     ) {
     }
 
-    public function handle(Document $invoice, ?string $userId = null): Document
+    public function handle(Document $invoice, ?string $userId = null, ?int $lockVersion = null): Document
     {
-        if (! in_array($invoice->type, ['invoice', 'credit_note'], true) || ! $invoice->isEditable()) {
-            throw new LedgerException("Document {$invoice->number} cannot be approved in status {$invoice->status}.");
+        if (! in_array($invoice->type, ['invoice', 'credit_note'], true)) {
+            throw new LedgerException("Document {$invoice->number} is not an invoice or credit note.");
         }
 
         $company = $this->current->get();
 
-        $posted = DB::transaction(function () use ($invoice, $company, $userId) {
+        return DB::transaction(function () use ($invoice, $company, $userId, $lockVersion) {
+            // Lock the row: two people approving at once must not post twice.
+            $invoice = Document::query()->lockForUpdate()->findOrFail($invoice->getKey());
+            $invoice->assertVersion($lockVersion);
+            $this->states->assert('invoice', $invoice->status, 'posted', $invoice->number);
+
+            $limit = $company->settings['approval']['invoice_above'] ?? null;
+            if ($limit !== null && $userId !== null && $invoice->created_by === $userId) {
+                $totalBase = Money::of($invoice->total, $invoice->currency)->convertTo($company->base_currency, (string) $invoice->fx_rate);
+                if (Money::of((string) $limit, $company->base_currency)->minus($totalBase)->isNegative()) {
+                    throw new LedgerException("{$invoice->number} is above the approval limit; someone other than its creator must approve it.");
+                }
+            }
+
             $entry = $this->posting->post($this->journalDraftFor($invoice->load('lines')), $userId);
 
             $invoice->status = 'posted';
@@ -56,11 +78,8 @@ final class ApproveInvoice
                 SubmitEInvoice::dispatch($company->getKey(), $submission->getKey())->afterCommit();
             }
 
-            return $invoice;
+            return $invoice->fresh(['lines', 'einvoiceSubmissions']);
         });
-
-        // Read back after commit, so a clearance that already ran (sync queue) is included.
-        return $posted->fresh(['lines', 'einvoiceSubmissions']);
     }
 
     /** The balanced journal draft for an invoice or credit note as its lines stand now (lines must be loaded). */
@@ -68,7 +87,8 @@ final class ApproveInvoice
     {
         $company = $this->current->get();
 
-        // Each tax kind posts to its own liability account (VAT payable, turnover tax payable ...).
+        // Each tax kind posts to its own liability account. VAT, GST and sales tax share one; a country
+        // pack that has a turnover tax adds its own account.
         $kinds = DB::table('tax_rates')->whereIn('id', $invoice->lines->pluck('tax_rate_id')->filter())->pluck('kind', 'id');
         $taxAccount = fn (?string $rateId) => $rateId === null ? null : Account::system(match ($kinds[$rateId] ?? 'vat') {
             'tot' => 'tot_payable',

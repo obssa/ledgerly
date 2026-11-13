@@ -13,7 +13,7 @@ export const demoCompany = {
 
 const c = (id: string, name: string, tin: string | null = null) => ({ id, name, tax_id: tin });
 
-export const demoInvoices: Invoice[] = [
+const invoices: Invoice[] = [
   { id: "i419", number: "INV-2019-0419", status: "draft", contact: c("c1", "Sheger Grand Hotel", "0012345678"), issue_date: "2026-11-02", due_date: "2026-12-02", currency: "ETB", subtotal: "436300.00", tax_total: "65445.00", total: "501745.00", amount_due: "501745.00" },
   { id: "i412", number: "INV-2019-0412", status: "posted", contact: c("c5", "Lalibela Lodge Group"), issue_date: "2026-10-28", due_date: "2026-11-27", currency: "ETB", subtotal: "72000.00", tax_total: "10800.00", total: "82800.00", amount_due: "82800.00", einvoice_submissions: [{ authority: "ET_MOR", status: "rejected", clearance_number: null, qr_payload: null, last_error: "Buyer TIN not found" }] },
   { id: "i406", number: "INV-2019-0406", status: "posted", contact: c("c4", "Harar Hills Café"), issue_date: "2026-09-24", due_date: "2026-10-24", currency: "ETB", subtotal: "36347.83", tax_total: "5452.17", total: "41800.00", amount_due: "41800.00" },
@@ -21,6 +21,13 @@ export const demoInvoices: Invoice[] = [
   { id: "i395", number: "INV-2019-0395", status: "posted", contact: c("c2", "Bole Brew Café"), issue_date: "2026-09-02", due_date: "2026-10-02", currency: "ETB", subtotal: "50652.17", tax_total: "7597.83", total: "58250.00", amount_due: "58250.00" },
   { id: "i388", number: "INV-2019-0388", status: "posted", contact: c("c1", "Sheger Grand Hotel", "0012345678"), issue_date: "2026-08-17", due_date: "2026-09-16", currency: "ETB", subtotal: "83826.09", tax_total: "12573.91", total: "96400.00", amount_due: "96400.00" },
 ];
+
+/** The demo company is in Ethiopia, where every posted invoice is registered with the Ministry of Revenue. */
+export const demoInvoices: Invoice[] = invoices.map((inv, n) =>
+  inv.status === "draft" || inv.einvoice_submissions?.length
+    ? inv
+    : { ...inv, einvoice_submissions: [{ authority: "ET_MOR", status: "cleared", clearance_number: `IRN-2019-${String(4100 + n)}`, qr_payload: null, last_error: null }] },
+);
 
 export const demoKpis = {
   cash: "2486320.00",

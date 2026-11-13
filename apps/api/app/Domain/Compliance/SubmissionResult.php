@@ -7,7 +7,7 @@ namespace App\Domain\Compliance;
 final readonly class SubmissionResult
 {
     private function __construct(
-        public string $status, // cleared | rejected | pending | retryable_error
+        public string $status, // cleared | rejected | pending | retryable_error | not_ready
         public ?string $clearanceNumber = null,
         public ?string $qrPayload = null,
         public ?string $signature = null,
@@ -31,6 +31,15 @@ final readonly class SubmissionResult
     public static function pending(array $raw = []): self
     {
         return new self('pending', raw: $raw);
+    }
+
+    /**
+     * The connector for this authority is not live yet (awaiting the authority's specification or our
+     * authorisation). The submission stays queued, with no retries, and is sent the day the connector goes live.
+     */
+    public static function notReady(string $reason): self
+    {
+        return new self('not_ready', error: $reason);
     }
 
     /** Network down, authority unavailable, timeout: the job retries with backoff. */

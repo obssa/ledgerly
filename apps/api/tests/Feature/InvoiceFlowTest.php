@@ -11,7 +11,9 @@ use Tests\TestCase;
 
 /**
  * End to end through the HTTP API on PostgreSQL: set up a company, invoice a customer, approve,
- * and check the ledger and the e-invoice clearance.
+ * and check the ledger and the e-invoice clearance; then edits with history, idempotency, optimistic
+ * locking, the approval step, voiding, read-only subscriptions and any-country setup.
+ * NOT YET RUN: the build sandbox could not install Laravel. CI (.github/workflows/ci.yml) runs it.
  *
  * Uses DatabaseMigrations (not RefreshDatabase): the balance check is a DEFERRED constraint trigger and
  * only fires when a transaction commits, which a per-test rollback would never do.
@@ -59,7 +61,17 @@ final class InvoiceFlowTest extends TestCase
         $this->postJson("/api/v1/invoices/{$invoiceId}/approve", [], $headers)
             ->assertOk()
             ->assertJsonPath('status', 'posted')
+            ->assertJsonPath('einvoice_submissions.0.status', 'queued');
+
+        // Clearance runs after the request's transaction commits (here at once: sync queue).
+        $this->getJson("/api/v1/invoices/{$invoiceId}", $headers)
+            ->assertOk()
             ->assertJsonPath('einvoice_submissions.0.status', 'cleared');
+
+        // Approving twice is refused by the state machine, and nothing posts twice.
+        $this->postJson("/api/v1/invoices/{$invoiceId}/approve", [], $headers)->assertStatus(422)->assertJsonPath('type', 'IllegalTransition');
+        $this->assertSame(1, DB::table('journal_entries')->where('company_id', $companyId)->count());
+        $this->assertSame([], DB::select('select * from ledger_verify(?)', [$companyId]));
 
         $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $headers)->assertOk()->json('data'));
         $this->assertSame('501745.00', $tb->firstWhere('code', '1200')['debit']);
@@ -133,6 +145,103 @@ final class InvoiceFlowTest extends TestCase
         $this->assertContains('period_reopened', $actions);
         $this->assertContains('period_relocked', $actions);
         $this->assertSame(2, DB::table('document_versions')->where('document_id', $id)->count());
+    }
+
+    public function test_requests_are_safe_to_repeat_and_safe_against_stale_saves(): void
+    {
+        config(['queue.default' => 'sync']);
+        [$headers, $companyId, $invoice] = $this->companyWithInvoiceData('retry@example.test');
+
+        // Same Idempotency-Key twice: one invoice, and the second response is the stored first one.
+        $key = ['Idempotency-Key' => 'b6c1a4f0-0000-4000-8000-000000000001'];
+        $first = $this->postJson('/api/v1/invoices', $invoice('10'), $headers + $key)->assertCreated();
+        $again = $this->postJson('/api/v1/invoices', $invoice('10'), $headers + $key)->assertCreated()->assertHeader('Idempotency-Replayed', 'true');
+        $this->assertSame($first->json('id'), $again->json('id'));
+        $this->assertSame(1, DB::table('documents')->where('company_id', $companyId)->count());
+
+        // The same key with a different body is a client bug, not a retry.
+        $this->postJson('/api/v1/invoices', $invoice('11'), $headers + $key)->assertStatus(422);
+
+        // Two people open the draft at version 1; the second save is refused.
+        $id = $first->json('id');
+        $this->putJson("/api/v1/invoices/{$id}", $invoice('12') + ['lock_version' => 1], $headers)->assertOk();
+        $this->putJson("/api/v1/invoices/{$id}", $invoice('13') + ['lock_version' => 1], $headers)->assertStatus(409)->assertJsonPath('type', 'StaleDocument');
+        $this->assertSame('12.00', DB::table('document_lines')->where('document_id', $id)->value('quantity'));
+
+        // No tenant context is left on the connection after a request.
+        $this->assertSame('', (string) DB::selectOne("select current_setting('app.company_id', true) as c")->c);
+    }
+
+    public function test_approval_step_void_and_read_only_subscription(): void
+    {
+        config(['queue.default' => 'sync']);
+        [$headers, $companyId, $invoice] = $this->companyWithInvoiceData('flow@example.test');
+        $id = $this->postJson('/api/v1/invoices', $invoice('10'), $headers)->assertCreated()->json('id');
+
+        // draft -> awaiting approval -> rejected back to draft -> approved (posted) -> void.
+        $this->postJson("/api/v1/invoices/{$id}/submit", [], $headers)->assertOk()->assertJsonPath('status', 'awaiting_approval');
+        $this->postJson("/api/v1/invoices/{$id}/reject", ['reason' => 'Wrong customer'], $headers)->assertOk()->assertJsonPath('status', 'draft');
+        $this->postJson("/api/v1/invoices/{$id}/approve", [], $headers)->assertOk()->assertJsonPath('status', 'posted');
+        $this->postJson("/api/v1/invoices/{$id}/void", [], $headers)->assertStatus(422); // a reason is required
+        $this->postJson("/api/v1/invoices/{$id}/void", ['reason' => 'Raised in error'], $headers)->assertOk()->assertJsonPath('status', 'void');
+
+        // The void reversed the entry: the trial balance is empty again and the ledger is sound.
+        $this->assertSame([], $this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $headers)->assertOk()->json('data'));
+        $this->assertSame([], DB::select('select * from ledger_verify(?)', [$companyId]));
+        $this->postJson("/api/v1/invoices/{$id}/approve", [], $headers)->assertStatus(422)->assertJsonPath('type', 'IllegalTransition');
+
+        // Suspended subscription: reading works, writing does not.
+        $org = DB::table('companies')->where('id', $companyId)->value('organisation_id');
+        foreach (['active', 'past_due', 'suspended'] as $status) {
+            DB::table('organisations')->where('id', $org)->update(['status' => $status]);
+        }
+        $this->getJson('/api/v1/invoices', $headers)->assertOk();
+        $this->postJson('/api/v1/invoices', $invoice('5'), $headers)->assertStatus(402)->assertJsonPath('type', 'SubscriptionReadOnly');
+    }
+
+    public function test_a_company_in_any_country_and_industry_can_be_set_up(): void
+    {
+        $user = User::query()->create(['name' => 'Ana', 'email' => 'ana@example.test', 'password' => 'secret-password']);
+        $this->actingAs($user, 'sanctum');
+
+        // Brazil has no country pack: the default pack applies and the currency must be chosen.
+        $this->postJson('/api/v1/companies', ['legal_name' => 'Cafe do Sul', 'country_code' => 'BR', 'fiscal_year_start_month' => 1])->assertStatus(422);
+        $id = $this->postJson('/api/v1/companies', [
+            'legal_name' => 'Cafe do Sul', 'country_code' => 'BR', 'base_currency' => 'BRL', 'industry' => 'restaurant_hospitality',
+            'fiscal_year_start_month' => 1, 'phone' => '+55 11 5555 0100', 'email' => 'oi@cafedosul.example', 'website' => 'https://cafedosul.example',
+        ])->assertCreated()->assertJsonPath('base_currency', 'BRL')->json('id');
+
+        $codes = DB::table('accounts')->where('company_id', $id)->pluck('code')->all();
+        $this->assertContains('1200', $codes);   // base chart
+        $this->assertContains('4020', $codes);   // Food sales, from the industry template
+        $this->assertSame(1, DB::table('fiscal_years')->where('company_id', $id)->count());
+
+        // Ethiopia on the Ethiopian calendar: the first fiscal year runs 1 Hamle to 30 Sene.
+        $et = $this->postJson('/api/v1/companies', [
+            'legal_name' => 'Addis Retail PLC', 'country_code' => 'ET', 'industry' => 'retail_wholesale', 'calendar' => 'ethiopian',
+            'fiscal_year_start_month' => 11, 'conversion_date' => '2026-10-31',
+        ])->assertCreated()->assertJsonPath('timezone', 'Africa/Addis_Ababa')->json('id');
+        $year = DB::table('fiscal_years')->where('company_id', $et)->first();
+        $this->assertSame(['2026-07-08', '2027-07-07'], [$year->starts_on, $year->ends_on]);
+    }
+
+    /** @return array{0: array<string, string>, 1: string, 2: \Closure} headers, company id, invoice payload builder */
+    private function companyWithInvoiceData(string $email): array
+    {
+        $user = User::query()->create(['name' => 'Hana', 'email' => $email, 'password' => 'secret-password']);
+        $this->actingAs($user, 'sanctum');
+        $companyId = $this->postJson('/api/v1/companies', ['legal_name' => 'Harar Traders', 'country_code' => 'ET', 'fiscal_year_start_month' => 7])->assertCreated()->json('id');
+        $sales = DB::table('accounts')->where(['company_id' => $companyId, 'system_key' => 'sales'])->value('id');
+        $vat15 = DB::table('tax_rates')->where(['company_id' => $companyId, 'code' => 'VAT15'])->value('id');
+        $customer = (string) \Illuminate\Support\Str::uuid();
+        DB::table('contacts')->insert(['id' => $customer, 'company_id' => $companyId, 'name' => 'Sheger Grand Hotel', 'is_customer' => true]);
+
+        $invoice = fn (string $qty) => [
+            'contact_id' => $customer, 'number' => 'INV-0001', 'issue_date' => '2026-11-02', 'currency' => 'ETB',
+            'lines' => [['description' => 'Roasted coffee 1 kg', 'quantity' => $qty, 'unit_price' => '1150', 'account_id' => $sales, 'tax_rate_id' => $vat15]],
+        ];
+
+        return [['X-Company-Id' => $companyId], $companyId, $invoice];
     }
 
     public function test_users_cannot_open_companies_they_do_not_belong_to(): void

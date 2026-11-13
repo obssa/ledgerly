@@ -5,8 +5,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The accounting core is written in plain PostgreSQL (database/schema/*.sql) because it relies on
- * features Laravel's schema builder does not express: deferred constraint triggers, immutability
- * triggers and row-level security. Each file is applied once, in order.
+ * features Laravel's schema builder does not express: hash partitioning, deferred constraint triggers,
+ * immutability and state-machine triggers, and row-level security. Each file is applied once, in order.
  */
 return new class extends Migration
 {
@@ -15,8 +15,9 @@ return new class extends Migration
         '002_ledger.sql',
         '003_business.sql',
         '004_compliance_audit.sql',
-        '005_rls.sql',
-        '006_history.sql',
+        '005_history.sql',
+        '006_state_machines.sql',
+        '007_rls.sql',
     ];
 
     public function up(): void

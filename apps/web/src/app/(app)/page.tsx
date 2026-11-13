@@ -15,7 +15,7 @@ export default async function HomePage() {
   const today = new Date("2026-11-02T00:00:00Z"); // demo "today"; use new Date() with live data
   const invoices = await getInvoices();
   const overdue = invoices
-    .filter((i) => i.status === "posted" && daysOverdue(i.due_date, today) > 0)
+    .filter((i) => (i.status === "posted" || i.status === "part_paid") && daysOverdue(i.due_date, today) > 0)
     .sort((a, b) => daysOverdue(b.due_date, today) - daysOverdue(a.due_date, today))
     .slice(0, 4);
   const k = demoKpis;

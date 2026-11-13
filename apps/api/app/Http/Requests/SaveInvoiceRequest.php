@@ -20,7 +20,9 @@ final class SaveInvoiceRequest extends FormRequest
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'prices_include_tax' => ['boolean'],
-            'language' => ['nullable', 'in:en,am,om,sw,fr'],
+            'language' => ['nullable', 'in:en'],
+            // The version the client read; a save is refused (409) if someone else saved in between.
+            'lock_version' => ['nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'lines' => ['required', 'array', 'min:1', 'max:500'],
             'lines.*.description' => ['required', 'string', 'max:500'],

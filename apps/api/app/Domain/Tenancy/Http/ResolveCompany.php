@@ -10,12 +10,17 @@ use App\Domain\Tenancy\Support\CurrentCompany;
 use App\Domain\Tenancy\Support\DatabaseTenantContext;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Selects the company for this request from the X-Company-Id header, checks the user belongs to it,
- * and sets the database tenant context so row-level security applies to every query that follows.
+ * Selects the company for this request from the X-Company-Id header, checks the user is an active member,
+ * and adds the company to the transaction's tenant context so row-level security applies to every query
+ * that follows. Runs inside RunInTenantTransaction.
+ *
+ * Also applies the two read-only states: a suspended or cancelled subscription and an archived company
+ * can be read and exported but not changed.
  */
 final class ResolveCompany
 {
@@ -32,12 +37,11 @@ final class ResolveCompany
             return response()->json(['message' => 'Send the X-Company-Id header with a company you belong to.'], 400);
         }
 
-        // Only the user id is set at this point, so RLS lets us see the user's own memberships.
-        DatabaseTenantContext::set($user->getKey(), null);
-
+        // Only the user id is in the context so far, so RLS lets us see the user's own memberships.
         $membership = Membership::query()
             ->where('user_id', $user->getKey())
             ->where('company_id', $companyId)
+            ->where('status', 'active')
             ->first();
 
         if (! $membership) {
@@ -45,12 +49,26 @@ final class ResolveCompany
         }
 
         DatabaseTenantContext::set($user->getKey(), $companyId);
-        $this->current->set(Company::query()->findOrFail($companyId), $membership);
+        $company = Company::query()->findOrFail($companyId);
+        $this->current->set($company, $membership);
 
         try {
+            if (! $request->isMethodSafe()) {
+                $subscription = DB::table('organisations')->where('id', $company->organisation_id)->value('status');
+
+                if (in_array($subscription, ['suspended', 'cancelled'], true)) {
+                    return response()->json([
+                        'message' => "The subscription is {$subscription}. The books are read-only; you can still view and export them.",
+                        'type' => 'SubscriptionReadOnly',
+                    ], 402);
+                }
+                if ($company->status === 'archived') {
+                    return response()->json(['message' => 'This company is archived and read-only.', 'type' => 'CompanyArchived'], 423);
+                }
+            }
+
             return $next($request);
         } finally {
-            DatabaseTenantContext::clear();
             $this->current->forget();
         }
     }

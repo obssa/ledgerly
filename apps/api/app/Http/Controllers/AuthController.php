@@ -19,7 +19,7 @@ final class AuthController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'password' => ['required', 'string', 'min:10'],
-            'locale' => ['nullable', 'in:en,am,om,sw,fr'],
+            'locale' => ['nullable', 'in:en'],
         ]);
 
         $user = User::query()->create([...$data, 'password' => Hash::make($data['password'])]);

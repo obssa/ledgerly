@@ -15,7 +15,7 @@ class Contact extends Model
     use HasUuids;
 
     protected $fillable = [
-        'name', 'is_customer', 'is_vendor', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days',
+        'name', 'is_customer', 'is_vendor', 'tax_id', 'email', 'phone', 'website', 'currency', 'payment_terms_days',
         'address', 'custom_fields',
     ];
 

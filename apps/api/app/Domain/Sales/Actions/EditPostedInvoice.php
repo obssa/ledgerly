@@ -28,7 +28,8 @@ use Illuminate\Support\Facades\DB;
  *
  * All in one transaction. While the fiscal year is open, anyone with `transactions.edit` may edit.
  * In a closed period only a role with `periods.reopen` (admin) may, and the reopen and re-lock are
- * themselves audited. The database refuses an edit that skips step 1 (006_history.sql).
+ * themselves audited. The database refuses an edit that skips step 1 (005_history.sql), an edit of a
+ * document that has payments, and an edit of a document cleared by the tax authority.
  */
 final class EditPostedInvoice
 {
@@ -43,8 +44,11 @@ final class EditPostedInvoice
 
     public function handle(Document $invoice, array $data, string $reason, string $userId, Membership $membership): Document
     {
-        if (! in_array($invoice->type, ['invoice', 'credit_note'], true) || $invoice->status !== 'posted') {
+        if (! in_array($invoice->type, ['invoice', 'credit_note'], true) || ! $invoice->isPosted()) {
             throw new LedgerException("Only posted invoices and credit notes are edited this way ({$invoice->number} is {$invoice->status}).");
+        }
+        if ($invoice->status !== 'posted') {
+            throw new LedgerException("{$invoice->number} has payments allocated to it. Remove the allocation first, then edit.");
         }
         if (mb_strlen(trim($reason)) < 3) {
             throw new LedgerException('A reason is required to edit a posted document.');
@@ -55,9 +59,13 @@ final class EditPostedInvoice
         if ($cleared) {
             throw new LedgerException("{$invoice->number} is registered with the tax authority; issue a credit note and a new invoice instead.");
         }
+        if (EInvoiceSubmission::query()->where('document_id', $invoice->getKey())->where('status', 'submitted')->exists()) {
+            throw new LedgerException("{$invoice->number} is being registered with the tax authority right now; try again when it has an answer.");
+        }
 
         $company = $this->current->get();
         $calc = $this->calculator->calculate($data);
+        $calc['lock_version'] = $data['lock_version'] ?? null;
 
         // Closed period: admin only.
         $closedUntil = $company->books_closed_until?->format('Y-m-d');
@@ -69,6 +77,7 @@ final class EditPostedInvoice
 
         $edited = DB::transaction(function () use ($invoice, $calc, $reason, $userId, $company, $reopen, $closedUntil) {
             $invoice = Document::query()->with('lines')->lockForUpdate()->findOrFail($invoice->getKey());
+            $invoice->assertVersion(isset($calc['lock_version']) ? (int) $calc['lock_version'] : null);
             $paid = Money::of($invoice->total, $invoice->currency)->minus(Money::of($invoice->amount_due, $invoice->currency));
             if (! $paid->isZero() && $calc['header']['currency'] !== $invoice->currency) {
                 throw new LedgerException("{$invoice->number} is partly paid; its currency cannot change.");
@@ -129,7 +138,7 @@ final class EditPostedInvoice
             // A submission not yet cleared (queued, failed or rejected) is re-sent with the corrected data.
             $pending = EInvoiceSubmission::query()->where('document_id', $invoice->getKey())->first();
             if ($pending && $pending->status !== 'cleared') {
-                $pending->forceFill(['status' => 'queued', 'last_error' => null])->save();
+                $pending->forceFill(['status' => 'queued', 'last_error' => null])->save(); // failed or rejected -> queued
                 SubmitEInvoice::dispatch($company->getKey(), $pending->getKey())->afterCommit();
             }
 

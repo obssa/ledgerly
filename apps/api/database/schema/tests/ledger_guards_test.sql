@@ -1,5 +1,5 @@
 -- Self-checking tests for the database-level ledger guards and tenant isolation.
--- Run against an EMPTY database that has 001..005 applied, as the owner/superuser:
+-- Run against an EMPTY database that has 001..007 applied, as the owner/superuser:
 --   psql -v ON_ERROR_STOP=1 -f tests/ledger_guards_test.sql
 -- Every block raises (and psql stops) if a guard does not behave as expected. Prints PASS lines.
 
@@ -13,7 +13,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
-INSERT INTO organisations (id, name) VALUES ('00000000-0000-0000-0000-0000000000a0', 'Test Org');
+INSERT INTO organisations (id, name) VALUES ('00000000-0000-0000-0000-0000000000a0', 'Test Org'), ('00000000-0000-0000-0000-0000000000a9', 'Unrelated Org');
 INSERT INTO users (id, name, email, password) VALUES
   ('00000000-0000-0000-0000-0000000000f1', 'Hana', 'hana@example.test', 'x'),
   ('00000000-0000-0000-0000-0000000000f2', 'Other', 'other@example.test', 'x');
@@ -162,20 +162,27 @@ BEGIN
 END $$;
 SELECT set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false);
 
--- T9: a posted document is frozen except status and amount_due
-DO $$ BEGIN
-  INSERT INTO contacts (id, company_id, name, is_customer)
-    VALUES ('00000000-0000-0000-0000-0000000000c1', app_company_id(), 'Sheger Grand Hotel', true);
-  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, status, total, amount_due, journal_entry_id)
+-- T9: a posted document is frozen except status and amount_due; paid states follow amount_due
+DO $$
+DECLARE st text; v integer;
+BEGIN
+  INSERT INTO contacts (id, company_id, name, is_customer, phone, email, website)
+    VALUES ('00000000-0000-0000-0000-0000000000c1', app_company_id(), 'Sheger Grand Hotel', true, '+251911000000', 'ap@sheger.example', 'https://sheger.example');
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due)
     VALUES ('00000000-0000-0000-0000-0000000000d1', app_company_id(), 'invoice', 'INV-0001', '00000000-0000-0000-0000-0000000000c1',
-            '2026-11-02', 'ETB', 'posted', 501745, 501745, '00000000-0000-0000-0000-00000000e001');
-  UPDATE documents SET amount_due = 0 WHERE id = '00000000-0000-0000-0000-0000000000d1';
+            '2026-11-02', 'ETB', 501745, 501745);
+  UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e001'
+   WHERE id = '00000000-0000-0000-0000-0000000000d1';
+  UPDATE documents SET amount_due = 100000 WHERE id = '00000000-0000-0000-0000-0000000000d1' RETURNING status, lock_version INTO st, v;
+  IF st <> 'part_paid' THEN RAISE EXCEPTION 'FAIL T9a: expected part_paid, got %', st; END IF;
+  IF v <> 3 THEN RAISE EXCEPTION 'FAIL T9b: lock_version should be 3 after two saves, got %', v; END IF;
   BEGIN
     UPDATE documents SET total = 1 WHERE id = '00000000-0000-0000-0000-0000000000d1';
     RAISE EXCEPTION 'FAIL T9: posted document total changed';
-  EXCEPTION WHEN insufficient_privilege THEN
-    RAISE NOTICE 'PASS T9 posted document frozen; amount_due may change';
-  END;
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  UPDATE documents SET amount_due = total WHERE id = '00000000-0000-0000-0000-0000000000d1' RETURNING status INTO st;
+  IF st <> 'posted' THEN RAISE EXCEPTION 'FAIL T9c: expected posted again, got %', st; END IF;
+  RAISE NOTICE 'PASS T9 posted document frozen; status follows amount_due; every save bumps lock_version';
 END $$;
 
 -- T10: the audit log is append-only
@@ -222,7 +229,7 @@ DO $$ BEGIN
     (app_company_id(), '00000000-0000-0000-0000-00000000e012', 1, '00000000-0000-0000-0000-000000000a11', 400000, 0),
     (app_company_id(), '00000000-0000-0000-0000-00000000e012', 2, '00000000-0000-0000-0000-000000000a40', 0, 400000);
   BEGIN
-    UPDATE documents SET total = 400000, journal_entry_id = '00000000-0000-0000-0000-00000000e012'
+    UPDATE documents SET total = 400000, amount_due = 400000, journal_entry_id = '00000000-0000-0000-0000-00000000e012'
      WHERE id = '00000000-0000-0000-0000-0000000000d1';
     RAISE EXCEPTION 'FAIL T12b: posted document edited without a saved version';
   EXCEPTION WHEN insufficient_privilege THEN
@@ -234,7 +241,7 @@ DO $$ BEGIN
     FROM documents d WHERE d.id = '00000000-0000-0000-0000-0000000000d1';
   INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal)
   VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000d1', 1, 'Coffee', 1, 400000, '00000000-0000-0000-0000-000000000a40', 400000);
-  UPDATE documents SET total = 400000, journal_entry_id = '00000000-0000-0000-0000-00000000e012'
+  UPDATE documents SET total = 400000, amount_due = 400000, journal_entry_id = '00000000-0000-0000-0000-00000000e012'
    WHERE id = '00000000-0000-0000-0000-0000000000d1';
   RAISE NOTICE 'PASS T12c edit allowed once version 1 is saved and re-posted';
 
@@ -274,6 +281,204 @@ BEGIN
   RAISE NOTICE 'PASS T14 audit log hash chain intact';
 END $$;
 
+-- T16: partitions are reachable only through the parent table (where row-level security applies)
+DO $$ BEGIN
+  PERFORM 1 FROM journal_lines_p00 LIMIT 1;
+  RAISE EXCEPTION 'FAIL T16: a partition was readable directly';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'PASS T16 partitions not readable directly';
+END $$;
+
+-- T17: account_balances equals the ledger lines; the trial balance balances; the app cannot write balances
+DO $$
+DECLARE n integer; d numeric; c numeric; d2 numeric;
+BEGIN
+  SELECT count(*) INTO n FROM ledger_verify(app_company_id());
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL T17a: ledger_verify reported % problems', n; END IF;
+  SELECT sum(debit), sum(credit) INTO d, c FROM trial_balance(app_company_id(), '2026-11-30');
+  IF d IS NULL OR d <> c THEN RAISE EXCEPTION 'FAIL T17b: trial balance does not balance (% vs %)', d, c; END IF;
+  SELECT sum(debit) INTO d2 FROM journal_lines;
+  IF d <> d2 THEN RAISE EXCEPTION 'FAIL T17c: trial balance % differs from ledger lines %', d, d2; END IF;
+  -- part month: nothing is dated before 2 Nov, everything by 2 Nov
+  SELECT coalesce(sum(debit), 0) INTO d FROM trial_balance(app_company_id(), '2026-11-01');
+  IF d <> 0 THEN RAISE EXCEPTION 'FAIL T17d: as-at 1 Nov should be empty, got %', d; END IF;
+  SELECT sum(debit) INTO d FROM trial_balance(app_company_id(), '2026-11-02');
+  IF d <> d2 THEN RAISE EXCEPTION 'FAIL T17e: as-at 2 Nov should include every line'; END IF;
+  BEGIN
+    UPDATE account_balances SET debit = debit + 1;
+    RAISE EXCEPTION 'FAIL T17f: application changed account_balances';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T17 balances table equals ledger; trial balance balances at month end and mid month';
+END $$;
+
+-- T18: lines cannot be added to an entry posted in an earlier transaction
+DO $$ BEGIN
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e012', 3, '00000000-0000-0000-0000-000000000a11', 5, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e012', 4, '00000000-0000-0000-0000-000000000a40', 0, 5);
+  RAISE EXCEPTION 'FAIL T18: lines added to an already posted entry';
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'PASS T18 posted entries accept no further lines';
+END $$;
+
+-- T19: state machines refuse illegal moves
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO documents (company_id, type, number, contact_id, issue_date, currency, status, total, amount_due)
+      VALUES (app_company_id(), 'invoice', 'INV-BAD', '00000000-0000-0000-0000-0000000000c1', '2026-11-02', 'ETB', 'paid', 10, 0);
+    RAISE EXCEPTION 'FAIL T19a: invoice created as paid';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due)
+    VALUES ('00000000-0000-0000-0000-0000000000d2', app_company_id(), 'invoice', 'INV-0002', '00000000-0000-0000-0000-0000000000c1', '2026-11-02', 'ETB', 1000, 1000);
+  BEGIN
+    UPDATE documents SET status = 'paid' WHERE id = '00000000-0000-0000-0000-0000000000d2';
+    RAISE EXCEPTION 'FAIL T19b: draft jumped to paid';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE documents SET status = 'sent' WHERE id = '00000000-0000-0000-0000-0000000000d2';
+    RAISE EXCEPTION 'FAIL T19c: invoice used a quote state';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  UPDATE documents SET status = 'void' WHERE id = '00000000-0000-0000-0000-0000000000d2';
+  BEGIN
+    UPDATE documents SET status = 'draft' WHERE id = '00000000-0000-0000-0000-0000000000d2';
+    RAISE EXCEPTION 'FAIL T19d: void document revived';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due)
+    VALUES ('00000000-0000-0000-0000-0000000000d3', app_company_id(), 'quote', 'QUO-0001', '00000000-0000-0000-0000-0000000000c1', '2026-11-02', 'ETB', 1000, 1000);
+  UPDATE documents SET status = 'sent' WHERE id = '00000000-0000-0000-0000-0000000000d3';
+  BEGIN
+    UPDATE documents SET status = 'posted' WHERE id = '00000000-0000-0000-0000-0000000000d3';
+    RAISE EXCEPTION 'FAIL T19e: quote was posted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T19 document state machines refuse illegal moves (5 cases)';
+END $$;
+
+-- T20: payments follow the invoice state machine: allocation, over-allocation, void while paid, reversal
+DO $$
+DECLARE st text; due numeric;
+BEGIN
+  INSERT INTO accounts (id, company_id, code, name, type, subtype) VALUES
+    ('00000000-0000-0000-0000-000000000a10', app_company_id(), '1000', 'Bank', 'asset', 'bank');
+  INSERT INTO payments (id, company_id, direction, contact_id, account_id, payment_date, method, currency, amount)
+    VALUES ('00000000-0000-0000-0000-0000000000e1', app_company_id(), 'in', '00000000-0000-0000-0000-0000000000c1',
+            '00000000-0000-0000-0000-000000000a10', '2026-11-05', 'bank_transfer', 'ETB', 400000);
+  BEGIN
+    INSERT INTO payment_allocations (company_id, payment_id, document_id, amount)
+      VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d1', 400000.01);
+    RAISE EXCEPTION 'FAIL T20a: allocation above the open amount accepted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO payment_allocations (company_id, payment_id, document_id, amount)
+      VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d2', 10);
+    RAISE EXCEPTION 'FAIL T20b: payment allocated to a void invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO payment_allocations (company_id, payment_id, document_id, amount)
+    VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000d1', 150000);
+  SELECT status, amount_due INTO st, due FROM documents WHERE id = '00000000-0000-0000-0000-0000000000d1';
+  IF st <> 'part_paid' OR due <> 250000 THEN RAISE EXCEPTION 'FAIL T20c: expected part_paid 250000, got % %', st, due; END IF;
+  BEGIN
+    UPDATE documents SET status = 'void' WHERE id = '00000000-0000-0000-0000-0000000000d1';
+    RAISE EXCEPTION 'FAIL T20d: invoice voided while a payment is allocated';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  DELETE FROM payment_allocations WHERE payment_id = '00000000-0000-0000-0000-0000000000e1';
+  UPDATE payments SET status = 'reversed' WHERE id = '00000000-0000-0000-0000-0000000000e1';
+  SELECT status INTO st FROM documents WHERE id = '00000000-0000-0000-0000-0000000000d1';
+  IF st <> 'posted' THEN RAISE EXCEPTION 'FAIL T20e: reversing the payment should reopen the invoice, got %', st; END IF;
+  BEGIN
+    UPDATE payments SET status = 'posted' WHERE id = '00000000-0000-0000-0000-0000000000e1';
+    RAISE EXCEPTION 'FAIL T20f: reversed payment revived';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T20 payment allocation guards (over-allocation, void invoice, void while paid, reversal reopens)';
+END $$;
+
+-- T21: an invoice cleared by the tax authority cannot be voided or edited; cleared is final
+DO $$ BEGIN
+  INSERT INTO einvoice_submissions (id, company_id, document_id, authority)
+    VALUES ('00000000-0000-0000-0000-0000000000e9', app_company_id(), '00000000-0000-0000-0000-0000000000d1', 'SANDBOX');
+  UPDATE einvoice_submissions SET status = 'cleared', clearance_number = 'IRN-1' WHERE id = '00000000-0000-0000-0000-0000000000e9';
+  BEGIN
+    UPDATE einvoice_submissions SET status = 'queued' WHERE id = '00000000-0000-0000-0000-0000000000e9';
+    RAISE EXCEPTION 'FAIL T21a: cleared e-invoice re-queued';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE documents SET status = 'void' WHERE id = '00000000-0000-0000-0000-0000000000d1';
+    RAISE EXCEPTION 'FAIL T21b: cleared invoice voided';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T21 cleared e-invoice is final; cleared invoice cannot be voided';
+END $$;
+
+-- T22: organisations are isolated, and the application cannot change its own subscription status
+DO $$
+DECLARE n integer;
+BEGIN
+  SELECT count(*) INTO n FROM organisations;
+  IF n <> 1 THEN RAISE EXCEPTION 'FAIL T22a: expected 1 visible organisation, saw %', n; END IF;
+  BEGIN
+    UPDATE organisations SET status = 'active';
+    RAISE EXCEPTION 'FAIL T22b: application changed the subscription status';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T22 organisations isolated; subscription status is not writable by the application';
+END $$;
+
+-- T23: a suspended subscription or an archived company is read-only
+RESET ROLE;
+UPDATE organisations SET status = 'active'    WHERE id = '00000000-0000-0000-0000-0000000000a0';
+UPDATE organisations SET status = 'past_due'  WHERE id = '00000000-0000-0000-0000-0000000000a0';
+UPDATE organisations SET status = 'suspended' WHERE id = '00000000-0000-0000-0000-0000000000a0';
+DO $$ BEGIN
+  UPDATE organisations SET status = 'trial' WHERE id = '00000000-0000-0000-0000-0000000000a0';
+  RAISE EXCEPTION 'FAIL T23a: suspended subscription went back to trial';
+EXCEPTION WHEN check_violation THEN NULL; END $$;
+SET ROLE ledgerly_web;
+DO $$
+DECLARE n integer;
+BEGIN
+  BEGIN
+    INSERT INTO journal_entries (company_id, number, entry_date, currency) VALUES (app_company_id(), 23, '2026-11-10', 'ETB');
+    RAISE EXCEPTION 'FAIL T23b: posting accepted while suspended';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  SELECT count(*) INTO n FROM journal_lines;
+  IF n = 0 THEN RAISE EXCEPTION 'FAIL T23c: a suspended company must still be able to read its books'; END IF;
+END $$;
+RESET ROLE;
+UPDATE organisations SET status = 'active' WHERE id = '00000000-0000-0000-0000-0000000000a0';
+UPDATE companies SET status = 'live'     WHERE id = '00000000-0000-0000-0000-00000000000a';
+UPDATE companies SET status = 'archived' WHERE id = '00000000-0000-0000-0000-00000000000a';
+SET ROLE ledgerly_web;
+DO $$ BEGIN
+  INSERT INTO journal_entries (company_id, number, entry_date, currency) VALUES (app_company_id(), 23, '2026-11-10', 'ETB');
+  RAISE EXCEPTION 'FAIL T23d: posting accepted in an archived company';
+EXCEPTION WHEN check_violation THEN
+  RAISE NOTICE 'PASS T23 suspended subscription and archived company are read-only (reads still work)';
+END $$;
+RESET ROLE;
+UPDATE companies SET status = 'live' WHERE id = '00000000-0000-0000-0000-00000000000a';
+SET ROLE ledgerly_web;
+
+-- T24: tenant context set for one transaction is gone after it (safe behind a connection pooler)
+SELECT set_config('app.user_id', '', false), set_config('app.company_id', '', false) \gset ignore_
+BEGIN;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true) \gset ignore_
+DO $$ BEGIN
+  IF (SELECT count(*) FROM journal_lines) = 0 THEN RAISE EXCEPTION 'FAIL T24a: no rows inside the tenant transaction'; END IF;
+END $$;
+COMMIT;
+DO $$ BEGIN
+  IF app_company_id() IS NOT NULL OR app_user_id() IS NOT NULL THEN RAISE EXCEPTION 'FAIL T24b: tenant context survived the transaction'; END IF;
+  IF (SELECT count(*) FROM journal_lines) + (SELECT count(*) FROM companies) + (SELECT count(*) FROM documents) <> 0 THEN
+    RAISE EXCEPTION 'FAIL T24c: rows visible with no tenant context';
+  END IF;
+  RAISE NOTICE 'PASS T24 transaction-local tenant context leaves nothing behind';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+
 RESET ROLE;
 
 -- T15: tampering is detected (simulates someone with database superuser access bypassing the triggers)
@@ -286,6 +491,16 @@ BEGIN
   SELECT audit_log_verify('00000000-0000-0000-0000-00000000000a') INTO broken;
   IF broken IS NULL THEN RAISE EXCEPTION 'FAIL T15: tampered audit row not detected'; END IF;
   RAISE NOTICE 'PASS T15 tampered audit row detected at id %', broken;
+END $$;
+
+-- T25: ledger_verify catches a balances table that has drifted from the ledger
+UPDATE account_balances SET debit = debit + 0.01
+ WHERE (company_id, account_id, period) = (SELECT company_id, account_id, period FROM account_balances LIMIT 1);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM ledger_verify('00000000-0000-0000-0000-00000000000a') WHERE problem LIKE 'balances differ%') THEN
+    RAISE EXCEPTION 'FAIL T25: drifted balance not detected';
+  END IF;
+  RAISE NOTICE 'PASS T25 ledger_verify detects a drifted balance';
 END $$;
 
 \echo 'All ledger guard tests passed.'

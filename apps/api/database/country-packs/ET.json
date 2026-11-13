@@ -11,13 +11,11 @@
   "default_calendar": "gregorian",
   "default_fiscal_year_start_month": 7,
   "languages": [
-    "en",
-    "am",
-    "om"
+    "en"
   ],
   "tax_id_label": "TIN",
   "tax_id_pattern": "^[0-9]{10}$",
-  "_verify": "Rates, codes and effective dates must be confirmed against the current VAT Proclamation, TOT rules and withholding rules with a tax adviser before go-live. effective_from 1900-01-01 means 'in force before the company's first period'.",
+  "_verify": "Checked on 13 Nov 2026 against published summaries of VAT Proclamation No. 1341/2024 and Income Tax (Amendment) Proclamation No. 1395/2025. A licensed tax adviser must confirm every rate, threshold and effective date against the official text before go-live. effective_from 1900-01-01 means 'in force before the company's first period'.",
   "tax_rates": [
     {
       "code": "VAT15",
@@ -41,25 +39,18 @@
       "effective_from": "1900-01-01"
     },
     {
-      "code": "TOT2",
-      "name": "Turnover tax 2% (goods)",
-      "kind": "tot",
-      "rate": "0.02",
-      "effective_from": "1900-01-01"
-    },
-    {
-      "code": "TOT10",
-      "name": "Turnover tax 10% (services)",
-      "kind": "tot",
-      "rate": "0.10",
-      "effective_from": "1900-01-01"
-    },
-    {
       "code": "WHT3",
-      "name": "Withholding tax 3%",
+      "name": "Withholding tax 3% (goods and services)",
       "kind": "withholding",
       "rate": "0.03",
-      "effective_from": "1900-01-01"
+      "effective_from": "2025-08-07"
+    },
+    {
+      "code": "WHT30",
+      "name": "Withholding tax 30% (supplier without TIN)",
+      "kind": "withholding",
+      "rate": "0.30",
+      "effective_from": "2025-08-07"
     }
   ],
   "extra_accounts": [
@@ -69,21 +60,15 @@
       "type": "liability",
       "subtype": "payroll",
       "system_key": "pension_payable"
-    },
-    {
-      "code": "2320",
-      "name": "Turnover tax payable",
-      "type": "liability",
-      "subtype": "tax_payable",
-      "system_key": "tot_payable"
     }
   ],
   "einvoicing": {
     "authority": "ET_MOR",
     "system": "Electronic Invoice Registration System (Ministry of Revenue)",
     "connector": "ethiopia_mor",
+    "model": "Clearance: each invoice is registered in real time before it is issued and receives an Invoice Registration Number (IRN) and QR code; receipts receive a Receipt Registration Number (RRN).",
     "legal_basis": "Electronic Invoicing System Administration Directive No. 1142/2026",
-    "status": "Framework in force; technical specification and taxpayer rollout schedule to be published by the Ministry"
+    "status": "Directive in force; the Ministry's implementation schedule (Article 29) and technical specification are not yet published. Software must be authorised by the Ministry. Invoices stay queued until Ledgerly is authorised."
   },
   "payment_methods": [
     "bank_transfer",
@@ -93,8 +78,27 @@
     "cbe_birr",
     "card"
   ],
-  "payroll": {
-    "status": "todo",
-    "note": "Load income-tax bands and pension rates from current law as versioned rules."
+  "fiscal_year": {
+    "gregorian_start_month": 7,
+    "ethiopian_start_month": 11,
+    "note": "The government budget and tax year runs Hamle 1 to Sene 30 (8 July to 7 July; 7 July to 6 July around an Ethiopian leap year). A company on the Ethiopian calendar starts its year in Hamle (month 11); one on the Gregorian calendar usually starts 1 July or 1 January."
+  },
+  "timezone": "Africa/Addis_Ababa",
+  "legal_basis": [
+    "Value Added Tax Proclamation No. 1341/2024",
+    "Income Tax Proclamation No. 979/2016 as amended by Proclamation No. 1395/2025 (turnover tax repealed; domestic withholding 3%)",
+    "Electronic Invoicing System Administration Directive No. 1142/2026"
+  ],
+  "rules": {
+    "withholding": {
+      "goods_above": "20000.00",
+      "services_above": "10000.00",
+      "default_code": "WHT3",
+      "without_tin_code": "WHT30",
+      "note": "Withhold when one payment is above the threshold; 30% when the supplier has no TIN."
+    },
+    "cash_payment_limit": "50000.00",
+    "cash_payment_limit_note": "Payments above ETB 50,000 must go through a bank or an authorised electronic channel; Ledgerly warns when a cash payment is above the limit.",
+    "books_required_note": "Category A taxpayers (annual turnover above ETB 2,000,000), VAT-registered businesses and professional service providers must keep books of account."
   }
 }

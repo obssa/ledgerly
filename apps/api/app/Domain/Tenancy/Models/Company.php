@@ -17,6 +17,7 @@ class Company extends Model
         'organisation_id', 'legal_name', 'trading_name', 'country_code', 'base_currency',
         'fiscal_year_start_month', 'calendar', 'accounting_basis', 'industry', 'tin',
         'vat_registered', 'vat_number', 'framework', 'conversion_date', 'books_closed_until', 'settings',
+        'timezone', 'phone', 'email', 'website',
     ];
 
     protected function casts(): array

@@ -1,0 +1,334 @@
+{
+  "_about": "Industry templates: extra accounts and defaults added to the base chart when a company picks its type of business at setup. A company can add, rename or hide accounts afterwards; these only save it the first hour.",
+  "industries": {
+    "retail_wholesale": {
+      "name": "Retail and wholesale",
+      "tracks_inventory": true,
+      "accounts": [
+        {
+          "code": "4050",
+          "name": "Sales discounts and returns",
+          "type": "income",
+          "subtype": "contra_income"
+        },
+        {
+          "code": "5050",
+          "name": "Freight and delivery inwards",
+          "type": "expense",
+          "subtype": "cogs"
+        },
+        {
+          "code": "6810",
+          "name": "Shop supplies and packaging",
+          "type": "expense",
+          "subtype": "operating"
+        }
+      ]
+    },
+    "services": {
+      "name": "Professional and other services",
+      "tracks_inventory": false,
+      "accounts": [
+        {
+          "code": "1220",
+          "name": "Unbilled work in progress",
+          "type": "asset",
+          "subtype": "receivable"
+        },
+        {
+          "code": "2450",
+          "name": "Deferred income",
+          "type": "liability",
+          "subtype": "deferred_income"
+        },
+        {
+          "code": "6910",
+          "name": "Subcontractors",
+          "type": "expense",
+          "subtype": "cogs"
+        }
+      ]
+    },
+    "restaurant_hospitality": {
+      "name": "Restaurant, cafe and hotel",
+      "tracks_inventory": true,
+      "accounts": [
+        {
+          "code": "4020",
+          "name": "Food sales",
+          "type": "income",
+          "subtype": "sales"
+        },
+        {
+          "code": "4030",
+          "name": "Beverage sales",
+          "type": "income",
+          "subtype": "sales"
+        },
+        {
+          "code": "4040",
+          "name": "Room revenue",
+          "type": "income",
+          "subtype": "sales"
+        },
+        {
+          "code": "5020",
+          "name": "Food cost",
+          "type": "expense",
+          "subtype": "cogs"
+        },
+        {
+          "code": "5030",
+          "name": "Beverage cost",
+          "type": "expense",
+          "subtype": "cogs"
+        },
+        {
+          "code": "2420",
+          "name": "Service charge payable",
+          "type": "liability",
+          "subtype": "accrual"
+        }
+      ]
+    },
+    "manufacturing": {
+      "name": "Manufacturing",
+      "tracks_inventory": true,
+      "accounts": [
+        {
+          "code": "1310",
+          "name": "Raw materials",
+          "type": "asset",
+          "subtype": "inventory"
+        },
+        {
+          "code": "1320",
+          "name": "Work in progress",
+          "type": "asset",
+          "subtype": "inventory"
+        },
+        {
+          "code": "1330",
+          "name": "Finished goods",
+          "type": "asset",
+          "subtype": "inventory"
+        },
+        {
+          "code": "5200",
+          "name": "Direct labour",
+          "type": "expense",
+          "subtype": "cogs"
+        },
+        {
+          "code": "5300",
+          "name": "Factory overheads",
+          "type": "expense",
+          "subtype": "cogs"
+        }
+      ]
+    },
+    "construction": {
+      "name": "Construction and contracting",
+      "tracks_inventory": true,
+      "accounts": [
+        {
+          "code": "1230",
+          "name": "Retentions receivable",
+          "type": "asset",
+          "subtype": "receivable"
+        },
+        {
+          "code": "2460",
+          "name": "Advances from customers",
+          "type": "liability",
+          "subtype": "deferred_income"
+        },
+        {
+          "code": "5400",
+          "name": "Subcontractor costs",
+          "type": "expense",
+          "subtype": "cogs"
+        },
+        {
+          "code": "5410",
+          "name": "Site materials",
+          "type": "expense",
+          "subtype": "cogs"
+        }
+      ]
+    },
+    "import_export": {
+      "name": "Import and export",
+      "tracks_inventory": true,
+      "accounts": [
+        {
+          "code": "1340",
+          "name": "Goods in transit",
+          "type": "asset",
+          "subtype": "inventory"
+        },
+        {
+          "code": "5500",
+          "name": "Customs duty and clearing",
+          "type": "expense",
+          "subtype": "cogs"
+        },
+        {
+          "code": "5510",
+          "name": "Freight and insurance",
+          "type": "expense",
+          "subtype": "cogs"
+        }
+      ]
+    },
+    "transport_logistics": {
+      "name": "Transport and logistics",
+      "tracks_inventory": false,
+      "accounts": [
+        {
+          "code": "4060",
+          "name": "Freight income",
+          "type": "income",
+          "subtype": "sales"
+        },
+        {
+          "code": "6410",
+          "name": "Fuel",
+          "type": "expense",
+          "subtype": "operating"
+        },
+        {
+          "code": "6420",
+          "name": "Vehicle repairs and maintenance",
+          "type": "expense",
+          "subtype": "operating"
+        },
+        {
+          "code": "6430",
+          "name": "Vehicle licences and insurance",
+          "type": "expense",
+          "subtype": "operating"
+        }
+      ]
+    },
+    "agriculture": {
+      "name": "Agriculture and agro-processing",
+      "tracks_inventory": true,
+      "accounts": [
+        {
+          "code": "1360",
+          "name": "Biological assets",
+          "type": "asset",
+          "subtype": "inventory"
+        },
+        {
+          "code": "4070",
+          "name": "Farm produce sales",
+          "type": "income",
+          "subtype": "sales"
+        },
+        {
+          "code": "5600",
+          "name": "Seeds, feed and fertiliser",
+          "type": "expense",
+          "subtype": "cogs"
+        }
+      ]
+    },
+    "healthcare": {
+      "name": "Clinic, pharmacy and healthcare",
+      "tracks_inventory": true,
+      "accounts": [
+        {
+          "code": "4080",
+          "name": "Patient fees",
+          "type": "income",
+          "subtype": "sales"
+        },
+        {
+          "code": "5700",
+          "name": "Medical supplies used",
+          "type": "expense",
+          "subtype": "cogs"
+        }
+      ]
+    },
+    "education": {
+      "name": "School and training",
+      "tracks_inventory": false,
+      "accounts": [
+        {
+          "code": "4090",
+          "name": "Tuition fees",
+          "type": "income",
+          "subtype": "sales"
+        },
+        {
+          "code": "2470",
+          "name": "Fees received in advance",
+          "type": "liability",
+          "subtype": "deferred_income"
+        }
+      ]
+    },
+    "nonprofit": {
+      "name": "Non-profit and NGO",
+      "tracks_inventory": false,
+      "accounts": [
+        {
+          "code": "4200",
+          "name": "Grants and donations",
+          "type": "income",
+          "subtype": "other_income"
+        },
+        {
+          "code": "2480",
+          "name": "Deferred grant income",
+          "type": "liability",
+          "subtype": "deferred_income"
+        },
+        {
+          "code": "3400",
+          "name": "Restricted funds",
+          "type": "equity",
+          "subtype": "reserve"
+        },
+        {
+          "code": "6920",
+          "name": "Programme costs",
+          "type": "expense",
+          "subtype": "operating"
+        }
+      ]
+    },
+    "real_estate": {
+      "name": "Real estate and rental",
+      "tracks_inventory": false,
+      "accounts": [
+        {
+          "code": "1510",
+          "name": "Investment property",
+          "type": "asset",
+          "subtype": "fixed_asset"
+        },
+        {
+          "code": "4300",
+          "name": "Rental income",
+          "type": "income",
+          "subtype": "sales"
+        },
+        {
+          "code": "2490",
+          "name": "Tenant deposits",
+          "type": "liability",
+          "subtype": "deposit"
+        }
+      ]
+    },
+    "other": {
+      "name": "Other",
+      "tracks_inventory": true,
+      "accounts": []
+    }
+  }
+}

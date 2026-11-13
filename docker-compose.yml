@@ -1,7 +1,7 @@
 # Local development stack. `docker compose up -d`, then see README.md "Run it".
 services:
   postgres:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_USER: ledgerly_owner          # owns the tables, runs migrations (bypasses RLS)
       POSTGRES_PASSWORD: ledgerly_owner

@@ -10,12 +10,11 @@
   "default_calendar": "gregorian",
   "default_fiscal_year_start_month": 1,
   "languages": [
-    "en",
-    "sw"
+    "en"
   ],
   "tax_id_label": "KRA PIN",
   "tax_id_pattern": "^[A-Z][0-9]{9}[A-Z]$",
-  "_verify": "Rates, codes and effective dates must be confirmed against the current VAT Act and KRA guidance with a tax adviser before go-live. effective_from 1900-01-01 means 'in force before the company's first period'.",
+  "_verify": "Second country, not yet reviewed. Rates, codes and effective dates must be confirmed against the current VAT Act and KRA guidance with a tax adviser before go-live. effective_from 1900-01-01 means 'in force before the company's first period'.",
   "tax_rates": [
     {
       "code": "VAT16",
@@ -83,8 +82,5 @@
     "airtel_money",
     "card"
   ],
-  "payroll": {
-    "status": "todo",
-    "note": "Load PAYE bands, NSSF, SHIF and housing levy rates from current law as versioned rules."
-  }
+  "timezone": "Africa/Nairobi"
 }

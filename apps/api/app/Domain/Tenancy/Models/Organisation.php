@@ -12,7 +12,7 @@ class Organisation extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['name', 'plan'];
+    protected $fillable = ['name', 'plan', 'created_by', 'trial_ends_at'];
 
     public function companies(): HasMany
     {

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Sales\Actions\ApproveInvoice;
 use App\Domain\Sales\Actions\EditPostedInvoice;
+use App\Domain\Sales\Actions\InvoiceWorkflow;
 use App\Domain\Sales\Actions\SaveInvoiceDraft;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Sales\Models\DocumentVersion;
@@ -49,7 +50,7 @@ final class InvoiceController extends Controller
     /** Drafts are saved directly; posted invoices go through EditPostedInvoice, which keeps their history. */
     public function update(SaveInvoiceRequest $request, Document $invoice, SaveInvoiceDraft $save, EditPostedInvoice $edit): JsonResponse
     {
-        if ($invoice->status !== 'posted') {
+        if (! $invoice->isPosted()) {
             $this->authorizeCompany('invoices.create');
 
             return response()->json($save->handle($request->validated(), $invoice, $request->user()->getKey()));
@@ -77,10 +78,35 @@ final class InvoiceController extends Controller
         ]);
     }
 
+    public function submit(Request $request, Document $invoice, InvoiceWorkflow $workflow): JsonResponse
+    {
+        $this->authorizeCompany('invoices.create');
+
+        return response()->json($workflow->submitForApproval($invoice, $request->user()->getKey()));
+    }
+
+    public function reject(Request $request, Document $invoice, InvoiceWorkflow $workflow): JsonResponse
+    {
+        $this->authorizeCompany('invoices.approve');
+        $reason = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:500']])['reason'];
+
+        return response()->json($workflow->reject($invoice, $reason, $request->user()->getKey()));
+    }
+
     public function approve(Request $request, Document $invoice, ApproveInvoice $approve): JsonResponse
     {
         $this->authorizeCompany('invoices.approve');
+        $version = $request->validate(['lock_version' => ['nullable', 'integer', 'min:1']])['lock_version'] ?? null;
 
-        return response()->json($approve->handle($invoice, $request->user()->getKey()));
+        return response()->json($approve->handle($invoice, $request->user()->getKey(), $version === null ? null : (int) $version));
+    }
+
+    /** Void a posted, unpaid invoice: its entry is reversed, the number is kept, the reason is audited. */
+    public function void(Request $request, Document $invoice, InvoiceWorkflow $workflow): JsonResponse
+    {
+        $this->authorizeCompany('transactions.edit');
+        $reason = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:500']])['reason'];
+
+        return response()->json($workflow->void($invoice, $reason, $request->user()->getKey(), app(CurrentCompany::class)->membership()));
     }
 }

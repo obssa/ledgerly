@@ -40,7 +40,10 @@ export interface EInvoiceSubmission {
 export interface Invoice {
   id: string;
   number: string;
-  status: "draft" | "approved" | "posted" | "void";
+  /** Invoice state machine: draft → awaiting_approval → posted → part_paid → paid; void. */
+  status: "draft" | "awaiting_approval" | "posted" | "part_paid" | "paid" | "void";
+  /** Send back on save: the API refuses the save (409) if someone else changed the invoice first. */
+  lock_version?: number;
   contact: Contact;
   issue_date: string;
   due_date: string | null;

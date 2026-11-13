@@ -13,7 +13,7 @@ class Membership extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['company_id', 'user_id', 'role', 'permissions'];
+    protected $fillable = ['company_id', 'user_id', 'role', 'permissions', 'status', 'invited_at'];
 
     protected function casts(): array
     {

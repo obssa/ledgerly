@@ -15,9 +15,9 @@ export function formatMoney(value: string | Scaled, currency: string): string {
   return `${currency} ${formatAmount(value, currency)}`;
 }
 
-/** Gregorian → Ethiopian calendar date (Amharic month names), for companies that choose it. */
+/** Gregorian → Ethiopian calendar date, for companies that choose it. English month names and digits only. */
 export function toEthiopian(date: Date): { year: number; month: number; day: number; label: string } {
-  const months = ["መስከረም", "ጥቅምት", "ኅዳር", "ታኅሣሥ", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜ"];
+  const months = ["Meskerem", "Tikimt", "Hidar", "Tahsas", "Tir", "Yekatit", "Megabit", "Miazia", "Ginbot", "Sene", "Hamle", "Nehase", "Pagume"];
   // Julian Day Number arithmetic (Amete Mihret era; epoch JDN 1724221).
   const y = date.getUTCFullYear(), m = date.getUTCMonth() + 1, d = date.getUTCDate();
   const a = Math.floor((14 - m) / 12), yy = y + 4800 - a, mm = m + 12 * a - 3;
@@ -27,5 +27,5 @@ export function toEthiopian(date: Date): { year: number; month: number; day: num
   const year = 4 * Math.floor((jdn - 1723856) / 1461) + Math.floor(r / 365) - Math.floor(r / 1460);
   const month = Math.floor(n / 30) + 1;
   const day = (n % 30) + 1;
-  return { year, month, day, label: `${months[month - 1]} ${day}, ${year} ዓ.ም` };
+  return { year, month, day, label: `${months[month - 1]} ${day}, ${year}` };
 }

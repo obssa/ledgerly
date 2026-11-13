@@ -1,5 +1,5 @@
 {
-  "_about": "IFRS for SMEs chart template (East Africa, Nigeria). Country packs add statutory accounts. system_key values are looked up by code; never rename them.",
+  "_about": "IFRS for SMEs chart template, the base for every company in every country. Country packs add statutory accounts; industry templates (_industries.json) add accounts for the type of business. system_key values are looked up by code; never rename them.",
   "accounts": [
     {
       "code": "1000",
@@ -22,11 +22,31 @@
       "system_key": "undeposited_funds"
     },
     {
+      "code": "1100",
+      "name": "Bank account",
+      "type": "asset",
+      "subtype": "bank",
+      "system_key": "bank"
+    },
+    {
+      "code": "1150",
+      "name": "Mobile money",
+      "type": "asset",
+      "subtype": "mobile_money"
+    },
+    {
       "code": "1200",
       "name": "Accounts receivable",
       "type": "asset",
       "subtype": "receivable",
       "system_key": "accounts_receivable"
+    },
+    {
+      "code": "1210",
+      "name": "Allowance for doubtful debts",
+      "type": "asset",
+      "subtype": "contra_asset",
+      "system_key": "doubtful_debts_allowance"
     },
     {
       "code": "1250",
@@ -73,6 +93,13 @@
       "type": "liability",
       "subtype": "payable",
       "system_key": "accounts_payable"
+    },
+    {
+      "code": "2050",
+      "name": "Goods received not invoiced",
+      "type": "liability",
+      "subtype": "accrual",
+      "system_key": "grni"
     },
     {
       "code": "2100",
@@ -122,8 +149,21 @@
       "subtype": "loan"
     },
     {
+      "code": "2600",
+      "name": "Income tax payable",
+      "type": "liability",
+      "subtype": "tax_payable",
+      "system_key": "income_tax_payable"
+    },
+    {
       "code": "3000",
       "name": "Share capital",
+      "type": "equity",
+      "subtype": "capital"
+    },
+    {
+      "code": "3050",
+      "name": "Owner's capital",
       "type": "equity",
       "subtype": "capital"
     },
@@ -140,6 +180,12 @@
       "type": "equity",
       "subtype": "opening_balance",
       "system_key": "opening_balance_equity"
+    },
+    {
+      "code": "3300",
+      "name": "Owner's drawings",
+      "type": "equity",
+      "subtype": "drawings"
     },
     {
       "code": "4000",
@@ -174,6 +220,13 @@
       "type": "expense",
       "subtype": "cogs",
       "system_key": "cogs"
+    },
+    {
+      "code": "5100",
+      "name": "Inventory adjustments",
+      "type": "expense",
+      "subtype": "cogs",
+      "system_key": "inventory_adjustment"
     },
     {
       "code": "6000",
@@ -246,10 +299,31 @@
       "subtype": "operating"
     },
     {
+      "code": "6950",
+      "name": "Bad debts",
+      "type": "expense",
+      "subtype": "operating",
+      "system_key": "bad_debt"
+    },
+    {
+      "code": "6990",
+      "name": "Rounding differences",
+      "type": "expense",
+      "subtype": "operating",
+      "system_key": "rounding"
+    },
+    {
       "code": "7000",
       "name": "Interest expense",
       "type": "expense",
       "subtype": "finance_cost"
+    },
+    {
+      "code": "7100",
+      "name": "Income tax expense",
+      "type": "expense",
+      "subtype": "income_tax",
+      "system_key": "income_tax_expense"
     }
   ]
 }

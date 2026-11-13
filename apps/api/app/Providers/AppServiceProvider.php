@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Domain\Compliance\ConnectorRegistry;
 use App\Domain\Tenancy\Support\CurrentCompany;
+use App\Support\StateMachine;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\ServiceProvider;
 
@@ -15,6 +16,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // scoped(): a fresh instance per request and per queued job (safe under Octane/Horizon).
         $this->app->scoped(CurrentCompany::class);
+        $this->app->singleton(StateMachine::class, fn () => StateMachine::fromConfig()); // read-only: safe to share
         $this->app->singleton(ConnectorRegistry::class, fn () => new ConnectorRegistry(config('einvoicing')));
     }
 

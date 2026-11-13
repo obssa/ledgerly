@@ -4,7 +4,7 @@ CREATE TABLE einvoice_submissions (
     id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id        uuid        NOT NULL REFERENCES companies (id),
     document_id       uuid        NOT NULL REFERENCES documents (id),
-    authority         text        NOT NULL, -- ET_MOR, KE_KRA, UG_URA, TZ_TRA, RW_RRA, NG_NRS, SANDBOX
+    authority         text        NOT NULL, -- ET_MOR, KE_KRA, SANDBOX ... one code per connector
     status            text        NOT NULL DEFAULT 'queued'
                       CHECK (status IN ('queued', 'submitted', 'cleared', 'rejected', 'failed')),
     attempts          integer     NOT NULL DEFAULT 0,
@@ -23,9 +23,9 @@ CREATE TABLE einvoice_submissions (
 );
 CREATE INDEX einvoice_pending_idx ON einvoice_submissions (company_id, status) WHERE status IN ('queued', 'failed');
 
--- Append-only: who did what, with before/after values.
+-- Append-only: who did what, with before/after values. Hash-partitioned by company.
 CREATE TABLE audit_log (
-    id           bigserial PRIMARY KEY,
+    id           bigserial,
     company_id   uuid        NOT NULL REFERENCES companies (id),
     user_id      uuid        REFERENCES users (id),
     actor_type   text        NOT NULL DEFAULT 'user' CHECK (actor_type IN ('user', 'system', 'api_client', 'ai_agent')),
@@ -35,8 +35,10 @@ CREATE TABLE audit_log (
     before       jsonb,
     after        jsonb,
     ip           inet,
-    created_at   timestamptz NOT NULL DEFAULT now()
-);
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (company_id, id)
+) PARTITION BY HASH (company_id);
+SELECT create_hash_partitions('audit_log', 16);
 CREATE INDEX audit_log_subject_idx ON audit_log (company_id, subject_type, subject_id);
 
 CREATE FUNCTION audit_log_append_only() RETURNS trigger LANGUAGE plpgsql AS $$

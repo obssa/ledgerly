@@ -10,32 +10,45 @@ use App\Domain\Tenancy\Models\Organisation;
 use App\Domain\Tenancy\Support\CountryPack;
 use App\Domain\Tenancy\Support\DatabaseTenantContext;
 use App\Models\User;
+use App\Support\FiscalCalendar;
+use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Onboarding step 2: create the company and install its country pack (chart of accounts, tax rates),
- * then make the signing-up user its owner.
+ * Onboarding: create the company, install its chart (base chart + country accounts + industry template)
+ * and tax rates, open its first fiscal year and make the signing-up user its owner.
+ *
+ * Works for every country: one with a pack gets that country's taxes and rules; any other country gets
+ * the default pack with the currency the company chose. Runs inside the request transaction.
  */
 final class SetUpCompany
 {
     /**
      * @param array{organisation_id?: string, legal_name: string, trading_name?: ?string, country_code: string,
      *              industry?: ?string, tin?: ?string, vat_registered?: bool, vat_number?: ?string,
-     *              calendar?: string, fiscal_year_start_month?: int, base_currency?: string,
-     *              conversion_date?: ?string} $data
+     *              calendar?: string, fiscal_year_start_month?: int, base_currency?: string, timezone?: string,
+     *              phone?: ?string, email?: ?string, website?: ?string, conversion_date?: ?string} $data
      */
     public function handle(User $owner, array $data): Company
     {
         $pack = CountryPack::load($data['country_code']);
-        $companyId = (string) Str::uuid();
+        $companyId = (string) Str::uuid7();
+        $accounts = $pack->accountsFor($data['industry'] ?? null);
+        $calendar = $data['calendar'] ?? 'gregorian';
 
-        return DB::transaction(function () use ($owner, $data, $pack, $companyId) {
-            // RLS only lets us write rows for the company in the session, so select it first.
+        return DB::transaction(function () use ($owner, $data, $pack, $companyId, $accounts, $calendar) {
+            // RLS only lets us write rows for the company in the transaction's context, so select it first.
             DatabaseTenantContext::set($owner->getKey(), $companyId);
 
-            $organisationId = $data['organisation_id']
-                ?? Organisation::query()->create(['name' => $data['legal_name']])->getKey();
+            // An existing organisation must be one the user can already see (RLS); a new one starts its trial.
+            $organisationId = isset($data['organisation_id'])
+                ? Organisation::query()->findOrFail($data['organisation_id'])->getKey()
+                : Organisation::query()->create([
+                    'name' => $data['legal_name'],
+                    'created_by' => $owner->getKey(),
+                    'trial_ends_at' => now()->addDays(30),
+                ])->getKey();
 
             $company = new Company([
                 'organisation_id' => $organisationId,
@@ -44,7 +57,11 @@ final class SetUpCompany
                 'country_code' => $pack->countryCode,
                 'base_currency' => $data['base_currency'] ?? $pack->baseCurrency,
                 'fiscal_year_start_month' => $data['fiscal_year_start_month'] ?? $pack->defaultFiscalYearStartMonth,
-                'calendar' => $data['calendar'] ?? 'gregorian',
+                'calendar' => $calendar,
+                'timezone' => $data['timezone'] ?? $pack->timezone,
+                'phone' => $data['phone'] ?? null,
+                'email' => $data['email'] ?? null,
+                'website' => $data['website'] ?? null,
                 'framework' => $pack->framework,
                 'conversion_date' => $data['conversion_date'] ?? null,
                 'industry' => $data['industry'] ?? null,
@@ -55,11 +72,21 @@ final class SetUpCompany
             $company->id = $companyId;
             $company->save();
 
-            Membership::query()->create(['company_id' => $companyId, 'user_id' => $owner->getKey(), 'role' => 'owner']);
+            Membership::query()->create(['company_id' => $companyId, 'user_id' => $owner->getKey(), 'role' => 'owner', 'status' => 'active']);
+
+            // First fiscal year: the one containing the conversion date (or today).
+            $fiscal = new FiscalCalendar($calendar, (int) $company->fiscal_year_start_month);
+            $year = $fiscal->yearContaining(new DateTimeImmutable($data['conversion_date'] ?? 'today'));
+            DB::table('fiscal_years')->insert([
+                'id' => (string) Str::uuid7(),
+                'company_id' => $companyId,
+                'starts_on' => $year['start']->format('Y-m-d'),
+                'ends_on' => $year['end']->format('Y-m-d'),
+            ]);
 
             $now = now();
             DB::table('accounts')->insert(array_map(fn (array $a) => [
-                'id' => (string) Str::uuid(),
+                'id' => (string) Str::uuid7(),
                 'company_id' => $companyId,
                 'code' => $a['code'],
                 'name' => $a['name'],
@@ -68,10 +95,10 @@ final class SetUpCompany
                 'system_key' => $a['system_key'] ?? null,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ], $pack->accounts));
+            ], $accounts));
 
             DB::table('tax_rates')->insert(array_map(fn (array $r) => [
-                'id' => (string) Str::uuid(),
+                'id' => (string) Str::uuid7(),
                 'company_id' => $companyId,
                 'country_code' => $pack->countryCode,
                 'code' => $r['code'],
@@ -88,7 +115,7 @@ final class SetUpCompany
                 'action' => 'created',
                 'subject_type' => 'company',
                 'subject_id' => $companyId,
-                'after' => json_encode(['country' => $pack->countryCode, 'accounts' => count($pack->accounts)]),
+                'after' => json_encode(['country' => $pack->countryCode, 'industry' => $data['industry'] ?? null, 'accounts' => count($accounts)]),
             ]);
 
             return $company;

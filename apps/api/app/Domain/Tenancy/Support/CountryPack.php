@@ -9,8 +9,12 @@ use InvalidArgumentException;
 use JsonException;
 
 /**
- * A country pack is data, not code: chart of accounts, tax rates, calendars, languages and the e-invoicing
- * connector for one country. Adding a country = a new JSON file + one connector class.
+ * A country pack is data, not code: tax rates, tax rules, calendars and the e-invoicing connector for one
+ * country, on top of the shared IFRS for SMEs chart. Adding a country = a new JSON file + one connector class.
+ *
+ * Ledgerly works in every country: a country without its own pack gets the default pack (_default.json),
+ * where the company picks its currency and enters its own tax rates. An industry template
+ * (_industries.json) then adds the accounts that type of business needs.
  */
 final readonly class CountryPack
 {
@@ -18,6 +22,7 @@ final readonly class CountryPack
     public const REQUIRED_SYSTEM_KEYS = [
         'accounts_receivable', 'accounts_payable', 'vat_payable', 'vat_receivable', 'inventory', 'cogs',
         'sales', 'retained_earnings', 'opening_balance_equity', 'fx_gain_loss', 'bank_charges', 'undeposited_funds',
+        'grni', 'inventory_adjustment', 'bad_debt', 'rounding', 'withholding_payable', 'withholding_receivable',
     ];
 
     /** Accounting frameworks and the chart template each one uses by default. */
@@ -43,6 +48,11 @@ final readonly class CountryPack
         public array $taxRates,
         public array $einvoicing,
         public array $paymentMethods,
+        public string $timezone = 'UTC',
+        public array $rules = [],
+        public bool $localised = true,   // false = the default pack, for a country with no pack of its own
+        public string $taxIdLabel = 'Tax ID',
+        public array $fiscalYear = [],
     ) {
     }
 
@@ -51,7 +61,16 @@ final readonly class CountryPack
         $directory ??= dirname(__DIR__, 4) . '/database/country-packs';
         $code = strtoupper($countryCode);
 
-        $pack = self::readJson("{$directory}/{$code}.json");
+        if (preg_match('/^[A-Z]{2}$/', $code) !== 1) {
+            throw new InvalidArgumentException("Not an ISO 3166-1 alpha-2 country code: {$countryCode}");
+        }
+
+        $localised = is_file("{$directory}/{$code}.json");
+        $pack = self::readJson($localised ? "{$directory}/{$code}.json" : "{$directory}/_default.json");
+        if (! $localised) {
+            $pack['country_code'] = $code;
+            $pack['name'] = $code;
+        }
         $template = $pack['chart_template'] ?? 'ifrs_sme';
         $base = self::readJson("{$directory}/_chart_{$template}.json");
 
@@ -69,13 +88,44 @@ final readonly class CountryPack
             taxRates: $pack['tax_rates'],
             einvoicing: $pack['einvoicing'] ?? [],
             paymentMethods: $pack['payment_methods'] ?? [],
+            timezone: $pack['timezone'] ?? 'UTC',
+            rules: $pack['rules'] ?? [],
+            localised: $localised,
+            taxIdLabel: $pack['tax_id_label'] ?? 'Tax ID',
+            fiscalYear: $pack['fiscal_year'] ?? [],
         );
         $instance->validate();
 
         return $instance;
     }
 
-    /** @return list<string> */
+    /**
+     * The chart for a company: base chart + country accounts + the accounts of its industry template.
+     *
+     * @return list<array{code: string, name: string, type: string, subtype?: string, system_key?: string}>
+     */
+    public function accountsFor(?string $industry, ?string $directory = null): array
+    {
+        if ($industry === null || $industry === '') {
+            return $this->accounts;
+        }
+
+        $accounts = array_merge($this->accounts, self::industries($directory)[$industry]['accounts']
+            ?? throw new InvalidArgumentException("Unknown industry: {$industry}"));
+        usort($accounts, fn (array $a, array $b) => strcmp($a['code'], $b['code']));
+
+        return $accounts;
+    }
+
+    /** @return array<string, array{name: string, tracks_inventory: bool, accounts: list<array<string, string>>}> */
+    public static function industries(?string $directory = null): array
+    {
+        $directory ??= dirname(__DIR__, 4) . '/database/country-packs';
+
+        return self::readJson("{$directory}/_industries.json")['industries'];
+    }
+
+    /** Countries with their own pack (tax rates, rules, e-invoicing). Every other country uses the default pack. */
     public static function available(?string $directory = null): array
     {
         $directory ??= dirname(__DIR__, 4) . '/database/country-packs';
@@ -88,7 +138,7 @@ final readonly class CountryPack
 
     public function isValidTaxId(string $taxId): bool
     {
-        return preg_match('/' . $this->taxIdPattern . '/', $taxId) === 1;
+        return preg_match('~' . str_replace('~', '\~', $this->taxIdPattern) . '~', $taxId) === 1;
     }
 
     private function validate(): void

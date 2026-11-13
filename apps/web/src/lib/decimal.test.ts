@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { documentAmounts, lineAmounts, parse, toString } from "./decimal";
+import { CURRENCIES, documentAmounts, lineAmounts, parse, toString } from "./decimal";
 import { formatAmount, toEthiopian } from "./format";
 
 // Same cases as apps/api/tests/Unit/TaxCalculatorTest.php: browser preview and API must agree.
@@ -56,10 +56,16 @@ describe("formatting", () => {
   });
 
   it("converts to the Ethiopian calendar", () => {
-    expect(toEthiopian(new Date("2026-11-02T00:00:00Z")).label).toBe("ጥቅምት 23, 2019 ዓ.ም");
+    expect(toEthiopian(new Date("2026-11-02T00:00:00Z")).label).toBe("Tikimt 23, 2019");
     const newYear = toEthiopian(new Date("2026-09-11T00:00:00Z"));
     expect([newYear.year, newYear.month, newYear.day]).toEqual([2019, 1, 1]);
     const pagume = toEthiopian(new Date("2023-09-11T00:00:00Z"));
     expect([pagume.year, pagume.month, pagume.day]).toEqual([2015, 13, 6]);
+  });
+
+  it("offers every currency, with no duplicates", () => {
+    expect(CURRENCIES.length).toBeGreaterThan(140);
+    expect(new Set(CURRENCIES).size).toBe(CURRENCIES.length);
+    for (const c of ["ETB", "USD", "EUR", "BRL", "INR", "JPY"]) expect(CURRENCIES).toContain(c);
   });
 });

@@ -1,0 +1,38 @@
+{
+  "_about": "Used for every country that has no pack of its own. The company chooses its currency and enters its own tax rates (VAT, GST or sales tax); there is no e-invoicing connector. Everything else (ledger, documents, inventory, banking, reports) works the same.",
+  "country_code": "ZZ",
+  "name": "Other country",
+  "base_currency": "USD",
+  "framework": "ifrs_sme",
+  "chart_template": "ifrs_sme",
+  "calendars": [
+    "gregorian"
+  ],
+  "default_calendar": "gregorian",
+  "default_fiscal_year_start_month": 1,
+  "languages": [
+    "en"
+  ],
+  "timezone": "UTC",
+  "tax_id_label": "Tax ID",
+  "tax_id_pattern": "^[A-Za-z0-9][A-Za-z0-9 ./-]{2,29}$",
+  "tax_rates": [
+    {
+      "code": "NOTAX",
+      "name": "No tax",
+      "kind": "other",
+      "rate": "0",
+      "effective_from": "1900-01-01"
+    }
+  ],
+  "extra_accounts": [],
+  "einvoicing": {},
+  "rules": {},
+  "payment_methods": [
+    "bank_transfer",
+    "cash",
+    "cheque",
+    "card",
+    "mobile_money"
+  ]
+}
