@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests;
 
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -30,6 +30,13 @@ trait RefreshLedgerDatabase
         if (! $owner || $app === $owner) {
             $this->fail('Feature tests need DB_USERNAME (application role) and DB_OWNER_USERNAME (owner) to be different logins.');
         }
+        // This drops the whole schema. Never on a database that is not obviously a test database.
+        foreach (['pgsql', 'owner'] as $connection) {
+            $database = (string) config("database.connections.{$connection}.database");
+            if (! str_ends_with($database, '_test')) {
+                $this->fail("Refusing to rebuild '{$database}' ({$connection} connection): feature tests only run on a database whose name ends in _test.");
+            }
+        }
 
         DB::purge('pgsql');
         $this->owner()->unprepared(
@@ -40,7 +47,7 @@ trait RefreshLedgerDatabase
     }
 
     /** The owner connection, for arranging fixtures and inspecting stored rows. Bypasses row-level security. */
-    protected function owner(): ConnectionInterface
+    protected function owner(): Connection
     {
         return DB::connection('owner');
     }
