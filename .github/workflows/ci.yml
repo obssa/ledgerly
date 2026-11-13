@@ -4,6 +4,14 @@ on:
   push: { branches: [main] }
   pull_request:
 
+# A newer push to the same branch or pull request cancels the run it replaces.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   database:
     runs-on: ubuntu-latest
@@ -16,7 +24,7 @@ jobs:
         options: --health-cmd "pg_isready -U ledgerly_owner" --health-interval 5s --health-retries 20
     env: { PGHOST: localhost, PGPORT: 5432, PGUSER: ledgerly_owner, PGPASSWORD: ledgerly_owner }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Schema, guard tests and concurrency tests
         run: |
           bash apps/api/database/schema/tests/run.sh | tee result.txt
@@ -28,33 +36,36 @@ jobs:
     services:
       postgres:
         image: postgres:18
-        env: { POSTGRES_USER: ledgerly_owner, POSTGRES_PASSWORD: ledgerly_owner, POSTGRES_DB: ledgerly_test }
+        env: { POSTGRES_USER: ledgerly_owner, POSTGRES_PASSWORD: ledgerly_owner, POSTGRES_DB: ledgerly }
         ports: ['5432:5432']
         options: --health-cmd "pg_isready -U ledgerly_owner" --health-interval 5s --health-retries 20
     defaults: { run: { working-directory: apps/api } }
-    env:
-      DB_CONNECTION: pgsql
-      DB_HOST: localhost
-      DB_DATABASE: ledgerly_test
-      DB_USERNAME: ledgerly_owner      # migrations run as the owner
-      DB_PASSWORD: ledgerly_owner
+    # Only the host comes from here. phpunit.xml fixes the roles: the schema is built as ledgerly_owner and
+    # every request runs as ledgerly_web, so row-level security applies in the tests (SECURITY.md S1).
+    env: { DB_HOST: localhost, PGHOST: localhost, PGUSER: ledgerly_owner, PGPASSWORD: ledgerly_owner }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Database roles, exactly as in local development (creates ledgerly_test)
+        run: psql -d ledgerly -v ON_ERROR_STOP=1 -f ../../docker/postgres/init.sql
       - uses: shivammathur/setup-php@v2
-        with: { php-version: '8.4', extensions: pdo_pgsql, bcmath, coverage: none }
-      - run: composer install --no-interaction --prefer-dist
+        with: { php-version: '8.4', extensions: pdo_pgsql, bcmath, intl, coverage: none }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('apps/api/composer.lock') }}
+      - run: composer install --no-interaction --prefer-dist --no-progress
       - name: Known vulnerabilities in PHP packages
         run: composer audit
       - run: cp .env.example .env && php artisan key:generate
-      - name: Unit and feature tests (feature tests run on PostgreSQL)
+      - name: Unit and feature tests (feature tests run on PostgreSQL as ledgerly_web)
         run: php artisan test
 
   web:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/web } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
       - run: npm ci
       - name: Known vulnerabilities in JavaScript packages

@@ -17,17 +17,19 @@
         </include>
     </source>
     <php>
-        <env name="APP_ENV" value="testing"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="CACHE_STORE" value="array"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="DB_CONNECTION" value="pgsql"/>
-        <env name="DB_DATABASE" value="ledgerly_test"/>
-        <!-- Feature tests migrate, so they run as the owner, which BYPASSES row-level security.
-             SECURITY.md task S1: migrate as the owner but run requests as ledgerly_web, and add the
-             two-company isolation tests, before any feature is called done. -->
-        <env name="DB_USERNAME" value="ledgerly_owner"/>
-        <env name="DB_PASSWORD" value="ledgerly_owner"/>
-        <env name="EINVOICE_FORCE_SANDBOX" value="true"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <!-- SECURITY.md S1: the schema is built as the owner, every request runs as ledgerly_web so
+             row-level security applies, exactly as in production (tests/RefreshLedgerDatabase.php).
+             force="true": a shell or docker-compose environment cannot silently switch the test role. -->
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="ledgerly_test" force="true"/>
+        <env name="DB_USERNAME" value="ledgerly_web" force="true"/>
+        <env name="DB_PASSWORD" value="ledgerly_web" force="true"/>
+        <env name="DB_OWNER_USERNAME" value="ledgerly_owner" force="true"/>
+        <env name="DB_OWNER_PASSWORD" value="ledgerly_owner" force="true"/>
+        <env name="EINVOICE_FORCE_SANDBOX" value="true" force="true"/>
     </php>
 </phpunit>
