@@ -25,7 +25,8 @@ ledgerly/
 │   │                              _chart_ifrs_sme (base chart), _industries (13 business types)
 │   └── tests/                     PHPUnit unit + feature tests
 ├── apps/web/                      Next.js 16 app (dashboard, invoices, new invoice, reports, onboarding)
-├── .github/workflows/ci.yml       Database, API and web tests on every pull request
+├── .github/workflows/ci.yml       Database, API, web tests and image builds on every pull request
+├── .github/workflows/deploy.yml   Production images to GHCR for every green commit on main
 ├── docker/postgres/init.sql       Owner vs app roles so row-level security applies to the app
 └── docker-compose.yml             Postgres, Redis, Meilisearch, MinIO, Mailpit, API, worker
 ```
@@ -40,8 +41,8 @@ cd apps/api
 cp .env.example .env
 composer install
 php artisan key:generate
-DB_USERNAME=ledgerly_owner DB_PASSWORD=ledgerly_owner php artisan migrate   # migrations run as the table owner
-php artisan serve                                                            # app runs as ledgerly_web (RLS applies)
+php artisan migrate --database=owner   # migrations run as the table owner (DB_OWNER_* in .env)
+php artisan serve                      # the app runs as ledgerly_web: row-level security applies
 
 # Web
 cd ../web
@@ -49,11 +50,14 @@ npm install
 LEDGERLY_API_URL=http://localhost:8000 npm run dev    # omit LEDGERLY_API_URL for demo mode with sample data
 ```
 
+PHP 8.3+ is required. Without it locally, run the API commands in the container instead, for example
+`docker compose run --rm api php artisan test`.
+
 ## Tests
 
 ```bash
 PGUSER=ledgerly_owner bash apps/api/database/schema/tests/run.sh   # fresh DB, schema, guard + concurrency tests
-cd apps/api && php artisan test                                    # unit + feature (feature tests need Postgres)
+cd apps/api && php artisan test                                    # unit + feature; feature tests rebuild ledgerly_test
 cd apps/web && npm test && npm run lint && npm run build
 ```
 
@@ -102,17 +106,44 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 | Double clicks and concurrent edits | Idempotency keys; optimistic locking |
 | No CI | `.github/workflows/ci.yml` |
 
-## Verified in the build sandbox (14 Nov 2026)
+## Verified
 
-- **Database: 46 checks pass** on PostgreSQL 16.15 as the restricted app role: 42 guard checks (T1–T35, of which T26–T35
-  are the access rules added by the security review) and 4 two-session concurrency checks (C1–C4). Benchmark on 3.9 million lines / 300 companies: balances equal the ledger, partition pruning
-  touches 1 of 16 partitions.
-- **API: 44 unit tests pass**, run through a PHPUnit-compatible shim because Packagist is blocked in the sandbox.
-- **API feature tests (`InvoiceFlowTest`, 6 tests) have NOT been run**, and neither has any Laravel middleware, controller or
-  job in this repo: they were written without a Laravel install. Run `composer install && php artisan test` first; expect to
-  fix small things. CI does this on every pull request.
-- PostgreSQL 18 (the production target) has not been tried here; CI runs the database tests on 16 and 18.
-- Web: 10 unit tests, lint (0 errors), production build, all pages render.
+**14 Nov 2026, first run of the Laravel layer (Docker, PostgreSQL 18, PHP 8.4) and in CI:**
+
+- **Database: 46 checks pass on PostgreSQL 16 and 18** as the restricted app role: 42 guard checks (T1–T35) and 4
+  two-session concurrency checks (C1–C4).
+- **API: 60 tests pass** (44 unit, 16 feature). Feature tests build the schema as the owner and run every request as
+  `ledgerly_web`, so row-level security applies (SECURITY.md S1). `TenantIsolationTest` covers every company route with
+  company B's ids in the header, URL and body, and tests row-level security and the Eloquent scope each on its own;
+  removing either one fails the suite.
+- **Web: 10 unit tests, lint (0 errors), production build.**
+- **Production images** build and run: the API image migrated a database as the owner, served sign-up and company setup as
+  `ledgerly_web`, and runs as a non-root user; the web image runs in demo mode or against the API from the same build.
+
+Earlier, in the build sandbox: benchmark on 3.9 million lines / 300 companies (balances equal the ledger, partition pruning
+touches 1 of 16 partitions).
+
+## CI/CD
+
+| Workflow | When | What |
+| --- | --- | --- |
+| `ci.yml` | every pull request and push to `main` | database guards on PG 16 + 18; API unit and feature tests on PG 18; `composer audit`; web tests, lint, build; `npm audit`; both production images build |
+| `deploy.yml` | after `ci` passes on `main` (or by hand) | builds `ghcr.io/<owner>/ledgerly-api` and `ledgerly-web`, tagged with the tested commit and `main`, with provenance and SBOM |
+| Dependabot | weekly | grouped updates for actions, composer, npm and base images |
+
+## Deploying
+
+Images are ready for any container host. A release, in this order:
+
+1. **Migrate** with a one-off task that alone holds the owner credentials:
+   `docker run --rm -e DB_HOST=... -e DB_DATABASE=... -e DB_OWNER_USERNAME=... -e DB_OWNER_PASSWORD=... ghcr.io/<owner>/ledgerly-api:<sha> php artisan migrate --database=owner --force`
+2. **Roll out the API** (`:8080`, health check `/up`) with `APP_KEY`, `APP_URL`, `FRONTEND_URL`, `DB_*` as `ledgerly_web`,
+   `REDIS_HOST`, and `TRUSTED_PROXIES` set to the load balancer's addresses (needed for HTTPS detection and per-client
+   rate limits). Never give it the owner credentials.
+3. **Roll out the worker**: the same image, command `php artisan horizon`.
+4. **Roll out the web app** (`:3000`) with `LEDGERLY_API_URL` pointing at the API.
+
+TLS is terminated by the load balancer. SECURITY.md S9 and S12 list what the host must provide before real customers sign in.
 
 ## Security
 

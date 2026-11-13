@@ -73,3 +73,21 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
+
+  images:
+    # The production images build on every pull request (not pushed), so a broken Dockerfile never reaches main.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { name: api, context: apps/api, dockerfile: apps/api/Dockerfile.production }
+          - { name: web, context: apps/web, dockerfile: apps/web/Dockerfile }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
