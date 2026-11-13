@@ -72,9 +72,9 @@ final class JournalDraftTest extends TestCase
         $reversal->assertBalanced();
 
         [$ar, $sales, $vat] = $reversal->lines();
-        $this->assertSame('115.0000', $ar->credit->toDecimalString());
-        $this->assertSame('100.0000', $sales->debit->toDecimalString());
-        $this->assertSame('15.0000', $vat->debit->toDecimalString());
+        $this->assertSame('115.00', $ar->credit->toDecimalString());
+        $this->assertSame('100.00', $sales->debit->toDecimalString());
+        $this->assertSame('15.00', $vat->debit->toDecimalString());
         $this->assertSame('reversal', $reversal->sourceType);
     }
 }

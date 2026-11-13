@@ -46,8 +46,8 @@ final class LedgerController extends Controller
             'memo' => ['nullable', 'string', 'max:500'],
             'lines' => ['required', 'array', 'min:2', 'max:500'],
             'lines.*.account_id' => ['required', 'uuid'],
-            'lines.*.debit' => ['nullable', 'decimal:0,4', 'min:0'],
-            'lines.*.credit' => ['nullable', 'decimal:0,4', 'min:0'],
+            'lines.*.debit' => ['nullable', 'decimal:0,2', 'min:0'],
+            'lines.*.credit' => ['nullable', 'decimal:0,2', 'min:0'],
             'lines.*.description' => ['nullable', 'string', 'max:255'],
         ]);
 

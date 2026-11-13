@@ -40,7 +40,7 @@ CREATE TABLE companies (
     vat_registered          boolean     NOT NULL DEFAULT false,
     vat_number              text,
     languages               text[]      NOT NULL DEFAULT ARRAY['en'],
-    framework               text        NOT NULL DEFAULT 'ifrs_sme' CHECK (framework IN ('ifrs_sme', 'syscohada')),
+    framework               text        NOT NULL DEFAULT 'ifrs_sme' CHECK (framework IN ('ifrs_sme')),
     conversion_date         date,       -- last bank statement date before Ledgerly; opening balances are as at this date
     books_closed_until      date,       -- period lock: nothing may post on or before this date
     settings                jsonb       NOT NULL DEFAULT '{}'::jsonb,

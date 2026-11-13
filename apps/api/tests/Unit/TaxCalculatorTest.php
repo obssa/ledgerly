@@ -21,27 +21,27 @@ final class TaxCalculatorTest extends TestCase
 
         $doc = $calc->document($lines, 'ETB');
 
-        $this->assertSame('436300.0000', $doc->subtotal->toDecimalString());
-        $this->assertSame('65445.0000', $doc->tax->toDecimalString());
-        $this->assertSame('501745.0000', $doc->total->toDecimalString());
+        $this->assertSame('436300.00', $doc->subtotal->toDecimalString());
+        $this->assertSame('65445.00', $doc->tax->toDecimalString());
+        $this->assertSame('501745.00', $doc->total->toDecimalString());
     }
 
     public function test_discount_is_applied_before_tax(): void
     {
         $line = (new TaxCalculator())->line(Money::of('100', 'KES'), '3', '0.10', '0.16');
 
-        $this->assertSame('270.0000', $line->subtotal->toDecimalString());
-        $this->assertSame('43.2000', $line->tax->toDecimalString());
-        $this->assertSame('313.2000', $line->total->toDecimalString());
+        $this->assertSame('270.00', $line->subtotal->toDecimalString());
+        $this->assertSame('43.20', $line->tax->toDecimalString());
+        $this->assertSame('313.20', $line->total->toDecimalString());
     }
 
     public function test_tax_inclusive_prices_split_back_into_net_and_tax(): void
     {
         $line = (new TaxCalculator())->line(Money::of('115', 'ETB'), '1', '0', '0.15', inclusive: true);
 
-        $this->assertSame('100.0000', $line->subtotal->toDecimalString());
-        $this->assertSame('15.0000', $line->tax->toDecimalString());
-        $this->assertSame('115.0000', $line->total->toDecimalString());
+        $this->assertSame('100.00', $line->subtotal->toDecimalString());
+        $this->assertSame('15.00', $line->tax->toDecimalString());
+        $this->assertSame('115.00', $line->total->toDecimalString());
     }
 
     public function test_inclusive_rounding_never_loses_a_cent(): void
@@ -54,11 +54,20 @@ final class TaxCalculatorTest extends TestCase
         );
     }
 
-    public function test_zero_decimal_currencies_round_to_whole_units(): void
+    public function test_every_currency_keeps_two_decimals(): void
     {
         $line = (new TaxCalculator())->line(Money::of('1999', 'UGX'), '3', '0', '0.18');
 
-        $this->assertSame('5997.0000', $line->subtotal->toDecimalString());
-        $this->assertSame('1079.0000', $line->tax->toDecimalString());
+        $this->assertSame('5997.00', $line->subtotal->toDecimalString());
+        $this->assertSame('1079.46', $line->tax->toDecimalString());
+    }
+
+    public function test_fractional_rates_keep_their_precision(): void
+    {
+        // 7.5% VAT on 199.99: 14.99925 rounds half-up to 15.00
+        $line = (new TaxCalculator())->line(Money::of('199.99', 'NGN'), '1', '0', '0.075');
+
+        $this->assertSame('15.00', $line->tax->toDecimalString());
+        $this->assertSame('214.99', $line->total->toDecimalString());
     }
 }

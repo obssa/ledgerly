@@ -1,28 +1,40 @@
 /**
  * Exact decimal maths for money in the browser, mirroring the API's Money/TaxCalculator
- * (apps/api/app/Domain). Values are bigint at scale 4 — never JS floats — so a total previewed
- * in the invoice form always equals the total the API calculates.
+ * (apps/api/app/Domain). Product rule: every amount has exactly 2 decimal places. Amounts are bigint
+ * hundredths — never JS floats — so a total previewed in the invoice form always equals the API's.
+ * Rates (tax, discount) are parsed at 6 decimals so 7.5% stays exact.
  */
 
-export const SCALE = 4;
+export const SCALE = 2;
 const FACTOR = 10n ** BigInt(SCALE);
+const RATE_SCALE = 6;
+const RATE_FACTOR = 10n ** BigInt(RATE_SCALE);
 
-export const CURRENCY_DECIMALS: Record<string, number> = {
-  ETB: 2, KES: 2, UGX: 0, TZS: 2, RWF: 0, NGN: 2, XOF: 0, XAF: 0, GHS: 2, ZAR: 2, USD: 2, EUR: 2, GBP: 2, AED: 2, CNY: 2,
-};
+/** Currencies the product supports; all use 2 decimal places. */
+export const CURRENCIES = ["ETB", "KES", "UGX", "TZS", "RWF", "NGN", "GHS", "ZAR", "USD", "EUR", "GBP", "AED", "CNY"] as const;
 
-export type Scaled = bigint; // value × 10^4
+export type Scaled = bigint; // amount × 100
 
-export function parse(value: string | number): Scaled {
+function parseAt(value: string | number, scale: number): bigint {
   const s = String(value).trim();
   if (!/^-?\d+(\.\d+)?$/.test(s)) throw new Error(`Not a decimal: ${s}`);
   const negative = s.startsWith("-");
   const [whole, frac = ""] = s.replace("-", "").split(".");
-  const digits = (frac + "0".repeat(SCALE)).slice(0, SCALE);
-  let scaled = BigInt(whole) * FACTOR + BigInt(digits);
-  // Round half-up on the digit after the 4th decimal.
-  if (frac.length > SCALE && Number(frac[SCALE]) >= 5) scaled += 1n;
+  const digits = (frac + "0".repeat(scale)).slice(0, scale);
+  let scaled = BigInt(whole) * 10n ** BigInt(scale) + BigInt(digits || "0");
+  // Round half-up on the first digit beyond the scale.
+  if (frac.length > scale && Number(frac[scale]) >= 5) scaled += 1n;
   return negative ? -scaled : scaled;
+}
+
+/** Parse an amount, price or quantity to 2 decimals (half-up). */
+export function parse(value: string | number): Scaled {
+  return parseAt(value, SCALE);
+}
+
+/** Parse a tax or discount rate (0..1) at 6 decimals. */
+export function parseRate(value: string | number): bigint {
+  return parseAt(value, RATE_SCALE);
 }
 
 export function toString(value: Scaled): string {
@@ -33,21 +45,10 @@ export function toString(value: Scaled): string {
   return `${negative ? "-" : ""}${whole}.${frac}`;
 }
 
-/** a × b, both at scale 4, rounded half-up (away from zero) back to scale 4. */
-export function multiply(a: Scaled, b: Scaled): Scaled {
-  return divRound(a * b, FACTOR);
-}
-
-/** a ÷ b, both at scale 4, rounded half-up to scale 4. */
-export function divide(a: Scaled, b: Scaled): Scaled {
-  return divRound(a * FACTOR, b);
-}
-
-/** Round to the currency's document decimals (ETB 2, UGX 0 …), result still at scale 4. */
-export function roundToCurrency(value: Scaled, currency: string): Scaled {
-  const decimals = CURRENCY_DECIMALS[currency] ?? 2;
-  const step = 10n ** BigInt(SCALE - decimals);
-  return divRound(value, step) * step;
+/** Kept for call sites: amounts are already at 2 decimals for every currency. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- currency kept in the signature for call sites
+export function roundToCurrency(value: Scaled, _currency?: string): Scaled {
+  return value;
 }
 
 function divRound(numerator: bigint, denominator: bigint): bigint {
@@ -72,21 +73,26 @@ export interface Amounts {
   total: Scaled;
 }
 
-/** Same rules as TaxCalculator::line(): round each line to the currency, then sum. */
-export function lineAmounts(line: LineInput, currency: string, inclusive = false): Amounts {
-  const factor = multiply(parse(line.quantity), FACTOR - parse(line.discountRate ?? "0"));
-  const gross = roundToCurrency(multiply(parse(line.unitPrice), factor), currency);
-  const rate = parse(line.taxRate ?? "0");
+/** Same rules as TaxCalculator::line(): round each line to 2 decimals, then sum. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- currency kept in the signature for call sites
+export function lineAmounts(line: LineInput, _currency?: string, inclusive = false): Amounts {
+  const qty = parse(line.quantity);
+  const price = parse(line.unitPrice);
+  const keep = RATE_FACTOR - parseRate(line.discountRate ?? "0");
+  const rate = parseRate(line.taxRate ?? "0");
+
+  // price × quantity × (1 − discount), exact, then one rounding to 2 decimals
+  const gross = divRound(price * qty * keep, FACTOR * RATE_FACTOR);
 
   if (inclusive) {
-    const subtotal = roundToCurrency(divide(gross, FACTOR + rate), currency);
+    const subtotal = divRound(gross * RATE_FACTOR, RATE_FACTOR + rate);
     return { subtotal, tax: gross - subtotal, total: gross };
   }
-  const tax = roundToCurrency(multiply(gross, rate), currency);
+  const tax = divRound(gross * rate, RATE_FACTOR);
   return { subtotal: gross, tax, total: gross + tax };
 }
 
-export function documentAmounts(lines: LineInput[], currency: string, inclusive = false): Amounts {
+export function documentAmounts(lines: LineInput[], currency?: string, inclusive = false): Amounts {
   return lines.reduce<Amounts>(
     (sum, l) => {
       const a = lineAmounts(l, currency, inclusive);

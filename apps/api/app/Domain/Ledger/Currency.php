@@ -6,18 +6,16 @@ namespace App\Domain\Ledger;
 
 use InvalidArgumentException;
 
-/** ISO 4217 currencies Ledgerly supports, with the decimals each uses on documents. */
+/** ISO 4217 currencies Ledgerly supports. Product rule: every amount is shown and stored to 2 decimal places. */
 final class Currency
 {
     private const DECIMALS = [
         'ETB' => 2, // Ethiopian birr
         'KES' => 2, // Kenyan shilling
-        'UGX' => 0, // Ugandan shilling
+        'UGX' => 2, // Ugandan shilling
         'TZS' => 2, // Tanzanian shilling
-        'RWF' => 0, // Rwandan franc
+        'RWF' => 2, // Rwandan franc
         'NGN' => 2, // Nigerian naira
-        'XOF' => 0, // West African CFA franc (UEMOA, OHADA)
-        'XAF' => 0, // Central African CFA franc (CEMAC, OHADA)
         'GHS' => 2, // Ghanaian cedi
         'ZAR' => 2, // South African rand
         'USD' => 2,

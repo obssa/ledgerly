@@ -34,18 +34,6 @@ final class CountryPackTest extends TestCase
         $this->assertFalse($pack->isValidTaxId('12345'));
     }
 
-    public function test_ohada_country_uses_the_syscohada_chart(): void
-    {
-        $pack = CountryPack::load('CI');
-
-        $this->assertSame('syscohada', $pack->framework);
-        $this->assertSame('XOF', $pack->baseCurrency);
-        $codes = array_column($pack->accounts, 'code', 'system_key');
-        $this->assertSame('411', $codes['accounts_receivable']);
-        $this->assertSame('401', $codes['accounts_payable']);
-        $this->assertSame('701', $codes['sales']);
-    }
-
     public function test_ifrs_countries_share_the_ifrs_chart(): void
     {
         $this->assertSame('ifrs_sme', CountryPack::load('ET')->chartTemplate);

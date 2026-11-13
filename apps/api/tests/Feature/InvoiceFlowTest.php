@@ -54,7 +54,7 @@ final class InvoiceFlowTest extends TestCase
                 ['description' => 'Roasted coffee 1 kg · Sidamo', 'quantity' => '160', 'unit_price' => '980', 'account_id' => $sales, 'tax_rate_id' => $vat15],
                 ['description' => 'Delivery · Addis Ababa', 'quantity' => '1', 'unit_price' => '3500', 'account_id' => $sales, 'tax_rate_id' => $vat15],
             ],
-        ], $headers)->assertCreated()->assertJsonPath('total', '501745.0000')->json('id');
+        ], $headers)->assertCreated()->assertJsonPath('total', '501745.00')->json('id');
 
         $this->postJson("/api/v1/invoices/{$invoiceId}/approve", [], $headers)
             ->assertOk()
@@ -62,9 +62,9 @@ final class InvoiceFlowTest extends TestCase
             ->assertJsonPath('einvoice_submissions.0.status', 'cleared');
 
         $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $headers)->assertOk()->json('data'));
-        $this->assertSame('501745.0000', $tb->firstWhere('code', '1200')['debit']);
-        $this->assertSame('65445.0000', $tb->firstWhere('code', '2300')['credit']);
-        $this->assertSame('436300.0000', $tb->firstWhere('code', '4000')['credit']);
+        $this->assertSame('501745.00', $tb->firstWhere('code', '1200')['debit']);
+        $this->assertSame('65445.00', $tb->firstWhere('code', '2300')['credit']);
+        $this->assertSame('436300.00', $tb->firstWhere('code', '4000')['credit']);
 
         // A posted invoice already registered with the tax authority is corrected with a credit note, not edited.
         $this->putJson("/api/v1/invoices/{$invoiceId}", ['reason' => 'Wrong price', 'contact_id' => $customer, 'number' => 'INV-2019-0419', 'issue_date' => '2026-11-02', 'currency' => 'ETB', 'lines' => [['description' => 'x', 'quantity' => '1', 'unit_price' => '1', 'account_id' => $sales]]], $headers)
@@ -97,12 +97,12 @@ final class InvoiceFlowTest extends TestCase
 
         // Edit with a reason: 240 → 200 kg. 200 × 1,150 = 230,000 + 15% VAT 34,500 = 264,500.
         $this->putJson("/api/v1/invoices/{$id}", $invoice('200', 'Customer returned 40 kg before delivery'), $headers)
-            ->assertOk()->assertJsonPath('total', '264500.0000')->assertJsonPath('status', 'posted');
+            ->assertOk()->assertJsonPath('total', '264500.00')->assertJsonPath('status', 'posted');
 
         // History: version 1 is the original, and the audit record carries the reason and the three entries.
         $history = $this->getJson("/api/v1/invoices/{$id}/history", $headers)->assertOk();
         $this->assertSame(1, $history->json('versions.0.version'));
-        $this->assertSame('317400.0000', $history->json('versions.0.snapshot.total'));
+        $this->assertSame('317400.00', $history->json('versions.0.snapshot.total'));
         $edit = collect($history->json('audit'))->firstWhere('action', 'edited_after_posting');
         $this->assertSame('Customer returned 40 kg before delivery', $edit['reason']);
         $after = json_decode($edit['after'], true);
@@ -113,7 +113,7 @@ final class InvoiceFlowTest extends TestCase
         $entries = DB::table('journal_entries')->where('company_id', $companyId)->orderBy('number')->get(['source_type', 'status']);
         $this->assertSame([['invoice', 'reversed'], ['reversal', 'posted'], ['invoice', 'posted']], $entries->map(fn ($e) => [$e->source_type, $e->status])->all());
         $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $headers)->json('data'));
-        $this->assertSame('264500.0000', $tb->firstWhere('code', '1200')['debit']);
+        $this->assertSame('264500.00', $tb->firstWhere('code', '1200')['debit']);
 
         // The audit chain is intact.
         $this->assertNull(DB::selectOne('select audit_log_verify(?) as broken', [$companyId])->broken);

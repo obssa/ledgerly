@@ -27,9 +27,9 @@ final class InvoicePostingBuilderTest extends TestCase
         $lines = $draft->lines();
         $this->assertCount(4, $lines); // AR + sales + VAT + delivery (grouped by account)
         $this->assertSame('ar', $lines[0]->accountId);
-        $this->assertSame('501745.0000', $lines[0]->debit->toDecimalString());
-        $this->assertSame('432800.0000', $lines[1]->credit->toDecimalString());
-        $this->assertSame('65445.0000', $lines[2]->credit->toDecimalString());
+        $this->assertSame('501745.00', $lines[0]->debit->toDecimalString());
+        $this->assertSame('432800.00', $lines[1]->credit->toDecimalString());
+        $this->assertSame('65445.00', $lines[2]->credit->toDecimalString());
         $this->assertSame('invoice', $draft->sourceType);
     }
 
@@ -48,7 +48,7 @@ final class InvoicePostingBuilderTest extends TestCase
         );
 
         $draft->assertBalanced();
-        $this->assertSame('1240.0000', $draft->lines()[0]->amountTxn->toDecimalString());
+        $this->assertSame('1240.00', $draft->lines()[0]->amountTxn->toDecimalString());
         $this->assertSame('ETB', $draft->totalDebit()->currency);
     }
 
@@ -63,9 +63,9 @@ final class InvoicePostingBuilderTest extends TestCase
         );
 
         [$ar, $sales, $vat] = $draft->lines();
-        $this->assertSame('1160.0000', $ar->credit->toDecimalString());
-        $this->assertSame('1000.0000', $sales->debit->toDecimalString());
-        $this->assertSame('160.0000', $vat->debit->toDecimalString());
+        $this->assertSame('1160.00', $ar->credit->toDecimalString());
+        $this->assertSame('1000.00', $sales->debit->toDecimalString());
+        $this->assertSame('160.00', $vat->debit->toDecimalString());
         $this->assertSame('credit_note', $draft->sourceType);
     }
 }

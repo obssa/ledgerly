@@ -47,8 +47,8 @@ CREATE TABLE items (
     name              text          NOT NULL,
     type              text          NOT NULL CHECK (type IN ('inventory', 'non_inventory', 'service', 'bundle')),
     unit              text          NOT NULL DEFAULT 'each',
-    sale_price        numeric(20,4),
-    purchase_price    numeric(20,4),
+    sale_price        numeric(20,2),
+    purchase_price    numeric(20,2),
     income_account_id uuid          REFERENCES accounts (id),
     expense_account_id uuid         REFERENCES accounts (id),
     default_tax_code  text,
@@ -79,8 +79,8 @@ CREATE TABLE stock_moves (
     moved_on       date          NOT NULL,
     kind           text          NOT NULL CHECK (kind IN ('opening', 'purchase', 'sale', 'sale_return', 'purchase_return',
                                                           'transfer_in', 'transfer_out', 'adjustment', 'production')),
-    quantity       numeric(18,4) NOT NULL CHECK (quantity <> 0),
-    unit_cost      numeric(20,4) NOT NULL CHECK (unit_cost >= 0), -- weighted-average or FIFO layer cost at the time
+    quantity       numeric(18,2) NOT NULL CHECK (quantity <> 0),
+    unit_cost      numeric(20,2) NOT NULL CHECK (unit_cost >= 0), -- weighted-average or FIFO layer cost at the time
     reference      text,          -- invoice / bill / GRN / count sheet number shown on the bin card
     document_id    uuid,
     transfer_group uuid,
@@ -109,13 +109,13 @@ CREATE TABLE documents (
     issue_date       date          NOT NULL,
     due_date         date,
     currency         char(3)       NOT NULL,
-    fx_rate          numeric(18,8) NOT NULL DEFAULT 1 CHECK (fx_rate > 0),
+    fx_rate          numeric(18,6) NOT NULL DEFAULT 1 CHECK (fx_rate > 0),
     prices_include_tax boolean     NOT NULL DEFAULT false,
     status           text          NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'approved', 'posted', 'void')),
-    subtotal         numeric(20,4) NOT NULL DEFAULT 0,
-    tax_total        numeric(20,4) NOT NULL DEFAULT 0,
-    total            numeric(20,4) NOT NULL DEFAULT 0,
-    amount_due       numeric(20,4) NOT NULL DEFAULT 0,
+    subtotal         numeric(20,2) NOT NULL DEFAULT 0,
+    tax_total        numeric(20,2) NOT NULL DEFAULT 0,
+    total            numeric(20,2) NOT NULL DEFAULT 0,
+    amount_due       numeric(20,2) NOT NULL DEFAULT 0,
     language         text          NOT NULL DEFAULT 'en',
     notes            text,
     journal_entry_id uuid          REFERENCES journal_entries (id),
@@ -137,13 +137,13 @@ CREATE TABLE document_lines (
     line_no       integer       NOT NULL,
     item_id       uuid          REFERENCES items (id),
     description   text          NOT NULL,
-    quantity      numeric(18,4) NOT NULL CHECK (quantity <> 0),
-    unit_price    numeric(20,4) NOT NULL,
+    quantity      numeric(18,2) NOT NULL CHECK (quantity <> 0),
+    unit_price    numeric(20,2) NOT NULL,
     discount_rate numeric(9,6)  NOT NULL DEFAULT 0 CHECK (discount_rate >= 0 AND discount_rate <= 1),
     tax_rate_id   uuid          REFERENCES tax_rates (id),
     account_id    uuid          NOT NULL REFERENCES accounts (id),
-    line_subtotal numeric(20,4) NOT NULL,
-    line_tax      numeric(20,4) NOT NULL DEFAULT 0,
+    line_subtotal numeric(20,2) NOT NULL,
+    line_tax      numeric(20,2) NOT NULL DEFAULT 0,
     UNIQUE (document_id, line_no)
 );
 
@@ -176,10 +176,10 @@ CREATE TABLE payments (
     method            text          NOT NULL, -- bank_transfer, cash, cheque, card, telebirr, mpesa, mtn_momo, airtel_money ...
     reference         text,
     currency          char(3)       NOT NULL,
-    fx_rate           numeric(18,8) NOT NULL DEFAULT 1,
-    amount            numeric(20,4) NOT NULL CHECK (amount > 0),
-    fee               numeric(20,4) NOT NULL DEFAULT 0 CHECK (fee >= 0),
-    withholding       numeric(20,4) NOT NULL DEFAULT 0 CHECK (withholding >= 0),
+    fx_rate           numeric(18,6) NOT NULL DEFAULT 1,
+    amount            numeric(20,2) NOT NULL CHECK (amount > 0),
+    fee               numeric(20,2) NOT NULL DEFAULT 0 CHECK (fee >= 0),
+    withholding       numeric(20,2) NOT NULL DEFAULT 0 CHECK (withholding >= 0),
     journal_entry_id  uuid          REFERENCES journal_entries (id),
     provider_txn_id   text,          -- id from the bank or mobile-money provider, for idempotency
     created_at        timestamptz   NOT NULL DEFAULT now(),
@@ -191,7 +191,7 @@ CREATE TABLE payment_allocations (
     company_id  uuid          NOT NULL REFERENCES companies (id),
     payment_id  uuid          NOT NULL REFERENCES payments (id) ON DELETE CASCADE,
     document_id uuid          NOT NULL REFERENCES documents (id),
-    amount      numeric(20,4) NOT NULL CHECK (amount > 0),
+    amount      numeric(20,2) NOT NULL CHECK (amount > 0),
     UNIQUE (payment_id, document_id)
 );
 
@@ -201,8 +201,8 @@ CREATE TABLE bank_transactions (
     account_id       uuid          NOT NULL REFERENCES accounts (id),
     posted_on        date          NOT NULL,
     description      text          NOT NULL,
-    amount           numeric(20,4) NOT NULL, -- + money in, - money out
-    balance_after    numeric(20,4),
+    amount           numeric(20,2) NOT NULL, -- + money in, - money out
+    balance_after    numeric(20,2),
     source           text          NOT NULL CHECK (source IN ('feed', 'statement', 'manual', 'mobile_money_api')),
     external_id      text,
     status           text          NOT NULL DEFAULT 'for_review' CHECK (status IN ('for_review', 'matched', 'categorised', 'excluded')),

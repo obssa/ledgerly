@@ -11,12 +11,12 @@ use InvalidArgumentException;
 /**
  * An exact amount in one currency. Never a float.
  *
- * Internally kept at the ledger's storage scale (4 decimal places, matching NUMERIC(20,4));
- * roundToCurrency() rounds to what the currency actually uses (ETB 2, UGX 0 ...) for documents.
+ * Product rule: every amount has exactly 2 decimal places (NUMERIC(20,2) in the database), rounded
+ * half-up the moment it is created. Rates (tax, discount, exchange) are not Money and keep their precision.
  */
 final readonly class Money
 {
-    public const STORAGE_SCALE = 4;
+    public const STORAGE_SCALE = 2;
 
     private function __construct(
         public BigDecimal $amount,
@@ -113,7 +113,7 @@ final readonly class Money
         return $this->currency === $other->currency && $this->amount->isEqualTo($other->amount);
     }
 
-    /** Value for a NUMERIC(20,4) column, e.g. "501745.0000". */
+    /** Value for a NUMERIC(20,2) column, e.g. "501745.00". */
     public function toDecimalString(): string
     {
         return (string) $this->amount;

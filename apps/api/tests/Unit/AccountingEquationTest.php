@@ -21,7 +21,7 @@ final class AccountingEquationTest extends TestCase
         );
 
         $this->assertTrue($eq->holds());
-        $this->assertSame('501745.0000', $eq->toArray()['liabilities_and_equity']);
+        $this->assertSame('501745.00', $eq->toArray()['liabilities_and_equity']);
     }
 
     public function test_a_gap_is_reported_not_hidden(): void
@@ -29,6 +29,6 @@ final class AccountingEquationTest extends TestCase
         $eq = new AccountingEquation(Money::of('100', 'ETB'), Money::of('40', 'ETB'), Money::of('50', 'ETB'), Money::zero('ETB'));
 
         $this->assertFalse($eq->holds());
-        $this->assertSame('10.0000', $eq->toArray()['difference']);
+        $this->assertSame('10.00', $eq->toArray()['difference']);
     }
 }

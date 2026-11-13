@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { documentAmounts, lineAmounts, parse, roundToCurrency, toString } from "./decimal";
+import { documentAmounts, lineAmounts, parse, toString } from "./decimal";
 import { formatAmount, toEthiopian } from "./format";
 
 // Same cases as apps/api/tests/Unit/TaxCalculatorTest.php: browser preview and API must agree.
@@ -13,41 +13,46 @@ describe("tax maths (mirrors TaxCalculator)", () => {
       ],
       "ETB",
     );
-    expect(toString(doc.subtotal)).toBe("436300.0000");
-    expect(toString(doc.tax)).toBe("65445.0000");
-    expect(toString(doc.total)).toBe("501745.0000");
+    expect(toString(doc.subtotal)).toBe("436300.00");
+    expect(toString(doc.tax)).toBe("65445.00");
+    expect(toString(doc.total)).toBe("501745.00");
   });
 
   it("applies discount before tax", () => {
     const l = lineAmounts({ quantity: "3", unitPrice: "100", discountRate: "0.10", taxRate: "0.16" }, "KES");
-    expect([toString(l.subtotal), toString(l.tax), toString(l.total)]).toEqual(["270.0000", "43.2000", "313.2000"]);
+    expect([toString(l.subtotal), toString(l.tax), toString(l.total)]).toEqual(["270.00", "43.20", "313.20"]);
   });
 
   it("splits tax-inclusive prices without losing a cent", () => {
     const l = lineAmounts({ quantity: "1", unitPrice: "99.99", taxRate: "0.15" }, "ETB", true);
-    expect(toString(l.subtotal + l.tax)).toBe("99.9900");
-    expect(toString(l.subtotal)).toBe("86.9500");
+    expect(toString(l.subtotal + l.tax)).toBe("99.99");
+    expect(toString(l.subtotal)).toBe("86.95");
   });
 
-  it("rounds zero-decimal currencies to whole units", () => {
+  it("keeps two decimals for every currency", () => {
     const l = lineAmounts({ quantity: "3", unitPrice: "1999", taxRate: "0.18" }, "UGX");
-    expect(toString(l.tax)).toBe("1079.0000");
+    expect(toString(l.tax)).toBe("1079.46");
+  });
+
+  it("keeps fractional rates exact (7.5%)", () => {
+    const l = lineAmounts({ quantity: "1", unitPrice: "199.99", taxRate: "0.075" }, "NGN");
+    expect([toString(l.tax), toString(l.total)]).toEqual(["15.00", "214.99"]);
   });
 
   it("never uses floats: 0.1 + 0.2 is exactly 0.3", () => {
-    expect(toString(parse("0.1") + parse("0.2"))).toBe("0.3000");
+    expect(toString(parse("0.1") + parse("0.2"))).toBe("0.30");
   });
 
   it("rounds half away from zero", () => {
-    expect(toString(roundToCurrency(parse("10.005"), "ETB"))).toBe("10.0100");
-    expect(toString(roundToCurrency(parse("-10.005"), "ETB"))).toBe("-10.0100");
+    expect(toString(parse("10.005"))).toBe("10.01");
+    expect(toString(parse("-10.005"))).toBe("-10.01");
   });
 });
 
 describe("formatting", () => {
   it("groups thousands without float conversion", () => {
-    expect(formatAmount("501745.0000", "ETB")).toBe("501,745.00");
-    expect(formatAmount("1234567.5", "XOF")).toBe("1,234,568");
+    expect(formatAmount("501745.00", "ETB")).toBe("501,745.00");
+    expect(formatAmount("1234567.5", "UGX")).toBe("1,234,567.50");
   });
 
   it("converts to the Ethiopian calendar", () => {

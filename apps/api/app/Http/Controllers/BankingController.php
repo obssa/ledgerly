@@ -30,8 +30,8 @@ final class BankingController extends Controller
             'date' => ['required', 'date_format:Y-m-d'],
             'from_account_id' => ['required', 'uuid', 'different:to_account_id'],
             'to_account_id' => ['required', 'uuid'],
-            'amount' => ['required', 'decimal:0,4', 'gt:0'],
-            'fee' => ['nullable', 'decimal:0,4', 'min:0'],
+            'amount' => ['required', 'decimal:0,2', 'gt:0'],
+            'fee' => ['nullable', 'decimal:0,2', 'min:0'],
             'memo' => ['nullable', 'string', 'max:255'],
         ]);
         $currency = $this->current->get()->base_currency;
@@ -55,8 +55,8 @@ final class BankingController extends Controller
             'bank_account_id' => ['required', 'uuid'],
             'slip_number' => ['nullable', 'string', 'max:40'],
             'receipts' => ['required', 'array', 'min:1', 'max:500'],
-            'receipts.*' => ['required', 'decimal:0,4', 'gt:0'],
-            'fee' => ['nullable', 'decimal:0,4', 'min:0'],
+            'receipts.*' => ['required', 'decimal:0,2', 'gt:0'],
+            'fee' => ['nullable', 'decimal:0,2', 'min:0'],
         ]);
         $currency = $this->current->get()->base_currency;
 

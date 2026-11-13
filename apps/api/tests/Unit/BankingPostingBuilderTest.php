@@ -21,10 +21,10 @@ final class BankingPostingBuilderTest extends TestCase
 
         [$in, $out, $fee, $feeOut] = $draft->lines();
         $this->assertSame('cbe', $in->accountId);
-        $this->assertSame('118640.0000', $in->debit->toDecimalString());
+        $this->assertSame('118640.00', $in->debit->toDecimalString());
         $this->assertSame('telebirr', $out->accountId);
-        $this->assertSame('25.0000', $fee->debit->toDecimalString());
-        $this->assertSame('118665.0000', $draft->totalCredit()->toDecimalString());
+        $this->assertSame('25.00', $fee->debit->toDecimalString());
+        $this->assertSame('118665.00', $draft->totalCredit()->toDecimalString());
     }
 
     public function test_transfer_to_the_same_account_is_refused(): void
@@ -44,8 +44,8 @@ final class BankingPostingBuilderTest extends TestCase
 
         [$bank, $undeposited] = $draft->lines();
         $this->assertCount(2, $draft->lines());
-        $this->assertSame('12000.0000', $bank->debit->toDecimalString());
-        $this->assertSame('12000.0000', $undeposited->credit->toDecimalString());
+        $this->assertSame('12000.00', $bank->debit->toDecimalString());
+        $this->assertSame('12000.00', $undeposited->credit->toDecimalString());
         $this->assertSame('deposit', $draft->sourceType);
     }
 
@@ -57,8 +57,8 @@ final class BankingPostingBuilderTest extends TestCase
         );
 
         [$bank, $fee, $undeposited] = $draft->lines();
-        $this->assertSame('970.0000', $bank->debit->toDecimalString());
-        $this->assertSame('30.0000', $fee->debit->toDecimalString());
-        $this->assertSame('1000.0000', $undeposited->credit->toDecimalString());
+        $this->assertSame('970.00', $bank->debit->toDecimalString());
+        $this->assertSame('30.00', $fee->debit->toDecimalString());
+        $this->assertSame('1000.00', $undeposited->credit->toDecimalString());
     }
 }

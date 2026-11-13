@@ -16,7 +16,7 @@ ledgerly/
 │   │   └── Tenancy/               Companies, memberships, roles, country packs, RLS context
 │   ├── database/schema/           Core schema in plain PostgreSQL (triggers + row-level security)
 │   │   └── tests/                 Self-checking SQL tests for every ledger guard
-│   ├── database/country-packs/    ET, KE (IFRS for SMEs), CI (SYSCOHADA) + chart templates
+│   ├── database/country-packs/    ET, KE (IFRS for SMEs) + chart template
 │   └── tests/                     PHPUnit unit + feature tests
 ├── apps/web/                      Next.js 16 app (dashboard, invoices, new invoice, reports, onboarding)
 ├── docker/postgres/init.sql       Owner vs app roles so RLS applies to the app
@@ -61,19 +61,18 @@ cd apps/web && npm test && npm run lint && npm run build
 | Journal lines never changed in place; edits are reversals | DB triggers + `PostingService::reverse` |
 | Nothing posts into a closed period | `PostingService` + DB trigger |
 | Tenant isolation | Eloquent scope + PostgreSQL row-level security |
-| Exact money, never floats | `Money` (brick/math) and `src/lib/decimal.ts` (bigint), same rounding rules |
+| Exact money, never floats, always 2 decimal places | `Money` (brick/math) and `src/lib/decimal.ts` (bigint), same rounding rules |
 | Posted documents frozen; audit log and stock moves append-only | DB triggers |
 | Assets = Liabilities + Equity | `ReportService::balanceSheet` → `AccountingEquation` |
 
 ## Verified in the build sandbox (2 Nov 2026)
 
 - 31 API unit tests pass (run through a PHPUnit-compatible shim; Packagist was blocked there, so run `composer install && php artisan test` locally — the feature tests in `InvoiceFlowTest` (incl. edit-with-history and closed-year admin edit) have not run yet).
-- 22 database guard tests pass (incl. edit history, hash chain, tamper detection) on PostgreSQL 16, as the restricted app role; report SQL (trial balance, P&L, balance sheet, bin card) checked against fixtures.
+- 22 database guard tests pass, all amounts NUMERIC(20,2) (incl. edit history, hash chain, tamper detection) on PostgreSQL 16, as the restricted app role; report SQL (trial balance, P&L, balance sheet, bin card) checked against fixtures.
 - Web: 8 unit tests, lint, production build, all 5 pages render.
 
 ## Before go-live (not done here)
 
 - Tax rates, codes and effective dates in every country pack: confirm with a tax adviser (`_verify` notes in each pack).
-- SYSCOHADA chart template and Côte d'Ivoire pack: validate with an OHADA accountant.
 - KRA eTIMS connector: implement from the official spec and pass KRA certification; Ethiopia MoR connector waits for the Ministry's technical spec and system accreditation.
 - Sign-in UI, MFA, bills/expenses screens, bank statement import and matching UI, payroll rule packs.

@@ -20,7 +20,7 @@ const months = ["January", "February", "March", "April", "May", "June", "July", 
 
 /**
  * Company setup. Posts to POST /api/v1/companies, which installs the country pack
- * (chart of accounts for IFRS for SMEs or SYSCOHADA, tax rates, e-invoicing connector).
+ * (IFRS for SMEs chart of accounts, tax rates, e-invoicing connector).
  */
 export default function OnboardingPage() {
   return (
@@ -54,7 +54,6 @@ export default function OnboardingPage() {
               <select className="field" id="country_code" name="country_code" defaultValue="ET">
                 <option value="ET">Ethiopia · IFRS for SMEs</option>
                 <option value="KE">Kenya · IFRS for SMEs</option>
-                <option value="CI">Côte d&apos;Ivoire · SYSCOHADA</option>
               </select>
             </div>
             <Field id="tin" label="TIN" defaultValue="0098765432" />

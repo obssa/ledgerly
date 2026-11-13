@@ -1,14 +1,14 @@
-import { CURRENCY_DECIMALS, parse, roundToCurrency, toString, type Scaled } from "./decimal";
+import { parse, toString, type Scaled } from "./decimal";
 
-/** "501745.0000" → "501,745.00" (grouping only; no float conversion). */
-export function formatAmount(value: string | Scaled, currency: string): string {
+/** "501745.00" → "501,745.00": always 2 decimals, grouping only, no float conversion. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- currency kept in the signature for call sites
+export function formatAmount(value: string | Scaled, _currency?: string): string {
   const scaled = typeof value === "bigint" ? value : parse(value);
-  const decimals = CURRENCY_DECIMALS[currency] ?? 2;
-  const [whole, frac] = toString(roundToCurrency(scaled, currency)).split(".");
+  const [whole, frac] = toString(scaled).split(".");
   const negative = whole.startsWith("-");
   const digits = negative ? whole.slice(1) : whole;
   const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return `${negative ? "−" : ""}${grouped}${decimals > 0 ? "." + frac.slice(0, decimals) : ""}`;
+  return `${negative ? "−" : ""}${grouped}.${frac}`;
 }
 
 export function formatMoney(value: string | Scaled, currency: string): string {

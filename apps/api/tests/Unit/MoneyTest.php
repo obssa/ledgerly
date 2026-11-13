@@ -14,14 +14,15 @@ final class MoneyTest extends TestCase
     {
         $sum = Money::of('0.1', 'ETB')->plus(Money::of('0.2', 'ETB'));
 
-        $this->assertSame('0.3000', $sum->toDecimalString());
+        $this->assertSame('0.30', $sum->toDecimalString());
     }
 
-    public function test_it_rounds_half_up_to_currency_decimals(): void
+    public function test_it_rounds_half_up_to_two_decimals(): void
     {
-        $this->assertSame('10.0100', Money::of('10.005', 'ETB')->roundToCurrency()->toDecimalString());
-        $this->assertSame('1235.0000', Money::of('1234.5', 'UGX')->roundToCurrency()->toDecimalString());
-        $this->assertSame('-10.0100', Money::of('-10.005', 'ETB')->roundToCurrency()->toDecimalString());
+        $this->assertSame('10.01', Money::of('10.005', 'ETB')->roundToCurrency()->toDecimalString());
+        $this->assertSame('1234.50', Money::of('1234.5', 'UGX')->roundToCurrency()->toDecimalString());
+        $this->assertSame('0.13', Money::of('0.125', 'ETB')->toDecimalString());
+        $this->assertSame('-10.01', Money::of('-10.005', 'ETB')->roundToCurrency()->toDecimalString());
     }
 
     public function test_it_refuses_to_mix_currencies(): void
@@ -35,7 +36,7 @@ final class MoneyTest extends TestCase
     {
         $etb = Money::of('1240', 'USD')->convertTo('ETB', '134.52500000');
 
-        $this->assertSame('166811.0000', $etb->toDecimalString());
+        $this->assertSame('166811.00', $etb->toDecimalString());
         $this->assertSame('ETB', $etb->currency);
     }
 

@@ -18,8 +18,8 @@ final class ReportService
     {
         return DB::select(<<<'SQL'
             SELECT a.id AS account_id, a.code, a.name, a.type,
-                   greatest(sum(l.debit) - sum(l.credit), 0)::numeric(20,4)::text AS debit,
-                   greatest(sum(l.credit) - sum(l.debit), 0)::numeric(20,4)::text AS credit
+                   greatest(sum(l.debit) - sum(l.credit), 0)::numeric(20,2)::text AS debit,
+                   greatest(sum(l.credit) - sum(l.debit), 0)::numeric(20,2)::text AS credit
               FROM journal_lines l
               JOIN journal_entries e ON e.id = l.journal_entry_id
               JOIN accounts a        ON a.id = l.account_id
@@ -91,7 +91,7 @@ final class ReportService
         // Each account's balance in its natural sign: assets debit-positive, the rest credit-positive.
         $rows = DB::select(<<<'SQL'
             SELECT a.code, a.name, a.type,
-                   (CASE WHEN a.type IN ('asset', 'expense') THEN sum(l.debit - l.credit) ELSE sum(l.credit - l.debit) END)::numeric(20,4)::text AS amount
+                   (CASE WHEN a.type IN ('asset', 'expense') THEN sum(l.debit - l.credit) ELSE sum(l.credit - l.debit) END)::numeric(20,2)::text AS amount
               FROM journal_lines l
               JOIN journal_entries e ON e.id = l.journal_entry_id
               JOIN accounts a        ON a.id = l.account_id
@@ -126,19 +126,19 @@ final class ReportService
     public function binCard(string $companyId, string $itemId, string $warehouseId, string $from, string $to): array
     {
         $opening = DB::selectOne(<<<'SQL'
-            SELECT coalesce(sum(quantity), 0)::numeric(18,4)::text AS quantity,
-                   coalesce(sum(quantity * unit_cost), 0)::numeric(20,4)::text AS value
+            SELECT coalesce(sum(quantity), 0)::numeric(18,2)::text AS quantity,
+                   coalesce(sum(quantity * unit_cost), 0)::numeric(20,2)::text AS value
               FROM stock_moves
              WHERE company_id = ? AND item_id = ? AND warehouse_id = ? AND moved_on < ?
             SQL, [$companyId, $itemId, $warehouseId, $from]);
 
         $moves = DB::select(<<<'SQL'
             SELECT moved_on, kind, reference,
-                   greatest(quantity, 0)::numeric(18,4)::text            AS qty_in,
-                   greatest(-quantity, 0)::numeric(18,4)::text           AS qty_out,
+                   greatest(quantity, 0)::numeric(18,2)::text            AS qty_in,
+                   greatest(-quantity, 0)::numeric(18,2)::text           AS qty_out,
                    unit_cost::text                                       AS unit_cost,
-                   (?::numeric + sum(quantity) OVER w)::numeric(18,4)::text            AS balance_qty,
-                   (?::numeric + sum(quantity * unit_cost) OVER w)::numeric(20,4)::text AS balance_value
+                   (?::numeric + sum(quantity) OVER w)::numeric(18,2)::text            AS balance_qty,
+                   (?::numeric + sum(quantity * unit_cost) OVER w)::numeric(20,2)::text AS balance_value
               FROM stock_moves
              WHERE company_id = ? AND item_id = ? AND warehouse_id = ? AND moved_on BETWEEN ? AND ?
             WINDOW w AS (ORDER BY moved_on, seq ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
@@ -154,7 +154,7 @@ final class ReportService
         // Income shown as credit - debit; expenses as debit - credit: both positive in normal use.
         $rows = DB::select(<<<'SQL'
             SELECT a.code, a.name, a.type, a.subtype,
-                   (CASE WHEN a.type = 'income' THEN sum(l.credit - l.debit) ELSE sum(l.debit - l.credit) END)::numeric(20,4)::text AS amount
+                   (CASE WHEN a.type = 'income' THEN sum(l.credit - l.debit) ELSE sum(l.debit - l.credit) END)::numeric(20,2)::text AS amount
               FROM journal_lines l
               JOIN journal_entries e ON e.id = l.journal_entry_id
               JOIN accounts a        ON a.id = l.account_id

@@ -14,32 +14,32 @@ export const demoCompany = {
 const c = (id: string, name: string, tin: string | null = null) => ({ id, name, tax_id: tin });
 
 export const demoInvoices: Invoice[] = [
-  { id: "i419", number: "INV-2019-0419", status: "draft", contact: c("c1", "Sheger Grand Hotel", "0012345678"), issue_date: "2026-11-02", due_date: "2026-12-02", currency: "ETB", subtotal: "436300.0000", tax_total: "65445.0000", total: "501745.0000", amount_due: "501745.0000" },
-  { id: "i412", number: "INV-2019-0412", status: "posted", contact: c("c5", "Lalibela Lodge Group"), issue_date: "2026-10-28", due_date: "2026-11-27", currency: "ETB", subtotal: "72000.0000", tax_total: "10800.0000", total: "82800.0000", amount_due: "82800.0000", einvoice_submissions: [{ authority: "ET_MOR", status: "rejected", clearance_number: null, qr_payload: null, last_error: "Buyer TIN not found" }] },
-  { id: "i406", number: "INV-2019-0406", status: "posted", contact: c("c4", "Harar Hills Café"), issue_date: "2026-09-24", due_date: "2026-10-24", currency: "ETB", subtotal: "36347.8300", tax_total: "5452.1700", total: "41800.0000", amount_due: "41800.0000" },
-  { id: "i401", number: "INV-2019-0401", status: "posted", contact: c("c3", "Rift Valley Roasters Ltd"), issue_date: "2026-09-15", due_date: "2026-10-15", currency: "USD", subtotal: "1240.0000", tax_total: "0.0000", total: "1240.0000", amount_due: "1240.0000" },
-  { id: "i395", number: "INV-2019-0395", status: "posted", contact: c("c2", "Bole Brew Café"), issue_date: "2026-09-02", due_date: "2026-10-02", currency: "ETB", subtotal: "50652.1700", tax_total: "7597.8300", total: "58250.0000", amount_due: "58250.0000" },
-  { id: "i388", number: "INV-2019-0388", status: "posted", contact: c("c1", "Sheger Grand Hotel", "0012345678"), issue_date: "2026-08-17", due_date: "2026-09-16", currency: "ETB", subtotal: "83826.0900", tax_total: "12573.9100", total: "96400.0000", amount_due: "96400.0000" },
+  { id: "i419", number: "INV-2019-0419", status: "draft", contact: c("c1", "Sheger Grand Hotel", "0012345678"), issue_date: "2026-11-02", due_date: "2026-12-02", currency: "ETB", subtotal: "436300.00", tax_total: "65445.00", total: "501745.00", amount_due: "501745.00" },
+  { id: "i412", number: "INV-2019-0412", status: "posted", contact: c("c5", "Lalibela Lodge Group"), issue_date: "2026-10-28", due_date: "2026-11-27", currency: "ETB", subtotal: "72000.00", tax_total: "10800.00", total: "82800.00", amount_due: "82800.00", einvoice_submissions: [{ authority: "ET_MOR", status: "rejected", clearance_number: null, qr_payload: null, last_error: "Buyer TIN not found" }] },
+  { id: "i406", number: "INV-2019-0406", status: "posted", contact: c("c4", "Harar Hills Café"), issue_date: "2026-09-24", due_date: "2026-10-24", currency: "ETB", subtotal: "36347.83", tax_total: "5452.17", total: "41800.00", amount_due: "41800.00" },
+  { id: "i401", number: "INV-2019-0401", status: "posted", contact: c("c3", "Rift Valley Roasters Ltd"), issue_date: "2026-09-15", due_date: "2026-10-15", currency: "USD", subtotal: "1240.00", tax_total: "0.00", total: "1240.00", amount_due: "1240.00" },
+  { id: "i395", number: "INV-2019-0395", status: "posted", contact: c("c2", "Bole Brew Café"), issue_date: "2026-09-02", due_date: "2026-10-02", currency: "ETB", subtotal: "50652.17", tax_total: "7597.83", total: "58250.00", amount_due: "58250.00" },
+  { id: "i388", number: "INV-2019-0388", status: "posted", contact: c("c1", "Sheger Grand Hotel", "0012345678"), issue_date: "2026-08-17", due_date: "2026-09-16", currency: "ETB", subtotal: "83826.09", tax_total: "12573.91", total: "96400.00", amount_due: "96400.00" },
 ];
 
 export const demoKpis = {
-  cash: "2486320.0000",
-  receivable: "914500.0000",
-  overdue: "286900.0000",
+  cash: "2486320.00",
+  receivable: "914500.00",
+  overdue: "286900.00",
   overdueCount: 12,
-  payable: "388140.0000",
+  payable: "388140.00",
   billsDueThisWeek: 6,
-  netProfit: "412880.0000",
-  vatDue: "142615.0000",
+  netProfit: "412880.00",
+  vatDue: "142615.00",
   vatDueDays: 28,
   einvoices: { cleared: 318, waiting: 2, rejected: 1 },
 };
 
 export const demoAccounts = [
-  { name: "CBE current ··4417", note: "Synced 12 min ago · 8 to review", balance: "1604210.0000" },
-  { name: "Awash savings ··0932", note: "Statement uploaded 1 Nov", balance: "512000.0000" },
-  { name: "Telebirr merchant", note: "Live · 5 to review", balance: "327610.0000" },
-  { name: "Petty cash · Bole shop", note: "Counted 31 Oct", balance: "42500.0000" },
+  { name: "CBE current ··4417", note: "Synced 12 min ago · 8 to review", balance: "1604210.00" },
+  { name: "Awash savings ··0932", note: "Statement uploaded 1 Nov", balance: "512000.00" },
+  { name: "Telebirr merchant", note: "Live · 5 to review", balance: "327610.00" },
+  { name: "Petty cash · Bole shop", note: "Counted 31 Oct", balance: "42500.00" },
 ];
 
 const r = (code: string, name: string, current: string, previous: string) => ({ code, name, current, previous });
@@ -47,34 +47,34 @@ const r = (code: string, name: string, current: string, previous: string) => ({ 
 export const demoProfitAndLoss: ProfitAndLoss = {
   sections: {
     income: [
-      r("4000", "Sales · roasted coffee", "1402600.0000", "1361330.0000"),
-      r("4010", "Sales · green coffee export", "386200.0000", "355600.0000"),
-      r("4100", "Delivery income", "21400.0000", "19800.0000"),
+      r("4000", "Sales · roasted coffee", "1402600.00", "1361330.00"),
+      r("4010", "Sales · green coffee export", "386200.00", "355600.00"),
+      r("4100", "Delivery income", "21400.00", "19800.00"),
     ],
     cost_of_sales: [
-      r("5000", "Green coffee purchases", "742300.0000", "701900.0000"),
-      r("5010", "Roasting and packaging", "118500.0000", "112200.0000"),
+      r("5000", "Green coffee purchases", "742300.00", "701900.00"),
+      r("5010", "Roasting and packaging", "118500.00", "112200.00"),
     ],
     expenses: [
-      r("6000", "Salaries and wages", "286300.0000", "286300.0000"),
-      r("6010", "Pension · employer", "31500.0000", "31500.0000"),
-      r("6100", "Rent", "120000.0000", "120000.0000"),
-      r("6200", "Utilities", "18640.0000", "17920.0000"),
-      r("6300", "Telephone and internet", "9850.0000", "9850.0000"),
-      r("6400", "Vehicle and fuel", "22400.0000", "19600.0000"),
-      r("6500", "Marketing", "15000.0000", "22000.0000"),
-      r("6600", "Bank charges and fees", "6230.0000", "5980.0000"),
-      r("6700", "Depreciation", "24600.0000", "24600.0000"),
-      r("4950", "Foreign exchange (gain)", "-6000.0000", "-4000.0000"),
-      r("7000", "Interest expense", "8000.0000", "8000.0000"),
+      r("6000", "Salaries and wages", "286300.00", "286300.00"),
+      r("6010", "Pension · employer", "31500.00", "31500.00"),
+      r("6100", "Rent", "120000.00", "120000.00"),
+      r("6200", "Utilities", "18640.00", "17920.00"),
+      r("6300", "Telephone and internet", "9850.00", "9850.00"),
+      r("6400", "Vehicle and fuel", "22400.00", "19600.00"),
+      r("6500", "Marketing", "15000.00", "22000.00"),
+      r("6600", "Bank charges and fees", "6230.00", "5980.00"),
+      r("6700", "Depreciation", "24600.00", "24600.00"),
+      r("4950", "Foreign exchange (gain)", "-6000.00", "-4000.00"),
+      r("7000", "Interest expense", "8000.00", "8000.00"),
     ],
   },
   totals: {
-    income: { current: "1810200.0000", previous: "1736730.0000" },
-    cost_of_sales: { current: "860800.0000", previous: "814100.0000" },
-    gross_profit: { current: "949400.0000", previous: "922630.0000" },
-    expenses: { current: "536520.0000", previous: "541750.0000" },
-    net_profit: { current: "412880.0000", previous: "380880.0000" },
+    income: { current: "1810200.00", previous: "1736730.00" },
+    cost_of_sales: { current: "860800.00", previous: "814100.00" },
+    gross_profit: { current: "949400.00", previous: "922630.00" },
+    expenses: { current: "536520.00", previous: "541750.00" },
+    net_profit: { current: "412880.00", previous: "380880.00" },
   },
 };
 

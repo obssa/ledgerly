@@ -31,7 +31,7 @@ CREATE TABLE journal_entries (
     source_type text          NOT NULL DEFAULT 'manual', -- invoice, bill, payment, payroll_run, manual, reversal ...
     source_id   uuid,
     currency    char(3)       NOT NULL,                   -- transaction currency
-    fx_rate     numeric(18,8) NOT NULL DEFAULT 1 CHECK (fx_rate > 0),
+    fx_rate     numeric(18,6) NOT NULL DEFAULT 1 CHECK (fx_rate > 0),
     status      text          NOT NULL DEFAULT 'posted' CHECK (status IN ('posted', 'reversed')),
     reverses_id uuid          REFERENCES journal_entries (id),
     posted_by   uuid          REFERENCES users (id),
@@ -48,9 +48,9 @@ CREATE TABLE journal_lines (
     line_no          integer       NOT NULL,
     account_id       uuid          NOT NULL REFERENCES accounts (id),
     description      text,
-    debit            numeric(20,4) NOT NULL DEFAULT 0 CHECK (debit  >= 0), -- base currency
-    credit           numeric(20,4) NOT NULL DEFAULT 0 CHECK (credit >= 0), -- base currency
-    amount_txn       numeric(20,4) NOT NULL DEFAULT 0, -- signed (+debit / -credit) in the entry's currency
+    debit            numeric(20,2) NOT NULL DEFAULT 0 CHECK (debit  >= 0), -- base currency
+    credit           numeric(20,2) NOT NULL DEFAULT 0 CHECK (credit >= 0), -- base currency
+    amount_txn       numeric(20,2) NOT NULL DEFAULT 0, -- signed (+debit / -credit) in the entry's currency
     contact_id       uuid,
     location_id      uuid,
     class_id         uuid,

@@ -21,7 +21,7 @@ final readonly class CountryPack
     ];
 
     /** Accounting frameworks and the chart template each one uses by default. */
-    public const FRAMEWORKS = ['ifrs_sme', 'syscohada'];
+    public const FRAMEWORKS = ['ifrs_sme'];
 
     private const ACCOUNT_TYPES = ['asset', 'liability', 'equity', 'income', 'expense'];
 
