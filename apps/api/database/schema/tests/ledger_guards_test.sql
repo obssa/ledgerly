@@ -503,4 +503,239 @@ DO $$ BEGIN
   RAISE NOTICE 'PASS T25 ledger_verify detects a drifted balance';
 END $$;
 
+
+-- =====================================================================================================
+-- Access rules inside a company (008_access_hardening.sql)
+-- =====================================================================================================
+INSERT INTO organisations (id, name, created_by) VALUES ('00000000-0000-0000-0000-0000000000c0', 'Access Org', '00000000-0000-0000-0000-0000000000f1');
+INSERT INTO users (id, name, email, password, mfa_secret) VALUES
+  ('00000000-0000-0000-0000-0000000000c1', 'Owner',      'owner@access.test',      'hash-owner', 'secret-owner'),
+  ('00000000-0000-0000-0000-0000000000c2', 'Admin',      'admin@access.test',      'hash-admin', NULL),
+  ('00000000-0000-0000-0000-0000000000c3', 'Viewer',     'viewer@access.test',     'hash-viewer', NULL),
+  ('00000000-0000-0000-0000-0000000000c4', 'Accountant', 'accountant@access.test', 'hash-acc', NULL),
+  ('00000000-0000-0000-0000-0000000000c5', 'Invited',    'invited@access.test',    'hash-inv', NULL),
+  ('00000000-0000-0000-0000-0000000000c6', 'Stranger',   'stranger@access.test',   'hash-str', 'secret-stranger');
+INSERT INTO companies (id, organisation_id, legal_name, country_code, base_currency, books_closed_until) VALUES
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000c0', 'Access Co', 'ET', 'ETB', '2026-06-30');
+INSERT INTO memberships (company_id, user_id, role, status) VALUES
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000c1', 'owner', 'active'),
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000c2', 'admin', 'active'),
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000c3', 'viewer', 'active'),
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000c4', 'accountant', 'active'),
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000c5', 'sales', 'invited');
+
+SET ROLE ledgerly_web;
+SELECT set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
+-- T26: a viewer cannot make themselves an owner, add a member, or remove one
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c3', false) \gset ignore_
+DO $$
+DECLARE n int;
+BEGIN
+  BEGIN
+    UPDATE memberships SET role = 'owner' WHERE user_id = app_user_id() AND company_id = app_company_id();
+    RAISE EXCEPTION 'FAIL T26a: a viewer promoted themselves';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    INSERT INTO memberships (company_id, user_id, role) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000c6', 'admin');
+    RAISE EXCEPTION 'FAIL T26b: a viewer added a member';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  UPDATE memberships SET role = 'viewer' WHERE user_id = '00000000-0000-0000-0000-0000000000c2';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL T26c: a viewer changed another member'; END IF;
+  DELETE FROM memberships WHERE user_id = '00000000-0000-0000-0000-0000000000c2';
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL T26d: a viewer removed a member'; END IF;
+  RAISE NOTICE 'PASS T26 a member without admin rights cannot change users or roles';
+END $$;
+
+-- T27: an admin manages members but cannot grant, change or remove the owner role
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c2', false) \gset ignore_
+DO $$ BEGIN
+  UPDATE memberships SET role = 'bookkeeper' WHERE user_id = '00000000-0000-0000-0000-0000000000c3' AND company_id = app_company_id();
+  BEGIN
+    UPDATE memberships SET role = 'owner' WHERE user_id = app_user_id() AND company_id = app_company_id();
+    RAISE EXCEPTION 'FAIL T27a: an admin made themselves owner';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE memberships SET status = 'deactivated' WHERE user_id = '00000000-0000-0000-0000-0000000000c1' AND company_id = app_company_id();
+    RAISE EXCEPTION 'FAIL T27b: an admin deactivated the owner';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    INSERT INTO memberships (company_id, user_id, role) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000c6', 'owner');
+    RAISE EXCEPTION 'FAIL T27c: an admin added an owner';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T27 an admin manages members but not the owner role';
+END $$;
+
+-- T28: the last active owner cannot be removed or demoted, even by themselves
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    UPDATE memberships SET role = 'viewer' WHERE user_id = app_user_id() AND company_id = app_company_id();
+    RAISE EXCEPTION 'FAIL T28a: the last owner was demoted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM memberships WHERE user_id = app_user_id() AND company_id = app_company_id();
+    RAISE EXCEPTION 'FAIL T28b: the last owner was removed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T28 a company always keeps an active owner';
+END $$;
+
+-- T29: an invited user can accept their own invitation and change nothing else
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c5', false),
+       set_config('app.company_id', '', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    UPDATE memberships SET status = 'active', role = 'admin' WHERE user_id = app_user_id();
+    RAISE EXCEPTION 'FAIL T29a: an invited user chose their own role';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  UPDATE memberships SET status = 'active' WHERE user_id = app_user_id();
+  IF (SELECT status FROM memberships WHERE user_id = app_user_id()) <> 'active' THEN
+    RAISE EXCEPTION 'FAIL T29b: the invitation could not be accepted';
+  END IF;
+  RAISE NOTICE 'PASS T29 an invited user can only accept the invitation';
+END $$;
+SELECT set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
+-- T30: closing a period is for accountants; reopening it and company settings are for owner and admin
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c4', false) \gset ignore_
+DO $$ BEGIN
+  UPDATE companies SET books_closed_until = '2026-07-31' WHERE id = app_company_id();
+  BEGIN
+    UPDATE companies SET books_closed_until = '2026-01-31' WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T30a: an accountant reopened a closed period';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE companies SET books_closed_until = NULL WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T30b: an accountant removed the period lock';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE companies SET tin = '0000000000', books_closed_until = '2026-08-31' WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T30c: an accountant changed company settings';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c3', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    UPDATE companies SET books_closed_until = '2026-12-31' WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T30d: a bookkeeper changed the period lock';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE organisations SET name = 'Renamed' WHERE id = '00000000-0000-0000-0000-0000000000c0';
+    IF (SELECT name FROM organisations WHERE id = '00000000-0000-0000-0000-0000000000c0') = 'Renamed' THEN
+      RAISE EXCEPTION 'FAIL T30e: a bookkeeper renamed the organisation';
+    END IF;
+  END;
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c2', false) \gset ignore_
+DO $$ BEGIN
+  UPDATE companies SET books_closed_until = '2026-06-30', trading_name = 'Access' WHERE id = app_company_id();
+  BEGIN
+    UPDATE companies SET organisation_id = '00000000-0000-0000-0000-0000000000a9' WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T30f: a company was moved to another organisation';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T30 period reopening and company settings need an owner or admin';
+END $$;
+
+-- T31: only the organisation's creator or an owner/admin of one of its companies can add a company to it
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c3', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-0000000000cd', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO companies (id, organisation_id, legal_name, country_code, base_currency)
+      VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000c0', 'Sneaked in', 'ET', 'ETB');
+    RAISE EXCEPTION 'FAIL T31a: a bookkeeper added a company to the organisation';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false) \gset ignore_
+DO $$ BEGIN
+  INSERT INTO companies (id, organisation_id, legal_name, country_code, base_currency)
+    VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000c0', 'Second Co', 'ET', 'ETB');
+  INSERT INTO memberships (company_id, user_id, role, status) VALUES (app_company_id(), app_user_id(), 'owner', 'active');
+  RAISE NOTICE 'PASS T31 adding a company to an organisation needs its creator, owner or admin';
+END $$;
+-- ...and once a company has an owner, nobody else can use the first-owner rule to join it
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c6', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO memberships (company_id, user_id, role, status) VALUES (app_company_id(), app_user_id(), 'owner', 'active');
+    RAISE EXCEPTION 'FAIL T31b: a stranger joined a company as owner';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+
+-- T32: user records are visible only to the user and to members of the company in the context
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c3', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+DO $$
+DECLARE n int;
+BEGIN
+  IF EXISTS (SELECT 1 FROM users WHERE email IN ('stranger@access.test', 'hana@example.test')) THEN
+    RAISE EXCEPTION 'FAIL T32a: a user outside the company is visible';
+  END IF;
+  IF (SELECT count(*) FROM users) <> 5 THEN RAISE EXCEPTION 'FAIL T32b: expected the 5 company members, saw %', (SELECT count(*) FROM users); END IF;
+  UPDATE users SET password = 'stolen' WHERE id <> app_user_id();
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL T32c: another user''s password was changed'; END IF;
+  BEGIN
+    DELETE FROM users WHERE id = '00000000-0000-0000-0000-0000000000c5';
+    RAISE EXCEPTION 'FAIL T32d: a user was deleted by the application';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    PERFORM app_user_id_for_invite('stranger@access.test');
+    RAISE EXCEPTION 'FAIL T32e: a bookkeeper looked up a user by email';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T32 user records are visible only to the user and their company';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false) \gset ignore_
+DO $$ BEGIN
+  IF app_user_id_for_invite('STRANGER@access.test') IS DISTINCT FROM '00000000-0000-0000-0000-0000000000c6'::uuid THEN
+    RAISE EXCEPTION 'FAIL T32f: an owner could not look up a user to invite';
+  END IF;
+END $$;
+
+-- T33: the audit chain can be verified only for the current company
+DO $$ BEGIN
+  PERFORM audit_log_verify(app_company_id());
+  BEGIN
+    PERFORM audit_log_verify('00000000-0000-0000-0000-00000000000a');
+    RAISE EXCEPTION 'FAIL T33: another company''s audit chain was checked';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS T33 the audit chain check is limited to the current company';
+  END;
+END $$;
+
+-- T34: the application role cannot create objects, read partitions, or become another role
+DO $$ BEGIN
+  BEGIN
+    CREATE TABLE sneaky (id int);
+    RAISE EXCEPTION 'FAIL T34a: the application role created a table';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+    RAISE EXCEPTION 'FAIL T34b: the application role switched off row-level security';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE state_transitions SET to_state = 'draft';
+    RAISE EXCEPTION 'FAIL T34c: the application role rewrote the state machines';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T34 the application role cannot change the schema or the rules';
+END $$;
+
+RESET ROLE;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ledgerly_web' AND (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb)) THEN
+    RAISE EXCEPTION 'FAIL T35: the application login role has elevated rights';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition AND NOT c.relrowsecurity
+                AND c.relname NOT IN ('state_transitions')) THEN
+    RAISE EXCEPTION 'FAIL T35: a table has no row-level security: %',
+      (SELECT string_agg(c.relname, ', ') FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition AND NOT c.relrowsecurity
+          AND c.relname NOT IN ('state_transitions'));
+  END IF;
+  RAISE NOTICE 'PASS T35 every table has row-level security and the application role has no elevated rights';
+END $$;
+
 \echo 'All ledger guard tests passed.'

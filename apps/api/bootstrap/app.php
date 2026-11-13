@@ -5,6 +5,7 @@ use App\Domain\Ledger\Exceptions\StaleDocument;
 use App\Domain\Tenancy\Http\ResolveCompany;
 use App\Http\Middleware\Idempotency;
 use App\Http\Middleware\RunInTenantTransaction;
+use App\Http\Middleware\SecurityHeaders;
 use App\Support\IllegalTransition;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: ResolveCompany::class);
         $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: Idempotency::class);
         $middleware->throttleApi('120,1');
+        $middleware->append(SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // Someone else saved the document first: the client reloads and tries again.

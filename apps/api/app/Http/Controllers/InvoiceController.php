@@ -71,7 +71,9 @@ final class InvoiceController extends Controller
 
         return response()->json([
             'versions' => DocumentVersion::query()->where('document_id', $invoice->getKey())->orderByDesc('version')->get(),
+            // Always name the company, even though row-level security would filter it anyway.
             'audit' => DB::table('audit_log')
+                ->where('company_id', $invoice->company_id)
                 ->where('subject_id', $invoice->getKey())
                 ->orderByDesc('id')
                 ->get(['id', 'action', 'user_id', 'actor_type', 'before', 'after', 'reason', 'ip', 'created_at']),

@@ -102,10 +102,10 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 | Double clicks and concurrent edits | Idempotency keys; optimistic locking |
 | No CI | `.github/workflows/ci.yml` |
 
-## Verified in the build sandbox (13 Nov 2026)
+## Verified in the build sandbox (14 Nov 2026)
 
-- **Database: 36 checks pass** on PostgreSQL 16.15 as the restricted app role: 32 guard checks (T1–T25) and 4 two-session
-  concurrency checks (C1–C4). Benchmark on 3.9 million lines / 300 companies: balances equal the ledger, partition pruning
+- **Database: 46 checks pass** on PostgreSQL 16.15 as the restricted app role: 42 guard checks (T1–T35, of which T26–T35
+  are the access rules added by the security review) and 4 two-session concurrency checks (C1–C4). Benchmark on 3.9 million lines / 300 companies: balances equal the ledger, partition pruning
   touches 1 of 16 partitions.
 - **API: 44 unit tests pass**, run through a PHPUnit-compatible shim because Packagist is blocked in the sandbox.
 - **API feature tests (`InvoiceFlowTest`, 6 tests) have NOT been run**, and neither has any Laravel middleware, controller or
@@ -113,6 +113,12 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
   fix small things. CI does this on every pull request.
 - PostgreSQL 18 (the production target) has not been tried here; CI runs the database tests on 16 and 18.
 - Web: 10 unit tests, lint (0 errors), production build, all pages render.
+
+## Security
+
+`SECURITY.md` is the record of the 14 Nov 2026 security review: threat model, every control and whether a test proves it,
+the 16 findings and their fixes, and the 15 blocking tasks (S1–S15) before a real customer signs in. `CLAUDE.md` holds the
+rules Claude Code follows in this repository.
 
 ## Before go-live (not done here)
 

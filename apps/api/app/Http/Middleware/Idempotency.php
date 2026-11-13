@@ -46,7 +46,11 @@ final class Idempotency
         if ($claimed === 0) {
             $stored = DB::table('idempotency_keys')->where(['company_id' => $companyId, 'key' => $key])->first();
 
-            if ($stored === null || $stored->request_hash !== $hash) {
+            // A key belongs to the user who first sent it: nobody else can replay it to read the stored response.
+            if ($stored !== null && (string) $stored->user_id !== (string) $request->user()?->getKey()) {
+                return response()->json(['message' => 'This Idempotency-Key belongs to another user.'], 422);
+            }
+            if ($stored === null || ! hash_equals((string) $stored->request_hash, $hash)) {
                 return response()->json(['message' => 'This Idempotency-Key was already used for a different request.'], 422);
             }
 

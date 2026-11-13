@@ -23,7 +23,11 @@ class User extends Authenticatable
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed'];
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'mfa_secret' => 'encrypted', // never stored readable: a database leak must not leak sign-in codes
+        ];
     }
 
     public function memberships(): HasMany
