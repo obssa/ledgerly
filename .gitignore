@@ -4,3 +4,10 @@ vendor/
 .env
 apps/api/storage/*.key
 .DS_Store
+# Laravel runtime and build output
+apps/api/.phpunit.result.cache
+apps/api/.phpunit.cache/
+apps/api/bootstrap/cache/*.php
+apps/api/storage/logs/*.log
+apps/api/storage/framework/
+apps/api/phpunit.shared-host.xml

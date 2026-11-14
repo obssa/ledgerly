@@ -5,22 +5,21 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
+use Tests\RefreshLedgerDatabase;
 use Tests\TestCase;
 
 /**
  * End to end through the HTTP API on PostgreSQL: set up a company, invoice a customer, approve,
  * and check the ledger and the e-invoice clearance; then edits with history, idempotency, optimistic
  * locking, the approval step, voiding, read-only subscriptions and any-country setup.
- * NOT YET RUN: the build sandbox could not install Laravel. CI (.github/workflows/ci.yml) runs it.
  *
- * Uses DatabaseMigrations (not RefreshDatabase): the balance check is a DEFERRED constraint trigger and
- * only fires when a transaction commits, which a per-test rollback would never do.
+ * Requests run as ledgerly_web (row-level security applies); fixtures and checks on stored rows use the
+ * owner connection (see RefreshLedgerDatabase).
  */
 final class InvoiceFlowTest extends TestCase
 {
-    use DatabaseMigrations;
+    use RefreshLedgerDatabase;
 
     public function test_owner_can_invoice_and_the_ledger_balances(): void
     {
@@ -38,9 +37,9 @@ final class InvoiceFlowTest extends TestCase
         ])->assertCreated()->json('id');
 
         $headers = ['X-Company-Id' => $companyId];
-        $sales = DB::table('accounts')->where(['company_id' => $companyId, 'system_key' => 'sales'])->value('id');
-        $vat15 = DB::table('tax_rates')->where(['company_id' => $companyId, 'code' => 'VAT15'])->value('id');
-        $customer = DB::table('contacts')->insertGetId([
+        $sales = $this->owner()->table('accounts')->where(['company_id' => $companyId, 'system_key' => 'sales'])->value('id');
+        $vat15 = $this->owner()->table('tax_rates')->where(['company_id' => $companyId, 'code' => 'VAT15'])->value('id');
+        $customer = $this->owner()->table('contacts')->insertGetId([
             'id' => (string) \Illuminate\Support\Str::uuid(), 'company_id' => $companyId,
             'name' => 'Sheger Grand Hotel', 'is_customer' => true, 'tax_id' => '0012345678',
         ]);
@@ -70,8 +69,8 @@ final class InvoiceFlowTest extends TestCase
 
         // Approving twice is refused by the state machine, and nothing posts twice.
         $this->postJson("/api/v1/invoices/{$invoiceId}/approve", [], $headers)->assertStatus(422)->assertJsonPath('type', 'IllegalTransition');
-        $this->assertSame(1, DB::table('journal_entries')->where('company_id', $companyId)->count());
-        $this->assertSame([], DB::select('select * from ledger_verify(?)', [$companyId]));
+        $this->assertSame(1, $this->owner()->table('journal_entries')->where('company_id', $companyId)->count());
+        $this->assertSame([], $this->owner()->select('select * from ledger_verify(?)', [$companyId]));
 
         $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $headers)->assertOk()->json('data'));
         $this->assertSame('501745.00', $tb->firstWhere('code', '1200')['debit']);
@@ -92,10 +91,10 @@ final class InvoiceFlowTest extends TestCase
         $this->actingAs($owner, 'sanctum');
         $companyId = $this->postJson('/api/v1/companies', ['legal_name' => 'Harar Traders', 'country_code' => 'ET', 'fiscal_year_start_month' => 7])->assertCreated()->json('id');
         $headers = ['X-Company-Id' => $companyId];
-        $sales = DB::table('accounts')->where(['company_id' => $companyId, 'system_key' => 'sales'])->value('id');
-        $vat15 = DB::table('tax_rates')->where(['company_id' => $companyId, 'code' => 'VAT15'])->value('id');
+        $sales = $this->owner()->table('accounts')->where(['company_id' => $companyId, 'system_key' => 'sales'])->value('id');
+        $vat15 = $this->owner()->table('tax_rates')->where(['company_id' => $companyId, 'code' => 'VAT15'])->value('id');
         $customer = (string) \Illuminate\Support\Str::uuid();
-        DB::table('contacts')->insert(['id' => $customer, 'company_id' => $companyId, 'name' => 'Sheger Grand Hotel', 'is_customer' => true]);
+        $this->owner()->table('contacts')->insert(['id' => $customer, 'company_id' => $companyId, 'name' => 'Sheger Grand Hotel', 'is_customer' => true]);
 
         $invoice = fn (string $qty, ?string $reason = null) => array_filter([
             'reason' => $reason, 'contact_id' => $customer, 'number' => 'INV-0001', 'issue_date' => '2026-11-02', 'currency' => 'ETB',
@@ -122,29 +121,29 @@ final class InvoiceFlowTest extends TestCase
         $this->assertNotNull($after['corrected_entry_id']);
 
         // The ledger kept the original, its reversal and the correction; the trial balance shows the net.
-        $entries = DB::table('journal_entries')->where('company_id', $companyId)->orderBy('number')->get(['source_type', 'status']);
+        $entries = $this->owner()->table('journal_entries')->where('company_id', $companyId)->orderBy('number')->get(['source_type', 'status']);
         $this->assertSame([['invoice', 'reversed'], ['reversal', 'posted'], ['invoice', 'posted']], $entries->map(fn ($e) => [$e->source_type, $e->status])->all());
         $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $headers)->json('data'));
         $this->assertSame('264500.00', $tb->firstWhere('code', '1200')['debit']);
 
         // The audit chain is intact.
-        $this->assertNull(DB::selectOne('select audit_log_verify(?) as broken', [$companyId])->broken);
+        $this->assertNull($this->owner()->selectOne('select audit_log_verify(?) as broken', [$companyId])->broken);
 
         // Close the books: a bookkeeper can no longer edit, the owner (admin) can, and the lock is restored.
-        DB::table('companies')->where('id', $companyId)->update(['books_closed_until' => '2026-11-30']);
+        $this->owner()->table('companies')->where('id', $companyId)->update(['books_closed_until' => '2026-11-30']);
         $bookkeeper = User::query()->create(['name' => 'Abebe', 'email' => 'abebe@example.test', 'password' => 'secret-password']);
-        DB::table('memberships')->insert(['id' => (string) \Illuminate\Support\Str::uuid(), 'company_id' => $companyId, 'user_id' => $bookkeeper->getKey(), 'role' => 'bookkeeper']);
+        $this->owner()->table('memberships')->insert(['id' => (string) \Illuminate\Support\Str::uuid(), 'company_id' => $companyId, 'user_id' => $bookkeeper->getKey(), 'role' => 'bookkeeper']);
 
         $this->actingAs($bookkeeper, 'sanctum');
         $this->putJson("/api/v1/invoices/{$id}", $invoice('190', 'Late correction'), $headers)->assertStatus(422)->assertJsonPath('type', 'PeriodLocked');
 
         $this->actingAs($owner, 'sanctum');
         $this->putJson("/api/v1/invoices/{$id}", $invoice('190', 'Auditor adjustment'), $headers)->assertOk();
-        $this->assertSame('2026-11-30', DB::table('companies')->where('id', $companyId)->value('books_closed_until'));
-        $actions = DB::table('audit_log')->where('company_id', $companyId)->orderBy('id')->pluck('action')->all();
+        $this->assertSame('2026-11-30', $this->owner()->table('companies')->where('id', $companyId)->value('books_closed_until'));
+        $actions = $this->owner()->table('audit_log')->where('company_id', $companyId)->orderBy('id')->pluck('action')->all();
         $this->assertContains('period_reopened', $actions);
         $this->assertContains('period_relocked', $actions);
-        $this->assertSame(2, DB::table('document_versions')->where('document_id', $id)->count());
+        $this->assertSame(2, $this->owner()->table('document_versions')->where('document_id', $id)->count());
     }
 
     public function test_requests_are_safe_to_repeat_and_safe_against_stale_saves(): void
@@ -157,7 +156,7 @@ final class InvoiceFlowTest extends TestCase
         $first = $this->postJson('/api/v1/invoices', $invoice('10'), $headers + $key)->assertCreated();
         $again = $this->postJson('/api/v1/invoices', $invoice('10'), $headers + $key)->assertCreated()->assertHeader('Idempotency-Replayed', 'true');
         $this->assertSame($first->json('id'), $again->json('id'));
-        $this->assertSame(1, DB::table('documents')->where('company_id', $companyId)->count());
+        $this->assertSame(1, $this->owner()->table('documents')->where('company_id', $companyId)->count());
 
         // The same key with a different body is a client bug, not a retry.
         $this->postJson('/api/v1/invoices', $invoice('11'), $headers + $key)->assertStatus(422);
@@ -166,7 +165,7 @@ final class InvoiceFlowTest extends TestCase
         $id = $first->json('id');
         $this->putJson("/api/v1/invoices/{$id}", $invoice('12') + ['lock_version' => 1], $headers)->assertOk();
         $this->putJson("/api/v1/invoices/{$id}", $invoice('13') + ['lock_version' => 1], $headers)->assertStatus(409)->assertJsonPath('type', 'StaleDocument');
-        $this->assertSame('12.00', DB::table('document_lines')->where('document_id', $id)->value('quantity'));
+        $this->assertSame('12.00', $this->owner()->table('document_lines')->where('document_id', $id)->value('quantity'));
 
         // No tenant context is left on the connection after a request.
         $this->assertSame('', (string) DB::selectOne("select current_setting('app.company_id', true) as c")->c);
@@ -174,7 +173,9 @@ final class InvoiceFlowTest extends TestCase
 
     public function test_approval_step_void_and_read_only_subscription(): void
     {
-        config(['queue.default' => 'sync']);
+        // Not cleared by the tax authority (Ethiopia's connector keeps it queued): a cleared invoice can only
+        // be corrected by a credit note, never voided, and the database refuses the void.
+        config(['einvoicing.force_sandbox' => false, 'queue.default' => 'sync']);
         [$headers, $companyId, $invoice] = $this->companyWithInvoiceData('flow@example.test');
         $id = $this->postJson('/api/v1/invoices', $invoice('10'), $headers)->assertCreated()->json('id');
 
@@ -187,13 +188,13 @@ final class InvoiceFlowTest extends TestCase
 
         // The void reversed the entry: the trial balance is empty again and the ledger is sound.
         $this->assertSame([], $this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $headers)->assertOk()->json('data'));
-        $this->assertSame([], DB::select('select * from ledger_verify(?)', [$companyId]));
+        $this->assertSame([], $this->owner()->select('select * from ledger_verify(?)', [$companyId]));
         $this->postJson("/api/v1/invoices/{$id}/approve", [], $headers)->assertStatus(422)->assertJsonPath('type', 'IllegalTransition');
 
         // Suspended subscription: reading works, writing does not.
-        $org = DB::table('companies')->where('id', $companyId)->value('organisation_id');
+        $org = $this->owner()->table('companies')->where('id', $companyId)->value('organisation_id');
         foreach (['active', 'past_due', 'suspended'] as $status) {
-            DB::table('organisations')->where('id', $org)->update(['status' => $status]);
+            $this->owner()->table('organisations')->where('id', $org)->update(['status' => $status]);
         }
         $this->getJson('/api/v1/invoices', $headers)->assertOk();
         $this->postJson('/api/v1/invoices', $invoice('5'), $headers)->assertStatus(402)->assertJsonPath('type', 'SubscriptionReadOnly');
@@ -211,17 +212,17 @@ final class InvoiceFlowTest extends TestCase
             'fiscal_year_start_month' => 1, 'phone' => '+55 11 5555 0100', 'email' => 'oi@cafedosul.example', 'website' => 'https://cafedosul.example',
         ])->assertCreated()->assertJsonPath('base_currency', 'BRL')->json('id');
 
-        $codes = DB::table('accounts')->where('company_id', $id)->pluck('code')->all();
+        $codes = $this->owner()->table('accounts')->where('company_id', $id)->pluck('code')->all();
         $this->assertContains('1200', $codes);   // base chart
         $this->assertContains('4020', $codes);   // Food sales, from the industry template
-        $this->assertSame(1, DB::table('fiscal_years')->where('company_id', $id)->count());
+        $this->assertSame(1, $this->owner()->table('fiscal_years')->where('company_id', $id)->count());
 
         // Ethiopia on the Ethiopian calendar: the first fiscal year runs 1 Hamle to 30 Sene.
         $et = $this->postJson('/api/v1/companies', [
             'legal_name' => 'Addis Retail PLC', 'country_code' => 'ET', 'industry' => 'retail_wholesale', 'calendar' => 'ethiopian',
             'fiscal_year_start_month' => 11, 'conversion_date' => '2026-10-31',
         ])->assertCreated()->assertJsonPath('timezone', 'Africa/Addis_Ababa')->json('id');
-        $year = DB::table('fiscal_years')->where('company_id', $et)->first();
+        $year = $this->owner()->table('fiscal_years')->where('company_id', $et)->first();
         $this->assertSame(['2026-07-08', '2027-07-07'], [$year->starts_on, $year->ends_on]);
     }
 
@@ -231,10 +232,10 @@ final class InvoiceFlowTest extends TestCase
         $user = User::query()->create(['name' => 'Hana', 'email' => $email, 'password' => 'secret-password']);
         $this->actingAs($user, 'sanctum');
         $companyId = $this->postJson('/api/v1/companies', ['legal_name' => 'Harar Traders', 'country_code' => 'ET', 'fiscal_year_start_month' => 7])->assertCreated()->json('id');
-        $sales = DB::table('accounts')->where(['company_id' => $companyId, 'system_key' => 'sales'])->value('id');
-        $vat15 = DB::table('tax_rates')->where(['company_id' => $companyId, 'code' => 'VAT15'])->value('id');
+        $sales = $this->owner()->table('accounts')->where(['company_id' => $companyId, 'system_key' => 'sales'])->value('id');
+        $vat15 = $this->owner()->table('tax_rates')->where(['company_id' => $companyId, 'code' => 'VAT15'])->value('id');
         $customer = (string) \Illuminate\Support\Str::uuid();
-        DB::table('contacts')->insert(['id' => $customer, 'company_id' => $companyId, 'name' => 'Sheger Grand Hotel', 'is_customer' => true]);
+        $this->owner()->table('contacts')->insert(['id' => $customer, 'company_id' => $companyId, 'name' => 'Sheger Grand Hotel', 'is_customer' => true]);
 
         $invoice = fn (string $qty) => [
             'contact_id' => $customer, 'number' => 'INV-0001', 'issue_date' => '2026-11-02', 'currency' => 'ETB',

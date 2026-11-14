@@ -18,12 +18,12 @@
 -- the application's connection, because that SQL could set the context itself. So: no string-built SQL,
 -- ever (see SECURITY.md).
 
-REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE CREATE ON SCHEMA {{schema}} FROM PUBLIC;
 
 -- Functions that run with the owner's rights never resolve names through a temporary schema.
-ALTER FUNCTION ledger_assert_can_post() SET search_path = public, pg_temp;
-ALTER FUNCTION ledger_apply_balances()  SET search_path = public, pg_temp;
-ALTER FUNCTION audit_log_chain()        SET search_path = public, pg_temp;
+ALTER FUNCTION ledger_assert_can_post() SET search_path = {{schema}}, pg_temp;
+ALTER FUNCTION ledger_apply_balances()  SET search_path = {{schema}}, pg_temp;
+ALTER FUNCTION audit_log_chain()        SET search_path = {{schema}}, pg_temp;
 
 -- ---------------------------------------------------------------------------------------------------
 -- Helpers. Each answers one narrow question about the CALLER, so running with the owner's rights leaks nothing.
@@ -31,18 +31,18 @@ ALTER FUNCTION audit_log_chain()        SET search_path = public, pg_temp;
 
 -- The caller's role in a company ('owner', 'admin', ...), or NULL when not an active member.
 CREATE FUNCTION app_member_role(p_company_id uuid) RETURNS text
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = {{schema}}, pg_temp AS $$
     SELECT role FROM memberships
      WHERE company_id = p_company_id AND user_id = app_user_id() AND status = 'active'
 $$;
 
 CREATE FUNCTION app_company_has_members(p_company_id uuid) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = {{schema}}, pg_temp AS $$
     SELECT EXISTS (SELECT 1 FROM memberships WHERE company_id = p_company_id)
 $$;
 
 CREATE FUNCTION app_can_add_company(p_organisation_id uuid) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = {{schema}}, pg_temp AS $$
     SELECT EXISTS (SELECT 1 FROM organisations o WHERE o.id = p_organisation_id AND o.created_by = app_user_id())
         OR EXISTS (SELECT 1 FROM memberships m JOIN companies c ON c.id = m.company_id
                     WHERE c.organisation_id = p_organisation_id AND m.user_id = app_user_id()
@@ -52,7 +52,7 @@ $$;
 -- For inviting someone who already has a Ledgerly account: returns only the id, only to an owner or admin
 -- of the current company.
 CREATE FUNCTION app_user_id_for_invite(p_email text) RETURNS uuid
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = {{schema}}, pg_temp AS $$
 BEGIN
     IF coalesce(app_member_role(app_company_id()), '') NOT IN ('owner', 'admin') THEN
         RAISE EXCEPTION 'Only an owner or admin can invite users' USING ERRCODE = 'insufficient_privilege';
@@ -130,7 +130,7 @@ CREATE TRIGGER memberships_guard BEFORE UPDATE OR DELETE ON memberships
 
 -- Applies to everyone, staff included: a live company is never left without an active owner.
 CREATE FUNCTION memberships_keep_an_owner() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = {{schema}}, pg_temp AS $$
 BEGIN
     IF OLD.role = 'owner' AND OLD.status = 'active'
        AND EXISTS (SELECT 1 FROM companies WHERE id = OLD.company_id)  -- not the cascade from deleting the company
@@ -216,14 +216,14 @@ CREATE POLICY user_change_self ON users FOR UPDATE
     USING ((SELECT app_user_id()) IS NULL OR id = (SELECT app_user_id()))
     WITH CHECK ((SELECT app_user_id()) IS NULL OR id = (SELECT app_user_id()));
 
-REVOKE DELETE ON users FROM ledgerly_app;  -- accounts are closed by a staff process, never deleted by a request
-GRANT EXECUTE ON FUNCTION app_user_id_for_invite(text) TO ledgerly_app;
+REVOKE DELETE ON users FROM {{app_role}};  -- accounts are closed by a staff process, never deleted by a request
+GRANT EXECUTE ON FUNCTION app_user_id_for_invite(text) TO {{app_role}};
 
 -- ---------------------------------------------------------------------------------------------------
 -- 5. The audit-chain check: the application may verify only the company it is working in.
 -- ---------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION audit_log_verify(p_company_id uuid) RETURNS bigint
-LANGUAGE plpgsql STABLE SET search_path = public, pg_temp AS $$
+LANGUAGE plpgsql STABLE SET search_path = {{schema}}, pg_temp AS $$
 DECLARE
     r        audit_log;
     expected text := NULL;

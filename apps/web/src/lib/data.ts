@@ -13,11 +13,11 @@ async function context() {
 }
 
 export async function getInvoices(): Promise<Invoice[]> {
-  if (isDemoMode) return demoInvoices;
+  if (isDemoMode()) return demoInvoices;
   return (await ledgerly.invoices(await context())).data;
 }
 
 export async function getProfitAndLoss(q: { from: string; to: string; compare_from?: string; compare_to?: string }): Promise<ProfitAndLoss> {
-  if (isDemoMode) return demoProfitAndLoss;
+  if (isDemoMode()) return demoProfitAndLoss;
   return ledgerly.profitAndLoss(q, await context());
 }

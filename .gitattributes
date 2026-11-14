@@ -1,0 +1,4 @@
+# Scripts and SQL run inside Linux containers and CI: keep LF even on Windows checkouts.
+*.sh   text eol=lf
+*.sql  text eol=lf
+artisan text eol=lf
