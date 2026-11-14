@@ -3,12 +3,12 @@
 # Built and pushed to GHCR by .github/workflows/deploy.yml.
 # Runtime: LEDGERLY_API_URL=https://api.example (server side only; without it the app runs in demo mode).
 
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
@@ -16,7 +16,7 @@ COPY . .
 # public/ holds no files yet, and git does not keep empty folders.
 RUN mkdir -p public && npm run build
 
-FROM node:22-alpine AS runtime
+FROM node:25-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
