@@ -10,7 +10,7 @@ PostgreSQL before the first paying customer; `deploy.yml` already publishes cont
 | Address | What | On the server |
 |---|---|---|
 | https://ledgerly.orcamind.dev | Web app (Next.js server) | cPanel *Setup Node.js App*: Node 22, app root `~/ledgerly-web`, startup file `app.js` |
-| https://ledgerly-api.orcamind.dev | API (Laravel) | subdomain, document root `~/ledgerly/current/api/public`, PHP 8.3 (the account's version) |
+| https://ledgerly-api.orcamind.dev | API (Laravel) | subdomain, document root `~/ledgerly/current/api/public`, PHP 8.3 through `shared/api.htaccess` (the account default is 8.1) |
 | PostgreSQL 13 | `orcamiib_ledgerly`, schema `ledgerly` | owner login `orcamiib_lowner` (deploy only), app login `orcamiib_lweb` |
 | cron | `schedule:run` and `queue:work` every minute | no Redis or long-running workers on shared hosting |
 
@@ -19,6 +19,7 @@ PostgreSQL before the first paying customer; `deploy.yml` already publishes cont
 ~/ledgerly/current -> releases/<sha>   what is live
 ~/ledgerly/shared/api.env              API settings: restricted login only, mode 600
 ~/ledgerly/shared/web.env              LEDGERLY_API_URL
+~/ledgerly/shared/api.htaccess         PHP 8.3 handler, put in front of every release's public/.htaccess
 ~/ledgerly/shared/storage/             uploads and logs, kept across releases
 ~/ledgerly/deploy/                     scripts, refreshed by every deploy
 ~/ledgerly-web/app.js                  Node.js entry: starts current/web/server.js
@@ -34,7 +35,7 @@ Both apps run under the same cPanel account (`orcamiib`). What keeps them apart,
 | Files | `~/ledgerly`, `~/ledgerly-web` | `~/bakery-ops.orcamind.dev` | no: every Ledgerly script works only inside its own folders |
 | Database | `orcamiib_ledgerly` (logins `_lowner`, `_lweb`) | its own | no: separate database and logins; nothing in Ledgerly names another database, and pg_hba lets each login into its own database only |
 | Deploy | this repository, its own SSH key and secrets | its own repository and key | no: either key can be revoked alone |
-| PHP version | 8.3 | 8.3 | **yes, account-wide** on CloudLinux. Ledgerly is pinned to PHP 8.3 (`composer.json` platform) so the account setting never has to change |
+| PHP version | 8.3 | 8.3 | no: the account default is 8.1 and each app picks its version with an `AddHandler` line in its own `.htaccess` (bakery-ops in `public/.htaccess`, Ledgerly through `shared/api.htaccess`, added to every release). Leave the account default alone |
 | Crontab | 2 lines appended | its own lines | **yes, one file**. `provision.sh` only appends, keeps a copy in `shared/crontab.before-ledgerly`, and touches nothing if the crontab cannot be read |
 | CPU, memory, processes | Node.js app, PHP requests, cron | the same | **yes, one account quota** (CloudLinux LVE). Check cPanel → *Resource Usage* after the first week; if either app hits the limits, that is the moment to move Ledgerly to its own server |
 | PostgreSQL server | one database on it | possibly one too | the server, not the data; advisory locks and row-level security are per database |
@@ -55,8 +56,7 @@ Then `smoke.sh` checks both addresses from outside. If it fails, `rollback.sh` p
 
 ## One-time setup
 
-Done once; the deploy needs all of it. **Status (14 Nov 2026): steps 1–5 and 7 done, step 6 done except the
-Cloudflare record for `ledgerly-api`.**
+Done once; the deploy needs all of it. **Status (15 Nov 2026): all done; live.**
 
 > The server's firewall (LFD) blocks an IP for a while after connections that never log in. `ssh-keyscan`
 > is one of those; so is probing ports. Scan the host key once, then only make real logins. If you are
@@ -85,9 +85,13 @@ Cloudflare record for `ledgerly-api`.**
    the GitHub secret, and the app password only in `shared/api.env`.
 6. **Domains**:
    - cPanel → Domains → create `ledgerly-api.orcamind.dev`, document root `ledgerly/current/api/public`.
-     **Do not change the PHP version.** On CloudLinux *Select PHP Version* applies to the whole account, so it
-     would change bakery-ops too. Ledgerly runs on PHP 8.3, the version the account already uses.
-   - Cloudflare → DNS → `ledgerly-api` record like the existing `ledgerly` one, proxied. SSL mode *Full (strict)*.
+     **Create it in the cPanel web interface**, not with `uapi` over SSH: the host copies new subdomains to its
+     Cloudflare integration from a hook that fails when run from the shell (`entrap_domain_hook.sh: Permission
+     denied`), and the address then never resolves.
+   - DNS is the host's Cloudflare integration (client area → Cloudflare → Manage DNS), not a Cloudflare account
+     of our own. Check that `ledgerly-api` is listed and proxied (orange).
+   - PHP: the folder gets 8.3 from `shared/api.htaccess` (written by `provision.sh`). Without it the account
+     default, 8.1, answers and every request is a 500 from Composer's platform check.
    - cPanel → Setup Node.js App → create: Node 22, production, app root `ledgerly-web`, app URL
      `ledgerly.orcamind.dev`, startup file `app.js`.
 7. **Turn the deploy on**: repository variable `DEPLOY_ENABLED=true`. Optional variables: `DEPLOY_PHP_BIN`

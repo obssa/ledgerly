@@ -39,6 +39,11 @@ mkdir -p "$ROOT/shared/storage/framework/cache" "$ROOT/shared/storage/framework/
 ln -sfn "$ROOT/shared/api.env" "$REL/api/.env"
 rm -rf "$REL/api/storage" && ln -sfn "$ROOT/shared/storage" "$REL/api/storage"
 mkdir -p "$REL/api/bootstrap/cache"
+# Server-specific lines for the API's .htaccess (on cPanel: which PHP serves the folder), kept out of the repo.
+if [ -f "$ROOT/shared/api.htaccess" ]; then
+  { cat "$ROOT/shared/api.htaccess"; echo; cat "$REL/api/public/.htaccess"; } > "$REL/api/public/.htaccess.new"
+  mv "$REL/api/public/.htaccess.new" "$REL/api/public/.htaccess"
+fi
 
 cd "$REL/api"
 OWNER_USERNAME="$(sed -n 's/^DB_OWNER_USERNAME=//p' .env)"

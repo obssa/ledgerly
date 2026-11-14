@@ -86,6 +86,14 @@ EOF
   echo "created shared/api.env (restricted login only)"
 fi
 
+# The account's default PHP is older than Ledgerly needs. cPanel picks PHP per folder through an .htaccess
+# handler (bakery-ops does the same), so the API's folder gets its own; release.sh puts it into every release.
+if [ ! -f "$ROOT/shared/api.htaccess" ]; then
+  printf '# PHP 8.3 for the API folder (cPanel per-directory handler)\nAddHandler %s .php .php8 .phtml\n' \
+    "${PHP_HANDLER:-application/x-httpd-alt-php83___lsphp}" > "$ROOT/shared/api.htaccess"
+  echo "created shared/api.htaccess"
+fi
+
 if [ ! -f "$ROOT/shared/web.env" ]; then
   ( umask 077; printf 'LEDGERLY_API_URL=%s\n' "$API_URL" > "$ROOT/shared/web.env" )
   echo "created shared/web.env"
