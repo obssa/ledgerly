@@ -55,7 +55,16 @@ Then `smoke.sh` checks both addresses from outside. If it fails, `rollback.sh` p
 
 ## One-time setup
 
-Done once; the deploy needs all of it.
+Done once; the deploy needs all of it. **Status (14 Nov 2026): steps 1–5 and 7 done, step 6 done except the
+Cloudflare record for `ledgerly-api`.**
+
+> The server's firewall (LFD) blocks an IP for a while after connections that never log in. `ssh-keyscan`
+> is one of those; so is probing ports. Scan the host key once, then only make real logins. If you are
+> blocked, every port times out from your IP while the sites still answer through Cloudflare. Only the host
+> can unblock you (client area or a support ticket); there is no command for it inside the account.
+>
+> On Windows, run the shell commands below in Git Bash, not PowerShell: PowerShell has no `<` redirect
+> and drops the empty passphrase in `ssh-keygen -N ""`.
 
 1. **Database** (done 14 Nov 2026): database `orcamiib_ledgerly`, logins `orcamiib_lowner` and `orcamiib_lweb`,
    passwords in `~/.ledgerly-db-secrets`. Then take the app login **out** of the database-owner role, which
