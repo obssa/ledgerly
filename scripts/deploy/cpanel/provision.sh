@@ -64,6 +64,9 @@ DB_PASSWORD=$WEB_PASSWORD
 DB_OWNER_USERNAME=$DB_OWNER
 DB_APP_ROLE=$DB_WEB
 DB_SCHEMA=ledgerly
+# cPanel's PostgreSQL lets a login connect only as a member of the database-owner role (pg_hba samerole).
+# The role check accepts that and still refuses table ownership or RLS bypass (SECURITY.md finding 23).
+DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true
 
 # No Redis on shared hosting: cache and queue in the database, queue worked by cron.
 CACHE_STORE=database

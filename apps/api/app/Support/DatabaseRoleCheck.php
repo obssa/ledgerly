@@ -12,17 +12,32 @@ use Illuminate\Support\Facades\DB;
  * (`php artisan ledgerly:check-database-roles`) and by DatabaseRoleTest.
  *
  * It exists because hosting panels grant more than they say: cPanel's "grant all privileges" makes the login
- * a member of the database-owner role, which can drop the database, and a login that owns (or is a member of
- * the owner of) the tables is not subject to their row-level security at all.
+ * a member of the database-owner role, and a login that owns (or is a member of the owner of) the tables is not
+ * subject to their row-level security at all.
+ *
+ * Membership of the database-owner role is a problem unless DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true. cPanel's
+ * PostgreSQL only lets a login connect to a database if it is a member of the role named after it (pg_hba
+ * `samerole`), and that role owns the database, so there the membership cannot be avoided; it becomes a warning.
+ * It still gives no way past row-level security: the tables and their schema belong to the owner login, which
+ * the checks below keep apart. What it does give is CREATE SCHEMA and ALTER DATABASE, reachable only through
+ * SQL injection (SECURITY.md finding 23). Superuser, RLS bypass, table ownership and CREATE in the schema are
+ * always problems.
  */
 final class DatabaseRoleCheck
 {
     /** @return list<string> what is wrong; empty when the login is properly restricted */
     public static function problems(?string $connection = null): array
     {
+        return self::report($connection)['problems'];
+    }
+
+    /** @return array{problems: list<string>, warnings: list<string>} */
+    public static function report(?string $connection = null): array
+    {
         $db = DB::connection($connection);
         $schema = SchemaSql::schema();
         $problems = [];
+        $warnings = [];
 
         $me = $db->selectOne('SELECT rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname = current_user');
         foreach (['rolsuper' => 'is a superuser', 'rolbypassrls' => 'bypasses row-level security', 'rolcreaterole' => 'can create roles', 'rolcreatedb' => 'can create databases'] as $flag => $what) {
@@ -36,7 +51,11 @@ final class DatabaseRoleCheck
                FROM pg_database d WHERE d.datname = current_database()",
         );
         if ($database->member) {
-            $problems[] = "{$me->rolname} is (a member of) the database owner {$database->owner}, so it can drop or alter the database. On cPanel: uapi Postgresql revoke_all_privileges user={$me->rolname} database=<database>.";
+            if (config('database.ledgerly.allow_owner_role_membership')) {
+                $warnings[] = "{$me->rolname} is a member of the database owner {$database->owner} (allowed by DB_ALLOW_OWNER_ROLE_MEMBERSHIP: the host requires it to connect). It can alter the database and create schemas, but not reach the tables past row-level security.";
+            } else {
+                $problems[] = "{$me->rolname} is (a member of) the database owner {$database->owner}, so it can drop or alter the database.";
+            }
         }
 
         $tables = $db->selectOne(
@@ -56,6 +75,6 @@ final class DatabaseRoleCheck
             $problems[] = "{$me->rolname} may create objects in schema {$schema}.";
         }
 
-        return $problems;
+        return ['problems' => $problems, 'warnings' => $warnings];
     }
 }

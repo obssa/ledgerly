@@ -32,7 +32,7 @@ Both apps run under the same cPanel account (`orcamiib`). What keeps them apart,
 |---|---|---|---|
 | Address | `ledgerly.orcamind.dev`, `ledgerly-api.orcamind.dev` | `bakery-ops.orcamind.dev` | no |
 | Files | `~/ledgerly`, `~/ledgerly-web` | `~/bakery-ops.orcamind.dev` | no: every Ledgerly script works only inside its own folders |
-| Database | `orcamiib_ledgerly` (logins `_lowner`, `_lweb`) | its own | no: separate database and logins; nothing in Ledgerly names another database |
+| Database | `orcamiib_ledgerly` (logins `_lowner`, `_lweb`) | its own | no: separate database and logins; nothing in Ledgerly names another database, and pg_hba lets each login into its own database only |
 | Deploy | this repository, its own SSH key and secrets | its own repository and key | no: either key can be revoked alone |
 | PHP version | 8.3 | 8.3 | **yes, account-wide** on CloudLinux. Ledgerly is pinned to PHP 8.3 (`composer.json` platform) so the account setting never has to change |
 | Crontab | 2 lines appended | its own lines | **yes, one file**. `provision.sh` only appends, keeps a copy in `shared/crontab.before-ledgerly`, and touches nothing if the crontab cannot be read |
@@ -47,8 +47,8 @@ server) → uploads it over SSH (pinned host key) → `release.sh` on the server
 1. unpacks into `releases/<sha>` and links the shared settings and storage;
 2. creates the `ledgerly` schema if needed and migrates **as the owner**. The owner password arrives on stdin
    from the GitHub secret and is never written on the server;
-3. runs `ledgerly:check-database-roles` **as the app login**: if that login could bypass row-level security
-   or drop the database, the release stops here and the old one stays live;
+3. runs `ledgerly:check-database-roles` **as the app login**: if that login could bypass row-level security,
+   the release stops here and the old one stays live;
 4. caches config and routes, switches `current`, restarts the Node.js app and the queue workers.
 
 Then `smoke.sh` checks both addresses from outside. If it fails, `rollback.sh` puts the previous release back.
@@ -67,11 +67,11 @@ Cloudflare record for `ledgerly-api`.**
 > and drops the empty passphrase in `ssh-keygen -N ""`.
 
 1. **Database** (done 14 Nov 2026): database `orcamiib_ledgerly`, logins `orcamiib_lowner` and `orcamiib_lweb`,
-   passwords in `~/.ledgerly-db-secrets`. Then take the app login **out** of the database-owner role, which
-   cPanel's "grant all privileges" put it in:
-   ```bash
-   uapi Postgresql revoke_all_privileges user=$(whoami)_lweb database=$(whoami)_ledgerly
-   ```
+   both given "all privileges" on it, passwords in `~/.ledgerly-db-secrets`. **Do not revoke the app login's
+   privileges**: on this server a login can connect only as a member of the database-owner role (pg_hba
+   `samerole`); without it the API gets `no pg_hba.conf entry`. `shared/api.env` sets
+   `DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true`, so the role check accepts that membership and still refuses
+   anything that would get past row-level security (SECURITY.md finding 23).
 2. **SSH key for GitHub Actions**: add the public key to `~/.ssh/authorized_keys` (cPanel → SSH Access).
 3. **GitHub secrets** (repository → Settings → Secrets and variables → Actions):
    `DEPLOY_HOST=gin.hostns.io`, `DEPLOY_PORT=22`, `DEPLOY_USER=orcamiib`, `DEPLOY_SSH_KEY` (private key),

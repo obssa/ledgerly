@@ -16,12 +16,15 @@
 | roles can be created. On shared hosting (cPanel) the app role is the application login itself and the
 | tables live in their own schema, because anyone may write to `public` there:
 |   DB_APP_ROLE=orcamiib_lweb  DB_SCHEMA=ledgerly
+| cPanel also lets a login connect only as a member of the database-owner role, so there
+|   DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true   (App\Support\DatabaseRoleCheck; SECURITY.md finding 23)
 */
 
 return [
     'ledgerly' => [
         'app_role' => env('DB_APP_ROLE', 'ledgerly_app'),
         'schema' => env('DB_SCHEMA', 'public'),
+        'allow_owner_role_membership' => (bool) env('DB_ALLOW_OWNER_ROLE_MEMBERSHIP', false),
     ],
 
     'connections' => [
