@@ -95,9 +95,11 @@ if [ ! -f "$ROOT/shared/api.htaccess" ]; then
 fi
 
 if [ ! -f "$ROOT/shared/web.env" ]; then
-  ( umask 077; printf 'LEDGERLY_API_URL=%s\n' "$API_URL" > "$ROOT/shared/web.env" )
+  ( umask 077; printf 'LEDGERLY_API_URL=%s\nLEDGERLY_WEB_URL=%s\n' "$API_URL" "$WEB_URL" > "$ROOT/shared/web.env" )
   echo "created shared/web.env"
 fi
+# The web app's public address, for redirects (apps/web/src/proxy.ts); added to installs made before it existed.
+grep -q '^LEDGERLY_WEB_URL=' "$ROOT/shared/web.env" || printf 'LEDGERLY_WEB_URL=%s\n' "$WEB_URL" >> "$ROOT/shared/web.env"
 
 [ -f "$ROOT/deploy/web-app.js" ] && cp "$ROOT/deploy/web-app.js" "$WEB_APP_ROOT/app.js"
 

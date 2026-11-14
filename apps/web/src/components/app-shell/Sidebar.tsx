@@ -1,8 +1,8 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { demoCompany } from "@/lib/demo";
 
 type NavItem = { href: string; label: string; soon?: boolean };
 
@@ -36,7 +36,8 @@ const groups: { label?: string; items: NavItem[] }[] = [
   { label: "Books", items: [{ href: "/journal", label: "Journal entries", soon: true }, { href: "/reports", label: "Reports" }] },
 ];
 
-export function Sidebar() {
+/** `company` is rendered on the server (CompanyBadge) and passed in, since this component runs in the browser. */
+export function Sidebar({ company }: { company: ReactNode }) {
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
@@ -50,12 +51,7 @@ export function Sidebar() {
         <span className="text-[19px] font-extrabold tracking-tight text-white">Ledgerly</span>
       </div>
 
-      <button className="w-full rounded-[10px] border border-[#23493f] bg-side-hover px-3 py-2.5 text-left text-white">
-        <span className="block text-sm font-bold">{demoCompany.legal_name}</span>
-        <span className="mt-0.5 block text-xs text-[#a9bdb7]">
-          {demoCompany.city} · {demoCompany.base_currency} · VAT registered
-        </span>
-      </button>
+      {company}
 
       {groups.map((group, i) => (
         <div key={i} className={i === 0 ? "mt-3" : ""}>

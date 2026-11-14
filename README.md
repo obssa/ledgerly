@@ -168,4 +168,5 @@ rules Claude Code follows in this repository.
 - Kenya pack and eTIMS connector: second country, not reviewed.
 - Billing provider integration that moves the subscription state machine; nightly `ledger_verify` and
   `audit_log_verify` jobs; load test at the plan's targets.
-- Sign-in UI, MFA, bills and expenses screens, payments UI, bank statement import and matching UI.
+- MFA, email verification and password reset screens (S2, S3), bills and expenses screens, payments UI, bank
+  statement import and matching UI. Sign-in, sign-up, sign-out and company setup are built (`apps/web/src/app/(auth)`).

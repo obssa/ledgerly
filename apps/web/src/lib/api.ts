@@ -113,7 +113,17 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   return body as T;
 }
 
+export interface AuthResult {
+  user: { id: string; name: string; email: string };
+  token: string;
+}
+
 export const ledgerly = {
+  login: (body: { email: string; password: string }) => api<AuthResult>("auth/login", { method: "POST", body }),
+  register: (body: { name: string; email: string; password: string }) => api<AuthResult>("auth/register", { method: "POST", body }),
+  logout: (token: string) => api<null>("auth/logout", { method: "POST", token }),
+  companies: (token: string) => api<{ data: Company[] }>("companies", { token }),
+  createCompany: (body: Record<string, unknown>, token: string) => api<Company>("companies", { method: "POST", body, token }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}`, ctx),
   approveInvoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}/approve`, { ...ctx, method: "POST" }),

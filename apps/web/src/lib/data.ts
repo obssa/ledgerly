@@ -1,23 +1,63 @@
 import "server-only";
-import { cookies } from "next/headers";
-import { isDemoMode, ledgerly, type Invoice, type ProfitAndLoss } from "./api";
-import { demoInvoices, demoProfitAndLoss } from "./demo";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { ApiError, isDemoMode, ledgerly, type Company, type Invoice, type ProfitAndLoss } from "./api";
+import { demoCompany, demoInvoices, demoProfitAndLoss } from "./demo";
+import { getSession } from "./session";
 
 /**
  * Server-side data access. In demo mode returns sample data; otherwise calls the API with the session's
- * token and selected company (cookies set by the sign-in flow, to be built in phase 1).
+ * token and selected company (HttpOnly cookies set by the sign-in flow, src/app/(auth)/actions.ts).
+ *
+ * connection() first: whether this is demo mode is decided per request, so one built image can run either
+ * way. Callers render inside a <Suspense> boundary (src/app/(app)/layout.tsx).
  */
-async function context() {
-  const jar = await cookies();
-  return { token: jar.get("ledgerly_token")?.value, companyId: jar.get("ledgerly_company")?.value };
+async function withApi<T>(call: (ctx: { token: string; companyId: string }) => Promise<T>): Promise<T> {
+  const { token, companyId } = await getSession();
+  if (!token) redirect("/sign-in");
+  if (!companyId) redirect("/onboarding");
+  try {
+    return await call({ token, companyId });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) redirect("/sign-in"); // token expired or signed out elsewhere
+    if (error instanceof ApiError && (error.status === 400 || error.status === 403)) redirect("/onboarding"); // no usable company
+    throw error;
+  }
 }
 
 export async function getInvoices(): Promise<Invoice[]> {
+  await connection();
   if (isDemoMode()) return demoInvoices;
-  return (await ledgerly.invoices(await context())).data;
+  return (await withApi((ctx) => ledgerly.invoices(ctx))).data;
 }
 
 export async function getProfitAndLoss(q: { from: string; to: string; compare_from?: string; compare_to?: string }): Promise<ProfitAndLoss> {
+  await connection();
   if (isDemoMode()) return demoProfitAndLoss;
-  return ledgerly.profitAndLoss(q, await context());
+  return withApi((ctx) => ledgerly.profitAndLoss(q, ctx));
+}
+
+export interface ShellContext {
+  companyName: string;
+  companyNote: string;
+  userName: string;
+  demo: boolean;
+}
+
+/** The company being worked on, and who is signed in, for the app shell. */
+export async function getShellContext(): Promise<ShellContext> {
+  await connection();
+  if (isDemoMode()) {
+    return {
+      companyName: demoCompany.legal_name,
+      companyNote: `${demoCompany.city} · ${demoCompany.base_currency} · VAT registered`,
+      userName: "Hana Bekele",
+      demo: true,
+    };
+  }
+  const { name, companyId } = await getSession();
+  const { data } = await withApi(({ token }) => ledgerly.companies(token));
+  const company: Company | undefined = data.find((c) => c.id === companyId);
+  if (!company) redirect("/onboarding");
+  return { companyName: company.trading_name ?? company.legal_name, companyNote: company.base_currency, userName: name ?? "", demo: false };
 }
