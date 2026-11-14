@@ -33,6 +33,7 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    strategy: { matrix: { php: ['8.3', '8.4'] } }   # 8.3 is the cPanel account (shared with bakery-ops); 8.4 the container image
     services:
       postgres:
         image: postgres:18
@@ -48,7 +49,7 @@ jobs:
       - name: Database roles, exactly as in local development (creates ledgerly_test)
         run: psql -d ledgerly -v ON_ERROR_STOP=1 -f ../../docker/postgres/init.sql
       - uses: shivammathur/setup-php@v2
-        with: { php-version: '8.4', extensions: pdo_pgsql, bcmath, intl, coverage: none }
+        with: { php-version: '${{ matrix.php }}', extensions: pdo_pgsql, bcmath, intl, coverage: none }
       - uses: actions/cache@v4
         with:
           path: ~/.composer/cache
@@ -78,7 +79,7 @@ jobs:
       - name: cPanel-style roles and database
         run: psql -d postgres -v ON_ERROR_STOP=1 -f database/schema/tests/shared-host-roles.sql
       - uses: shivammathur/setup-php@v2
-        with: { php-version: '8.4', extensions: pdo_pgsql, bcmath, intl, coverage: none }
+        with: { php-version: '8.3', extensions: pdo_pgsql, bcmath, intl, coverage: none }   # what the cPanel account runs
       - uses: actions/cache@v4
         with:
           path: ~/.composer/cache

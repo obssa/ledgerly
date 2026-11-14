@@ -18,7 +18,7 @@ set -euo pipefail
 
 SHA="${1:?usage: release.sh <sha>}"
 ROOT="${LEDGERLY_ROOT:-$HOME/ledgerly}"
-PHP="${PHP_BIN:-/opt/alt/php84/usr/bin/php}"
+PHP="${PHP_BIN:-/opt/alt/php83/usr/bin/php}"
 WEB_APP_ROOT="${LEDGERLY_WEB_APP_ROOT:-$HOME/ledgerly-web}"
 KEEP=5
 

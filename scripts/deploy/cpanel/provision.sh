@@ -12,7 +12,7 @@ set -euo pipefail
 U="$(whoami)"
 ROOT="${LEDGERLY_ROOT:-$HOME/ledgerly}"
 WEB_APP_ROOT="${LEDGERLY_WEB_APP_ROOT:-$HOME/ledgerly-web}"
-PHP="${PHP_BIN:-/opt/alt/php84/usr/bin/php}"
+PHP="${PHP_BIN:-/opt/alt/php83/usr/bin/php}"
 API_URL="${API_URL:-https://ledgerly-api.orcamind.dev}"
 WEB_URL="${WEB_URL:-https://ledgerly.orcamind.dev}"
 DB_NAME="${DB_NAME:-${U}_ledgerly}"
@@ -90,13 +90,20 @@ fi
 
 [ -f "$ROOT/deploy/web-app.js" ] && cp "$ROOT/deploy/web-app.js" "$WEB_APP_ROOT/app.js"
 
-# Read the crontab into a variable first: `crontab -l | grep -q` under pipefail can report "missing" when grep
-# stops early (SIGPIPE), which would add the line twice.
+# The crontab is shared with every other app on this cPanel account (bakery-ops). Lines are only ever appended;
+# nothing else in it is changed, and if it cannot be read for any reason other than "there is none yet", it is
+# left alone, so a read failure can never wipe another app's jobs. A copy is kept before the first change.
 add_cron() {
   local current
-  current="$(crontab -l 2>/dev/null || true)"
+  if ! current="$(crontab -l 2>&1)"; then
+    case "$current" in
+      *"no crontab"*) current="" ;;
+      *) echo "Could not read the crontab ($current): not touching it. Add this line by hand: $1"; return 1 ;;
+    esac
+  fi
   grep -qxF -- "$1" <<<"$current" && return 0
-  printf '%s\n%s\n' "$current" "$1" | sed '/^$/d' | crontab -
+  [ -f "$ROOT/shared/crontab.before-ledgerly" ] || printf '%s\n' "$current" > "$ROOT/shared/crontab.before-ledgerly"
+  if [ -n "$current" ]; then printf '%s\n%s\n' "$current" "$1"; else printf '%s\n' "$1"; fi | crontab -
   echo "cron: $1"
 }
 add_cron "* * * * * cd $ROOT/current/api && $PHP artisan schedule:run >/dev/null 2>&1"

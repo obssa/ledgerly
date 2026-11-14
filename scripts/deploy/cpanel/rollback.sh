@@ -7,7 +7,7 @@
 set -euo pipefail
 
 ROOT="${LEDGERLY_ROOT:-$HOME/ledgerly}"
-PHP="${PHP_BIN:-/opt/alt/php84/usr/bin/php}"
+PHP="${PHP_BIN:-/opt/alt/php83/usr/bin/php}"
 WEB_APP_ROOT="${LEDGERLY_WEB_APP_ROOT:-$HOME/ledgerly-web}"
 
 PREVIOUS="$(cat "$ROOT/shared/previous-release" 2>/dev/null || true)"

@@ -100,7 +100,7 @@ jobs:
       - id: sha
         run: echo "sha=$SHA" >> "$GITHUB_OUTPUT"
       - uses: shivammathur/setup-php@v2
-        with: { php-version: '8.4', extensions: pdo_pgsql, bcmath, intl, tools: 'composer:v2', coverage: none }
+        with: { php-version: '8.3', extensions: pdo_pgsql, bcmath, intl, tools: 'composer:v2', coverage: none }   # the cPanel account runs PHP 8.3
       - name: API with production packages only
         working-directory: apps/api
         run: composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader --classmap-authoritative
@@ -134,7 +134,7 @@ jobs:
       url: ${{ vars.DEPLOY_WEB_URL || 'https://ledgerly.orcamind.dev' }}
     env:
       SHA: ${{ needs.bundle.outputs.sha }}
-      PHP_BIN: ${{ vars.DEPLOY_PHP_BIN || '/opt/alt/php84/usr/bin/php' }}
+      PHP_BIN: ${{ vars.DEPLOY_PHP_BIN || '/opt/alt/php83/usr/bin/php' }}
       WEB_URL: ${{ vars.DEPLOY_WEB_URL || 'https://ledgerly.orcamind.dev' }}
       API_URL: ${{ vars.DEPLOY_API_URL || 'https://ledgerly-api.orcamind.dev' }}
     steps:
