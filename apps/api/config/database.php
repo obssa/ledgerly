@@ -11,9 +11,19 @@
 |                          API's environment, so this connection cannot be opened by a running request.
 |
 | Laravel merges this file's `connections` with its own defaults (sqlite, mysql, pgsql, ...).
+|
+| `ledgerly` fills the schema's placeholders (App\Support\SchemaSql). The defaults suit a server where
+| roles can be created. On shared hosting (cPanel) the app role is the application login itself and the
+| tables live in their own schema, because anyone may write to `public` there:
+|   DB_APP_ROLE=orcamiib_lweb  DB_SCHEMA=ledgerly
 */
 
 return [
+    'ledgerly' => [
+        'app_role' => env('DB_APP_ROLE', 'ledgerly_app'),
+        'schema' => env('DB_SCHEMA', 'public'),
+    ],
+
     'connections' => [
         'pgsql' => [
             'driver' => 'pgsql',
@@ -28,7 +38,7 @@ return [
             'prefix_indexes' => true,
             // Query errors must not copy amounts, emails or tokens into logs (SECURITY.md S10).
             'mask_bindings_in_exception_messages' => env('DB_MASK_BINDINGS', true),
-            'search_path' => 'public',
+            'search_path' => env('DB_SCHEMA', 'public'),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
@@ -43,7 +53,7 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'mask_bindings_in_exception_messages' => env('DB_MASK_BINDINGS', true),
-            'search_path' => 'public',
+            'search_path' => env('DB_SCHEMA', 'public'),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
     ],

@@ -116,6 +116,7 @@ Found on 14 Nov 2026 by running the Laravel layer for the first time:
 | 19 | A 404 named the model class and echoed the requested id | Low | Plain `Not found.` for every API 404 |
 | 20 | A request without a token and without `Accept: application/json` got a 500 (redirect to a missing login route); validation errors redirected | Medium | API errors always JSON; guests get 401 |
 | 21 | Behind a load balancer the API could not see HTTPS (no HSTS) and saw every client as one address, so the per-address sign-in lockout would lock out everyone | Medium | `TRUSTED_PROXIES` |
+| 22 | On the cPanel host, "grant all privileges" made the app login a member of the database-owner role: it could drop or alter the database. And `public` is writable by every login there, which the owner-rights functions searched | High | Membership revoked; tables in their own schema, functions search only it; `ledgerly:check-database-roles` stops any deploy whose app login could bypass row-level security or change the database |
 
 ## 4. Honest limits
 

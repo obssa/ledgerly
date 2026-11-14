@@ -143,7 +143,7 @@ final class TenantIsolationTest extends TestCase
             SELECT c.relname AS name,
                    EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'company_id' AND NOT a.attisdropped) AS has_company
               FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-             WHERE n.nspname = 'public' AND c.relrowsecurity AND NOT c.relispartition
+             WHERE n.nspname = current_schema() AND c.relrowsecurity AND NOT c.relispartition
              ORDER BY 1
             SQL));
         $this->assertNotEmpty($tables);
