@@ -29,7 +29,15 @@ for h in x-content-type-options x-frame-options cache-control strict-transport-s
 done
 echo "ok  API security headers (HSTS means HTTPS is seen through Cloudflare)"
 
-wait_for "$WEB/" 200   # the first request also starts the Node.js app
-curl -sI --max-time 20 "$WEB/" | grep -qi '^x-frame-options: DENY' || { echo "FAIL web app lacks X-Frame-Options"; exit 1; }
-if curl -s --max-time 20 "$WEB/" | grep -q 'Demo mode'; then echo "FAIL web app is in demo mode: LEDGERLY_API_URL missing from shared/web.env"; exit 1; fi
-echo "ok  web app answers, connected to the API"
+wait_for "$WEB/sign-in" 200   # the first request also starts the Node.js app
+page="$(curl -s --max-time 20 "$WEB/sign-in")"
+grep -q 'Sign in to Ledgerly' <<<"$page" || { echo "FAIL the sign-in page did not render"; exit 1; }
+grep -q 'This page couldn' <<<"$page" && { echo "FAIL the sign-in page shows a server error"; exit 1; }
+curl -sI --max-time 20 "$WEB/sign-in" | grep -qi '^x-frame-options: DENY' || { echo "FAIL web app lacks X-Frame-Options"; exit 1; }
+echo "ok  sign-in page renders"
+
+# Without a session every app page goes to sign-in. A 200 here means demo mode (LEDGERLY_API_URL missing
+# from shared/web.env) or a guard that does not run.
+got="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 20 "$WEB/")"
+[ "$got" = "307 $WEB/sign-in" ] || { echo "FAIL $WEB/ without a session answered '$got', expected '307 $WEB/sign-in'"; exit 1; }
+echo "ok  web app sends visitors without a session to sign-in, at its public address"

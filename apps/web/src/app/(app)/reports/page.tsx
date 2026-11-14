@@ -1,7 +1,7 @@
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { ProfitAndLossRow } from "@/lib/api";
 import { parse } from "@/lib/decimal";
-import { getProfitAndLoss } from "@/lib/data";
+import { getProfitAndLoss, getShellContext } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Profit and loss" };
@@ -33,9 +33,14 @@ const cycle = [
 export default async function ReportsPage() {
   const pl = await getProfitAndLoss({ from: "2026-10-01", to: "2026-10-31", compare_from: "2026-09-01", compare_to: "2026-09-30" });
   const t = pl.totals;
+  const { companyName } = await getShellContext();
+  // No income yet (a new company) means no margin, not a division by zero.
   const margin = (num: string, den: string) => {
-    const tenths = (parse(num) * 1000n) / parse(den);
-    return `${tenths / 10n}.${tenths % 10n}%`;
+    const d = parse(den);
+    if (d === 0n) return "—";
+    const tenths = (parse(num) * 1000n) / d;
+    const abs = tenths < 0n ? -tenths : tenths;
+    return `${tenths < 0n ? "−" : ""}${abs / 10n}.${abs % 10n}%`;
   };
 
   const section = (title: string, rows: ProfitAndLossRow[], total: { current: string; previous: string | null }) => (
@@ -84,7 +89,7 @@ export default async function ReportsPage() {
 
         <Card className="min-w-0 flex-[4_1_560px]" label="Profit and loss statement">
           <div className="mb-3 text-center">
-            <div className="text-[17px] font-extrabold">Abyssinia Coffee Traders PLC</div>
+            <div className="text-[17px] font-extrabold">{companyName}</div>
             <div className="text-[13px] text-muted">Profit and loss · 1–31 October 2026 · {CURRENCY}</div>
           </div>
           <div className="overflow-x-auto">

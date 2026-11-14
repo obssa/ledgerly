@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 
-export function Topbar() {
+export function Topbar({ user }: { user: ReactNode }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="max-w-[520px] flex-[1_1_320px]">
@@ -16,7 +17,7 @@ export function Topbar() {
         <button className="btn" aria-label="Switch calendar">GC · EC</button>
         <button className="btn" aria-label="Language">EN</button>
         <Link href="/invoices/new" className="btn btn-primary">+ New invoice</Link>
-        <div aria-label="Hana Bekele, owner" className="grid size-10 place-items-center rounded-full bg-brand text-sm font-bold text-white">HB</div>
+        {user}
       </div>
     </header>
   );

@@ -154,6 +154,7 @@ Do these in Claude Code, in this order. Each ends with a test.
 | S12 | Hosting: TLS 1.2+ only, HSTS, database and Redis on a private network, PgBouncer in transaction mode, firewall or CDN rate limiting, automatic security updates | Deployment checklist signed |
 | S13 | Queued jobs set the tenant context from the job's own company id and user id, inside one transaction; a job test proves a job for company A cannot touch company B | Job isolation test |
 | S14 | Independent penetration test before the first paying customer; fix all high and medium findings | Report on file |
+| S15 | Sign-in lockout per person, not per web server: the web app signs people in from the server, so the API's per-address limits (10 sign-ins a minute, lockout after 20 failures) currently count everyone together, and 20 wrong passwords lock all users out for 15 minutes. Have the web server pass the visitor's address (from Cloudflare's `CF-Connecting-IP`) on a request the API can authenticate as coming from the web server, and limit on that | Lockout test with two visitor addresses |
 | S15 | Data protection (Ethiopia Proclamation 1321/2024): legal opinion on where data may be hosted, privacy notice, data-export and account-closure process, breach-notification procedure | Opinion and documents on file |
 
 ## 6. Rules for every change
