@@ -25,8 +25,7 @@ use Illuminate\Validation\ValidationException;
  *
  * Authenticator-app code at sign-in: loginMfa here and MfaController (SECURITY.md S2).
  *
- * NOT built yet and required before any real customer signs in (SECURITY.md, "Before launch"):
- * email verification, password reset, "sign out everywhere".
+ * Email confirmation, password reset and change, "sign out everywhere": AccountController (SECURITY.md S3).
  */
 final class AuthController extends Controller
 {
@@ -37,17 +36,18 @@ final class AuthController extends Controller
     /** A valid hash of a random, discarded password: checked when the email is unknown, so timing is the same. */
     private const NO_SUCH_USER_HASH = '$2y$12$67EfWL8jROy.ZST/qih4buEn/RvnJZxqqUkeDSYh.Wr6R4E3k77qy';
 
-    public function register(Request $request): JsonResponse
+    public function register(Request $request, AccountController $account): JsonResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email:rfc', 'max:190', 'unique:users,email'],
-            'password' => ['required', 'string', 'max:200', Password::min(10)->uncompromised()],
+            'password' => ['required', 'string', 'max:200', Password::defaults()],
             'locale' => ['nullable', 'in:en'],
         ]);
         $data['email'] = Str::lower($data['email']);
 
-        $user = User::query()->create($data); // the model hashes the password (cast 'hashed')
+        $user = User::query()->create($data)->refresh(); // the model hashes the password (cast 'hashed')
+        $account->sendVerification($user); // a company can be created only once the address is confirmed (S3)
 
         return response()->json(['user' => $user, 'token' => $this->issueToken($user)], 201);
     }
@@ -146,6 +146,6 @@ final class AuthController extends Controller
 
     private function issueToken(User $user): string
     {
-        return $user->createToken('web', ['*'], now()->addMinutes((int) config('sanctum.expiration', 720)))->plainTextToken;
+        return $user->issueToken();
     }
 }

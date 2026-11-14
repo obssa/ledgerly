@@ -123,6 +123,8 @@ export interface User {
   email: string;
   /** True once an authenticator app is set up: sign-in then asks for a code. */
   mfa_enabled: boolean;
+  /** True once the emailed link was opened; needed to create a company. */
+  email_verified: boolean;
 }
 
 export interface AuthResult {
@@ -145,6 +147,13 @@ export const ledgerly = {
   mfaConfirm: (code: string, token: string) => api<{ recovery_codes: string[] }>("auth/mfa/confirm", { method: "POST", body: { code }, token }),
   register: (body: { name: string; email: string; password: string }) => api<AuthResult>("auth/register", { method: "POST", body }),
   logout: (token: string) => api<null>("auth/logout", { method: "POST", token }),
+  logoutEverywhere: (token: string) => api<null>("auth/logout-everywhere", { method: "POST", token }),
+  verifyEmail: (token: string) => api<{ message: string }>("auth/email/verify", { method: "POST", body: { token } }),
+  resendVerification: (token: string) => api<{ message: string }>("auth/email/resend", { method: "POST", token }),
+  forgotPassword: (email: string) => api<{ message: string }>("auth/password/forgot", { method: "POST", body: { email } }),
+  resetPassword: (body: { token: string; password: string }) => api<{ message: string }>("auth/password/reset", { method: "POST", body }),
+  changePassword: (body: { current_password: string; password: string }, token: string) =>
+    api<{ token: string }>("auth/password", { method: "POST", body, token }),
   companies: (token: string) => api<{ data: Company[] }>("companies", { token }),
   createCompany: (body: Record<string, unknown>, token: string) => api<Company>("companies", { method: "POST", body, token }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),

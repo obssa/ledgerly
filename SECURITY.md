@@ -144,7 +144,7 @@ Do these in Claude Code, in this order. Each ends with a test.
 |---|---|---|
 | ~~S1~~ | **Done 14 Nov 2026.** Run feature tests as `ledgerly_web` (migrate with the owner connection, serve requests with the application connection). Add a two-company test for **every** endpoint: company B's id in the URL, body and header returns 404 or 403, never data | The suite fails if a policy or scope is removed |
 | ~~S2~~ | **Done 15 Nov 2026** (`MfaTest`, `TotpTest`, database test T36). Authenticator code (TOTP) at sign-in: enrol with QR, 10 one-time recovery codes (stored hashed), required for owner and admin, required for all staff. Code checked before the token is issued; code attempts rate-limited | Sign-in without a code fails for an enrolled user |
-| S3 | Email verification before a company can be created; password reset with a single-use, 60-minute token; changing password or resetting it deletes all tokens; "sign out everywhere" | Tests for each |
+| ~~S3~~ | **Done 15 Nov 2026** (`AccountSecurityTest`, database test T37). Email verification before a company can be created; password reset with a single-use, 60-minute token; changing password or resetting it deletes all tokens; "sign out everywhere" | Tests for each |
 | S4 | A permission test per route: each role in `config/permissions.php` against each route, from one table | A new route without a row fails the test |
 | S5 | `config/cors.php`: only `FRONTEND_URL`, no wildcard, no credentials for other origins | Request from another origin is refused |
 | S6 | Web: full Content-Security-Policy with nonces; token kept in an `HttpOnly`, `Secure`, `SameSite=Lax` cookie set by the Next.js server, never readable by page script | No token in `localStorage` or page source |

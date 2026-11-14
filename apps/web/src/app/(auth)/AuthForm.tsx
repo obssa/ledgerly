@@ -11,15 +11,20 @@ interface Field {
   hint?: string;
 }
 
-/** One form for sign-in and sign-up: the fields, the Server Function, and the API's messages. */
+/**
+ * One form for the account screens (sign in, sign up, code, passwords): the fields, the Server Function, and
+ * the API's messages. `hidden` carries values the person does not type, such as the token from an emailed link.
+ */
 export function AuthForm({
   action,
   fields,
   submit,
+  hidden,
 }: {
   action: (state: FormState | undefined, form: FormData) => Promise<FormState>;
   fields: Field[];
   submit: string;
+  hidden?: Record<string, string>;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -30,6 +35,12 @@ export function AuthForm({
           {state.error}
         </p>
       )}
+      {state?.notice && (
+        <p role="status" className="rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">
+          {state.notice}
+        </p>
+      )}
+      {Object.entries(hidden ?? {}).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
       {fields.map((f) => {
         const invalid = Boolean(state?.fields?.[f.name]);
         return (

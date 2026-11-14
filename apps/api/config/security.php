@@ -14,6 +14,11 @@
 return [
     'web_server_key' => env('WEB_SERVER_KEY', ''),
 
+    // Where the links in emails lead: the web app (SECURITY.md S3).
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+    'email' => ['verify_minutes' => 24 * 60],
+    'password' => ['reset_minutes' => 60],
+
     'mfa' => [
         'required_roles' => ['owner', 'admin'],
         'issuer' => env('APP_NAME', 'Ledgerly'),

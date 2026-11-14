@@ -734,6 +734,31 @@ BEGIN
 END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false) \gset ignore_
 
+-- T37: emailed one-time links belong to one user and only known kinds exist (010)
+DO $$ BEGIN
+  INSERT INTO user_email_tokens (user_id, purpose, token_hash, expires_at) VALUES (app_user_id(), 'reset_password', 'hash-of-c1-link', now() + interval '1 hour');
+  BEGIN
+    INSERT INTO user_email_tokens (user_id, purpose, token_hash, expires_at)
+      VALUES ('00000000-0000-0000-0000-0000000000c3', 'reset_password', 'planted-link', now() + interval '1 hour');
+    RAISE EXCEPTION 'FAIL T37a: a reset link was planted on another user';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    INSERT INTO user_email_tokens (user_id, purpose, token_hash, expires_at) VALUES (app_user_id(), 'become_admin', 'other-kind', now());
+    RAISE EXCEPTION 'FAIL T37b: an unknown kind of link was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c3', false) \gset ignore_
+DO $$
+DECLARE n int;
+BEGIN
+  IF EXISTS (SELECT 1 FROM user_email_tokens) THEN RAISE EXCEPTION 'FAIL T37c: another user''s links are visible'; END IF;
+  UPDATE user_email_tokens SET used_at = now();
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL T37d: another user''s link was used up'; END IF;
+  RAISE NOTICE 'PASS T37 emailed one-time links are readable and usable only by their own user';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

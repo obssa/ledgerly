@@ -43,6 +43,14 @@ final class CompanyController extends Controller
      */
     public function store(Request $request, SetUpCompany $setUp): JsonResponse
     {
+        // A company's books are opened only for a person whose email address is confirmed (SECURITY.md S3).
+        if ($request->user()->email_verified_at === null) {
+            return response()->json([
+                'message' => 'Confirm your email address first: we sent you a link when you signed up.',
+                'type' => 'EmailNotVerified',
+            ], 403);
+        }
+
         $data = $request->validate([
             'legal_name' => ['required', 'string', 'max:200'],
             'trading_name' => ['nullable', 'string', 'max:200'],
