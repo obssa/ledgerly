@@ -36,7 +36,7 @@ Both apps run under the same cPanel account (`orcamiib`). What keeps them apart,
 | Database | `orcamiib_ledgerly` (logins `_lowner`, `_lweb`) | its own | no: separate database and logins; nothing in Ledgerly names another database, and pg_hba lets each login into its own database only |
 | Deploy | this repository, its own SSH key and secrets | its own repository and key | no: either key can be revoked alone |
 | PHP version | 8.3 | 8.3 | no: the account default is 8.1 and each app picks its version with an `AddHandler` line in its own `.htaccess` (bakery-ops in `public/.htaccess`, Ledgerly through `shared/api.htaccess`, added to every release). Leave the account default alone |
-| Crontab | 2 lines appended | its own lines | **yes, one file**. `provision.sh` only appends, keeps a copy in `shared/crontab.before-ledgerly`, and touches nothing if the crontab cannot be read |
+| Crontab | 2 lines appended | its own lines | **yes, one file**. `provision.sh` only appends, keeps a copy in `shared/crontab.before-ledgerly`, and touches nothing if the crontab cannot be read. The host rewrites each saved line to start with `sleep $((RANDOM % 60)) &&`; `provision.sh` recognises its lines by their command, so running it again adds nothing |
 | CPU, memory, processes | Node.js app, PHP requests, cron | the same | **yes, one account quota** (CloudLinux LVE). Check cPanel → *Resource Usage* after the first week; if either app hits the limits, that is the moment to move Ledgerly to its own server |
 | PostgreSQL server | one database on it | possibly one too | the server, not the data; advisory locks and row-level security are per database |
 

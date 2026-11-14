@@ -45,6 +45,25 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        // The same login on its own session, for the database cache store (DB_CACHE_CONNECTION=cache where
+        // there is no Redis). Rate-limit counters live in the cache: on the request's own connection a
+        // failed, rolled-back request would erase its own failed attempt.
+        'cache' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_URL'),
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'ledgerly'),
+            'username' => env('DB_USERNAME', 'ledgerly_web'),
+            'password' => env('DB_PASSWORD', ''),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'mask_bindings_in_exception_messages' => env('DB_MASK_BINDINGS', true),
+            'search_path' => env('DB_SCHEMA', 'public'),
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
         'owner' => [
             'driver' => 'pgsql',
             'host' => env('DB_OWNER_HOST', env('DB_HOST', '127.0.0.1')),

@@ -20,9 +20,21 @@ async function withApi<T>(call: (ctx: { token: string; companyId: string }) => P
     return await call({ token, companyId });
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) redirect("/sign-in"); // token expired or signed out elsewhere
+    // Owners and admins work in a company only with an authenticator app set up (SECURITY.md S2).
+    if (error instanceof ApiError && error.status === 403 && (error.body as { type?: string } | null)?.type === "MfaEnrolmentRequired") {
+      redirect("/security");
+    }
     if (error instanceof ApiError && (error.status === 400 || error.status === 403)) redirect("/onboarding"); // no usable company
     throw error;
   }
+}
+
+/** Whether the signed-in person has an authenticator app set up. */
+export async function getSecurityStatus(): Promise<{ mfaEnabled: boolean; demo: boolean }> {
+  await connection();
+  if (isDemoMode()) return { mfaEnabled: false, demo: true };
+  const { user } = await withApi(({ token }) => ledgerly.me(token));
+  return { mfaEnabled: user.mfa_enabled, demo: false };
 }
 
 export async function getInvoices(): Promise<Invoice[]> {

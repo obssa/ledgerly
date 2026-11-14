@@ -150,14 +150,17 @@ final class TenantIsolationTest extends TestCase
 
         $bRows = fn (string $table, bool $hasCompany, $db) => match (true) {
             $table === 'users' => $db->table('users')->where('id', $this->b['user'])->count(),
+            $table === 'user_recovery_codes' => $db->table('user_recovery_codes')->where('user_id', $this->b['user'])->count(),
             $table === 'companies' => $db->table('companies')->where('id', $this->b['company'])->count(),
             $table === 'organisations' => $db->table('organisations')->where('id', $this->b['organisation'])->count(),
             $hasCompany => $db->table($table)->where('company_id', $this->b['company'])->count(),
             default => $this->fail("{$table} has row-level security but no company_id: teach TenantIsolationTest how to find company B's rows."),
         };
 
+        $this->owner()->table('user_recovery_codes')->insert(['user_id' => $this->b['user'], 'code_hash' => 'hash-of-a-code-of-b']);
+
         // Fixtures are real: B has rows in the tables that matter (otherwise the check below proves nothing).
-        foreach (['companies', 'organisations', 'users', 'memberships', 'accounts', 'journal_entries', 'journal_lines', 'account_balances',
+        foreach (['companies', 'organisations', 'users', 'user_recovery_codes', 'memberships', 'accounts', 'journal_entries', 'journal_lines', 'account_balances',
             'documents', 'document_lines', 'contacts', 'tax_rates', 'audit_log', 'einvoice_submissions', 'fiscal_years'] as $table) {
             $row = $tables->firstWhere('name', $table);
             $this->assertNotNull($row, "{$table} has no row-level security");
@@ -202,7 +205,7 @@ final class TenantIsolationTest extends TestCase
      */
     private function companyWithRecords(string $email, string $name): array
     {
-        $user = User::query()->create(['name' => $name, 'email' => $email, 'password' => 'secret-password']);
+        $user = $this->createUser($name, $email);
         $this->lastUser = $user;
         $this->actingAs($user, 'sanctum');
 

@@ -7,12 +7,12 @@ export interface FormState {
 }
 
 /**
- * Turns an API failure into a message for the person filling in the form. Validation (422) and lockout (429)
- * messages come from the API and are meant to be shown; anything else gets a general message, so server
- * details never reach the page.
+ * Turns an API failure into a message for the person filling in the form. Validation (422), lockout (429)
+ * and "already done" (409) messages come from the API and are meant to be shown; anything else gets a general
+ * message, so server details never reach the page.
  */
 export function formStateFromError(error: unknown): FormState {
-  if (error instanceof ApiError && (error.status === 422 || error.status === 429)) {
+  if (error instanceof ApiError && [409, 422, 429].includes(error.status)) {
     const body = (error.body ?? {}) as { message?: string; errors?: Record<string, string[]> };
     const fields = body.errors ?? {};
     const first = Object.values(fields)[0]?.[0];

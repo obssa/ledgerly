@@ -96,10 +96,14 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   const url = new URL(`/api/v1/${path.replace(/^\//, "")}`, base);
   for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, v);
 
+  // Loaded here, not at the top: this module is also imported by tests and for its types.
+  const visitor = await import("./visitor").then((m) => m.visitorHeaders()).catch(() => ({}));
+
   const res = await fetch(url, {
     method: opts.method ?? "GET",
     headers: {
       Accept: "application/json",
+      ...visitor,
       ...(opts.body ? { "Content-Type": "application/json" } : {}),
       ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
       ...(opts.companyId ? { "X-Company-Id": opts.companyId } : {}),
@@ -113,13 +117,32 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   return body as T;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  /** True once an authenticator app is set up: sign-in then asks for a code. */
+  mfa_enabled: boolean;
+}
+
 export interface AuthResult {
-  user: { id: string; name: string; email: string };
+  user: User;
   token: string;
 }
 
+/** The password was right, but an authenticator code is needed before a token is issued. */
+export interface MfaChallenge {
+  mfa_required: true;
+  challenge: string;
+}
+
 export const ledgerly = {
-  login: (body: { email: string; password: string }) => api<AuthResult>("auth/login", { method: "POST", body }),
+  login: (body: { email: string; password: string }) => api<AuthResult | MfaChallenge>("auth/login", { method: "POST", body }),
+  loginWithCode: (body: { challenge: string; code?: string; recovery_code?: string }) =>
+    api<AuthResult>("auth/login/mfa", { method: "POST", body }),
+  me: (token: string) => api<{ user: User }>("auth/me", { token }),
+  mfaEnrol: (token: string) => api<{ secret: string; otpauth_uri: string }>("auth/mfa/enrol", { method: "POST", token }),
+  mfaConfirm: (code: string, token: string) => api<{ recovery_codes: string[] }>("auth/mfa/confirm", { method: "POST", body: { code }, token }),
   register: (body: { name: string; email: string; password: string }) => api<AuthResult>("auth/register", { method: "POST", body }),
   logout: (token: string) => api<null>("auth/logout", { method: "POST", token }),
   companies: (token: string) => api<{ data: Company[] }>("companies", { token }),

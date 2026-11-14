@@ -24,7 +24,7 @@ final class InvoiceFlowTest extends TestCase
     public function test_owner_can_invoice_and_the_ledger_balances(): void
     {
         config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
-        $user = User::query()->create(['name' => 'Hana', 'email' => 'hana@example.test', 'password' => 'secret-password']);
+        $user = $this->createUser('Hana', 'hana@example.test');
         $this->actingAs($user, 'sanctum');
 
         $companyId = $this->postJson('/api/v1/companies', [
@@ -87,7 +87,7 @@ final class InvoiceFlowTest extends TestCase
     {
         // Ethiopia's connector keeps submissions queued until the Ministry's spec exists, so the invoice is not cleared.
         config(['einvoicing.force_sandbox' => false, 'queue.default' => 'sync']);
-        $owner = User::query()->create(['name' => 'Hana', 'email' => 'hana2@example.test', 'password' => 'secret-password']);
+        $owner = $this->createUser('Hana', 'hana2@example.test');
         $this->actingAs($owner, 'sanctum');
         $companyId = $this->postJson('/api/v1/companies', ['legal_name' => 'Harar Traders', 'country_code' => 'ET', 'fiscal_year_start_month' => 7])->assertCreated()->json('id');
         $headers = ['X-Company-Id' => $companyId];
@@ -131,7 +131,7 @@ final class InvoiceFlowTest extends TestCase
 
         // Close the books: a bookkeeper can no longer edit, the owner (admin) can, and the lock is restored.
         $this->owner()->table('companies')->where('id', $companyId)->update(['books_closed_until' => '2026-11-30']);
-        $bookkeeper = User::query()->create(['name' => 'Abebe', 'email' => 'abebe@example.test', 'password' => 'secret-password']);
+        $bookkeeper = $this->createUser('Abebe', 'abebe@example.test');
         $this->owner()->table('memberships')->insert(['id' => (string) \Illuminate\Support\Str::uuid(), 'company_id' => $companyId, 'user_id' => $bookkeeper->getKey(), 'role' => 'bookkeeper']);
 
         $this->actingAs($bookkeeper, 'sanctum');
@@ -202,7 +202,7 @@ final class InvoiceFlowTest extends TestCase
 
     public function test_a_company_in_any_country_and_industry_can_be_set_up(): void
     {
-        $user = User::query()->create(['name' => 'Ana', 'email' => 'ana@example.test', 'password' => 'secret-password']);
+        $user = $this->createUser('Ana', 'ana@example.test');
         $this->actingAs($user, 'sanctum');
 
         // Brazil has no country pack: the default pack applies and the currency must be chosen.
@@ -229,7 +229,7 @@ final class InvoiceFlowTest extends TestCase
     /** @return array{0: array<string, string>, 1: string, 2: \Closure} headers, company id, invoice payload builder */
     private function companyWithInvoiceData(string $email): array
     {
-        $user = User::query()->create(['name' => 'Hana', 'email' => $email, 'password' => 'secret-password']);
+        $user = $this->createUser('Hana', $email);
         $this->actingAs($user, 'sanctum');
         $companyId = $this->postJson('/api/v1/companies', ['legal_name' => 'Harar Traders', 'country_code' => 'ET', 'fiscal_year_start_month' => 7])->assertCreated()->json('id');
         $sales = $this->owner()->table('accounts')->where(['company_id' => $companyId, 'system_key' => 'sales'])->value('id');
@@ -247,7 +247,7 @@ final class InvoiceFlowTest extends TestCase
 
     public function test_users_cannot_open_companies_they_do_not_belong_to(): void
     {
-        $user = User::query()->create(['name' => 'A', 'email' => 'a@example.test', 'password' => 'secret-password']);
+        $user = $this->createUser('A', 'a@example.test');
         $this->actingAs($user, 'sanctum');
 
         $this->getJson('/api/v1/invoices', ['X-Company-Id' => (string) \Illuminate\Support\Str::uuid()])->assertForbidden();

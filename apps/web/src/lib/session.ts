@@ -41,6 +41,21 @@ export async function startSession(token: string, name: string): Promise<void> {
   jar.set(TOKEN_COOKIE, token, options);
   jar.set(NAME_COOKIE, name, options);
   jar.delete(COMPANY_COOKIE);
+  jar.delete(CHALLENGE_COOKIE);
+}
+
+/**
+ * Between the password and the authenticator code there is no session yet, only the API's challenge. It is
+ * kept like the token: HttpOnly, and for the five minutes the API accepts it.
+ */
+const CHALLENGE_COOKIE = "ledgerly_challenge";
+
+export async function holdChallenge(challenge: string): Promise<void> {
+  (await cookies()).set(CHALLENGE_COOKIE, challenge, { ...options, maxAge: 60 * 5 });
+}
+
+export async function heldChallenge(): Promise<string | undefined> {
+  return (await cookies()).get(CHALLENGE_COOKIE)?.value;
 }
 
 export async function selectCompany(companyId: string): Promise<void> {
@@ -49,5 +64,5 @@ export async function selectCompany(companyId: string): Promise<void> {
 
 export async function endSession(): Promise<void> {
   const jar = await cookies();
-  for (const name of [TOKEN_COOKIE, COMPANY_COOKIE, NAME_COOKIE]) jar.delete(name);
+  for (const name of [TOKEN_COOKIE, COMPANY_COOKIE, NAME_COOKIE, CHALLENGE_COOKIE]) jar.delete(name);
 }
