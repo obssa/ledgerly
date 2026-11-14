@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Support\SchemaSql;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
 
@@ -39,9 +40,8 @@ trait RefreshLedgerDatabase
         }
 
         DB::purge('pgsql');
-        $this->owner()->unprepared(
-            'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT USAGE ON SCHEMA public TO ledgerly_app;'
-        );
+        $schema = SchemaSql::schema();   // a checked identifier from configuration
+        $this->owner()->unprepared("DROP SCHEMA IF EXISTS \"{$schema}\" CASCADE; CREATE SCHEMA \"{$schema}\";");
         $this->artisan('migrate', ['--database' => 'owner', '--force' => true])->assertSuccessful();
         $this->owner()->disconnect();
     }

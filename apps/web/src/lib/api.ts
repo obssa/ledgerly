@@ -82,13 +82,18 @@ interface RequestOptions {
   query?: Record<string, string | undefined>;
 }
 
-export const apiBaseUrl = process.env.LEDGERLY_API_URL ?? process.env.NEXT_PUBLIC_LEDGERLY_API_URL;
-export const isDemoMode = !apiBaseUrl;
+/**
+ * Read at call time, not when the module loads: the production image is built once and pointed at an API by
+ * its runtime environment. A module-level constant would freeze the build machine's (empty) value.
+ */
+export const apiBaseUrl = (): string | undefined => process.env.LEDGERLY_API_URL ?? process.env.NEXT_PUBLIC_LEDGERLY_API_URL;
+export const isDemoMode = (): boolean => !apiBaseUrl();
 
 export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  if (!apiBaseUrl) throw new ApiError(0, "LEDGERLY_API_URL is not set (demo mode)");
+  const base = apiBaseUrl();
+  if (!base) throw new ApiError(0, "LEDGERLY_API_URL is not set (demo mode)");
 
-  const url = new URL(`/api/v1/${path.replace(/^\//, "")}`, apiBaseUrl);
+  const url = new URL(`/api/v1/${path.replace(/^\//, "")}`, base);
   for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, v);
 
   const res = await fetch(url, {
