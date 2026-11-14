@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import QRCode from "qrcode";
 import { ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
-import { endSession, getSession, heldChallenge, holdChallenge, selectCompany, startSession } from "@/lib/session";
+import { endSession, getSession, heldChallenge, holdChallenge, replaceToken, selectCompany, startSession } from "@/lib/session";
 
 /*
  * Server Functions behind the sign-in, sign-up, sign-out and company-setup forms. They run on the web server,
@@ -109,6 +109,57 @@ export async function signOut(): Promise<void> {
   if (token) await ledgerly.logout(token).catch(() => undefined); // the cookie goes either way
   await endSession();
   redirect("/sign-in");
+}
+
+export async function signOutEverywhere(): Promise<void> {
+  const { token } = await getSession();
+  if (token) await ledgerly.logoutEverywhere(token).catch(() => undefined);
+  await endSession();
+  redirect("/sign-in");
+}
+
+/** Sends the confirmation email again (company setup needs a confirmed address). */
+export async function resendVerification(): Promise<FormState> {
+  const { token } = await getSession();
+  if (!token) redirect("/sign-in");
+  try {
+    return { notice: (await ledgerly.resendVerification(token)).message };
+  } catch (error) {
+    return formStateFromError(error);
+  }
+}
+
+export async function forgotPassword(_: FormState | undefined, form: FormData): Promise<FormState> {
+  try {
+    return { notice: (await ledgerly.forgotPassword(text(form, "email") ?? "")).message };
+  } catch (error) {
+    return formStateFromError(error);
+  }
+}
+
+export async function resetPassword(_: FormState | undefined, form: FormData): Promise<FormState> {
+  try {
+    const { message } = await ledgerly.resetPassword({ token: text(form, "token") ?? "", password: String(form.get("password") ?? "") });
+    await endSession(); // the API ended every session; this browser's cookies go too
+    return { notice: message };
+  } catch (error) {
+    return formStateFromError(error);
+  }
+}
+
+export async function changePassword(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const { token } = await getSession();
+  if (!token) redirect("/sign-in");
+  try {
+    const fresh = await ledgerly.changePassword(
+      { current_password: String(form.get("current_password") ?? ""), password: String(form.get("password") ?? "") },
+      token,
+    );
+    await replaceToken(fresh.token);
+    return { notice: "Your password is changed. Every other device was signed out." };
+  } catch (error) {
+    return formStateFromError(error);
+  }
 }
 
 const OPTIONAL = ["trading_name", "base_currency", "tin", "phone", "email", "website", "calendar", "conversion_date", "industry"] as const;

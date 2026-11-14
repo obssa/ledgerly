@@ -58,6 +58,11 @@ export async function heldChallenge(): Promise<string | undefined> {
   return (await cookies()).get(CHALLENGE_COOKIE)?.value;
 }
 
+/** After a password change the API ends every session and hands this one a new token. */
+export async function replaceToken(token: string): Promise<void> {
+  (await cookies()).set(TOKEN_COOKIE, token, options);
+}
+
 export async function selectCompany(companyId: string): Promise<void> {
   (await cookies()).set(COMPANY_COOKIE, companyId, options);
 }

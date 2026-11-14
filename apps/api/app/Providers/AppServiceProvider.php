@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Model::shouldBeStrict(! $this->app->isProduction());
+
+        // One password rule for sign-up, reset and change. The leaked-password check asks an outside service
+        // (k-anonymity: only five characters of the hash leave the server); tests do not call out.
+        Password::defaults(fn () => $this->app->environment('testing')
+            ? Password::min(10)
+            : Password::min(10)->uncompromised());
 
         // Named limiters, each with its own counter. (Two unnamed `throttle:n,1` middlewares on one route share
         // a counter and count every request twice: the sign-in limit of 10 a minute was really 5.)

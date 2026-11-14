@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { createCompany } from "@/app/(auth)/actions";
+import { createCompany, resendVerification } from "@/app/(auth)/actions";
 import { COUNTRIES, INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 
@@ -10,7 +10,27 @@ const months = ["January", "February", "March", "April", "May", "June", "July", 
 /** Creates the company through POST /api/v1/companies (createCompany), then opens its books. */
 export function OnboardingForm() {
   const [state, formAction, pending] = useActionState(createCompany, undefined);
+  const [resent, resend, resending] = useActionState(resendVerification, undefined);
   const bad = (name: string) => Boolean(state?.fields?.[name]);
+
+  // The API opens a company's books only for a confirmed email address (SECURITY.md S3).
+  if (state?.code === "EmailNotVerified") {
+    return (
+      <form action={resend} className="max-w-[560px]">
+        <h2 className="text-[26px] font-extrabold tracking-tight">Confirm your email address first</h2>
+        <p className="mt-2 text-[15px] leading-relaxed text-muted">
+          We sent a link to your email address when you signed up. Open it, then come back and create your company.
+          Check your spam folder if it is not in your inbox.
+        </p>
+        {resent?.notice && <p role="status" className="mt-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">{resent.notice}</p>}
+        {resent?.error && <p role="alert" className="mt-4 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{resent.error}</p>}
+        <div className="mt-5 flex flex-wrap gap-2.5">
+          <button type="submit" className="btn" disabled={resending}>{resending ? "Sending…" : "Send the email again"}</button>
+          <a href="/onboarding" className="btn btn-primary">I have confirmed it</a>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <form action={formAction} className="max-w-[760px]" noValidate>

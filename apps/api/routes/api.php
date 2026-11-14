@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CompanyController;
@@ -20,10 +21,16 @@ Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:auth');
     Route::post('auth/login/mfa', [AuthController::class, 'loginMfa'])->middleware('throttle:auth');
+    Route::post('auth/email/verify', [AccountController::class, 'verifyEmail'])->middleware('throttle:auth');
+    Route::post('auth/password/forgot', [AccountController::class, 'forgotPassword'])->middleware('throttle:auth');
+    Route::post('auth/password/reset', [AccountController::class, 'resetPassword'])->middleware('throttle:auth');
 
     Route::middleware(['auth:sanctum', 'tenant.tx'])->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('auth/me', [AuthController::class, 'me']);
+        Route::post('auth/logout-everywhere', [AccountController::class, 'logoutEverywhere']);
+        Route::post('auth/email/resend', [AccountController::class, 'resendVerification']);
+        Route::post('auth/password', [AccountController::class, 'changePassword']);
 
         Route::post('auth/mfa/enrol', [MfaController::class, 'enrol']);
         Route::post('auth/mfa/confirm', [MfaController::class, 'confirm']);

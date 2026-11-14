@@ -102,6 +102,9 @@ if [ ! -f "$ROOT/shared/web.env" ]; then
 fi
 # Settings added after the first install: appended once, never changed.
 grep -q '^DB_CACHE_CONNECTION=' "$ROOT/shared/api.env" || printf '\n# The cache on its own database session (rate limits survive a rolled-back request)\nDB_CACHE_CONNECTION=cache\n' >> "$ROOT/shared/api.env"
+# Email (confirmation and reset links, SECURITY.md S3) goes out through the server's own mail system. The
+# domain already publishes SPF and DKIM for this server. No mailbox or password is needed to send.
+grep -q '^MAIL_MAILER=' "$ROOT/shared/api.env" || printf '\n# Email through the server (sendmail); SPF and DKIM are published for the domain\nMAIL_MAILER=sendmail\nMAIL_FROM_ADDRESS=%s\nMAIL_FROM_NAME=Ledgerly\n' "${MAIL_FROM:-no-reply@orcamind.dev}" >> "$ROOT/shared/api.env"
 # One secret on both sides: with it the web server may tell the API which visitor it acts for, so sign-in
 # limits count people, not the web server (SECURITY.md S16).
 if ! grep -q '^WEB_SERVER_KEY=.' "$ROOT/shared/api.env" || ! grep -q '^LEDGERLY_WEB_KEY=.' "$ROOT/shared/web.env"; then

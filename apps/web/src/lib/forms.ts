@@ -3,6 +3,10 @@ import { ApiError } from "./api";
 /** What a form shows after a failed submit: one message, and the fields the API rejected. */
 export interface FormState {
   error?: string;
+  /** Something went right and is worth saying, such as "we sent you an email". */
+  notice?: string;
+  /** The API's name for a refusal the screen reacts to, such as "EmailNotVerified". */
+  code?: string;
   fields?: Record<string, string[]>;
 }
 
@@ -17,6 +21,11 @@ export function formStateFromError(error: unknown): FormState {
     const fields = body.errors ?? {};
     const first = Object.values(fields)[0]?.[0];
     return { error: first ?? body.message ?? "Check the highlighted fields.", fields };
+  }
+  // A refusal with a name is written for the person: the email address is not confirmed yet, and so on.
+  if (error instanceof ApiError && error.status === 403) {
+    const body = (error.body ?? {}) as { message?: string; type?: string };
+    if (body.type && body.message) return { error: body.message, code: body.type };
   }
   if (error instanceof ApiError && error.status === 0) {
     return { error: "This is the demo: there is no server to sign in to." };

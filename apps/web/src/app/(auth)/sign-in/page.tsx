@@ -16,7 +16,10 @@ export default function SignInPage() {
           { name: "password", label: "Password", type: "password", autoComplete: "current-password" },
         ]}
       />
-      <p className="mt-5 text-center text-sm text-muted">
+      <p className="mt-4 text-center text-sm">
+        <Link href="/forgot-password" className="font-bold text-brand">Forgot your password?</Link>
+      </p>
+      <p className="mt-3 text-center text-sm text-muted">
         New to Ledgerly? <Link href="/sign-up" className="font-bold text-brand">Create an account</Link>
       </p>
     </>

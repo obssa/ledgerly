@@ -1,5 +1,7 @@
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getSecurityStatus } from "@/lib/data";
+import { changePassword, signOutEverywhere } from "@/app/(auth)/actions";
+import { AuthForm } from "@/app/(auth)/AuthForm";
 import { AuthenticatorSetup } from "./AuthenticatorSetup";
 
 export const metadata = { title: "Sign-in security" };
@@ -31,6 +33,32 @@ export default async function SecurityPage() {
           <AuthenticatorSetup />
         )}
       </Card>
+
+      {!demo && (
+        <div className="mt-4 flex max-w-[820px] flex-wrap gap-4">
+          <Card className="min-w-0 flex-[1_1_340px]" label="Password">
+            <h2 className="text-[19px] font-bold">Password</h2>
+            <p className="mt-1.5 text-sm text-muted">Changing it signs you out on every other device.</p>
+            <AuthForm
+              action={changePassword}
+              submit="Change password"
+              fields={[
+                { name: "current_password", label: "Current password", type: "password", autoComplete: "current-password" },
+                { name: "password", label: "New password", type: "password", autoComplete: "new-password", hint: "At least 10 characters." },
+              ]}
+            />
+          </Card>
+          <Card className="min-w-0 flex-[1_1_300px]" label="Sessions">
+            <h2 className="text-[19px] font-bold">Sessions</h2>
+            <p className="mt-1.5 text-sm text-muted">
+              Lost a phone or used a shared computer? Sign out everywhere, this device included, and sign in again.
+            </p>
+            <form action={signOutEverywhere}>
+              <button type="submit" className="btn mt-4">Sign out everywhere</button>
+            </form>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
