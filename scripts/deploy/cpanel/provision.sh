@@ -128,7 +128,9 @@ add_cron() {
       *) echo "Could not read the crontab ($current): not touching it. Add this line by hand: $1"; return 1 ;;
     esac
   fi
-  grep -qxF -- "$1" <<<"$current" && return 0
+  # Already there? Compared by the command, not the whole line: this host rewrites a line when it is saved
+  # (it puts `sleep $((RANDOM % 60)) &&` in front, to spread load), and an exact match would add it again.
+  grep -qF -- "${1#\* \* \* \* \* }" <<<"$current" && return 0
   [ -f "$ROOT/shared/crontab.before-ledgerly" ] || printf '%s\n' "$current" > "$ROOT/shared/crontab.before-ledgerly"
   if [ -n "$current" ]; then printf '%s\n%s\n' "$current" "$1"; else printf '%s\n' "$1"; fi | crontab -
   echo "cron: $1"
