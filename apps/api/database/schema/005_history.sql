@@ -118,7 +118,7 @@ CREATE FUNCTION audit_log_row_digest(r audit_log) RETURNS text LANGUAGE sql IMMU
 $$;
 
 -- Runs as the table owner so it can read the previous row whatever RLS context the caller has.
-CREATE FUNCTION audit_log_chain() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE FUNCTION audit_log_chain() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = {{schema}} AS $$
 BEGIN
     -- One writer at a time per company, so ids and hashes follow the same order.
     PERFORM pg_advisory_xact_lock(hashtext('audit_log:' || NEW.company_id::text));
@@ -136,7 +136,7 @@ CREATE TRIGGER audit_log_hash_chain
 
 -- Returns the id of the first row whose hash or link is wrong, or NULL when the whole chain is intact.
 CREATE FUNCTION audit_log_verify(p_company_id uuid) RETURNS bigint
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = {{schema}} AS $$
 DECLARE
     r        audit_log;
     expected text := NULL;

@@ -1,17 +1,28 @@
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { Sidebar } from "@/components/app-shell/Sidebar";
 import { Topbar } from "@/components/app-shell/Topbar";
 import { isDemoMode } from "@/lib/api";
+
+/** Decided per request, so one built image can run in demo mode or against an API. */
+async function DemoBanner() {
+  await connection();
+  if (!isDemoMode()) return null;
+  return (
+    <p className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
+      Demo mode: showing sample data. Set LEDGERLY_API_URL to connect to the API.
+    </p>
+  );
+}
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-screen flex-wrap">
       <Sidebar />
       <main className="min-w-0 flex-[999_1_560px] px-8 pb-10 pt-5">
-        {isDemoMode && (
-          <p className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
-            Demo mode: showing sample data. Set LEDGERLY_API_URL to connect to the API.
-          </p>
-        )}
+        <Suspense fallback={null}>
+          <DemoBanner />
+        </Suspense>
         <Topbar />
         {children}
       </main>

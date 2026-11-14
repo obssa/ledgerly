@@ -179,7 +179,7 @@ CREATE FUNCTION ledger_period_lock_key(p_company_id uuid) RETURNS bigint LANGUAG
 $$;
 
 -- SECURITY DEFINER: reads the organisation's status whatever the caller's row-level-security context.
-CREATE FUNCTION ledger_assert_can_post() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE FUNCTION ledger_assert_can_post() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = {{schema}} AS $$
 DECLARE
     closed_until   date;
     company_status text;
@@ -250,7 +250,7 @@ CREATE TRIGGER journal_lines_same_company
 
 -- 5. Keep account_balances in step. One statement-level trigger per INSERT, rows applied in a fixed
 -- (account, period) order so two postings can never deadlock on the balance rows.
-CREATE FUNCTION ledger_apply_balances() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE FUNCTION ledger_apply_balances() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = {{schema}} AS $$
 BEGIN
     INSERT INTO account_balances (company_id, account_id, period, debit, credit)
     SELECT company_id, account_id, date_trunc('month', entry_date)::date, sum(debit), sum(credit)

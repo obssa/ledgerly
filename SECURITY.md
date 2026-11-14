@@ -5,7 +5,7 @@ standing record: what protects the system, what was proven by a test, what is wr
 and what must be built before a real customer signs in.
 
 **Status in one line:** the database layer is hardened and tested (46 checks). The Laravel request layer
-is written with the right controls but has never been run. Sign-in is not finished (no authenticator
+now runs (14 Nov 2026) and its feature tests run as `ledgerly_web` with two-company isolation tests (S1 done). Sign-in is not finished (no authenticator
 code yet). The product is **not ready for real customer data** until the "Before launch" list is done.
 
 ## 1. What we are protecting, and from whom
@@ -39,8 +39,8 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | Partitions cannot be read directly, only through the parent table where the policy applies | Tested: T16 |
 | The application connects as `ledgerly_web`: not owner, not superuser, no BYPASSRLS, cannot create or alter anything | Tested: T34, T35 |
 | User records (email, password hash, authenticator secret) visible only to the user and their company | Tested: T32 |
-| Eloquent global scope adds the company filter as a second layer | Written |
-| `ResolveCompany` checks an active membership before the company enters the context | Written |
+| Eloquent global scope adds the company filter as a second layer | Tested: `TenantIsolationTest` (scope alone, RLS bypassed) |
+| `ResolveCompany` checks an active membership before the company enters the context | Tested: `TenantIsolationTest` (B's id in the header, every company route) |
 
 ### Access inside a company
 | Control | State |
@@ -52,7 +52,7 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | Reopening a closed period and changing company settings need an owner or admin | Tested: T30 |
 | Adding a company to an organisation needs its creator, owner or admin | Tested: T31 |
 | The application cannot change its own subscription status or plan | Tested: T22 |
-| Every controller action checks a permission (`authorizeCompany`) | Written; all 21 company routes reviewed by hand |
+| Every controller action checks a permission (`authorizeCompany`) | Written; all 21 company routes reviewed by hand (route-by-role test is S4) |
 
 ### Integrity of the books
 | Control | State |
@@ -81,7 +81,7 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | All input validated; no string-built SQL anywhere (`grep` clean on 14 Nov) | Reviewed by hand |
 | Idempotency keys belong to one user and one request body | Written |
 | Rate limit 120 requests a minute per user; 10 a minute on sign-in and registration | Written |
-| API responses: no caching, no framing, no sniffing, HTTPS only | Written |
+| API responses: no caching, no framing, no sniffing, HTTPS only; errors always JSON, plain 404s | Tested: `ApiResponsesTest` |
 | Web app: no framing, no sniffing, HTTPS only; no tokens in `localStorage` (none found) | Build passes |
 | Amounts are decimal strings end to end, never floating point | Tested (unit tests) |
 | Dependency vulnerability scan in CI (`composer audit`, `npm audit`); npm scan clean on 14 Nov | In CI |
@@ -105,7 +105,18 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | 13 | Functions with owner rights resolved names through the temporary schema | Low | `search_path = public, pg_temp` (008) |
 | 14 | No statement or lock timeout on the application role | Medium | `docker/postgres/init.sql` |
 | 15 | No dependency scan in CI | Medium | Added |
-| 16 | **Feature tests run as the database owner, which bypasses row-level security** | High | **Open: task S1** |
+| 16 | Feature tests ran as the database owner, which bypasses row-level security | High | S1: owner migrates, requests run as `ledgerly_web`; `TenantIsolationTest` |
+
+Found on 14 Nov 2026 by running the Laravel layer for the first time:
+
+| # | Finding | Severity | Fix |
+|---|---|---|---|
+| 17 | `php artisan migrate` never applied `008_access_hardening.sql`: a database built through Laravel had none of findings 1–5, 12, 13 | High | Migration `2026_11_14_000000_apply_access_hardening` |
+| 18 | Tests inside the compose container ran against the development database and rebuilt its schema (Laravel reads `$_SERVER` before phpunit's `<env>`) | High | `<server>` entries; test base refuses any database not named `*_test` |
+| 19 | A 404 named the model class and echoed the requested id | Low | Plain `Not found.` for every API 404 |
+| 20 | A request without a token and without `Accept: application/json` got a 500 (redirect to a missing login route); validation errors redirected | Medium | API errors always JSON; guests get 401 |
+| 21 | Behind a load balancer the API could not see HTTPS (no HSTS) and saw every client as one address, so the per-address sign-in lockout would lock out everyone | Medium | `TRUSTED_PROXIES` |
+| 22 | On the cPanel host, "grant all privileges" made the app login a member of the database-owner role: it could drop or alter the database. And `public` is writable by every login there, which the owner-rights functions searched | High | Membership revoked; tables in their own schema, functions search only it; `ledgerly:check-database-roles` stops any deploy whose app login could bypass row-level security or change the database |
 
 ## 4. Honest limits
 
@@ -125,7 +136,7 @@ Do these in Claude Code, in this order. Each ends with a test.
 
 | Task | What | Done when |
 |---|---|---|
-| S1 | Run feature tests as `ledgerly_web` (migrate with the owner connection, serve requests with the application connection). Add a two-company test for **every** endpoint: company B's id in the URL, body and header returns 404 or 403, never data | The suite fails if a policy or scope is removed |
+| ~~S1~~ | **Done 14 Nov 2026.** Run feature tests as `ledgerly_web` (migrate with the owner connection, serve requests with the application connection). Add a two-company test for **every** endpoint: company B's id in the URL, body and header returns 404 or 403, never data | The suite fails if a policy or scope is removed |
 | S2 | Authenticator code (TOTP) at sign-in: enrol with QR, 10 one-time recovery codes (stored hashed), required for owner and admin, required for all staff. Code checked before the token is issued; code attempts rate-limited | Sign-in without a code fails for an enrolled user |
 | S3 | Email verification before a company can be created; password reset with a single-use, 60-minute token; changing password or resetting it deletes all tokens; "sign out everywhere" | Tests for each |
 | S4 | A permission test per route: each role in `config/permissions.php` against each route, from one table | A new route without a row fails the test |
