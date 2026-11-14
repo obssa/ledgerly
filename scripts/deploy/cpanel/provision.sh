@@ -70,6 +70,8 @@ DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true
 
 # No Redis on shared hosting: cache and queue in the database, queue worked by cron.
 CACHE_STORE=database
+# Its own database session: a failed, rolled-back request must not erase its own rate-limit count.
+DB_CACHE_CONNECTION=cache
 QUEUE_CONNECTION=database
 SESSION_DRIVER=array
 FILESYSTEM_DISK=local
@@ -98,7 +100,19 @@ if [ ! -f "$ROOT/shared/web.env" ]; then
   ( umask 077; printf 'LEDGERLY_API_URL=%s\nLEDGERLY_WEB_URL=%s\n' "$API_URL" "$WEB_URL" > "$ROOT/shared/web.env" )
   echo "created shared/web.env"
 fi
-# The web app's public address, for redirects (apps/web/src/proxy.ts); added to installs made before it existed.
+# Settings added after the first install: appended once, never changed.
+grep -q '^DB_CACHE_CONNECTION=' "$ROOT/shared/api.env" || printf '\n# The cache on its own database session (rate limits survive a rolled-back request)\nDB_CACHE_CONNECTION=cache\n' >> "$ROOT/shared/api.env"
+# One secret on both sides: with it the web server may tell the API which visitor it acts for, so sign-in
+# limits count people, not the web server (SECURITY.md S16).
+if ! grep -q '^WEB_SERVER_KEY=.' "$ROOT/shared/api.env" || ! grep -q '^LEDGERLY_WEB_KEY=.' "$ROOT/shared/web.env"; then
+  WEB_KEY="$(openssl rand -hex 32)"
+  sed -i '/^WEB_SERVER_KEY=/d' "$ROOT/shared/api.env"; sed -i '/^LEDGERLY_WEB_KEY=/d' "$ROOT/shared/web.env"
+  printf '\n# Shared with the web app (LEDGERLY_WEB_KEY in web.env)\nWEB_SERVER_KEY=%s\n' "$WEB_KEY" >> "$ROOT/shared/api.env"
+  printf 'LEDGERLY_WEB_KEY=%s\n' "$WEB_KEY" >> "$ROOT/shared/web.env"
+  unset WEB_KEY
+  echo "created the web-server key (api.env and web.env)"
+fi
+# The web app's public address, for redirects (apps/web/src/proxy.ts).
 grep -q '^LEDGERLY_WEB_URL=' "$ROOT/shared/web.env" || printf 'LEDGERLY_WEB_URL=%s\n' "$WEB_URL" >> "$ROOT/shared/web.env"
 
 [ -f "$ROOT/deploy/web-app.js" ] && cp "$ROOT/deploy/web-app.js" "$WEB_APP_ROOT/app.js"

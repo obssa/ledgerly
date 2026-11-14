@@ -19,6 +19,8 @@ use Symfony\Component\HttpFoundation\Response;
  * and adds the company to the transaction's tenant context so row-level security applies to every query
  * that follows. Runs inside RunInTenantTransaction.
  *
+ * Refuses owners and admins who have not set up an authenticator app (config/security.php).
+ *
  * Also applies the two read-only states: a suspended or cancelled subscription and an archived company
  * can be read and exported but not changed.
  */
@@ -46,6 +48,14 @@ final class ResolveCompany
 
         if (! $membership) {
             return response()->json(['message' => 'You do not have access to this company.'], 403);
+        }
+
+        // Owners and admins can change everything, so they work only with a second factor (SECURITY.md S2).
+        if (in_array($membership->role, (array) config('security.mfa.required_roles'), true) && ! $user->mfa_enabled) {
+            return response()->json([
+                'message' => 'Set up an authenticator app to work in this company: it is required for owners and admins.',
+                'type' => 'MfaEnrolmentRequired',
+            ], 403);
         }
 
         DatabaseTenantContext::set($user->getKey(), $companyId);

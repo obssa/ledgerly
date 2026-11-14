@@ -6,8 +6,12 @@ namespace App\Providers;
 
 use App\Domain\Compliance\ConnectorRegistry;
 use App\Domain\Tenancy\Support\CurrentCompany;
+use App\Support\ClientAddress;
 use App\Support\StateMachine;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,5 +27,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Model::shouldBeStrict(! $this->app->isProduction());
+
+        // Named limiters, each with its own counter. (Two unnamed `throttle:n,1` middlewares on one route share
+        // a counter and count every request twice: the sign-in limit of 10 a minute was really 5.)
+        // Counted per signed-in user, otherwise per visitor address (ClientAddress), never per web server.
+        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
+            ->by('api|' . ($request->user()?->getAuthIdentifier() ?? ClientAddress::of($request))));
+        RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)
+            ->by('auth|' . ClientAddress::of($request)));
     }
 }

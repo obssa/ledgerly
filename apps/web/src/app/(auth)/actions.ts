@@ -1,9 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import QRCode from "qrcode";
 import { ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
-import { endSession, getSession, selectCompany, startSession } from "@/lib/session";
+import { endSession, getSession, heldChallenge, holdChallenge, selectCompany, startSession } from "@/lib/session";
 
 /*
  * Server Functions behind the sign-in, sign-up, sign-out and company-setup forms. They run on the web server,
@@ -23,13 +24,70 @@ async function afterSignIn(token: string): Promise<string> {
 export async function signIn(_: FormState | undefined, form: FormData): Promise<FormState> {
   let next: string;
   try {
-    const { token, user } = await ledgerly.login({ email: text(form, "email") ?? "", password: String(form.get("password") ?? "") });
+    const result = await ledgerly.login({ email: text(form, "email") ?? "", password: String(form.get("password") ?? "") });
+    if ("mfa_required" in result) {
+      // The password was right, but there is no session until the authenticator code is too.
+      await holdChallenge(result.challenge);
+      next = "/sign-in/code";
+    } else {
+      await startSession(result.token, result.user.name);
+      next = await afterSignIn(result.token);
+    }
+  } catch (error) {
+    return formStateFromError(error);
+  }
+  redirect(next);
+}
+
+/** Second step of sign-in: six digits from the authenticator app, or one of the recovery codes. */
+export async function verifyCode(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const challenge = await heldChallenge();
+  if (!challenge) return { error: "This sign-in has expired. Go back and enter your password again." };
+
+  const entered = text(form, "code") ?? "";
+  const isAppCode = /^\d{6}$/.test(entered.replace(/\s/g, ""));
+  let next: string;
+  try {
+    const { token, user } = await ledgerly.loginWithCode(isAppCode ? { challenge, code: entered } : { challenge, recovery_code: entered });
     await startSession(token, user.name);
     next = await afterSignIn(token);
   } catch (error) {
     return formStateFromError(error);
   }
   redirect(next);
+}
+
+/** What the authenticator setup screen shows after each step. */
+export interface AuthenticatorState extends FormState {
+  /** To scan: the QR code as an image address, and the same secret as text for typing in. */
+  qr?: string;
+  secret?: string;
+  /** Shown once, after the first correct code. */
+  recoveryCodes?: string[];
+}
+
+export async function beginAuthenticator(): Promise<AuthenticatorState> {
+  const { token } = await getSession();
+  if (!token) redirect("/sign-in");
+  try {
+    const { secret, otpauth_uri } = await ledgerly.mfaEnrol(token);
+    // Drawn here on the server: the secret is never sent to a third-party QR service.
+    const svg = await QRCode.toString(otpauth_uri, { type: "svg", margin: 1, errorCorrectionLevel: "M" });
+    return { secret, qr: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}` };
+  } catch (error) {
+    return formStateFromError(error);
+  }
+}
+
+export async function confirmAuthenticator(_: AuthenticatorState | undefined, form: FormData): Promise<AuthenticatorState> {
+  const { token } = await getSession();
+  if (!token) redirect("/sign-in");
+  try {
+    const { recovery_codes } = await ledgerly.mfaConfirm(text(form, "code") ?? "", token);
+    return { recoveryCodes: recovery_codes };
+  } catch (error) {
+    return formStateFromError(error);
+  }
 }
 
 export async function signUp(_: FormState | undefined, form: FormData): Promise<FormState> {

@@ -110,7 +110,7 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 
 **14 Nov 2026, first run of the Laravel layer (Docker, PostgreSQL 18, PHP 8.4) and in CI:**
 
-- **Database: 46 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 42 guard checks (T1–T35) and 4
+- **Database: 47 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 43 guard checks (T1–T36) and 4
   two-session concurrency checks (C1–C4).
 - **API: 60 tests pass** (44 unit, 16 feature). Feature tests build the schema as the owner and run every request as
   `ledgerly_web`, so row-level security applies (SECURITY.md S1). `TenantIsolationTest` covers every company route with
@@ -168,5 +168,6 @@ rules Claude Code follows in this repository.
 - Kenya pack and eTIMS connector: second country, not reviewed.
 - Billing provider integration that moves the subscription state machine; nightly `ledger_verify` and
   `audit_log_verify` jobs; load test at the plan's targets.
-- MFA, email verification and password reset screens (S2, S3), bills and expenses screens, payments UI, bank
+- Email verification and password reset (S3), turning the authenticator off or renewing recovery codes in the
+  web app (the API has both), bills and expenses screens, payments UI, bank
   statement import and matching UI. Sign-in, sign-up, sign-out and company setup are built (`apps/web/src/app/(auth)`).

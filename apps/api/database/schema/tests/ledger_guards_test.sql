@@ -705,6 +705,35 @@ DO $$ BEGIN
   END;
 END $$;
 
+-- T36: recovery codes belong to one user; the authenticator cannot be "confirmed" without a secret (009)
+DO $$
+DECLARE n int;
+BEGIN
+  INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (app_user_id(), 'hash-of-c1-code');
+  BEGIN
+    INSERT INTO user_recovery_codes (user_id, code_hash) VALUES ('00000000-0000-0000-0000-0000000000c3', 'planted');
+    RAISE EXCEPTION 'FAIL T36a: a recovery code was planted on another user';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE users SET mfa_secret = NULL, mfa_confirmed_at = now() WHERE id = app_user_id();
+    RAISE EXCEPTION 'FAIL T36b: the authenticator was marked confirmed without a secret';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c3', false) \gset ignore_
+DO $$
+DECLARE n int;
+BEGIN
+  IF EXISTS (SELECT 1 FROM user_recovery_codes) THEN RAISE EXCEPTION 'FAIL T36c: another user''s recovery codes are visible'; END IF;
+  UPDATE user_recovery_codes SET used_at = now();
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL T36d: another user''s recovery code was used up'; END IF;
+  DELETE FROM user_recovery_codes;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL T36e: another user''s recovery codes were deleted'; END IF;
+  RAISE NOTICE 'PASS T36 recovery codes are readable and usable only by their own user';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

@@ -5,6 +5,7 @@ use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
+use App\Http\Controllers\MfaController;
 use App\Http\Controllers\TaxRateController;
 use Illuminate\Support\Facades\Route;
 
@@ -16,11 +17,18 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
-    Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
-    Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
+    Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:auth');
+    Route::post('auth/login/mfa', [AuthController::class, 'loginMfa'])->middleware('throttle:auth');
 
     Route::middleware(['auth:sanctum', 'tenant.tx'])->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
+        Route::get('auth/me', [AuthController::class, 'me']);
+
+        Route::post('auth/mfa/enrol', [MfaController::class, 'enrol']);
+        Route::post('auth/mfa/confirm', [MfaController::class, 'confirm']);
+        Route::post('auth/mfa/recovery-codes', [MfaController::class, 'recoveryCodes']);
+        Route::delete('auth/mfa', [MfaController::class, 'disable']);
 
         Route::get('companies', [CompanyController::class, 'index']);
         Route::post('companies', [CompanyController::class, 'store']);

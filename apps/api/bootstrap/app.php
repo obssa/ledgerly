@@ -39,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
         if ($proxies = array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', ''))))) {
             $middleware->trustProxies(at: $proxies);
         }
-        $middleware->throttleApi('120,1');
+        $middleware->throttleApi('api'); // named limiters: AppServiceProvider::boot
         $middleware->append(SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
