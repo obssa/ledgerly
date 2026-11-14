@@ -116,7 +116,8 @@ Found on 14 Nov 2026 by running the Laravel layer for the first time:
 | 19 | A 404 named the model class and echoed the requested id | Low | Plain `Not found.` for every API 404 |
 | 20 | A request without a token and without `Accept: application/json` got a 500 (redirect to a missing login route); validation errors redirected | Medium | API errors always JSON; guests get 401 |
 | 21 | Behind a load balancer the API could not see HTTPS (no HSTS) and saw every client as one address, so the per-address sign-in lockout would lock out everyone | Medium | `TRUSTED_PROXIES` |
-| 22 | On the cPanel host, "grant all privileges" made the app login a member of the database-owner role: it could drop or alter the database. And `public` is writable by every login there, which the owner-rights functions searched | High | Membership revoked; tables in their own schema, functions search only it; `ledgerly:check-database-roles` stops any deploy whose app login could bypass row-level security or change the database |
+| 22 | On the cPanel host, "grant all privileges" made the app login a member of the database-owner role: it could drop or alter the database. And `public` is writable by every login there, which the owner-rights functions searched | High | Tables in their own schema, functions search only it; `ledgerly:check-database-roles` stops any deploy whose app login could bypass row-level security. The membership itself could not stay revoked: see 23 |
+| 23 | cPanel's PostgreSQL lets a login connect only as a member of the role named after the database (pg_hba `samerole`), and that role owns the database. Revoking the membership (22) left the API unable to connect at all | Medium, accepted on the cPanel host | `DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true` there only: the role check reports the membership as a warning and still refuses superuser, RLS bypass, table ownership and CREATE in the schema. The tables and the `ledgerly` schema belong to the owner login, so row-level security still applies; the CI job `api-shared-host` runs every feature test with this membership in place. What remains is CREATE SCHEMA and ALTER DATABASE, reachable only through SQL injection; both connections set `search_path` themselves, so a planted database default does not reach the migrations. Goes away with S12 (on PostgreSQL 16+, `GRANT ... WITH INHERIT FALSE, SET FALSE`) |
 
 ## 4. Honest limits
 
@@ -126,6 +127,9 @@ Found on 14 Nov 2026 by running the Laravel layer for the first time:
 - **The owner role bypasses everything.** Migrations, billing and the staff console use it. Its password
   must live only in the deploy system and the staff service, never in the API's environment.
   (`DB_OWNER_URL` in `.env.example` is for local development only.)
+- **On the cPanel host the API's login is a member of the database-owner role** (finding 23). It cannot read
+  across companies, but SQL injected there could alter database settings or create schemas. Staging and
+  early access only; S12 removes it.
 - **The audit chain detects tampering, it does not prevent it** by someone with superuser access. Send a
   daily chain head (last hash per company) to storage the database administrator cannot write.
 - **Nothing in the Laravel layer has run.** Every "Written" row above becomes real only when its test passes.

@@ -21,9 +21,21 @@ final class DatabaseRoleTest extends TestCase
 
     public function test_the_check_catches_a_login_that_owns_the_tables(): void
     {
+        config(['database.ledgerly.allow_owner_role_membership' => false]);
         $problems = implode("\n", DatabaseRoleCheck::problems('owner'));
 
         $this->assertStringContainsString('row-level security does not apply', $problems);
         $this->assertStringContainsString('database owner', $problems);
+    }
+
+    public function test_allowing_owner_role_membership_downgrades_only_that_finding(): void
+    {
+        config(['database.ledgerly.allow_owner_role_membership' => true]);
+        ['problems' => $problems, 'warnings' => $warnings] = DatabaseRoleCheck::report('owner');
+
+        $this->assertStringNotContainsString('database owner', implode("\n", $problems));
+        $this->assertStringContainsString('database owner', implode("\n", $warnings));
+        // Table ownership is never allowed: that is what row-level security does not apply to.
+        $this->assertStringContainsString('row-level security does not apply', implode("\n", $problems));
     }
 }

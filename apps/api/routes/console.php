@@ -27,7 +27,10 @@ Artisan::command('ledgerly:create-schema {--database=owner}', function () {
 | API runs as could bypass row-level security or change the database (App\Support\DatabaseRoleCheck).
 */
 Artisan::command('ledgerly:check-database-roles', function () {
-    $problems = \App\Support\DatabaseRoleCheck::problems();
+    ['problems' => $problems, 'warnings' => $warnings] = \App\Support\DatabaseRoleCheck::report();
+    foreach ($warnings as $warning) {
+        $this->warn($warning);
+    }
     foreach ($problems as $problem) {
         $this->error($problem);
     }

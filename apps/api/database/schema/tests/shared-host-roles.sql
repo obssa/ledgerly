@@ -3,9 +3,11 @@
 --
 --   cp_ledgerly_test   NOLOGIN role that owns the database (cPanel names it after the database)
 --   cp_lowner          login, member of the database-owner role: runs migrations, owns the tables
---   cp_lweb            login, NOT a member of anything: the API. (cPanel's "grant all privileges" would make
---                      it a member; the deploy revokes that, and `ledgerly:check-database-roles` refuses to
---                      go live while it is.)
+--   cp_lweb            login, the API. Also a member of the database-owner role, because cPanel's pg_hba
+--                      (`samerole`) lets a login connect only as a member of the role named after the
+--                      database. That role owns the database, not the tables or their schema, so row-level
+--                      security still applies: every feature test below runs with this membership in place.
+--                      DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true makes the role check accept it (SECURITY.md 23).
 --   public schema      owned by postgres and writable by everyone (PostgreSQL 13 default), so the tables live
 --                      in their own schema, DB_SCHEMA=ledgerly
 --
@@ -13,5 +15,5 @@
 --   psql -v ON_ERROR_STOP=1 -f shared-host-roles.sql
 CREATE ROLE cp_ledgerly_test NOLOGIN;
 CREATE ROLE cp_lowner LOGIN PASSWORD 'cp_lowner' NOSUPERUSER NOCREATEROLE NOCREATEDB IN ROLE cp_ledgerly_test;
-CREATE ROLE cp_lweb   LOGIN PASSWORD 'cp_lweb'   NOSUPERUSER NOCREATEROLE NOCREATEDB;
+CREATE ROLE cp_lweb   LOGIN PASSWORD 'cp_lweb'   NOSUPERUSER NOCREATEROLE NOCREATEDB IN ROLE cp_ledgerly_test;
 CREATE DATABASE cp_ledgerly_test OWNER cp_ledgerly_test;

@@ -70,6 +70,9 @@ jobs:
           provenance: mode=max
           sbom: true
       - uses: actions/attest-build-provenance@v3
+        # GitHub stores attestations only for public repositories (or organisation plans). The image still
+        # carries its own provenance and SBOM (above); this adds the signed, GitHub-verifiable record.
+        if: ${{ !github.event.repository.private }}
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.build.outputs.digest }}
