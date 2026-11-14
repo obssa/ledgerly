@@ -15,7 +15,7 @@ permissions:
 jobs:
   database:
     runs-on: ubuntu-latest
-    strategy: { matrix: { postgres: [16, 18] } }   # 16 is the oldest supported; 18 is production
+    strategy: { matrix: { postgres: [13, 16, 18] } }   # 13 is the cPanel host; 18 is the target for a dedicated server
     services:
       postgres:
         image: postgres:${{ matrix.postgres }}
@@ -33,6 +33,7 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    strategy: { matrix: { php: ['8.3', '8.4'] } }   # 8.3 is the cPanel account (shared with bakery-ops); 8.4 the container image
     services:
       postgres:
         image: postgres:18
@@ -48,7 +49,7 @@ jobs:
       - name: Database roles, exactly as in local development (creates ledgerly_test)
         run: psql -d ledgerly -v ON_ERROR_STOP=1 -f ../../docker/postgres/init.sql
       - uses: shivammathur/setup-php@v2
-        with: { php-version: '8.4', extensions: pdo_pgsql, bcmath, intl, coverage: none }
+        with: { php-version: '${{ matrix.php }}', extensions: pdo_pgsql, bcmath, intl, coverage: none }
       - uses: actions/cache@v4
         with:
           path: ~/.composer/cache
@@ -59,6 +60,36 @@ jobs:
       - run: cp .env.example .env && php artisan key:generate
       - name: Unit and feature tests (feature tests run on PostgreSQL as ledgerly_web)
         run: php artisan test
+
+  api-shared-host:
+    # The production host is cPanel shared hosting: PostgreSQL 13, logins that cannot create roles, a public
+    # schema anyone may write. Same role layout here (shared-host-roles.sql); every feature test runs as the
+    # restricted login with the tables in their own schema.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    defaults: { run: { working-directory: apps/api } }
+    env: { DB_HOST: localhost, DB_SCHEMA: ledgerly, DB_APP_ROLE: cp_lweb, PGHOST: localhost, PGUSER: postgres, PGPASSWORD: postgres }
+    steps:
+      - uses: actions/checkout@v5
+      - name: cPanel-style roles and database
+        run: psql -d postgres -v ON_ERROR_STOP=1 -f database/schema/tests/shared-host-roles.sql
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '8.3', extensions: pdo_pgsql, bcmath, intl, coverage: none }   # what the cPanel account runs
+      - uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('apps/api/composer.lock') }}
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: cp .env.example .env && php artisan key:generate
+      - name: Feature tests as cp_lweb, tables in schema ledgerly
+        run: |
+          sed -e 's/value="ledgerly_test"/value="cp_ledgerly_test"/g' -e 's/value="ledgerly_web"/value="cp_lweb"/g'               -e 's/value="ledgerly_owner"/value="cp_lowner"/g' phpunit.xml > phpunit.shared-host.xml
+          vendor/bin/phpunit -c phpunit.shared-host.xml --testsuite Feature
 
   web:
     runs-on: ubuntu-latest

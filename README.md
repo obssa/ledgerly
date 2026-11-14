@@ -110,12 +110,14 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 
 **14 Nov 2026, first run of the Laravel layer (Docker, PostgreSQL 18, PHP 8.4) and in CI:**
 
-- **Database: 46 checks pass on PostgreSQL 16 and 18** as the restricted app role: 42 guard checks (T1–T35) and 4
+- **Database: 46 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 42 guard checks (T1–T35) and 4
   two-session concurrency checks (C1–C4).
 - **API: 60 tests pass** (44 unit, 16 feature). Feature tests build the schema as the owner and run every request as
   `ledgerly_web`, so row-level security applies (SECURITY.md S1). `TenantIsolationTest` covers every company route with
   company B's ids in the header, URL and body, and tests row-level security and the Eloquent scope each on its own;
   removing either one fails the suite.
+- **Shared hosting**: the feature tests also pass on PostgreSQL 13 with the role layout of the cPanel account (no role
+  creation, `public` writable by everyone, tables in their own schema), in CI on every pull request.
 - **Web: 10 unit tests, lint (0 errors), production build.**
 - **Production images** build and run: the API image migrated a database as the owner, served sign-up and company setup as
   `ledgerly_web`, and runs as a non-root user; the web image runs in demo mode or against the API from the same build.
@@ -129,11 +131,17 @@ touches 1 of 16 partitions).
 | --- | --- | --- |
 | `ci.yml` | every pull request and push to `main` | database guards on PG 16 + 18; API unit and feature tests on PG 18; `composer audit`; web tests, lint, build; `npm audit`; both production images build |
 | `deploy.yml` | after `ci` passes on `main` (or by hand) | builds `ghcr.io/<owner>/ledgerly-api` and `ledgerly-web`, tagged with the tested commit and `main`, with provenance and SBOM |
+| `deploy.yml` → `cpanel` | same, once `DEPLOY_ENABLED=true` | deploys to the cPanel account (docs/runbook/cpanel.md) |
 | Dependabot | weekly | grouped updates for actions, composer, npm and base images |
 
 ## Deploying
 
-Images are ready for any container host. A release, in this order:
+**Now: the cPanel account** (https://ledgerly.orcamind.dev, API at https://ledgerly-api.orcamind.dev). `deploy.yml`
+uploads each green `main` over SSH, migrates as the owner, refuses to go live unless the app login is properly
+restricted, switches atomically, smoke-tests and rolls back on failure. Setup and operations:
+[`docs/runbook/cpanel.md`](docs/runbook/cpanel.md). Shared hosting is for staging and early access only (S11, S12).
+
+**Later: a container host.** Images are ready. A release, in this order:
 
 1. **Migrate** with a one-off task that alone holds the owner credentials:
    `docker run --rm -e DB_HOST=... -e DB_DATABASE=... -e DB_OWNER_USERNAME=... -e DB_OWNER_PASSWORD=... ghcr.io/<owner>/ledgerly-api:<sha> php artisan migrate --database=owner --force`
