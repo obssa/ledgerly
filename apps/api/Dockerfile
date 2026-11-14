@@ -1,5 +1,5 @@
 # Development image for the Ledgerly API. Production uses a multi-stage build with OPcache and FrankenPHP/Octane.
-FROM php:8.4-cli
+FROM php:8.5-cli
 
 RUN apt-get update && apt-get install -y --no-install-recommends git unzip libpq-dev libicu-dev libzip-dev \
     && docker-php-ext-install pdo_pgsql pgsql intl bcmath zip pcntl \
