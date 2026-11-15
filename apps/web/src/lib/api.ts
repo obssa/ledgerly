@@ -5,6 +5,8 @@
 
 export interface Company {
   id: string;
+  /** The paying organisation; several companies can share one (multi-company). */
+  organisation_id: string;
   legal_name: string;
   trading_name: string | null;
   country_code: string;

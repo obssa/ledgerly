@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { OnboardingForm } from "./OnboardingForm";
 
 export const metadata = { title: "Set up your company" };
@@ -17,7 +18,13 @@ const steps = [
  * and e-invoicing connector. Any other country works too: the company picks its currency here and enters
  * its own tax rates afterwards.
  */
-export default function OnboardingPage() {
+/** Reads ?organisation= on the server, so the form is in the HTML; the plain form is the static fallback. */
+async function Form({ searchParams }: Pick<PageProps<"/onboarding">, "searchParams">) {
+  const { organisation } = await searchParams;
+  return <OnboardingForm organisation={typeof organisation === "string" && /^[0-9a-f-]{36}$/i.test(organisation) ? organisation : null} />;
+}
+
+export default function OnboardingPage({ searchParams }: PageProps<"/onboarding">) {
   return (
     <div className="flex min-h-screen flex-wrap">
       <aside className="max-w-full flex-[1_1_340px] bg-side px-9 py-8 text-white">
@@ -37,7 +44,9 @@ export default function OnboardingPage() {
       </aside>
 
       <main className="min-w-0 flex-[999_1_560px] px-12 py-10">
-        <OnboardingForm />
+        <Suspense fallback={<OnboardingForm />}>
+          <Form searchParams={searchParams} />
+        </Suspense>
       </main>
     </div>
   );
