@@ -36,6 +36,31 @@ export async function saveCompanySettings(_: FormState | undefined, form: FormDa
   return { notice: "Company settings saved." };
 }
 
+export async function setCurrency(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const currency = text(form, "currency") ?? "";
+  const enabled = form.get("enabled") !== "false";
+  try {
+    await ledgerly.setCurrency({ currency, enabled }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: enabled ? `${currency} added.` : `${currency} turned off. Its rates and documents are kept.` };
+}
+
+export async function addExchangeRate(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const body = { currency: text(form, "currency") ?? "", rate_date: text(form, "rate_date") ?? "", rate: (text(form, "rate") ?? "").replace(/,/g, "") };
+  try {
+    await ledgerly.addExchangeRate(body, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: `Rate saved: 1 ${body.currency} = ${body.rate} on ${body.rate_date}.` };
+}
+
 export async function setPeriodLock(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   try {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Sales\Actions;
 
+use App\Domain\Ledger\ExchangeRates;
 use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Ledger\Money;
 use App\Domain\Sales\Models\Document;
@@ -20,6 +21,7 @@ final class SaveInvoiceDraft
     public function __construct(
         private readonly CurrentCompany $company,
         private readonly TaxCalculator $tax,
+        private readonly ExchangeRates $rates,
     ) {
     }
 
@@ -109,7 +111,8 @@ final class SaveInvoiceDraft
                 'issue_date' => $data['issue_date'],
                 'due_date' => $data['due_date'] ?? null,
                 'currency' => $currency,
-                'fx_rate' => $data['fx_rate'] ?? '1',
+                // 1 for the base currency; else the rate given, or the company's rate for the issue date.
+                'fx_rate' => $this->rates->forDocument($this->company->get(), $currency, $data['issue_date'], isset($data['fx_rate']) ? (string) $data['fx_rate'] : null),
                 'prices_include_tax' => $inclusive,
                 'language' => $data['language'] ?? 'en',
                 'notes' => $data['notes'] ?? null,

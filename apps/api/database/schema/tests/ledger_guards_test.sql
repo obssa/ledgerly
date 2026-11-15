@@ -800,6 +800,57 @@ SET ROLE ledgerly_web;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T39: foreign currencies and exchange rates belong to one company, are never the base currency, never deleted (012)
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  INSERT INTO company_currencies (company_id, currency) VALUES (app_company_id(), 'USD');
+  INSERT INTO exchange_rates (company_id, currency, rate_date, rate) VALUES (app_company_id(), 'USD', '2026-11-02', 134.523333);
+  BEGIN
+    INSERT INTO company_currencies (company_id, currency) VALUES (app_company_id(), 'ETB');
+    RAISE EXCEPTION 'FAIL T39a: the base currency was added as a foreign currency';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO exchange_rates (company_id, currency, rate_date, rate) VALUES (app_company_id(), 'ETB', '2026-11-02', 1);
+    RAISE EXCEPTION 'FAIL T39b: a rate was stored for the base currency';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO exchange_rates (company_id, currency, rate_date, rate) VALUES (app_company_id(), 'EUR', '2026-11-02', 0);
+    RAISE EXCEPTION 'FAIL T39c: a zero rate was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO exchange_rates (company_id, currency, rate_date, rate) VALUES (app_company_id(), 'USD', '2026-11-02', 135);
+    RAISE EXCEPTION 'FAIL T39d: two rates were stored for one day';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM exchange_rates;
+    RAISE EXCEPTION 'FAIL T39e: a rate was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE exchange_rates SET currency = 'EUR';
+    RAISE EXCEPTION 'FAIL T39f: a rate was moved to another currency';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', false) \gset ignore_
+DO $$
+DECLARE n int;
+BEGIN
+  IF EXISTS (SELECT 1 FROM exchange_rates) OR EXISTS (SELECT 1 FROM company_currencies) THEN
+    RAISE EXCEPTION 'FAIL T39g: company B sees company A''s currencies or rates';
+  END IF;
+  UPDATE exchange_rates SET rate = 1;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n <> 0 THEN RAISE EXCEPTION 'FAIL T39h: company B changed company A''s rate'; END IF;
+  BEGIN
+    INSERT INTO exchange_rates (company_id, currency, rate_date, rate) VALUES ('00000000-0000-0000-0000-00000000000a', 'EUR', '2026-11-02', 150);
+    RAISE EXCEPTION 'FAIL T39i: company B planted a rate in company A';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T39 currencies and rates belong to one company, are never the base currency and are never deleted';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

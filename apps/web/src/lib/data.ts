@@ -1,8 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Company, type CompanySettings, type Invoice, type ProfitAndLoss } from "./api";
-import { demoCompany, demoCompanySettings, demoInvoices, demoProfitAndLoss } from "./demo";
+import { ApiError, isDemoMode, ledgerly, type Company, type CompanySettings, type Currencies, type Invoice, type ProfitAndLoss } from "./api";
+import { demoCompany, demoCompanySettings, demoCurrencies, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
 /**
@@ -42,6 +42,12 @@ export async function getCompanySettings(): Promise<CompanySettings & { demo: bo
   await connection();
   if (isDemoMode()) return { ...demoCompanySettings, demo: true };
   return { ...(await withApi((ctx) => ledgerly.companySettings(ctx))), demo: false };
+}
+
+export async function getCurrencies(): Promise<Currencies> {
+  await connection();
+  if (isDemoMode()) return demoCurrencies;
+  return withApi((ctx) => ledgerly.currencies(ctx));
 }
 
 export async function getInvoices(): Promise<Invoice[]> {

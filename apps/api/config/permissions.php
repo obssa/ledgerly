@@ -10,6 +10,7 @@
 | company.view       read the company profile and fiscal settings; every role
 | company.manage     change the profile and settings; owner and admin only (via '*')
 | periods.close      move the period lock date forward
+| accounting.rates   enter or correct exchange rates (accountant via 'accounting.*')
 */
 
 return [

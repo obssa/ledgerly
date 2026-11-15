@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useId, type ReactNode } from "react";
-import type { CompanySettings } from "@/lib/api";
+import type { CompanySettings, Currencies } from "@/lib/api";
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
 import { VAT_SHOWN } from "@/lib/settings";
-import { saveCompanySettings, setPeriodLock } from "./actions";
+import { addExchangeRate, saveCompanySettings, setCurrency, setPeriodLock } from "./actions";
 
 type Settings = CompanySettings & { demo: boolean };
 
@@ -128,6 +128,89 @@ export function PeriodLockForm({ settings }: { settings: Settings }) {
       )}
       <button type="submit" className="btn mt-4" disabled={pending}>{pending ? "Saving…" : "Save lock date"}</button>
     </form>
+  );
+}
+
+/**
+ * Foreign currencies and their rates. An owner or admin adds and turns off currencies; an accountant enters the rate
+ * of a day (a second entry for the same day corrects it). Invoices take the rate of their own date.
+ */
+export function CurrenciesPanel({ settings, currencies }: { settings: Settings; currencies: Currencies }) {
+  const [added, add, adding] = useActionState(setCurrency, undefined);
+  const [rated, rate, rating] = useActionState(addExchangeRate, undefined);
+  const [toggled, toggle, toggling] = useActionState(setCurrency, undefined);
+  const enabled = currencies.data.filter((c) => c.is_enabled);
+  const manage = settings.can.manage && !settings.demo;
+  const enterRates = settings.can.enter_rates && !settings.demo && enabled.length > 0;
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div>
+      <div className="mt-3"><Message state={toggled} /></div>
+      {currencies.data.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">Only {currencies.base_currency}. Add a currency to invoice or pay in it.</p>
+      ) : (
+        <table className="mt-3 w-full text-sm">
+          <thead>
+            <tr className="text-left text-[12px] uppercase tracking-wide text-muted">
+              <th className="py-1.5 font-bold">Currency</th>
+              <th className="py-1.5 text-right font-bold">Latest rate ({currencies.base_currency})</th>
+              <th className="py-1.5" />
+            </tr>
+          </thead>
+          <tbody>
+            {currencies.data.map((c) => (
+              <tr key={c.currency} className="border-t border-line">
+                <td className="py-2 font-semibold">{c.currency}{!c.is_enabled && <span className="ml-2 text-[12px] font-normal text-muted">off</span>}</td>
+                <td className="num py-2 text-right">
+                  {c.latest_rate ? <>{c.latest_rate}<span className="block text-[12px] text-muted">{c.latest_rate_date}</span></> : <span className="text-muted">none yet</span>}
+                </td>
+                <td className="py-2 text-right">
+                  {manage && (
+                    <form action={toggle}>
+                      <input type="hidden" name="currency" value={c.currency} />
+                      <input type="hidden" name="enabled" value={c.is_enabled ? "false" : "true"} />
+                      <button type="submit" className="text-[13px] font-bold text-brand" disabled={toggling}>{c.is_enabled ? "Turn off" : "Turn on"}</button>
+                    </form>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {manage && (
+        <form action={add} className="mt-4">
+          <Message state={added} />
+          <div className="flex flex-wrap items-end gap-2.5">
+          <div className="min-w-[140px] flex-1">
+            <Select name="currency" label="Add a currency" defaultValue="USD">
+              {CURRENCIES.filter((c) => c !== currencies.base_currency && !currencies.data.some((d) => d.currency === c)).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </Select>
+          </div>
+          <button type="submit" className="btn" disabled={adding}>{adding ? "Adding…" : "Add"}</button>
+          </div>
+        </form>
+      )}
+
+      {enterRates && (
+        <form action={rate} className="mt-5 border-t border-line pt-4" noValidate>
+          <h3 className="mb-2 text-[15px] font-bold">Enter a rate</h3>
+          <Message state={rated} />
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2.5">
+            <Select name="currency" label="Currency" defaultValue={enabled[0].currency}>
+              {enabled.map((c) => <option key={c.currency} value={c.currency}>{c.currency}</option>)}
+            </Select>
+            <TextField name="rate_date" label="Date" type="date" defaultValue={today} invalid={Boolean(rated?.fields?.rate_date)} />
+            <TextField name="rate" label={`${currencies.base_currency} for 1 unit`} invalid={Boolean(rated?.fields?.rate)} />
+          </div>
+          <button type="submit" className="btn mt-3" disabled={rating}>{rating ? "Saving…" : "Save rate"}</button>
+        </form>
+      )}
+    </div>
   );
 }
 
