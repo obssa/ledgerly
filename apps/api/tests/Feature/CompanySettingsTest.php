@@ -110,7 +110,7 @@ final class CompanySettingsTest extends TestCase
         $this->lock(['books_closed_until' => '2026-10-31'])->assertOk();
         $this->lock(['books_closed_until' => '2026-09-30', 'reason' => 'Late bill'])->assertForbidden();
         $this->lock(['books_closed_until' => null, 'reason' => 'Late bill'])->assertForbidden();
-        $this->lock(['books_closed_until' => now()->addDay()->format('Y-m-d')])->assertUnprocessable();
+        $this->lock(['books_closed_until' => now('Africa/Addis_Ababa')->addDay()->format('Y-m-d')])->assertUnprocessable();
 
         $this->actingAs($this->ownerUser, 'sanctum');
         $this->lock(['books_closed_until' => '2026-09-30'])->assertUnprocessable()->assertJsonValidationErrors('reason');

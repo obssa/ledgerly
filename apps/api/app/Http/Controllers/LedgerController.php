@@ -141,7 +141,7 @@ final class LedgerController extends Controller
     public function arAgeing(Request $request, ReceivablesReport $receivables): JsonResponse
     {
         $this->authorizeCompany('reports.view');
-        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? now()->format('Y-m-d');
+        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? app(CurrentCompany::class)->today();
         $company = $this->current->get();
 
         return response()->json($receivables->ageing($company->getKey(), Account::system('accounts_receivable')->getKey(), $company->base_currency, $asOf));
@@ -151,7 +151,7 @@ final class LedgerController extends Controller
     public function apAgeing(Request $request, ReceivablesReport $report): JsonResponse
     {
         $this->authorizeCompany('reports.view');
-        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? now()->format('Y-m-d');
+        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? app(CurrentCompany::class)->today();
         $company = $this->current->get();
 
         return response()->json($report->ageing($company->getKey(), Account::system('accounts_payable')->getKey(), $company->base_currency, $asOf, 'bill'));

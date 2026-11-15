@@ -68,7 +68,7 @@ final class PaymentMadeController extends Controller
         $data = $request->validate([
             'contact_id' => ['required', 'uuid'],
             'account_id' => ['required', 'uuid'],
-            'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
             'method' => ['required', Rule::in(PaymentReceivedController::METHODS)],
             'reference' => ['nullable', 'string', 'max:100'],
             'currency' => ['required', Rule::in(Currency::all())],
@@ -94,7 +94,7 @@ final class PaymentMadeController extends Controller
     {
         $this->authorizeCompany('payments.reverse');
         $data = $request->validate([
-            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
             'reason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
 

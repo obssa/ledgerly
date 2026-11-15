@@ -78,7 +78,7 @@ final class CompanySettingsController extends Controller
             'base_currency' => ['sometimes', 'required', Rule::in(Currency::all())],
             'calendar' => ['sometimes', 'required', Rule::in(array_values(array_unique(['gregorian', ...$pack->calendars])))],
             'fiscal_year_start_month' => ['sometimes', 'required', 'integer', 'between:1,12'],
-            'conversion_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'conversion_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
         ]);
 
         if ($data['version'] !== $this->version($company)) {
@@ -126,7 +126,7 @@ final class CompanySettingsController extends Controller
         $this->authorizeCompany('periods.close');
 
         $data = $request->validate([
-            'books_closed_until' => ['present', 'nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'books_closed_until' => ['present', 'nullable', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 

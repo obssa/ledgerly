@@ -58,7 +58,7 @@ final class CurrencyTest extends TestCase
         $this->rate('2026-11-03', '135.10')->assertCreated();
         $this->rate('2026-11-03', '135.20')->assertOk();
         $this->rate('2026-11-03', '135.20')->assertOk(); // the same value again changes nothing
-        $this->rate(now()->addDay()->format('Y-m-d'), '135')->assertUnprocessable()->assertJsonValidationErrors('rate_date');
+        $this->rate(now('Africa/Addis_Ababa')->addDay()->format('Y-m-d'), '135')->assertUnprocessable()->assertJsonValidationErrors('rate_date');
         $this->postJson('/api/v1/exchange-rates', ['currency' => 'EUR', 'rate_date' => '2026-11-03', 'rate' => '150'], $this->h)
             ->assertUnprocessable()->assertJsonValidationErrors('currency');
         $this->rate('2026-11-03', '0')->assertUnprocessable();

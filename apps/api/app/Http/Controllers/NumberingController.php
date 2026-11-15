@@ -27,7 +27,7 @@ final class NumberingController extends Controller
     {
         $this->authorizeCompany('company.view');
         $company = $current->get();
-        $today = new DateTimeImmutable('today');
+        $today = new DateTimeImmutable(app(CurrentCompany::class)->today());
 
         return response()->json(['data' => array_map(fn (string $type) => [
             ...$this->numbers->settings($company->getKey(), $type),
@@ -65,6 +65,6 @@ final class NumberingController extends Controller
                 userId: $request->user()->getKey());
         }
 
-        return response()->json([...$after, 'next_number' => $this->numbers->preview($company, $data['doc_type'], new DateTimeImmutable('today'))]);
+        return response()->json([...$after, 'next_number' => $this->numbers->preview($company, $data['doc_type'], new DateTimeImmutable(app(CurrentCompany::class)->today()))]);
     }
 }

@@ -79,7 +79,7 @@ final class SupplierController extends Controller
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
-        $to = $q['to'] ?? now()->format('Y-m-d');
+        $to = $q['to'] ?? app(CurrentCompany::class)->today();
         $from = $q['from'] ?? now()->subDays(90)->format('Y-m-d');
         $company = $current->get();
 

@@ -31,8 +31,8 @@ final class WithholdingAdvice
 
         $code = blank($supplier->tax_id) ? ($rules['without_tin_code'] ?? $rules['default_code']) : $rules['default_code'];
         $rate = DB::table('tax_rates')->where(['company_id' => $company->getKey(), 'code' => $code, 'kind' => 'withholding'])
-            ->where('effective_from', '<=', now()->format('Y-m-d'))
-            ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', now()->format('Y-m-d')))
+            ->where('effective_from', '<=', now($company->timezone ?: 'UTC')->format('Y-m-d'))
+            ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', now($company->timezone ?: 'UTC')->format('Y-m-d')))
             ->orderByDesc('effective_from')->value('rate');
 
         return [
