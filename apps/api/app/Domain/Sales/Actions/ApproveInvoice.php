@@ -19,6 +19,7 @@ use App\Domain\Tenancy\Support\CurrentCompany;
 use App\Support\StateMachine;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Approve = post to the ledger + queue tax-authority clearance, in one transaction.
@@ -65,6 +66,14 @@ final class ApproveInvoice
                 }
             }
 
+            $original = $invoice->type === 'credit_note' ? Document::query()->lockForUpdate()->findOrFail($invoice->original_document_id) : null;
+            if ($original !== null) {
+                if (! in_array($original->status, ['posted', 'part_paid', 'paid'], true)) {
+                    throw new LedgerException("{$original->label()} is not posted, so it cannot be credited.");
+                }
+                app(SaveInvoiceDraft::class)->assertCreditable($original, (string) $invoice->total, $invoice);
+            }
+
             // Gapless: the number is taken in this transaction, so a posting that fails takes none.
             if ($invoice->number === null) {
                 if (! $this->numbers->isAutomatic($company->getKey(), $invoice->type)) {
@@ -77,6 +86,19 @@ final class ApproveInvoice
             $invoice->status = 'posted';
             $invoice->journal_entry_id = $entry->getKey();
             $invoice->save();
+
+            // A credit note settles what its invoice still owes; the rest stays as the customer's credit.
+            if ($original !== null && in_array($original->status, ['posted', 'part_paid'], true)) {
+                $apply = Money::of((string) $invoice->total, $invoice->currency);
+                $due = Money::of((string) $original->amount_due, $invoice->currency);
+                $apply = $due->minus($apply)->isNegative() ? $due : $apply;
+                if (! $apply->isZero()) {
+                    DB::table('credit_applications')->insert([
+                        'id' => (string) Str::uuid7(), 'company_id' => $company->getKey(), 'credit_note_id' => $invoice->getKey(),
+                        'invoice_id' => $original->getKey(), 'amount' => $apply->toDecimalString(), 'created_by' => $userId,
+                    ]);
+                }
+            }
 
             if ($connector = $this->connectors->forCountry($company->country_code)) {
                 $submission = EInvoiceSubmission::query()->create([

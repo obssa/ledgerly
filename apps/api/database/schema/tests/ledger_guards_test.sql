@@ -1046,6 +1046,69 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T44: a credit note names a posted invoice of its customer, never credits more than it, and its applications move
+-- both amounts due and are never changed (017). Uses invoice INV-T43 (1,000.00, open again after T43's reversal).
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency) VALUES (app_company_id(), 'credit_note', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB');
+    RAISE EXCEPTION 'FAIL T44a: a credit note without its invoice was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, original_document_id)
+      VALUES (app_company_id(), 'credit_note', '00000000-0000-0000-0000-0000000000c4', '2027-06-30', 'ETB', '00000000-0000-0000-0000-0000000000d6');
+    RAISE EXCEPTION 'FAIL T44b: a credit note credited another customer''s invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- A posted credit note of 300.00.
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e440', app_company_id(), 9440, '2027-06-30', 'ETB', 'credit_note');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e440', 1, '00000000-0000-0000-0000-000000000a40', 300, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e440', 2, '00000000-0000-0000-0000-000000000a11', 0, 300);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due, original_document_id) VALUES
+    ('00000000-0000-0000-0000-0000000000d7', app_company_id(), 'credit_note', 'CN-T44', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', 300, 300, '00000000-0000-0000-0000-0000000000d6');
+  UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e440' WHERE id = '00000000-0000-0000-0000-0000000000d7';
+
+  -- A second one of 800.00 would credit 1,100.00 of a 1,000.00 invoice.
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e441', app_company_id(), 9441, '2027-06-30', 'ETB', 'credit_note');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e441', 1, '00000000-0000-0000-0000-000000000a40', 800, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e441', 2, '00000000-0000-0000-0000-000000000a11', 0, 800);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due, original_document_id) VALUES
+    ('00000000-0000-0000-0000-0000000000d8', app_company_id(), 'credit_note', 'CN-T44B', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', 800, 800, '00000000-0000-0000-0000-0000000000d6');
+  BEGIN
+    UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e441' WHERE id = '00000000-0000-0000-0000-0000000000d8';
+    RAISE EXCEPTION 'FAIL T44c: credit notes credited more than the invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  BEGIN
+    INSERT INTO credit_applications (company_id, credit_note_id, invoice_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000d7', '00000000-0000-0000-0000-0000000000d6', 300.01);
+    RAISE EXCEPTION 'FAIL T44d: more was applied than the credit note holds';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO credit_applications (company_id, credit_note_id, invoice_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000d7', '00000000-0000-0000-0000-0000000000d6', 200);
+  IF (SELECT amount_due FROM documents WHERE id = '00000000-0000-0000-0000-0000000000d6') <> 800
+     OR (SELECT (amount_due, status) FROM documents WHERE id = '00000000-0000-0000-0000-0000000000d7') <> (100.00::numeric(20,2), 'part_paid'::text) THEN
+    RAISE EXCEPTION 'FAIL T44e: applying 200.00 did not leave 800.00 due on the invoice and 100.00 of credit';
+  END IF;
+  BEGIN
+    UPDATE credit_applications SET amount = 1;
+    RAISE EXCEPTION 'FAIL T44f: an application was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM credit_applications;
+    RAISE EXCEPTION 'FAIL T44g: an application was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', false) \gset ignore_
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM credit_applications) THEN RAISE EXCEPTION 'FAIL T44h: company B sees company A''s credit applications'; END IF;
+  RAISE NOTICE 'PASS T44 credit notes name their invoice, never credit more than it, and their applications move both amounts and stay';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

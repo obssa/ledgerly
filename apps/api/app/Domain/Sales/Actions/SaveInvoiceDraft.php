@@ -34,15 +34,29 @@ final class SaveInvoiceDraft
      *              lines: list<array{description: string, quantity: string, unit_price: string, discount_rate?: string,
      *                                account_id: string, tax_rate_id?: ?string, item_id?: ?string}>} $data
      */
-    public function handle(array $data, ?Document $document = null, ?string $userId = null): Document
+    public function handle(array $data, ?Document $document = null, ?string $userId = null, ?Document $original = null): Document
     {
         if ($document && ! $document->isEditable()) {
             throw new LedgerException('Posted invoices are edited through EditPostedInvoice, which keeps their history.');
         }
 
-        return DB::transaction(function () use ($data, $document, $userId) {
+        return DB::transaction(function () use ($data, $document, $userId, $original) {
+            // A credit note corrects one invoice: its customer, currency and rate are the invoice's.
+            if ($original === null && $document?->type === 'credit_note') {
+                $original = Document::query()->findOrFail($document->original_document_id);
+            }
+            $type = $original !== null ? 'credit_note' : ($document->type ?? 'invoice');
+            if ($original !== null) {
+                $data['contact_id'] = $original->contact_id;
+                $data['currency'] = $original->currency;
+                $data['fx_rate'] = (string) $original->fx_rate;
+            }
+
             $calc = $this->calculate($data);
-            $calc['header']['number'] = $this->draftNumber($data, $document);
+            $calc['header']['number'] = $this->draftNumber($data, $document, $type);
+            if ($original !== null) {
+                $this->assertCreditable($original, $calc['totals']['total'], $document);
+            }
 
             if ($document) {
                 $document = Document::query()->lockForUpdate()->findOrFail($document->getKey());
@@ -52,7 +66,7 @@ final class SaveInvoiceDraft
                 }
             }
 
-            $document ??= new Document(['type' => 'invoice', 'created_by' => $userId]);
+            $document ??= new Document(['type' => $type, 'created_by' => $userId, 'original_document_id' => $original?->getKey()]);
             $document->fill($calc['header']);
             $document->status = 'draft'; // a change while awaiting approval sends it back to draft
             $document->forceFill($calc['totals']);
@@ -70,10 +84,10 @@ final class SaveInvoiceDraft
      * Automatic numbering: a draft has no number; it gets one when posted. Manual numbering (pre-printed books):
      * the number typed on the draft, unique per company and type (database constraint).
      */
-    private function draftNumber(array $data, ?Document $document): ?string
+    private function draftNumber(array $data, ?Document $document, string $type = 'invoice'): ?string
     {
         $number = isset($data['number']) && trim((string) $data['number']) !== '' ? trim((string) $data['number']) : null;
-        $automatic = $this->numbers->isAutomatic($this->company->id(), 'invoice');
+        $automatic = $this->numbers->isAutomatic($this->company->id(), $type);
 
         if ($automatic && $number !== null) {
             throw ValidationException::withMessages(['number' => ['Invoices are numbered when they are posted. Leave the number empty.']]);
@@ -81,12 +95,27 @@ final class SaveInvoiceDraft
         if (! $automatic && $number === null) {
             throw ValidationException::withMessages(['number' => ['Type the number from your invoice book.']]);
         }
-        if ($number !== null && Document::query()->where(['type' => 'invoice', 'number' => $number])
+        if ($number !== null && Document::query()->where(['type' => $type, 'number' => $number])
             ->when($document, fn ($q) => $q->whereKeyNot($document->getKey()))->exists()) {
             throw ValidationException::withMessages(['number' => ["{$number} is already used by another invoice."]]);
         }
 
         return $number;
+    }
+
+    /**
+     * The credit notes of one invoice never add up to more than the invoice (also a database rule, 017).
+     */
+    public function assertCreditable(Document $original, string $total, ?Document $except = null): void
+    {
+        $credited = (string) (Document::query()->where(['type' => 'credit_note', 'original_document_id' => $original->getKey()])
+            ->whereIn('status', ['posted', 'part_paid', 'paid'])
+            ->when($except, fn ($q) => $q->whereKeyNot($except->getKey()))
+            ->sum('total'));
+        $left = Money::of((string) $original->total, $original->currency)->minus(Money::of($credited, $original->currency));
+        if ($left->minus(Money::of($total, $original->currency))->isNegative()) {
+            throw ValidationException::withMessages(['lines' => ["{$original->number} can be credited by {$left->toDecimalString()} at most."]]);
+        }
     }
 
     /**

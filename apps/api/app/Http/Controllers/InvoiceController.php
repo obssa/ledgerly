@@ -33,11 +33,13 @@ final class InvoiceController extends Controller
 
         return response()->json([
             ...$invoice->toArray(),
-            'warnings' => in_array($invoice->status, ['void', 'paid'], true) ? [] : $this->credit->warnings($this->current->get(), $invoice),
+            'warnings' => $invoice->type !== 'invoice' || in_array($invoice->status, ['void', 'paid'], true) ? [] : $this->credit->warnings($this->current->get(), $invoice),
             'can' => [
                 'edit' => (bool) $membership?->can($invoice->isPosted() ? 'transactions.edit' : 'invoices.create'),
                 'approve' => (bool) $membership?->can('invoices.approve'),
                 'void' => (bool) $membership?->can('transactions.edit'),
+                'credit' => (bool) $membership?->can('invoices.create'),
+                'apply' => (bool) $membership?->can('payments.receive'),
             ],
         ], $status);
     }
@@ -69,7 +71,7 @@ final class InvoiceController extends Controller
     {
         $this->authorizeCompany('invoices.view');
 
-        return $this->present($invoice->load(['lines', 'contact:id,name,tax_id,email', 'einvoiceSubmissions']));
+        return $this->present($invoice->load(['lines', 'contact:id,name,tax_id,email', 'einvoiceSubmissions', 'original:id,number']));
     }
 
     public function store(SaveInvoiceRequest $request, SaveInvoiceDraft $save): JsonResponse

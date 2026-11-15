@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getInvoice } from "@/lib/data";
+import { getInvoice, getOpenInvoices } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { ApplyCredit } from "./ApplyCredit";
 import { InvoiceActions } from "./InvoiceActions";
 
 export const metadata = { title: "Invoice" };
@@ -22,14 +23,20 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const { posted } = await searchParams;
   const invoice = await getInvoice(id);
   if (!invoice) notFound();
-  const status = STATUS[invoice.status] ?? { label: invoice.status, tone: "neutral" as const };
+  const creditNote = invoice.type === "credit_note";
+  const status = creditNote && invoice.status === "paid" ? { label: "Applied", tone: "good" as const }
+    : creditNote && invoice.status === "part_paid" ? { label: "Credit left", tone: "warn" as const }
+    : STATUS[invoice.status] ?? { label: invoice.status, tone: "neutral" as const };
   const submission = invoice.einvoice_submissions?.[0];
+  const kind = creditNote ? "Credit note" : "Invoice";
+  const canApply = creditNote && invoice.can.apply && ["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0 && !invoice.demo;
+  const openInvoices = canApply ? await getOpenInvoices(invoice.contact.id, invoice.currency) : [];
 
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / Invoice</>}
-        title={<>{invoice.number ? <span className="num">{invoice.number}</span> : "Draft invoice"} <Pill tone={status.tone}>{status.label}</Pill></>}
+        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / {kind}</>}
+        title={<>{kind} {invoice.number ? <span className="num">{invoice.number}</span> : "(draft)"} <Pill tone={status.tone}>{status.label}</Pill></>}
       />
       {posted === "0" && invoice.status !== "posted" && (
         <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
@@ -47,6 +54,9 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
               <div className="text-[13px] text-muted">Customer</div>
               <Link href={`/customers/${encodeURIComponent(invoice.contact.id)}`} className="font-bold hover:underline">{invoice.contact.name}</Link>
               {invoice.contact.tax_id && <div className="num text-[13px] text-muted">TIN {invoice.contact.tax_id}</div>}
+              {creditNote && invoice.original && (
+                <div className="mt-1 text-[13px]">Corrects <Link href={`/invoices/${encodeURIComponent(invoice.original.id)}`} className="num font-semibold hover:underline">{invoice.original.number}</Link></div>
+              )}
             </div>
             <div className="text-right">
               <div><span className="text-muted">Issued</span> <span className="num">{invoice.issue_date}</span></div>
@@ -76,13 +86,17 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <div className="flex justify-between py-1"><dt>Subtotal</dt><dd className="num">{formatAmount(invoice.subtotal)}</dd></div>
             <div className="flex justify-between py-1"><dt>Tax</dt><dd className="num">{formatAmount(invoice.tax_total)}</dd></div>
             <div className="mt-1 flex justify-between border-t-2 border-ink pt-2 text-lg font-extrabold"><dt>Total</dt><dd className="num">{formatMoney(invoice.total, invoice.currency)}</dd></div>
-            <div className="flex justify-between py-1 font-semibold"><dt>Still due</dt><dd className="num">{formatMoney(invoice.amount_due, invoice.currency)}</dd></div>
+            <div className="flex justify-between py-1 font-semibold"><dt>{creditNote ? "Credit left" : "Still due"}</dt><dd className="num">{formatMoney(invoice.amount_due, invoice.currency)}</dd></div>
           </dl>
           {invoice.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{invoice.notes}</p>}
         </Card>
 
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
           {!invoice.demo && <InvoiceActions invoice={invoice} />}
+          {!creditNote && invoice.can.credit && ["posted", "part_paid", "paid"].includes(invoice.status) && !invoice.demo && (
+            <Link href={`/invoices/${encodeURIComponent(invoice.id)}/credit-note`} className="btn justify-center">Issue a credit note</Link>
+          )}
+          {canApply && <ApplyCredit creditNoteId={invoice.id} left={invoice.amount_due} invoices={openInvoices} />}
           <Card label="E-invoice">
             <h2 className="text-[17px] font-bold">E-invoice</h2>
             <p className="mt-1.5 text-sm">

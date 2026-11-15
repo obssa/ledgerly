@@ -36,7 +36,7 @@ export function InvoiceActions({ invoice }: { invoice: InvoiceDetail }) {
           Registered with the tax authority: correct it with a credit note and, if needed, a new invoice.
         </p>
       )}
-      {posted && !registered && invoice.can.void && (
+      {posted && !registered && invoice.can.void && invoice.type !== "credit_note" && (
         <form action={action} className="rounded-xl border border-line p-3">
           <input type="hidden" name="id" value={invoice.id} />
           <input type="hidden" name="action" value="void" />

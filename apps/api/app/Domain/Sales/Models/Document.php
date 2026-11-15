@@ -20,7 +20,7 @@ class Document extends Model
 
     protected $fillable = [
         'type', 'number', 'contact_id', 'issue_date', 'due_date', 'currency', 'fx_rate', 'prices_include_tax',
-        'language', 'notes', 'location_id', 'custom_fields', 'created_by',
+        'language', 'notes', 'location_id', 'custom_fields', 'created_by', 'original_document_id',
     ];
 
     protected function casts(): array
@@ -54,6 +54,12 @@ class Document extends Model
     public function label(): string
     {
         return $this->number ?? 'the draft';
+    }
+
+    /** The invoice a credit note corrects. */
+    public function original(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'original_document_id');
     }
 
     public function isEditable(): bool
