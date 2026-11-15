@@ -61,7 +61,7 @@ export default async function HomePage() {
                   return (
                     <tr key={inv.id}>
                       <td className="font-semibold">{inv.contact.name}</td>
-                      <td className="num">{inv.number}</td>
+                      <td className="num">{inv.number ?? <span className="text-muted">Draft</span>}</td>
                       <td><Pill tone={days > 30 ? "bad" : "warn"}>{days} days</Pill></td>
                       <td className="num text-right">{formatMoney(inv.amount_due, inv.currency)}</td>
                     </tr>

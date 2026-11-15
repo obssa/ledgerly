@@ -61,6 +61,23 @@ export async function addExchangeRate(_: FormState | undefined, form: FormData):
   return { notice: `Rate saved: 1 ${body.currency} = ${body.rate} on ${body.rate_date}.` };
 }
 
+export async function saveNumbering(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const saved = await ledgerly.saveNumbering({
+      doc_type: text(form, "doc_type") ?? "",
+      mode: form.get("mode") === "manual" ? "manual" : "automatic",
+      prefix: text(form, "prefix") ?? "",
+      include_year: form.get("include_year") === "on",
+      padding: Number(text(form, "padding") ?? 4),
+    }, ctx);
+    refresh();
+    return { notice: saved.mode === "manual" ? "Saved. Numbers are typed from your invoice book." : `Saved. The next number will be ${saved.next_number}.` };
+  } catch (error) {
+    return refusal(error);
+  }
+}
+
 export async function setPeriodLock(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   try {

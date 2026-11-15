@@ -101,7 +101,7 @@ final class TenantIsolationTest extends TestCase
         $headers = ['X-Company-Id' => $this->a['company']];
         $line = fn (array $over = []) => [...['description' => 'Coffee', 'quantity' => '1', 'unit_price' => '100', 'account_id' => $this->a['sales'], 'tax_rate_id' => $this->a['tax_rate']], ...$over];
         $invoice = fn (array $over = [], array $lineOver = []) => [
-            ...['contact_id' => $this->a['contact'], 'number' => 'INV-X', 'issue_date' => '2026-11-03', 'currency' => 'ETB', 'lines' => [$line($lineOver)]],
+            ...['contact_id' => $this->a['contact'], 'issue_date' => '2026-11-03', 'currency' => 'ETB', 'lines' => [$line($lineOver)]],
             ...$over,
         ];
         $before = $this->ledgerCounts();

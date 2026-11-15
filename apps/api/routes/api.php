@@ -9,6 +9,7 @@ use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
+use App\Http\Controllers\NumberingController;
 use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\TaxRateController;
 use Illuminate\Support\Facades\Route;
@@ -53,6 +54,9 @@ Route::prefix('v1')->group(function () {
             Route::put('currencies', [CurrencyController::class, 'update']);
             Route::get('exchange-rates', [CurrencyController::class, 'rates']);
             Route::post('exchange-rates', [CurrencyController::class, 'storeRate']);
+
+            Route::get('numbering', [NumberingController::class, 'index']);
+            Route::put('numbering', [NumberingController::class, 'update']);
 
             Route::get('opening-balances', [OpeningBalanceController::class, 'show']);
             Route::put('opening-balances', [OpeningBalanceController::class, 'update']);

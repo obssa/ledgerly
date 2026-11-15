@@ -40,7 +40,7 @@ export default async function InvoicesPage() {
             <tbody>
               {invoices.map((inv) => (
                 <tr key={inv.id}>
-                  <td className="num font-semibold">{inv.number}</td>
+                  <td className="num font-semibold">{inv.number ?? <span className="text-muted">Draft</span>}</td>
                   <td>{inv.contact.name}</td>
                   <td>{inv.issue_date}</td>
                   <td>{inv.due_date ?? "—"}</td>

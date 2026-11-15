@@ -80,7 +80,7 @@ final class CurrencyTest extends TestCase
         $this->rate('2026-10-30', '133.000000')->assertCreated();
 
         // 4 Nov: the newest rate on or before the date is 2 Nov.
-        $id = $this->invoice(['number' => 'INV-USD-1', 'issue_date' => '2026-11-04', 'currency' => 'USD'])->assertCreated()
+        $id = $this->invoice(['issue_date' => '2026-11-04', 'currency' => 'USD'])->assertCreated()
             ->assertJsonPath('fx_rate', '134.523333')->json('id');
         $this->postJson("/api/v1/invoices/{$id}/approve", [], $this->h)->assertOk();
 
@@ -97,16 +97,16 @@ final class CurrencyTest extends TestCase
 
     public function test_without_a_recent_rate_the_invoice_asks_for_one(): void
     {
-        $this->invoice(['number' => 'INV-USD-2', 'issue_date' => '2026-11-20', 'currency' => 'USD'])
+        $this->invoice(['issue_date' => '2026-11-20', 'currency' => 'USD'])
             ->assertUnprocessable()->assertJsonValidationErrors('fx_rate');
-        $this->invoice(['number' => 'INV-USD-2', 'issue_date' => '2026-11-20', 'currency' => 'USD', 'fx_rate' => '136.25'])
+        $this->invoice(['issue_date' => '2026-11-20', 'currency' => 'USD', 'fx_rate' => '136.25'])
             ->assertCreated()->assertJsonPath('fx_rate', '136.250000');
     }
 
     public function test_an_invoice_uses_only_the_companys_currencies_and_rate_1_for_the_base_currency(): void
     {
-        $this->invoice(['number' => 'INV-EUR', 'currency' => 'EUR', 'fx_rate' => '150'])->assertUnprocessable()->assertJsonValidationErrors('currency');
-        $this->invoice(['number' => 'INV-ETB', 'currency' => 'ETB', 'fx_rate' => '5'])->assertCreated()->assertJsonPath('fx_rate', '1.000000');
+        $this->invoice(['currency' => 'EUR', 'fx_rate' => '150'])->assertUnprocessable()->assertJsonValidationErrors('currency');
+        $this->invoice(['currency' => 'ETB', 'fx_rate' => '5'])->assertCreated()->assertJsonPath('fx_rate', '1.000000');
     }
 
     private function rate(string $date, string $rate): TestResponse
@@ -118,7 +118,7 @@ final class CurrencyTest extends TestCase
     private function invoice(array $over): TestResponse
     {
         return $this->postJson('/api/v1/invoices', [
-            'contact_id' => $this->c['contact'], 'number' => 'INV-X', 'issue_date' => '2026-11-04', 'currency' => 'ETB',
+            'contact_id' => $this->c['contact'], 'issue_date' => '2026-11-04', 'currency' => 'ETB',
             'lines' => [['description' => 'Coffee', 'quantity' => '2', 'unit_price' => '500', 'account_id' => $this->c['sales'], 'tax_rate_id' => $this->c['tax_rate']]],
             ...$over,
         ], $this->h);

@@ -51,7 +51,7 @@ final class InvoiceWorkflow
 
         return DB::transaction(function () use ($invoice, $reason, $userId, $membership, $company) {
             $invoice = Document::query()->lockForUpdate()->findOrFail($invoice->getKey());
-            $this->states->assert('invoice', $invoice->status, 'void', $invoice->number);
+            $this->states->assert('invoice', $invoice->status, 'void', $invoice->label());
 
             $reversalId = null;
             if ($invoice->status === 'posted') {
@@ -86,7 +86,7 @@ final class InvoiceWorkflow
     {
         return DB::transaction(function () use ($invoice, $to, $action, $reason, $userId) {
             $invoice = Document::query()->lockForUpdate()->findOrFail($invoice->getKey());
-            $this->states->assert('invoice', $invoice->status, $to, $invoice->number);
+            $this->states->assert('invoice', $invoice->status, $to, $invoice->label());
 
             $from = $invoice->status;
             $invoice->status = $to;

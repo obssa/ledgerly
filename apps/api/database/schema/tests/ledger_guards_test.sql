@@ -851,6 +851,62 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T40: a posted document has a number that never changes; numbering settings belong to one company (013)
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$
+DECLARE posted constant uuid := '00000000-0000-0000-0000-0000000000d4';
+BEGIN
+  -- A posted invoice of its own (not registered with the tax authority, so the edit path is open).
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type)
+    VALUES ('00000000-0000-0000-0000-00000000e041', app_company_id(), 9041, '2027-06-30', 'ETB', 'invoice');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e041', 1, '00000000-0000-0000-0000-000000000a11', 100, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e041', 2, '00000000-0000-0000-0000-000000000a40', 0, 100);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due)
+    VALUES (posted, app_company_id(), 'invoice', 'INV-T40', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', 100, 100);
+  UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e041' WHERE id = posted;
+  -- Take the allowed edit path: current version saved, re-posted with a new entry. Only the number rule can refuse.
+  INSERT INTO document_versions (company_id, document_id, version, journal_entry_id, snapshot, reason, edited_by)
+  SELECT app_company_id(), d.id, 1, d.journal_entry_id, to_jsonb(d), 'T40', app_user_id() FROM documents d WHERE d.id = posted;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type)
+    VALUES ('00000000-0000-0000-0000-00000000e040', app_company_id(), 9040, '2027-06-30', 'ETB', 'invoice');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e040', 1, '00000000-0000-0000-0000-000000000a11', 100, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e040', 2, '00000000-0000-0000-0000-000000000a40', 0, 100);
+  BEGIN
+    UPDATE documents SET number = 'RENUMBERED', journal_entry_id = '00000000-0000-0000-0000-00000000e040' WHERE id = posted;
+    RAISE EXCEPTION 'FAIL T40a: a posted number changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE documents SET number = NULL, journal_entry_id = '00000000-0000-0000-0000-00000000e040' WHERE id = posted;
+    RAISE EXCEPTION 'FAIL T40b: a posted document lost its number';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- The same edit keeping the number is allowed: the rule is about the number only.
+  UPDATE documents SET notes = 'T40', journal_entry_id = '00000000-0000-0000-0000-00000000e040' WHERE id = posted;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, status) VALUES
+      (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', 'draft');
+  EXCEPTION WHEN others THEN RAISE EXCEPTION 'FAIL T40f: a draft without a number was refused (%)', SQLERRM; END;
+  INSERT INTO document_numbering (company_id, doc_type, prefix) VALUES (app_company_id(), 'invoice', 'FV/');
+  BEGIN
+    INSERT INTO document_numbering (company_id, doc_type, prefix) VALUES (app_company_id(), 'credit_note', 'no spaces');
+    RAISE EXCEPTION 'FAIL T40c: a prefix with spaces was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', false) \gset ignore_
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM document_numbering) THEN RAISE EXCEPTION 'FAIL T40d: company B sees company A''s numbering'; END IF;
+  BEGIN
+    INSERT INTO document_numbering (company_id, doc_type) VALUES ('00000000-0000-0000-0000-00000000000a', 'bill');
+    RAISE EXCEPTION 'FAIL T40e: company B changed company A''s numbering';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T40 a posted number never changes and numbering belongs to one company';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

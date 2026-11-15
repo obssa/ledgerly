@@ -34,6 +34,8 @@ final class PermissionMatrixTest extends TestCase
         'PUT api/v1/currencies' => 'company.manage',
         'GET api/v1/exchange-rates' => 'company.view',
         'POST api/v1/exchange-rates' => 'accounting.rates',
+        'GET api/v1/numbering' => 'company.view',
+        'PUT api/v1/numbering' => 'company.manage',
         'GET api/v1/opening-balances' => 'accounting.view',
         'PUT api/v1/opening-balances' => 'accounting.opening',
 
