@@ -162,7 +162,17 @@ export async function changePassword(_: FormState | undefined, form: FormData): 
   }
 }
 
-const OPTIONAL = ["trading_name", "base_currency", "tin", "phone", "email", "website", "calendar", "conversion_date", "industry"] as const;
+const OPTIONAL = ["organisation_id", "trading_name", "base_currency", "tin", "phone", "email", "website", "calendar", "conversion_date", "industry"] as const;
+
+/** Company switcher: works in another company without signing out. Only a company of the person's own list. */
+export async function switchCompany(form: FormData): Promise<void> {
+  const { token } = await getSession();
+  if (!token) redirect("/sign-in");
+  const id = text(form, "company_id");
+  const { data } = await ledgerly.companies(token);
+  if (id && data.some((c) => c.id === id)) await selectCompany(id);
+  redirect("/");
+}
 
 export async function createCompany(_: FormState | undefined, form: FormData): Promise<FormState> {
   const { token } = await getSession();

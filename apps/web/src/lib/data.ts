@@ -91,6 +91,10 @@ export interface ShellContext {
   companyNote: string;
   userName: string;
   demo: boolean;
+  /** Every company the person can switch to, the current one included. */
+  companies: { id: string; name: string }[];
+  companyId: string;
+  organisationId: string | null;
 }
 
 /** The company being worked on, and who is signed in, for the app shell. */
@@ -102,11 +106,22 @@ export async function getShellContext(): Promise<ShellContext> {
       companyNote: `${demoCompany.city} · ${demoCompany.base_currency} · VAT registered`,
       userName: "Hana Bekele",
       demo: true,
+      companies: [{ id: demoCompany.id, name: demoCompany.trading_name }],
+      companyId: demoCompany.id,
+      organisationId: null,
     };
   }
   const { name, companyId } = await getSession();
   const { data } = await withApi(({ token }) => ledgerly.companies(token));
   const company: Company | undefined = data.find((c) => c.id === companyId);
   if (!company) redirect("/onboarding");
-  return { companyName: company.trading_name ?? company.legal_name, companyNote: company.base_currency, userName: name ?? "", demo: false };
+  return {
+    companyName: company.trading_name ?? company.legal_name,
+    companyNote: company.base_currency,
+    userName: name ?? "",
+    demo: false,
+    companies: data.map((c) => ({ id: c.id, name: c.trading_name ?? c.legal_name })),
+    companyId: company.id,
+    organisationId: company.organisation_id,
+  };
 }

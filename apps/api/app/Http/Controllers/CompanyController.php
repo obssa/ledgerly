@@ -10,6 +10,7 @@ use App\Domain\Tenancy\Models\Company;
 use App\Domain\Tenancy\Support\CountryPack;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 final class CompanyController extends Controller
@@ -21,7 +22,7 @@ final class CompanyController extends Controller
             ->whereIn('id', fn ($q) => $q->select('company_id')->from('memberships')
                 ->where('user_id', $request->user()->getKey())->where('status', 'active'))
             ->orderBy('legal_name')
-            ->get(['id', 'legal_name', 'trading_name', 'country_code', 'base_currency', 'status']);
+            ->get(['id', 'organisation_id', 'legal_name', 'trading_name', 'country_code', 'base_currency', 'status']);
 
         return response()->json(['data' => $companies]);
     }
@@ -52,6 +53,8 @@ final class CompanyController extends Controller
         }
 
         $data = $request->validate([
+            // Another company of an existing organisation (multi-company); without it a new organisation starts.
+            'organisation_id' => ['nullable', 'uuid'],
             'legal_name' => ['required', 'string', 'max:200'],
             'trading_name' => ['nullable', 'string', 'max:200'],
             'legal_form' => ['nullable', Rule::in(CompanySettingsController::LEGAL_FORMS)],
@@ -75,6 +78,13 @@ final class CompanyController extends Controller
             // Last bank statement date before switching to Ledgerly: opening balances are entered as at this date.
             'conversion_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
         ]);
+
+        // The database decides who may add a company to an organisation: its creator, or an owner or admin of one
+        // of its companies (008_access_hardening.sql). Asked first, so the answer is a clear 403, not a failed insert.
+        if (! empty($data['organisation_id'])
+            && ! DB::selectOne('select app_can_add_company(?::uuid) as ok', [$data['organisation_id']])->ok) {
+            return response()->json(['message' => 'Only an owner or admin of this organisation can add a company to it.', 'type' => 'NotOrganisationAdmin'], 403);
+        }
 
         $pack = CountryPack::load($data['country_code']);
 

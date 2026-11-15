@@ -1,15 +1,41 @@
-import { signOut } from "@/app/(auth)/actions";
+import Link from "next/link";
+import { signOut, switchCompany } from "@/app/(auth)/actions";
 import { getShellContext } from "@/lib/data";
 
 /** Server parts of the app shell; the layout renders each inside <Suspense>. */
 
+/** The company being worked in, and the switcher: other companies, and adding one to the same organisation. */
 export async function CompanyBadge() {
-  const { companyName, companyNote } = await getShellContext();
+  const { companyName, companyNote, companies, companyId, organisationId, demo } = await getShellContext();
+  const others = companies.filter((c) => c.id !== companyId);
+
   return (
-    <div className="w-full rounded-[10px] border border-[#23493f] bg-side-hover px-3 py-2.5 text-left text-white">
-      <span className="block text-sm font-bold">{companyName}</span>
-      <span className="mt-0.5 block text-xs text-[#a9bdb7]">{companyNote}</span>
-    </div>
+    <details className="group w-full rounded-[10px] border border-[#23493f] bg-side-hover text-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+        <span>
+          <span className="block text-sm font-bold">{companyName}</span>
+          <span className="mt-0.5 block text-xs text-[#a9bdb7]">{companyNote}</span>
+        </span>
+        <span aria-hidden="true" className="text-xs text-[#a9bdb7] group-open:rotate-180">▾</span>
+        <span className="sr-only">Switch company</span>
+      </summary>
+      <div className="border-t border-[#23493f] px-1.5 py-1.5">
+        {others.map((c) => (
+          <form key={c.id} action={switchCompany}>
+            <input type="hidden" name="company_id" value={c.id} />
+            <button type="submit" className="block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-side">{c.name}</button>
+          </form>
+        ))}
+        {!demo && (
+          <Link
+            href={organisationId ? `/onboarding?organisation=${encodeURIComponent(organisationId)}` : "/onboarding"}
+            className="block rounded-md px-2 py-1.5 text-sm font-semibold text-mint hover:bg-side"
+          >
+            + Add a company
+          </Link>
+        )}
+      </div>
+    </details>
   );
 }
 

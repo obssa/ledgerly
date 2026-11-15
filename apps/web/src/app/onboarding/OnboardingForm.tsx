@@ -8,7 +8,8 @@ import { CURRENCIES } from "@/lib/decimal";
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** Creates the company through POST /api/v1/companies (createCompany), then opens its books. */
-export function OnboardingForm() {
+/** organisation: from the company switcher, the new company joins the same organisation (the API checks who may). */
+export function OnboardingForm({ organisation = null }: { organisation?: string | null }) {
   const [state, formAction, pending] = useActionState(createCompany, undefined);
   const [resent, resend, resending] = useActionState(resendVerification, undefined);
   const bad = (name: string) => Boolean(state?.fields?.[name]);
@@ -37,8 +38,9 @@ export function OnboardingForm() {
       {state?.error && (
         <p role="alert" className="mb-4 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>
       )}
-      <div className="text-[13px] font-bold text-muted">Step 2 of 6</div>
-      <h2 className="mb-6 mt-1.5 text-[26px] font-extrabold tracking-tight">Tell us about your business</h2>
+      {organisation && <input type="hidden" name="organisation_id" value={organisation} />}
+      <div className="text-[13px] font-bold text-muted">{organisation ? "Another company in your organisation" : "Step 2 of 6"}</div>
+      <h2 className="mb-6 mt-1.5 text-[26px] font-extrabold tracking-tight">{organisation ? "Add a company" : "Tell us about your business"}</h2>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-[18px]">
         <Field id="legal_name" label="Legal name" required invalid={bad("legal_name")} />
