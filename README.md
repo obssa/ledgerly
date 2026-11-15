@@ -112,13 +112,13 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 
 - **Database: 50 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 46 guard checks (T1–T39) and 4
   two-session concurrency checks (C1–C4).
-- **API: 110 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
+- **API: 117 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
   `ledgerly_web`, so row-level security applies (SECURITY.md S1). `TenantIsolationTest` covers every company route with
   company B's ids in the header, URL and body, and tests row-level security and the Eloquent scope each on its own;
   removing either one fails the suite.
 - **Shared hosting**: the feature tests also pass on PostgreSQL 13 with the role layout of the cPanel account (no role
   creation, `public` writable by everyone, tables in their own schema), in CI on every pull request.
-- **Web: 17 unit tests, lint (0 errors), production build.**
+- **Web: 21 unit tests, lint (0 errors), production build.**
 - **Production images** build and run: the API image migrated a database as the owner, served sign-up and company setup as
   `ledgerly_web`, and runs as a non-root user; the web image runs in demo mode or against the API from the same build.
 
@@ -129,7 +129,7 @@ touches 1 of 16 partitions).
 
 | Module | Built | Next |
 | --- | --- | --- |
-| 1 Company & Setup | Company setup; profile and settings (legal form, address, tax ID checked per country); the foundation of the books (base currency, calendar, fiscal year start, conversion date) fixed once anything is posted (database rule T38); period lock: accountants close, owners and admins reopen with a reason; foreign currencies and daily exchange rates (T39), a foreign-currency invoice takes the rate of its date and keeps it; every change audited | Opening balances, numbering, locations and dimensions, company switcher, data import; central-bank rate feed |
+| 1 Company & Setup | Company setup; profile and settings (legal form, address, tax ID checked per country); the foundation of the books (base currency, calendar, fiscal year start, conversion date) fixed once anything is posted (database rule T38); period lock: accountants close, owners and admins reopen with a reason; foreign currencies and daily exchange rates (T39), a foreign-currency invoice takes the rate of its date and keeps it; opening trial balance on the conversion date (a difference goes to Opening balance equity, flagged; re-entry reverses and replaces); every change audited | Open invoices and bills at conversion (with the Customer and Supplier modules), numbering, locations and dimensions, company switcher, data import; central-bank rate feed |
 
 ## CI/CD
 

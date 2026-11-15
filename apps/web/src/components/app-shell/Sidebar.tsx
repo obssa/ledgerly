@@ -33,7 +33,14 @@ const groups: { label?: string; items: NavItem[] }[] = [
     ],
   },
   { label: "Compliance", items: [{ href: "/tax", label: "Tax centre", soon: true }, { href: "/einvoicing", label: "E-invoicing", soon: true }] },
-  { label: "Books", items: [{ href: "/journal", label: "Journal entries", soon: true }, { href: "/reports", label: "Reports" }] },
+  {
+    label: "Books",
+    items: [
+      { href: "/journal", label: "Journal entries", soon: true },
+      { href: "/opening-balances", label: "Opening balances" },
+      { href: "/reports", label: "Reports" },
+    ],
+  },
 ];
 
 /** `company` is rendered on the server (CompanyBadge) and passed in, since this component runs in the browser. */

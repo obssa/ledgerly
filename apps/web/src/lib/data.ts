@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Company, type CompanySettings, type Currencies, type Invoice, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Invoice, type OpeningBalances, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -48,6 +48,16 @@ export async function getCurrencies(): Promise<Currencies> {
   await connection();
   if (isDemoMode()) return demoCurrencies;
   return withApi((ctx) => ledgerly.currencies(ctx));
+}
+
+/** The opening balances and the accounts they can be entered on. null in the demo, which has no ledger to change. */
+export async function getOpeningBalances(): Promise<{ opening: OpeningBalances; accounts: Account[] } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi(async (ctx) => {
+    const [opening, accounts] = await Promise.all([ledgerly.openingBalances(ctx), ledgerly.accounts(ctx)]);
+    return { opening, accounts: accounts.data };
+  });
 }
 
 export async function getInvoices(): Promise<Invoice[]> {

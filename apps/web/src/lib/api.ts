@@ -56,6 +56,30 @@ export interface Currencies {
   data: { currency: string; is_enabled: boolean; latest_rate: string | null; latest_rate_date: string | null }[];
 }
 
+export interface Account {
+  id: string;
+  code: string;
+  name: string;
+  type: "asset" | "liability" | "equity" | "income" | "expense";
+  system_key: string | null;
+  /** Set for a bank or wallet account kept in a foreign currency. */
+  currency: string | null;
+  is_active: boolean;
+}
+
+/** GET /opening-balances: the trial balance entered as at the conversion date. */
+export interface OpeningBalances {
+  conversion_date: string | null;
+  base_currency: string;
+  journal_entry: { id: string; number: number; entry_date: string } | null;
+  lines: { account_id: string; debit: string; credit: string }[];
+  /** Debits minus credits of the lines; booked to Opening balance equity and flagged. */
+  difference: string;
+  /** System keys of control accounts whose opening balance comes from their detail, not one figure. */
+  from_detail: string[];
+  can: { enter: boolean };
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -210,6 +234,10 @@ export const ledgerly = {
     api<{ currency: string; is_enabled: boolean }>("currencies", { ...ctx, method: "PUT", body }),
   addExchangeRate: (body: { currency: string; rate_date: string; rate: string }, ctx: RequestOptions) =>
     api<{ id: string }>("exchange-rates", { ...ctx, method: "POST", body }),
+  accounts: (ctx: RequestOptions) => api<{ data: Account[] }>("accounts", ctx),
+  openingBalances: (ctx: RequestOptions) => api<OpeningBalances>("opening-balances", ctx),
+  saveOpeningBalances: (lines: { account_id: string; debit?: string; credit?: string }[], ctx: RequestOptions) =>
+    api<OpeningBalances>("opening-balances", { ...ctx, method: "PUT", body: { lines } }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}`, ctx),
   approveInvoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}/approve`, { ...ctx, method: "POST" }),
