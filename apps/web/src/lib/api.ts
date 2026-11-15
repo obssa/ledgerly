@@ -63,6 +63,7 @@ export interface Account {
   code: string;
   name: string;
   type: "asset" | "liability" | "equity" | "income" | "expense";
+  subtype?: string | null;
   system_key: string | null;
   /** Set for a bank or wallet account kept in a foreign currency. */
   currency: string | null;
@@ -199,6 +200,25 @@ export interface InvoiceDetail extends Invoice {
   can: { edit: boolean; approve: boolean; void: boolean };
 }
 
+/** A payment received (Module 2). Recorded once; reversed, never changed. */
+export interface PaymentReceived {
+  id: string;
+  contact_id: string;
+  contact?: { id: string; name: string };
+  account_id: string;
+  payment_date: string;
+  method: string;
+  reference: string | null;
+  currency: string;
+  fx_rate: string;
+  amount: string;
+  fee: string;
+  withholding: string;
+  status: "posted" | "reversed";
+  allocations_count?: number;
+  allocations?: { id: string; amount: string; document_id: string; document?: { id: string; number: string | null; issue_date?: string; total: string; amount_due: string; status: string } }[];
+}
+
 export interface ProfitAndLossRow {
   code: string;
   name: string;
@@ -325,6 +345,13 @@ export const ledgerly = {
   createCustomer: (body: Record<string, unknown>, ctx: RequestOptions) => api<Customer>("customers", { ...ctx, method: "POST", body }),
   updateCustomer: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<Customer>(`customers/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  openInvoices: (contactId: string, ctx: RequestOptions) =>
+    api<{ data: Invoice[] }>("invoices", { ...ctx, query: { contact_id: contactId, open: "1" } }),
+  paymentsReceived: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-received", ctx),
+  paymentReceived: (id: string, ctx: RequestOptions) => api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}`, ctx),
+  receivePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<PaymentReceived>("payments-received", { ...ctx, method: "POST", body }),
+  reversePayment: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
+    api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),

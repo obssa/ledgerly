@@ -1,0 +1,51 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Card, PageTitle, Pill } from "@/components/ui";
+import { getPaymentReceived } from "@/lib/data";
+import { formatAmount, formatMoney } from "@/lib/format";
+import { ReversePayment } from "./ReversePayment";
+
+export const metadata = { title: "Payment" };
+
+export default async function PaymentPage({ params }: PageProps<"/payments/[id]">) {
+  const { id } = await params;
+  const payment = await getPaymentReceived(id);
+  if (!payment) notFound();
+
+  return (
+    <>
+      <PageTitle
+        eyebrow={<><Link href="/payments" className="hover:underline">Payments received</Link> / Payment</>}
+        title={<>{formatMoney(payment.amount, payment.currency)} from {payment.contact?.name} {payment.status === "reversed" ? <Pill tone="bad">Reversed</Pill> : <Pill tone="good">Recorded</Pill>}</>}
+      />
+      <div className="flex flex-wrap items-start gap-4">
+        <Card className="min-w-0 flex-[2_1_520px]" label="Payment">
+          <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 text-sm">
+            <div><dt className="text-muted">Date</dt><dd className="num">{payment.payment_date}</dd></div>
+            <div><dt className="text-muted">Method</dt><dd>{payment.method.replace("_", " ")}</dd></div>
+            <div><dt className="text-muted">Reference</dt><dd className="num">{payment.reference ?? "—"}</dd></div>
+            <div><dt className="text-muted">Tax withheld</dt><dd className="num">{formatAmount(payment.withholding)}</dd></div>
+            <div><dt className="text-muted">Bank fee</dt><dd className="num">{formatAmount(payment.fee)}</dd></div>
+            {Number(payment.fx_rate) !== 1 && <div><dt className="text-muted">Rate</dt><dd className="num">{payment.fx_rate}</dd></div>}
+          </dl>
+          <h2 className="mb-2 mt-5 text-[15px] font-bold">Invoices settled</h2>
+          {(payment.allocations ?? []).length === 0 ? (
+            <p className="text-sm text-muted">{payment.status === "reversed" ? "None: the payment was reversed and its invoices owe again." : "None: the payment is the customer's credit."}</p>
+          ) : (
+            <ul className="text-sm">
+              {payment.allocations!.map((a) => (
+                <li key={a.id} className="flex justify-between gap-2 border-t border-line py-1.5">
+                  <Link href={`/invoices/${encodeURIComponent(a.document_id)}`} className="num hover:underline">{a.document?.number}</Link>
+                  <span className="num font-semibold">{formatAmount(a.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        {payment.status === "posted" && (
+          <aside className="min-w-0 flex-[1_1_300px]"><ReversePayment id={payment.id} /></aside>
+        )}
+      </div>
+    </>
+  );
+}

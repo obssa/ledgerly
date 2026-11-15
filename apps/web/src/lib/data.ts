@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Customer, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Customer, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -149,6 +149,58 @@ export async function getInvoice(id: string): Promise<(InvoiceDetail & { demo: b
   if (isDemoMode()) return null;
   try {
     return { ...(await withApi((ctx) => ledgerly.invoice(id, ctx))), demo: false };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export interface ReceiveOptions {
+  customers: { id: string; name: string }[];
+  customer: { id: string; name: string; currency: string | null } | null;
+  /** The chosen customer's open invoices, oldest first. */
+  invoices: Invoice[];
+  accounts: { id: string; code: string; name: string; currency: string | null }[];
+  currencies: string[];
+  baseCurrency: string;
+  demo: boolean;
+}
+
+/** What the receive-payment screen offers: customers, the chosen one's open invoices, accounts money can go into. */
+export async function getReceiveOptions(customerId: string | null): Promise<ReceiveOptions> {
+  await connection();
+  if (isDemoMode()) {
+    return { customers: demoCustomers.map((c) => ({ id: c.id, name: c.name })), customer: null, invoices: [], accounts: [], currencies: ["ETB"], baseCurrency: "ETB", demo: true };
+  }
+  return withApi(async (ctx) => {
+    const [customers, accounts, currencies] = await Promise.all([ledgerly.customers({}, ctx), ledgerly.accounts(ctx), ledgerly.currencies(ctx)]);
+    const customer = customers.data.find((c) => c.id === customerId) ?? null;
+    const invoices = customer ? (await ledgerly.openInvoices(customer.id, ctx)).data : [];
+    return {
+      customers: customers.data.map((c) => ({ id: c.id, name: c.name })),
+      customer: customer ? { id: customer.id, name: customer.name, currency: customer.currency } : null,
+      invoices,
+      accounts: accounts.data
+        .filter((a) => a.is_active && (a.system_key === "undeposited_funds" || ["bank", "cash", "mobile_money"].includes(a.subtype ?? "")))
+        .map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })),
+      currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
+      baseCurrency: currencies.base_currency,
+      demo: false,
+    };
+  });
+}
+
+export async function getPaymentsReceived(): Promise<PaymentReceived[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.paymentsReceived(ctx))).data;
+}
+
+export async function getPaymentReceived(id: string): Promise<PaymentReceived | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.paymentReceived(id, ctx));
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;

@@ -121,6 +121,12 @@ final class TenantIsolationTest extends TestCase
             'journal line tagged with B\'s location' => ['POST', '/api/v1/journal-entries', ['date' => '2026-11-05', 'lines' => [
                 ['account_id' => $this->a['bank'], 'debit' => '10', 'location_id' => $this->b['dimension']], ['account_id' => $this->a['equity'], 'credit' => '10'],
             ]]],
+            'payment from B\'s customer' => ['POST', '/api/v1/payments-received', ['contact_id' => $this->b['contact'], 'account_id' => $this->a['bank'],
+                'payment_date' => '2026-11-05', 'method' => 'cash', 'currency' => 'ETB', 'amount' => '10']],
+            'payment into B\'s bank' => ['POST', '/api/v1/payments-received', ['contact_id' => $this->a['contact'], 'account_id' => $this->b['bank'],
+                'payment_date' => '2026-11-05', 'method' => 'cash', 'currency' => 'ETB', 'amount' => '10']],
+            'payment settling B\'s invoice' => ['POST', '/api/v1/payments-received', ['contact_id' => $this->a['contact'], 'account_id' => $this->a['bank'],
+                'payment_date' => '2026-11-05', 'method' => 'cash', 'currency' => 'ETB', 'amount' => '10', 'allocations' => [['invoice_id' => $this->b['invoice'], 'amount' => '10']]]],
             'transfer out of B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->b['bank'], 'to_account_id' => $this->a['bank'], 'amount' => '10']],
             'transfer into B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->a['bank'], 'to_account_id' => $this->b['bank'], 'amount' => '10']],
             'deposit into B\'s bank' => ['POST', '/api/v1/banking/deposits', ['date' => '2026-11-05', 'bank_account_id' => $this->b['bank'], 'receipts' => ['10']]],
@@ -222,7 +228,7 @@ final class TenantIsolationTest extends TestCase
     /** @return array<string, int> */
     private function ledgerCounts(): array
     {
-        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'audit_log', 'idempotency_keys'])
+        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys'])
             ->mapWithKeys(fn ($t) => [$t => $this->owner()->table($t)->count()])->all();
     }
 

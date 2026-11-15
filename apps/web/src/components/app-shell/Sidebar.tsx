@@ -13,6 +13,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
     items: [
       { href: "/invoices", label: "Sales and invoices" },
       { href: "/customers", label: "Customers" },
+      { href: "/payments", label: "Payments received" },
       { href: "/products", label: "Products and services", soon: true },
     ],
   },

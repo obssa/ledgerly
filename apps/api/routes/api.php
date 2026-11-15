@@ -13,6 +13,7 @@ use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\NumberingController;
 use App\Http\Controllers\OpeningBalanceController;
+use App\Http\Controllers\PaymentReceivedController;
 use App\Http\Controllers\TaxRateController;
 use Illuminate\Support\Facades\Route;
 
@@ -89,6 +90,11 @@ Route::prefix('v1')->group(function () {
             Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve']);
             Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void']);
             Route::get('invoices/{invoice}/history', [InvoiceController::class, 'history']);
+
+            Route::get('payments-received', [PaymentReceivedController::class, 'index']);
+            Route::post('payments-received', [PaymentReceivedController::class, 'store']);
+            Route::get('payments-received/{payment}', [PaymentReceivedController::class, 'show']);
+            Route::post('payments-received/{payment}/reverse', [PaymentReceivedController::class, 'reverse']);
 
             Route::post('banking/transfers', [BankingController::class, 'transfer']);
             Route::post('banking/deposits', [BankingController::class, 'deposit']);

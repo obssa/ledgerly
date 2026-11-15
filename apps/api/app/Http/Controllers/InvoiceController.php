@@ -45,13 +45,21 @@ final class InvoiceController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('invoices.view');
+        $filters = $request->validate([
+            'status' => ['nullable', 'in:draft,awaiting_approval,posted,part_paid,paid,void'],
+            'contact_id' => ['nullable', 'uuid'],
+            'open' => ['nullable', 'boolean'],   // posted and not fully paid: what a payment can settle
+        ]);
 
         $invoices = Document::query()
             ->where('type', 'invoice')
             ->with('contact:id,name')
-            ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['contact_id'] ?? null, fn ($q, $id) => $q->where('contact_id', $id))
+            ->when($filters['open'] ?? false, fn ($q) => $q->whereIn('status', ['posted', 'part_paid']))
             ->when($request->boolean('overdue'), fn ($q) => $q->where('amount_due', '>', 0)->whereDate('due_date', '<', now()))
-            ->orderByDesc('issue_date')
+            // Open invoices oldest first (the order a payment settles them in); otherwise newest first.
+            ->orderBy('issue_date', ($filters['open'] ?? false) ? 'asc' : 'desc')->orderBy('id')
             ->cursorPaginate(50);
 
         return response()->json($invoices);
