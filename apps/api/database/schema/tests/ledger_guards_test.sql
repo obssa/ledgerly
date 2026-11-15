@@ -907,6 +907,66 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T41: a line names only its own company's locations, classes and projects, of the right kind (014)
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', false) \gset ignore_
+INSERT INTO dimensions (id, company_id, kind, code, name)
+  VALUES ('00000000-0000-0000-0000-000000000d43', app_company_id(), 'location', 'NBO', 'Nairobi');
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$
+DECLARE n int := 9410;
+  line_ok boolean;
+BEGIN
+  IF EXISTS (SELECT 1 FROM dimensions) THEN RAISE EXCEPTION 'FAIL T41a: company A sees company B''s dimensions'; END IF;
+  INSERT INTO dimensions (id, company_id, kind, code, name) VALUES
+    ('00000000-0000-0000-0000-000000000d41', app_company_id(), 'location', 'HQ', 'Head office'),
+    ('00000000-0000-0000-0000-000000000d42', app_company_id(), 'class', 'RETAIL', 'Retail');
+
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e410', app_company_id(), 9410, '2027-06-30', 'ETB');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, location_id, class_id) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e410', 1, '00000000-0000-0000-0000-000000000a11', 10, 0,
+     '00000000-0000-0000-0000-000000000d41', '00000000-0000-0000-0000-000000000d42'),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e410', 2, '00000000-0000-0000-0000-000000000a40', 0, 10, NULL, NULL);
+
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e411', app_company_id(), 9411, '2027-06-30', 'ETB');
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, location_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e411', 1, '00000000-0000-0000-0000-000000000a11', 10, 0, '00000000-0000-0000-0000-000000000d43');
+    RAISE EXCEPTION 'FAIL T41b: a line named company B''s location';
+  EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e412', app_company_id(), 9412, '2027-06-30', 'ETB');
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, location_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e412', 1, '00000000-0000-0000-0000-000000000a11', 10, 0, '00000000-0000-0000-0000-000000000d42');
+    RAISE EXCEPTION 'FAIL T41c: a class was used as a location';
+  EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, location_id) VALUES
+      (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', '00000000-0000-0000-0000-000000000d43');
+    RAISE EXCEPTION 'FAIL T41d: a document named company B''s location';
+  EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+
+  -- Turned off: still valid on old entries, so they can be reversed.
+  UPDATE dimensions SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000d41';
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e413', app_company_id(), 9413, '2027-06-30', 'ETB');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, location_id) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e413', 1, '00000000-0000-0000-0000-000000000a40', 10, 0, '00000000-0000-0000-0000-000000000d41'),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e413', 2, '00000000-0000-0000-0000-000000000a11', 0, 10, '00000000-0000-0000-0000-000000000d41');
+
+  BEGIN
+    UPDATE dimensions SET code = 'HQ2' WHERE id = '00000000-0000-0000-0000-000000000d41';
+    RAISE EXCEPTION 'FAIL T41e: a dimension code changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM dimensions;
+    RAISE EXCEPTION 'FAIL T41f: a dimension was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T41 lines name only their own company''s dimensions, of the right kind; dimensions are never deleted';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

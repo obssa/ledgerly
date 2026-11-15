@@ -78,6 +78,30 @@ export async function saveNumbering(_: FormState | undefined, form: FormData): P
   }
 }
 
+export async function addDimension(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const body = { kind: text(form, "kind") ?? "", code: text(form, "code") ?? "", name: text(form, "name") ?? "" };
+  try {
+    await ledgerly.addDimension(body, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: `${body.code} added.` };
+}
+
+export async function toggleDimension(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const active = form.get("is_active") === "true";
+  try {
+    await ledgerly.updateDimension(text(form, "id") ?? "", { is_active: active }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: active ? "Turned on." : "Turned off. Old entries keep it." };
+}
+
 export async function setPeriodLock(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   try {

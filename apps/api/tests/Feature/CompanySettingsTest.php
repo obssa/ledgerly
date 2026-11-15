@@ -42,7 +42,7 @@ final class CompanySettingsTest extends TestCase
             ->assertJsonPath('books_started', false)
             ->assertJsonPath('locked_fields', [])
             ->assertJsonPath('options.tax_id_label', 'TIN')
-            ->assertJsonPath('can', ['manage' => true, 'close_periods' => true, 'reopen_periods' => true, 'enter_rates' => true]);
+            ->assertJsonPath('can', ['manage' => true, 'close_periods' => true, 'reopen_periods' => true, 'enter_rates' => true, 'manage_dimensions' => true]);
 
         $this->save(['version' => $settings->json('version'), 'trading_name' => 'Abyssinia', 'tin' => '0012345678', 'address_line1' => 'Bole Road'])
             ->assertOk()
@@ -103,7 +103,7 @@ final class CompanySettingsTest extends TestCase
     {
         $accountant = $this->member('accountant');
         $this->actingAs($accountant, 'sanctum');
-        $this->settings()->assertOk()->assertJsonPath('can', ['manage' => false, 'close_periods' => true, 'reopen_periods' => false, 'enter_rates' => true]);
+        $this->settings()->assertOk()->assertJsonPath('can', ['manage' => false, 'close_periods' => true, 'reopen_periods' => false, 'enter_rates' => true, 'manage_dimensions' => true]);
         $this->save(['version' => 'x', 'trading_name' => 'Mine'])->assertForbidden();
 
         $this->lock(['books_closed_until' => '2026-09-30'])->assertOk()->assertJsonPath('books_closed_until', '2026-09-30');

@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useId, type ReactNode } from "react";
-import type { CompanySettings, Currencies, Numbering } from "@/lib/api";
+import type { CompanySettings, Currencies, Dimension, Numbering } from "@/lib/api";
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
 import { VAT_SHOWN } from "@/lib/settings";
-import { addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock } from "./actions";
+import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock, toggleDimension } from "./actions";
 
 type Settings = CompanySettings & { demo: boolean };
 
@@ -208,6 +208,71 @@ export function CurrenciesPanel({ settings, currencies }: { settings: Settings; 
             <TextField name="rate" label={`${currencies.base_currency} for 1 unit`} invalid={Boolean(rated?.fields?.rate)} />
           </div>
           <button type="submit" className="btn mt-3" disabled={rating}>{rating ? "Saving…" : "Save rate"}</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+const KINDS: { kind: Dimension["kind"]; label: string; hint: string }[] = [
+  { kind: "location", label: "Branches and locations", hint: "Shops, branches, sites" },
+  { kind: "class", label: "Departments and classes", hint: "Departments, lines of business" },
+  { kind: "project", label: "Projects", hint: "Jobs and contracts" },
+];
+
+/**
+ * Locations, classes and projects that transactions are tagged with, so reports can be cut by them. Turned off,
+ * never deleted: old entries keep their meaning.
+ */
+export function DimensionsPanel({ settings, dimensions }: { settings: Settings; dimensions: Dimension[] }) {
+  const [added, add, adding] = useActionState(addDimension, undefined);
+  const [toggled, toggle, toggling] = useActionState(toggleDimension, undefined);
+  const manage = settings.can.manage_dimensions && !settings.demo;
+
+  return (
+    <div className="mt-3">
+      <Message state={toggled} />
+      {KINDS.map(({ kind, label }) => {
+        const rows = dimensions.filter((d) => d.kind === kind);
+        return (
+          <div key={kind} className="mt-3">
+            <h3 className="text-[14px] font-bold">{label}</h3>
+            {rows.length === 0 ? (
+              <p className="text-[13px] text-muted">None yet.</p>
+            ) : (
+              <ul className="mt-1">
+                {rows.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-sm">
+                    <span className={d.is_active ? "" : "text-muted line-through"}>
+                      <span className="num mr-2 text-muted">{d.code}</span>{d.name}
+                    </span>
+                    {manage && (
+                      <form action={toggle}>
+                        <input type="hidden" name="id" value={d.id} />
+                        <input type="hidden" name="is_active" value={d.is_active ? "false" : "true"} />
+                        <button type="submit" className="text-[13px] font-bold text-brand" disabled={toggling}>{d.is_active ? "Turn off" : "Turn on"}</button>
+                      </form>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+
+      {manage && (
+        <form action={add} className="mt-5 border-t border-line pt-4" noValidate>
+          <h3 className="mb-2 text-[15px] font-bold">Add</h3>
+          <Message state={added} />
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2.5">
+            <Select name="kind" label="Kind" defaultValue="location">
+              {KINDS.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+            </Select>
+            <TextField name="code" label="Code" hint="e.g. HQ, MRK" invalid={Boolean(added?.fields?.code)} />
+            <TextField name="name" label="Name" invalid={Boolean(added?.fields?.name)} />
+          </div>
+          <button type="submit" className="btn mt-3" disabled={adding}>{adding ? "Adding…" : "Add"}</button>
         </form>
       )}
     </div>
