@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanySettingsController;
+use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
@@ -46,6 +47,11 @@ Route::prefix('v1')->group(function () {
             Route::get('company', [CompanySettingsController::class, 'show']);
             Route::put('company', [CompanySettingsController::class, 'update']);
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);
+
+            Route::get('currencies', [CurrencyController::class, 'index']);
+            Route::put('currencies', [CurrencyController::class, 'update']);
+            Route::get('exchange-rates', [CurrencyController::class, 'rates']);
+            Route::post('exchange-rates', [CurrencyController::class, 'storeRate']);
 
             Route::get('accounts', [LedgerController::class, 'accounts']);
             Route::get('journal-entries', [LedgerController::class, 'entries']);

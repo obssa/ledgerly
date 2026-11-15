@@ -46,8 +46,14 @@ export interface CompanySettings {
   books_started: boolean;
   locked_fields: string[];
   fiscal_years: { starts_on: string; ends_on: string; status: string }[];
-  can: { manage: boolean; close_periods: boolean; reopen_periods: boolean };
+  can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean };
   options: { tax_id_label: string; calendars: string[]; legal_forms: string[] };
+}
+
+/** GET /currencies: the base currency and the foreign currencies a company works in, with each one's latest rate. */
+export interface Currencies {
+  base_currency: string;
+  data: { currency: string; is_enabled: boolean; latest_rate: string | null; latest_rate_date: string | null }[];
 }
 
 export interface Contact {
@@ -199,6 +205,11 @@ export const ledgerly = {
   saveCompanySettings: (body: Record<string, unknown>, ctx: RequestOptions) => api<CompanySettings>("company", { ...ctx, method: "PUT", body }),
   setPeriodLock: (body: { books_closed_until: string | null; reason?: string }, ctx: RequestOptions) =>
     api<{ books_closed_until: string | null }>("company/period-lock", { ...ctx, method: "PUT", body }),
+  currencies: (ctx: RequestOptions) => api<Currencies>("currencies", ctx),
+  setCurrency: (body: { currency: string; enabled: boolean }, ctx: RequestOptions) =>
+    api<{ currency: string; is_enabled: boolean }>("currencies", { ...ctx, method: "PUT", body }),
+  addExchangeRate: (body: { currency: string; rate_date: string; rate: string }, ctx: RequestOptions) =>
+    api<{ id: string }>("exchange-rates", { ...ctx, method: "POST", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}`, ctx),
   approveInvoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}/approve`, { ...ctx, method: "POST" }),

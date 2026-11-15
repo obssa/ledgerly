@@ -176,6 +176,7 @@ final class CompanySettingsController extends Controller
                 'manage' => (bool) $membership?->can('company.manage'),
                 'close_periods' => (bool) $membership?->can('periods.close'),
                 'reopen_periods' => (bool) $membership?->can('periods.reopen'),
+                'enter_rates' => (bool) $membership?->can('accounting.rates'),
             ],
             'options' => [
                 'tax_id_label' => $pack->taxIdLabel,

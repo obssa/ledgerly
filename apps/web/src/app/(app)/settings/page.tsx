@@ -1,6 +1,6 @@
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanySettings } from "@/lib/data";
-import { CompanyProfileForm, PeriodLockForm } from "./SettingsForms";
+import { getCompanySettings, getCurrencies } from "@/lib/data";
+import { CompanyProfileForm, CurrenciesPanel, PeriodLockForm } from "./SettingsForms";
 
 export const metadata = { title: "Company settings" };
 
@@ -9,7 +9,7 @@ export const metadata = { title: "Company settings" };
  * accountant closes periods. What a role cannot change is shown read-only (the API refuses it anyway).
  */
 export default async function SettingsPage() {
-  const settings = await getCompanySettings();
+  const [settings, currencies] = await Promise.all([getCompanySettings(), getCurrencies()]);
   const year = settings.fiscal_years.at(-1);
 
   return (
@@ -41,6 +41,14 @@ export default async function SettingsPage() {
               {settings.books_closed_until ? <>Books are closed up to <strong className="num">{settings.books_closed_until}</strong>.</> : "No period is closed."}
             </p>
             <PeriodLockForm settings={settings} />
+          </Card>
+
+          <Card label="Currencies">
+            <h2 className="text-[19px] font-bold">Currencies</h2>
+            <p className="mt-1.5 text-sm text-muted">
+              Books are kept in {currencies.base_currency}. An invoice in another currency takes the rate of its own date and keeps it.
+            </p>
+            <CurrenciesPanel settings={settings} currencies={currencies} />
           </Card>
 
           <Card label="Fiscal year">

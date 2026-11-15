@@ -1,4 +1,4 @@
-import type { CompanySettings, Invoice, ProfitAndLoss } from "./api";
+import type { CompanySettings, Currencies, Invoice, ProfitAndLoss } from "./api";
 
 /** Sample data for demo mode (no LEDGERLY_API_URL). Fictional company and customers. */
 
@@ -38,8 +38,13 @@ export const demoCompanySettings: CompanySettings = {
   books_started: true,
   locked_fields: ["base_currency", "calendar", "fiscal_year_start_month", "conversion_date"],
   fiscal_years: [{ starts_on: "2026-07-08", ends_on: "2027-07-07", status: "open" }],
-  can: { manage: false, close_periods: false, reopen_periods: false },
+  can: { manage: false, close_periods: false, reopen_periods: false, enter_rates: false },
   options: { tax_id_label: "TIN", calendars: ["gregorian", "ethiopian"], legal_forms: ["sole_proprietor", "private_limited", "share_company"] },
+};
+
+export const demoCurrencies: Currencies = {
+  base_currency: "ETB",
+  data: [{ currency: "USD", is_enabled: true, latest_rate: "134.523333", latest_rate_date: "2026-11-02" }],
 };
 
 const c = (id: string, name: string, tin: string | null = null) => ({ id, name, tax_id: tin });

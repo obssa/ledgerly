@@ -19,7 +19,7 @@ trait CompanyFixtures
 
     /**
      * A company set up through the API by its own owner, with a posted invoice, a draft, a manual entry, a tax
-     * rate, a customer, an item and a warehouse. @return array<string, string>
+     * rate, a foreign currency with a rate, a customer, an item and a warehouse. @return array<string, string>
      */
     protected function companyWithRecords(string $email, string $name): array
     {
@@ -45,6 +45,9 @@ trait CompanyFixtures
         $ids['tax_rate'] = $this->postJson('/api/v1/tax-rates', ['code' => 'LOCAL5', 'name' => 'Local levy', 'kind' => 'other', 'rate' => '0.05', 'effective_from' => '2026-07-08'], $h)
             ->assertCreated()->json('id');
 
+        $this->putJson('/api/v1/currencies', ['currency' => 'USD', 'enabled' => true], $h)->assertOk();
+        $this->postJson('/api/v1/exchange-rates', ['currency' => 'USD', 'rate_date' => '2026-11-02', 'rate' => '134.523333'], $h)->assertCreated();
+
         $invoice = fn (string $number) => ['contact_id' => $ids['contact'], 'number' => $number, 'issue_date' => '2026-11-02', 'currency' => 'ETB',
             'lines' => [['description' => 'Coffee', 'quantity' => '2', 'unit_price' => '500', 'account_id' => $ids['sales'], 'tax_rate_id' => $ids['tax_rate']]]];
         $ids['invoice'] = $this->postJson('/api/v1/invoices', $invoice('INV-1'), $h)->assertCreated()->json('id');
@@ -65,7 +68,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(24, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(28, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -86,6 +89,7 @@ trait CompanyFixtures
         $query = match ($route->uri()) {
             'api/v1/reports/trial-balance', 'api/v1/reports/balance-sheet' => ['as_of' => '2026-12-31'],
             'api/v1/reports/profit-and-loss' => ['from' => '2026-07-08', 'to' => '2027-07-07'],
+            'api/v1/exchange-rates' => ['currency' => 'USD', 'from' => '2026-07-08', 'to' => '2027-07-07'],
             'api/v1/reports/bin-card' => ['item_id' => $ids['item'], 'warehouse_id' => $ids['warehouse'], 'from' => '2026-07-08', 'to' => '2027-07-07'],
             default => [],
         };
