@@ -223,6 +223,24 @@ export interface PaymentReceived {
   allocations?: { id: string; amount: string; document_id: string; document?: { id: string; number: string | null; issue_date?: string; total: string; amount_due: string; status: string } }[];
 }
 
+/** GET /reports/ar-ageing: open invoices by days overdue; each total is the customer's receivable balance. */
+export interface ArAgeing {
+  as_of: string;
+  rows: ({ contact_id: string; name: string } & Record<"current" | "days_1_30" | "days_31_60" | "days_61_90" | "over_90" | "credits" | "total", string>)[];
+  totals: Record<"current" | "days_1_30" | "days_31_60" | "days_61_90" | "over_90" | "credits" | "total", string>;
+}
+
+/** GET /customers/{id}/statement: the receivable account's lines for the customer, with a running balance. */
+export interface CustomerStatement {
+  customer: { id: string; name: string; tax_id: string | null; address?: Address };
+  currency: string;
+  from: string;
+  to: string;
+  opening: string;
+  closing: string;
+  lines: { date: string; entry: number; source_type: string; memo: string | null; reference: string | null; document_id: string | null; debit: string; credit: string; balance: string }[];
+}
+
 export interface ProfitAndLossRow {
   code: string;
   name: string;
@@ -356,6 +374,9 @@ export const ledgerly = {
   receivePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<PaymentReceived>("payments-received", { ...ctx, method: "POST", body }),
   reversePayment: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
+  arAgeing: (asOf: string | undefined, ctx: RequestOptions) => api<ArAgeing>("reports/ar-ageing", { ...ctx, query: { as_of: asOf } }),
+  customerStatement: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) =>
+    api<CustomerStatement>(`customers/${encodeURIComponent(id)}/statement`, { ...ctx, query: q }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),

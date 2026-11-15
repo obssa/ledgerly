@@ -53,6 +53,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/customers' => 'contacts.view',
         'POST api/v1/customers' => 'contacts.create',
         'GET api/v1/customers/{customer}' => 'contacts.view',
+        'GET api/v1/customers/{customer}/statement' => 'contacts.view',
         'PUT api/v1/customers/{customer}' => 'contacts.edit',
 
         'GET api/v1/invoices' => 'invoices.view',
@@ -80,6 +81,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/reports/trial-balance' => 'reports.view',
         'GET api/v1/reports/balance-sheet' => 'reports.view',
         'GET api/v1/reports/bin-card' => 'reports.view',
+        'GET api/v1/reports/ar-ageing' => 'reports.view',
         'GET api/v1/reports/profit-and-loss' => 'reports.view',
     ];
 

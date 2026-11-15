@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use Tests\CompanyFixtures;
+use Tests\RefreshLedgerDatabase;
+use Tests\TestCase;
+
+/**
+ * Module 2 reports: AR ageing and the customer statement. Both agree with the receivable account in the ledger.
+ * The fixture invoice (1,050.00, 2 Nov 2026, no due date) has 50.00 paid on 3 Nov.
+ */
+final class ReceivablesReportTest extends TestCase
+{
+    use CompanyFixtures;
+    use RefreshLedgerDatabase;
+
+    /** @var array<string, string> */
+    private array $c;
+
+    private array $h;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
+        $this->c = $this->companyWithRecords('owner@example.test', 'Abyssinia Coffee');
+        $this->h = ['X-Company-Id' => $this->c['company']];
+    }
+
+    public function test_the_ageing_buckets_open_invoices_and_each_total_is_the_customers_receivable_balance(): void
+    {
+        // A payment of 300.00 that is not allocated: the customer's credit.
+        $this->postJson('/api/v1/payments-received', ['contact_id' => $this->c['contact'], 'account_id' => $this->c['bank'], 'payment_date' => '2026-11-10',
+            'method' => 'cash', 'currency' => 'ETB', 'amount' => '300'], $this->h)->assertCreated();
+
+        $ageing = $this->getJson('/api/v1/reports/ar-ageing?as_of=2026-11-30', $this->h)->assertOk();
+        $ageing->assertJsonPath('rows.0.name', 'Abyssinia Coffee customer')
+            ->assertJsonPath('rows.0.current', '0.00')
+            ->assertJsonPath('rows.0.days_1_30', '1000.00')   // 28 days after 2 Nov
+            ->assertJsonPath('rows.0.credits', '-300.00')
+            ->assertJsonPath('rows.0.total', '700.00')
+            ->assertJsonPath('totals.total', '700.00');
+
+        $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $this->h)->json('data'));
+        $ar = $tb->firstWhere('account_id', $this->accountId('accounts_receivable'));
+        $this->assertSame('700.00', $ar['debit'], 'the ageing total is the receivable account');
+
+        $this->getJson('/api/v1/reports/ar-ageing?as_of=2027-03-01', $this->h)->assertJsonPath('rows.0.over_90', '1000.00');
+    }
+
+    public function test_the_statement_lists_every_movement_with_a_running_balance(): void
+    {
+        $this->getJson("/api/v1/customers/{$this->c['contact']}/statement?from=2026-11-01&to=2026-11-30", $this->h)->assertOk()
+            ->assertJsonPath('opening', '0.00')
+            ->assertJsonPath('lines.0.reference', 'INV-2027-0001')
+            ->assertJsonPath('lines.0.debit', '1050.00')
+            ->assertJsonPath('lines.0.balance', '1050.00')
+            ->assertJsonPath('lines.1.source_type', 'payment')
+            ->assertJsonPath('lines.1.credit', '50.00')
+            ->assertJsonPath('lines.1.balance', '1000.00')
+            ->assertJsonPath('closing', '1000.00');
+
+        // A later period starts from what was owed.
+        $this->getJson("/api/v1/customers/{$this->c['contact']}/statement?from=2026-12-01&to=2026-12-31", $this->h)
+            ->assertJsonPath('opening', '1000.00')->assertJsonCount(0, 'lines')->assertJsonPath('closing', '1000.00');
+        $this->getJson("/api/v1/customers/{$this->c['contact']}/statement?from=2026-12-01&to=2026-11-01", $this->h)->assertUnprocessable();
+    }
+
+    private function accountId(string $key): string
+    {
+        return $this->owner()->table('accounts')->where(['company_id' => $this->c['company'], 'system_key' => $key])->value('id');
+    }
+}

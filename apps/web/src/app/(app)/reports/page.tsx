@@ -30,6 +30,9 @@ const cycle = [
   { stage: "Financial health", reports: ["Liquidity ratios", "Cash runway", "Audit log of changes"] },
 ];
 
+/** Reports that have their own page; the others are on the way. */
+const LINKS: Record<string, string> = { "AR ageing": "/reports/ar-ageing", "Customer statements": "/customers" };
+
 export default async function ReportsPage() {
   const pl = await getProfitAndLoss({ from: "2026-10-01", to: "2026-10-31", compare_from: "2026-09-01", compare_to: "2026-09-30" });
   const t = pl.totals;
@@ -81,7 +84,7 @@ export default async function ReportsPage() {
             <div key={g.stage} className="mb-2">
               <div className="px-3 pb-1 pt-2 text-[13px] font-bold text-muted">{g.stage}</div>
               {g.reports.map((r) => (
-                <a key={r} href="#" className={`block rounded-lg px-3 py-2 text-sm font-semibold ${r === "Profit and loss" ? "bg-[#f0faf7] text-brand" : "hover:bg-[#f0faf7]"}`}>{r}</a>
+                <a key={r} href={LINKS[r] ?? "#"} className={`block rounded-lg px-3 py-2 text-sm font-semibold ${r === "Profit and loss" ? "bg-[#f0faf7] text-brand" : "hover:bg-[#f0faf7]"}`}>{r}</a>
               ))}
             </div>
           ))}

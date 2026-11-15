@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCustomer } from "@/lib/data";
@@ -30,6 +31,7 @@ export default async function CustomerPage({ params }: PageProps<"/customers/[id
               Credit limit {formatAmount(customer.credit_limit)}{over ? ": over the limit" : ""}
             </p>
           )}
+          <Link href={`/customers/${encodeURIComponent(customer.id)}/statement`} className="btn mt-4">Statement</Link>
           <h2 className="mb-2 mt-5 text-[15px] font-bold">Recent invoices</h2>
           {(customer.recent_invoices ?? []).length === 0 ? (
             <p className="text-sm text-muted">No posted invoices yet.</p>
