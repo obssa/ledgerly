@@ -21,7 +21,7 @@ class JournalEntry extends Model
 
     protected function casts(): array
     {
-        return ['entry_date' => 'date', 'posted_at' => 'datetime'];
+        return ['entry_date' => 'date:Y-m-d', 'posted_at' => 'datetime'];
     }
 
     public function lines(): HasMany
