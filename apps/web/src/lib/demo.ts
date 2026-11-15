@@ -1,4 +1,4 @@
-import type { CompanySettings, Currencies, Dimension, Invoice, Numbering, ProfitAndLoss } from "./api";
+import type { CompanySettings, Currencies, Customer, Dimension, Invoice, Numbering, ProfitAndLoss } from "./api";
 
 /** Sample data for demo mode (no LEDGERLY_API_URL). Fictional company and customers. */
 
@@ -51,6 +51,12 @@ export const demoDimensions: Dimension[] = [
   { id: "d1", kind: "location", code: "HQ", name: "Head office, Bole", is_active: true },
   { id: "d2", kind: "location", code: "MRK", name: "Merkato shop", is_active: true },
   { id: "d3", kind: "class", code: "WHOLESALE", name: "Wholesale", is_active: true },
+];
+
+export const demoCustomers: Customer[] = [
+  { id: "c1", name: "Sheger Grand Hotel", tax_id: "0012345678", email: "ap@sheger.example", phone: "+251 11 555 0101", currency: null, payment_terms_days: 30, credit_limit: "600000.00", is_active: true, open_balance: "598145.00" },
+  { id: "c2", name: "Bole Brew Café", tax_id: null, email: null, phone: "+251 91 100 2000", currency: null, payment_terms_days: 15, credit_limit: null, is_active: true, open_balance: "58250.00" },
+  { id: "c3", name: "Rift Valley Roasters Ltd", tax_id: null, email: "accounts@rvr.example", phone: null, currency: "USD", payment_terms_days: 45, credit_limit: null, is_active: true, open_balance: "166808.93" },
 ];
 
 export const demoNumbering: Numbering[] = [

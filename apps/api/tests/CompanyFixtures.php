@@ -70,7 +70,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(35, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(39, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -82,6 +82,7 @@ trait CompanyFixtures
             'invoice' => $ids['draft'],     // a draft accepts every invoice action, so the control call reaches the controller
             'entry' => $ids['entry'],
             'dimension' => $ids['dimension'],
+            'customer' => $ids['contact'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

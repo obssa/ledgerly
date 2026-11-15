@@ -6,6 +6,7 @@ use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DimensionController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
@@ -73,6 +74,11 @@ Route::prefix('v1')->group(function () {
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
             Route::post('tax-rates', [TaxRateController::class, 'store']);
+
+            Route::get('customers', [CustomerController::class, 'index']);
+            Route::post('customers', [CustomerController::class, 'store']);
+            Route::get('customers/{customer}', [CustomerController::class, 'show']);
+            Route::put('customers/{customer}', [CustomerController::class, 'update']);
 
             Route::get('invoices', [InvoiceController::class, 'index']);
             Route::post('invoices', [InvoiceController::class, 'store']);

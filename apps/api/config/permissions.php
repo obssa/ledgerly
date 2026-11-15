@@ -7,6 +7,7 @@
 | transactions.edit  edit a posted document while its period is open (history is always kept)
 | periods.reopen     edit or void inside a closed period or fiscal year; owner and admin only (via '*')
 | invoices.approve   post an invoice; with settings.approval.invoice_above set, not your own above that amount
+| contacts.edit      change or archive a customer or supplier (sales and purchasing staff only view and add)
 | company.view       read the company profile and fiscal settings; every role
 | company.manage     change the profile and settings; owner and admin only (via '*')
 | periods.close      move the period lock date forward

@@ -967,6 +967,31 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T42: contacts are archived, never deleted; a tax exemption names its reason (015)
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    DELETE FROM contacts WHERE id = '00000000-0000-0000-0000-0000000000c1';
+    RAISE EXCEPTION 'FAIL T42a: a contact was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE contacts SET tax_exempt = true WHERE id = '00000000-0000-0000-0000-0000000000c1';
+    RAISE EXCEPTION 'FAIL T42b: a tax exemption without a reason was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE contacts SET credit_limit = -1 WHERE id = '00000000-0000-0000-0000-0000000000c1';
+    RAISE EXCEPTION 'FAIL T42c: a negative credit limit was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE contacts SET is_active = false, tax_exempt = true, tax_exempt_reason = 'Embassy (diplomatic exemption)'
+   WHERE id = '00000000-0000-0000-0000-0000000000c1';
+  IF NOT FOUND THEN RAISE EXCEPTION 'FAIL T42d: a contact could not be archived'; END IF;
+  UPDATE contacts SET is_active = true, tax_exempt = false, tax_exempt_reason = NULL WHERE id = '00000000-0000-0000-0000-0000000000c1';
+  RAISE NOTICE 'PASS T42 contacts are archived, never deleted; an exemption names its reason';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

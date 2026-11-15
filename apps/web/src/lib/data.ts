@@ -1,8 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Dimension, type Invoice, type Numbering, type OpeningBalances, type ProfitAndLoss } from "./api";
-import { demoCompany, demoCompanySettings, demoCurrencies, demoDimensions, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
+import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Customer, type Dimension, type Invoice, type Numbering, type OpeningBalances, type ProfitAndLoss } from "./api";
+import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
 /**
@@ -72,6 +72,31 @@ export async function getNumbering(): Promise<Numbering[]> {
   const types = ["invoice", "credit_note"];
   if (isDemoMode()) return demoNumbering;
   return (await withApi((ctx) => ledgerly.numbering(ctx))).data.filter((n) => types.includes(n.doc_type));
+}
+
+export async function getCustomers(q: { search?: string; archived?: boolean }): Promise<{ data: Customer[]; can: { create: boolean; edit: boolean }; demo: boolean }> {
+  await connection();
+  if (isDemoMode()) {
+    const s = q.search?.toLowerCase();
+    return { data: demoCustomers.filter((c) => !s || c.name.toLowerCase().includes(s)), can: { create: false, edit: false }, demo: true };
+  }
+  const result = await withApi((ctx) => ledgerly.customers({ search: q.search || undefined, include_archived: q.archived ? "1" : undefined }, ctx));
+  return { ...result, demo: false };
+}
+
+/** One customer, or null when it is not one of this company's customers. */
+export async function getCustomer(id: string): Promise<(Customer & { demo: boolean }) | null> {
+  await connection();
+  if (isDemoMode()) {
+    const c = demoCustomers.find((d) => d.id === id);
+    return c ? { ...c, recent_invoices: [], can: { create: false, edit: false }, demo: true } : null;
+  }
+  try {
+    return { ...(await withApi((ctx) => ledgerly.customer(id, ctx))), demo: false };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 export async function getInvoices(): Promise<Invoice[]> {
