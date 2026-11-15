@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Customer, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -216,6 +216,23 @@ export async function getPaymentReceived(id: string): Promise<PaymentReceived | 
     return await withApi((ctx) => ledgerly.paymentReceived(id, ctx));
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export async function getArAgeing(asOf?: string): Promise<ArAgeing | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi((ctx) => ledgerly.arAgeing(asOf, ctx));
+}
+
+export async function getCustomerStatement(id: string, q: { from?: string; to?: string }): Promise<CustomerStatement | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.customerStatement(id, q, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 422)) return null;
     throw error;
   }
 }

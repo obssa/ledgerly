@@ -6,6 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Ledger\Currency;
+use App\Domain\Ledger\Models\Account;
+use App\Domain\Reports\ReceivablesReport;
 use App\Domain\Sales\Models\Contact;
 use App\Domain\Tenancy\Support\CountryPack;
 use App\Domain\Tenancy\Support\CurrentCompany;
@@ -61,6 +63,26 @@ final class CustomerController extends Controller
         $this->assertCustomer($customer);
 
         return response()->json($this->present($customer));
+    }
+
+    /** The customer's statement for a period (default: the last 90 days), from the receivable account's lines. */
+    public function statement(Request $request, Contact $customer, CurrentCompany $current, ReceivablesReport $receivables): JsonResponse
+    {
+        $this->authorizeCompany('contacts.view');
+        $this->assertCustomer($customer);
+        $q = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+        $to = $q['to'] ?? now()->format('Y-m-d');
+        $from = $q['from'] ?? now()->subDays(90)->format('Y-m-d');
+        $company = $current->get();
+
+        return response()->json([
+            'customer' => $customer->only(['id', 'name', 'tax_id', 'address']),
+            ...$receivables->statement($company->getKey(), Account::system('accounts_receivable')->getKey(), $customer->getKey(), $company->base_currency, $from, $to),
+            'currency' => $company->base_currency,
+        ]);
     }
 
     public function store(Request $request, CurrentCompany $current): JsonResponse

@@ -80,6 +80,7 @@ Route::prefix('v1')->group(function () {
             Route::get('customers', [CustomerController::class, 'index']);
             Route::post('customers', [CustomerController::class, 'store']);
             Route::get('customers/{customer}', [CustomerController::class, 'show']);
+            Route::get('customers/{customer}/statement', [CustomerController::class, 'statement']);
             Route::put('customers/{customer}', [CustomerController::class, 'update']);
 
             Route::get('invoices', [InvoiceController::class, 'index']);
@@ -107,6 +108,7 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/trial-balance', [LedgerController::class, 'trialBalance']);
             Route::get('reports/balance-sheet', [LedgerController::class, 'balanceSheet']);
             Route::get('reports/bin-card', [LedgerController::class, 'binCard']);
+            Route::get('reports/ar-ageing', [LedgerController::class, 'arAgeing']);
             Route::get('reports/profit-and-loss', [LedgerController::class, 'profitAndLoss']);
         });
     });

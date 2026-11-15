@@ -11,6 +11,7 @@ use App\Domain\Ledger\Models\Dimension;
 use App\Domain\Ledger\Models\JournalEntry;
 use App\Domain\Ledger\Money;
 use App\Domain\Ledger\PostingService;
+use App\Domain\Reports\ReceivablesReport;
 use App\Domain\Reports\ReportService;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use DateTimeImmutable;
@@ -133,6 +134,16 @@ final class LedgerController extends Controller
         $company = $this->current->get();
 
         return response()->json($reports->balanceSheet($company->getKey(), $company->base_currency, $asOf));
+    }
+
+    /** What customers owe today by age, with credit not yet used; each customer's total is their receivable balance. */
+    public function arAgeing(Request $request, ReceivablesReport $receivables): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? now()->format('Y-m-d');
+        $company = $this->current->get();
+
+        return response()->json($receivables->ageing($company->getKey(), Account::system('accounts_receivable')->getKey(), $company->base_currency, $asOf));
     }
 
     public function binCard(Request $request, ReportService $reports): JsonResponse
