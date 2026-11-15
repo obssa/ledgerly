@@ -76,7 +76,8 @@ final class CompanyController extends Controller
             'timezone' => ['nullable', 'timezone'],
             'fiscal_year_start_month' => ['required', 'integer', 'between:1,12'],
             // Last bank statement date before switching to Ledgerly: opening balances are entered as at this date.
-            'conversion_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            // The company's time zone is not set yet: no later than today anywhere (UTC+14).
+            'conversion_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:' . now('Pacific/Kiritimati')->format('Y-m-d')],
         ]);
 
         // The database decides who may add a company to an organisation: its creator, or an owner or admin of one

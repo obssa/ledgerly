@@ -39,6 +39,15 @@ final class CurrentCompany
         return $this->get()->getKey();
     }
 
+    /**
+     * Today's date where the company is (its time zone), as Y-m-d. "Not after today" checks and default dates use it:
+     * the server runs in UTC, and in Addis Ababa (UTC+3) the day starts three hours earlier.
+     */
+    public function today(): string
+    {
+        return now($this->get()->timezone ?: 'UTC')->format('Y-m-d');
+    }
+
     public function membership(): ?Membership
     {
         return $this->membership;

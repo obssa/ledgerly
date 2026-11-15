@@ -87,7 +87,7 @@ final class CurrencyController extends Controller
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
-        $to = $data['to'] ?? now()->format('Y-m-d');
+        $to = $data['to'] ?? app(CurrentCompany::class)->today();
         $from = $data['from'] ?? now()->subDays(90)->format('Y-m-d');
 
         return response()->json(['data' => DB::table('exchange_rates')
@@ -105,7 +105,7 @@ final class CurrencyController extends Controller
 
         $data = $request->validate([
             'currency' => ['required', Rule::in(Currency::all())],
-            'rate_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'rate_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
             'rate' => ['required', 'decimal:0,6', 'gt:0', 'max:999999999999'],
         ]);
         if (! $this->rates->isEnabled($company->getKey(), $data['currency'])) {

@@ -8,6 +8,7 @@ use App\Domain\Ledger\Currency;
 use App\Domain\Sales\Actions\ReceivePayment;
 use App\Domain\Sales\Actions\ReversePayment;
 use App\Domain\Sales\Models\Payment;
+use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -49,7 +50,7 @@ final class PaymentReceivedController extends Controller
         $data = $request->validate([
             'contact_id' => ['required', 'uuid'],
             'account_id' => ['required', 'uuid'],
-            'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
             'method' => ['required', Rule::in(self::METHODS)],
             'reference' => ['nullable', 'string', 'max:100'],
             'provider_txn_id' => ['nullable', 'string', 'max:100'],
@@ -71,7 +72,7 @@ final class PaymentReceivedController extends Controller
         $this->authorizeCompany('payments.reverse');
         $this->assertReceived($payment);
         $data = $request->validate([
-            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
             'reason' => ['required', 'string', 'min:3', 'max:500'],
         ]);
 

@@ -84,7 +84,7 @@ final class PaymentReceivedTest extends TestCase
         $this->pay(['account_id' => $this->accountId('sales')])->assertUnprocessable()->assertJsonValidationErrors('account_id');
         $this->pay(['account_id' => $this->usdBank()])->assertUnprocessable()->assertJsonValidationErrors('account_id');
         $this->pay(['amount' => '10', 'fee' => '11'])->assertUnprocessable()->assertJsonValidationErrors('fee');
-        $this->pay(['payment_date' => now()->addDay()->format('Y-m-d')])->assertUnprocessable()->assertJsonValidationErrors('payment_date');
+        $this->pay(['payment_date' => now('Africa/Addis_Ababa')->addDay()->format('Y-m-d')])->assertUnprocessable()->assertJsonValidationErrors('payment_date');
 
         $this->putJson('/api/v1/company/period-lock', ['books_closed_until' => '2026-11-10'], $this->h)->assertOk();
         $before = $this->owner()->table('payments')->count();
