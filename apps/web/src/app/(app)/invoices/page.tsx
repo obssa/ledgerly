@@ -40,7 +40,9 @@ export default async function InvoicesPage() {
             <tbody>
               {invoices.map((inv) => (
                 <tr key={inv.id}>
-                  <td className="num font-semibold">{inv.number ?? <span className="text-muted">Draft</span>}</td>
+                  <td className="num font-semibold">
+                    <Link href={`/invoices/${encodeURIComponent(inv.id)}`} className="hover:underline">{inv.number ?? <span className="text-muted">Draft</span>}</Link>
+                  </td>
                   <td>{inv.contact.name}</td>
                   <td>{inv.issue_date}</td>
                   <td>{inv.due_date ?? "—"}</td>

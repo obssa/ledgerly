@@ -178,6 +178,27 @@ export interface Invoice {
   einvoice_submissions?: EInvoiceSubmission[];
 }
 
+export interface TaxRate {
+  id: string;
+  code: string;
+  name: string;
+  kind: "vat" | "sales_tax" | "tot" | "withholding" | "excise" | "other";
+  /** 0.15 = 15% */
+  rate: string;
+  effective_from: string;
+  effective_to: string | null;
+}
+
+/** GET /invoices/{id}: the invoice, warnings that do not block, and what the signed-in member may do with it. */
+export interface InvoiceDetail extends Invoice {
+  fx_rate: string;
+  notes: string | null;
+  contact: Contact & { email?: string | null };
+  lines: InvoiceLine[];
+  warnings: { type: string; message: string }[];
+  can: { edit: boolean; approve: boolean; void: boolean };
+}
+
 export interface ProfitAndLossRow {
   code: string;
   name: string;
@@ -305,8 +326,13 @@ export const ledgerly = {
   updateCustomer: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<Customer>(`customers/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
-  invoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}`, ctx),
-  approveInvoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}/approve`, { ...ctx, method: "POST" }),
+  invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
+  createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
+  approveInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),
+  submitInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
+  voidInvoice: (id: string, reason: string, ctx: RequestOptions) =>
+    api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
+  taxRates: (ctx: RequestOptions) => api<{ data: TaxRate[] }>("tax-rates", ctx),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>
     api<ProfitAndLoss>("reports/profit-and-loss", { ...ctx, query: q }),
 };
