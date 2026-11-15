@@ -1,4 +1,7 @@
 # Weekly dependency updates, grouped so they arrive as a few reviewable pull requests that CI checks.
+# Groups carry minor and patch updates only; a major arrives as its own pull request so it can be judged alone.
+# Runtimes follow the production host (PHP 8.3, Node 22 LTS): image and type majors past them are ignored and
+# moved by hand together with the server (docs/runbook/cpanel.md).
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -10,16 +13,24 @@ updates:
     directory: /apps/api
     schedule: { interval: weekly }
     groups:
-      laravel: { patterns: ["laravel/*"] }
-      dev: { dependency-type: development }
+      laravel: { patterns: ["laravel/*"], update-types: [minor, patch] }
+      dev: { dependency-type: development, update-types: [minor, patch] }
 
   - package-ecosystem: npm
     directory: /apps/web
     schedule: { interval: weekly }
     groups:
-      next-react: { patterns: ["next", "eslint-config-next", "react", "react-dom", "@types/react*"] }
-      dev: { dependency-type: development }
+      next-react: { patterns: ["next", "eslint-config-next", "react", "react-dom", "@types/react*"], update-types: [minor, patch] }
+      dev: { dependency-type: development, update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directories: [/apps/api, /apps/web]
     schedule: { interval: weekly }
+    ignore:
+      - dependency-name: php
+        versions: [">=8.5"]
+      - dependency-name: node
+        versions: [">=23"]
