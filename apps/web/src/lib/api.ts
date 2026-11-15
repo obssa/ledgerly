@@ -46,7 +46,7 @@ export interface CompanySettings {
   books_started: boolean;
   locked_fields: string[];
   fiscal_years: { starts_on: string; ends_on: string; status: string }[];
-  can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean };
+  can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean; manage_dimensions: boolean };
   options: { tax_id_label: string; calendars: string[]; legal_forms: string[] };
 }
 
@@ -88,6 +88,15 @@ export interface Numbering {
   include_year: boolean;
   padding: number;
   next_number: string;
+}
+
+/** A location (branch, site), class (department) or project that transactions are tagged with. */
+export interface Dimension {
+  id: string;
+  kind: "location" | "class" | "project";
+  code: string;
+  name: string;
+  is_active: boolean;
 }
 
 export interface Contact {
@@ -249,6 +258,11 @@ export const ledgerly = {
   openingBalances: (ctx: RequestOptions) => api<OpeningBalances>("opening-balances", ctx),
   saveOpeningBalances: (lines: { account_id: string; debit?: string; credit?: string }[], ctx: RequestOptions) =>
     api<OpeningBalances>("opening-balances", { ...ctx, method: "PUT", body: { lines } }),
+  dimensions: (ctx: RequestOptions) => api<{ data: Dimension[] }>("dimensions", ctx),
+  addDimension: (body: { kind: string; code: string; name: string }, ctx: RequestOptions) =>
+    api<Dimension>("dimensions", { ...ctx, method: "POST", body }),
+  updateDimension: (id: string, body: { name?: string; is_active?: boolean }, ctx: RequestOptions) =>
+    api<Dimension>(`dimensions/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   numbering: (ctx: RequestOptions) => api<{ data: Numbering[] }>("numbering", ctx),
   saveNumbering: (body: Omit<Numbering, "next_number">, ctx: RequestOptions) => api<Numbering>("numbering", { ...ctx, method: "PUT", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),

@@ -19,7 +19,7 @@ trait CompanyFixtures
 
     /**
      * A company set up through the API by its own owner, with a posted invoice, a draft, a manual entry, a tax
-     * rate, a foreign currency with a rate, a customer, an item and a warehouse. @return array<string, string>
+     * rate, a foreign currency with a rate, a location, a customer, an item and a warehouse. @return array<string, string>
      */
     protected function companyWithRecords(string $email, string $name): array
     {
@@ -45,6 +45,8 @@ trait CompanyFixtures
         $ids['tax_rate'] = $this->postJson('/api/v1/tax-rates', ['code' => 'LOCAL5', 'name' => 'Local levy', 'kind' => 'other', 'rate' => '0.05', 'effective_from' => '2026-07-08'], $h)
             ->assertCreated()->json('id');
 
+        $ids['dimension'] = $this->postJson('/api/v1/dimensions', ['kind' => 'location', 'code' => 'HQ', 'name' => "{$name} head office"], $h)
+            ->assertCreated()->json('id');
         $this->putJson('/api/v1/currencies', ['currency' => 'USD', 'enabled' => true], $h)->assertOk();
         $this->postJson('/api/v1/exchange-rates', ['currency' => 'USD', 'rate_date' => '2026-11-02', 'rate' => '134.523333'], $h)->assertCreated();
 
@@ -68,7 +70,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(32, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(35, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -79,6 +81,7 @@ trait CompanyFixtures
         $params = [
             'invoice' => $ids['draft'],     // a draft accepts every invoice action, so the control call reaches the controller
             'entry' => $ids['entry'],
+            'dimension' => $ids['dimension'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

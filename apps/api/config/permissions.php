@@ -12,6 +12,7 @@
 | periods.close      move the period lock date forward
 | accounting.rates   enter or correct exchange rates (accountant via 'accounting.*')
 | accounting.opening enter or replace the opening balances (accountant via 'accounting.*')
+| accounting.dimensions  add, rename and turn off locations, classes and projects (accountant via 'accounting.*')
 */
 
 return [

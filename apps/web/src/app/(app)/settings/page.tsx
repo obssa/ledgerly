@@ -1,6 +1,6 @@
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanySettings, getCurrencies, getNumbering } from "@/lib/data";
-import { CompanyProfileForm, CurrenciesPanel, NumberingPanel, PeriodLockForm } from "./SettingsForms";
+import { getCompanySettings, getCurrencies, getDimensions, getNumbering } from "@/lib/data";
+import { CompanyProfileForm, CurrenciesPanel, DimensionsPanel, NumberingPanel, PeriodLockForm } from "./SettingsForms";
 
 export const metadata = { title: "Company settings" };
 
@@ -9,7 +9,7 @@ export const metadata = { title: "Company settings" };
  * accountant closes periods. What a role cannot change is shown read-only (the API refuses it anyway).
  */
 export default async function SettingsPage() {
-  const [settings, currencies, numbering] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering()]);
+  const [settings, currencies, numbering, dimensions] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering(), getDimensions()]);
   const year = settings.fiscal_years.at(-1);
 
   return (
@@ -49,6 +49,12 @@ export default async function SettingsPage() {
               Books are kept in {currencies.base_currency}. An invoice in another currency takes the rate of its own date and keeps it.
             </p>
             <CurrenciesPanel settings={settings} currencies={currencies} />
+          </Card>
+
+          <Card label="Locations and dimensions">
+            <h2 className="text-[19px] font-bold">Locations and dimensions</h2>
+            <p className="mt-1.5 text-sm text-muted">Tag transactions with a branch, department or project to see reports for each.</p>
+            <DimensionsPanel settings={settings} dimensions={dimensions} />
           </Card>
 
           <Card label="Numbering">

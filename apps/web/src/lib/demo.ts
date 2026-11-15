@@ -1,4 +1,4 @@
-import type { CompanySettings, Currencies, Invoice, Numbering, ProfitAndLoss } from "./api";
+import type { CompanySettings, Currencies, Dimension, Invoice, Numbering, ProfitAndLoss } from "./api";
 
 /** Sample data for demo mode (no LEDGERLY_API_URL). Fictional company and customers. */
 
@@ -38,7 +38,7 @@ export const demoCompanySettings: CompanySettings = {
   books_started: true,
   locked_fields: ["base_currency", "calendar", "fiscal_year_start_month", "conversion_date"],
   fiscal_years: [{ starts_on: "2026-07-08", ends_on: "2027-07-07", status: "open" }],
-  can: { manage: false, close_periods: false, reopen_periods: false, enter_rates: false },
+  can: { manage: false, close_periods: false, reopen_periods: false, enter_rates: false, manage_dimensions: false },
   options: { tax_id_label: "TIN", calendars: ["gregorian", "ethiopian"], legal_forms: ["sole_proprietor", "private_limited", "share_company"] },
 };
 
@@ -46,6 +46,12 @@ export const demoCurrencies: Currencies = {
   base_currency: "ETB",
   data: [{ currency: "USD", is_enabled: true, latest_rate: "134.523333", latest_rate_date: "2026-11-02" }],
 };
+
+export const demoDimensions: Dimension[] = [
+  { id: "d1", kind: "location", code: "HQ", name: "Head office, Bole", is_active: true },
+  { id: "d2", kind: "location", code: "MRK", name: "Merkato shop", is_active: true },
+  { id: "d3", kind: "class", code: "WHOLESALE", name: "Wholesale", is_active: true },
+];
 
 export const demoNumbering: Numbering[] = [
   { doc_type: "invoice", mode: "automatic", prefix: "INV-", include_year: true, padding: 4, next_number: "INV-2019-0420" },

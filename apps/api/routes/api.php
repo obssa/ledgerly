@@ -6,6 +6,7 @@ use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\DimensionController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
@@ -54,6 +55,10 @@ Route::prefix('v1')->group(function () {
             Route::put('currencies', [CurrencyController::class, 'update']);
             Route::get('exchange-rates', [CurrencyController::class, 'rates']);
             Route::post('exchange-rates', [CurrencyController::class, 'storeRate']);
+
+            Route::get('dimensions', [DimensionController::class, 'index']);
+            Route::post('dimensions', [DimensionController::class, 'store']);
+            Route::put('dimensions/{dimension}', [DimensionController::class, 'update']);
 
             Route::get('numbering', [NumberingController::class, 'index']);
             Route::put('numbering', [NumberingController::class, 'update']);
