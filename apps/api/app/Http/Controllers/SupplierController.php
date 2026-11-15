@@ -6,6 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Ledger\Currency;
+use App\Domain\Ledger\Models\Account;
+use App\Domain\Reports\ReceivablesReport;
 use App\Domain\Sales\Models\Contact;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use App\Http\Controllers\Concerns\ContactRules;
@@ -66,6 +68,26 @@ final class SupplierController extends Controller
         $this->assertSupplier($supplier);
 
         return response()->json($this->present($supplier));
+    }
+
+    /** The supplier's statement for a period (default: the last 90 days), from the payable account's lines. */
+    public function statement(Request $request, Contact $supplier, CurrentCompany $current, ReceivablesReport $report): JsonResponse
+    {
+        $this->authorizeCompany('contacts.view');
+        $this->assertSupplier($supplier);
+        $q = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+        $to = $q['to'] ?? now()->format('Y-m-d');
+        $from = $q['from'] ?? now()->subDays(90)->format('Y-m-d');
+        $company = $current->get();
+
+        return response()->json([
+            'supplier' => $supplier->only(['id', 'name', 'tax_id', 'address']),
+            ...$report->statement($company->getKey(), Account::system('accounts_payable')->getKey(), $supplier->getKey(), $company->base_currency, $from, $to, payable: true),
+            'currency' => $company->base_currency,
+        ]);
     }
 
     public function store(Request $request, CurrentCompany $current): JsonResponse

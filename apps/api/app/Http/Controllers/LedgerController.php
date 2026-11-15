@@ -147,6 +147,16 @@ final class LedgerController extends Controller
         return response()->json($receivables->ageing($company->getKey(), Account::system('accounts_receivable')->getKey(), $company->base_currency, $asOf));
     }
 
+    /** AP ageing: open bills by days overdue; each total is what the company owes that supplier on accounts payable. */
+    public function apAgeing(Request $request, ReceivablesReport $report): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? now()->format('Y-m-d');
+        $company = $this->current->get();
+
+        return response()->json($report->ageing($company->getKey(), Account::system('accounts_payable')->getKey(), $company->base_currency, $asOf, 'bill'));
+    }
+
     public function binCard(Request $request, ReportService $reports): JsonResponse
     {
         $this->authorizeCompany('reports.view');

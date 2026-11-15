@@ -26,7 +26,11 @@ export default async function SupplierPage({ params }: PageProps<"/suppliers/[id
           <div className="text-[13px] text-muted">We owe on posted bills</div>
           <div className="num mt-1 text-[28px] font-extrabold">{formatAmount(supplier.open_balance)}</div>
           {supplier.withholding_exempt && <p className="mt-1 text-sm text-muted">Exempt from withholding · {supplier.withholding_exempt_reason}</p>}
-          {supplier.can?.bill && supplier.is_active && !supplier.demo && <Link href="/bills/new" className="btn mt-4">New bill</Link>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href={`/suppliers/${encodeURIComponent(supplier.id)}/statement`} className="btn">Statement</Link>
+            {supplier.can?.bill && supplier.is_active && !supplier.demo && <Link href="/bills/new" className="btn">New bill</Link>}
+            {supplier.open_balance !== "0.00" && !supplier.open_balance.startsWith("-") && !supplier.demo && <Link href={`/payments-made/new?supplier=${encodeURIComponent(supplier.id)}`} className="btn">Pay</Link>}
+          </div>
           <h2 className="mb-2 mt-5 text-[15px] font-bold">Recent bills</h2>
           {(supplier.recent_bills ?? []).length === 0 ? (
             <p className="text-sm text-muted">No posted bills yet.</p>

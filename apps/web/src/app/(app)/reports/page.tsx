@@ -24,14 +24,14 @@ function change(current: string, previous: string | null): string {
 const cycle = [
   { stage: "Statements", reports: ["Profit and loss", "Balance sheet (A = L + E checked)", "Cash flow statement"] },
   { stage: "Ledger and trial balance", reports: ["Trial balance", "General ledger", "Journal report"] },
-  { stage: "Receivables and payables", reports: ["AR ageing", "AP ageing", "Customer statements"] },
+  { stage: "Receivables and payables", reports: ["AR ageing", "AP ageing", "Customer statements", "Supplier statements"] },
   { stage: "Tax", reports: ["VAT return worksheet", "Withholding summary", "E-invoice register"] },
   { stage: "Operations", reports: ["Sales by item", "Inventory valuation", "Bin card (stock card)"] },
   { stage: "Financial health", reports: ["Liquidity ratios", "Cash runway", "Audit log of changes"] },
 ];
 
 /** Reports that have their own page; the others are on the way. */
-const LINKS: Record<string, string> = { "AR ageing": "/reports/ar-ageing", "Customer statements": "/customers" };
+const LINKS: Record<string, string> = { "AR ageing": "/reports/ar-ageing", "AP ageing": "/reports/ap-ageing", "Customer statements": "/customers", "Supplier statements": "/suppliers" };
 
 export default async function ReportsPage() {
   const pl = await getProfitAndLoss({ from: "2026-10-01", to: "2026-10-31", compare_from: "2026-09-01", compare_to: "2026-09-30" });

@@ -8,7 +8,8 @@ use App\Domain\Ledger\Money;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Module 2 reports on what customers owe, in the base currency. Every query takes its values as bound parameters;
+ * Module 2 and 3 reports on what customers owe and what the company owes suppliers, in the base currency. Payables
+ * read the same way with the sign turned: a bill raises the balance (a credit), a payment lowers it. Every query takes its values as bound parameters;
  * nothing from a request becomes SQL (CLAUDE.md rule 1).
  *
  * Both reports agree with the ledger by construction: the ageing's total per customer is that customer's balance on
@@ -25,16 +26,17 @@ final class ReceivablesReport
      *
      * @return array{as_of: string, rows: list<array<string, mixed>>, totals: array<string, string>}
      */
-    public function ageing(string $companyId, string $receivableAccountId, string $currency, string $asOf): array
+    public function ageing(string $companyId, string $receivableAccountId, string $currency, string $asOf, string $documentType = 'invoice'): array
     {
+        $payable = $documentType === 'bill';
         $open = DB::select(<<<'SQL'
             SELECT d.contact_id,
                    greatest(?::date - coalesce(d.due_date, d.issue_date), 0) AS days,
                    round(d.amount_due * d.fx_rate, 2)::text AS amount
               FROM documents d
-             WHERE d.company_id = ?::uuid AND d.type = 'invoice'
+             WHERE d.company_id = ?::uuid AND d.type = ?
                AND d.status IN ('posted', 'part_paid') AND d.amount_due > 0
-            SQL, [$asOf, $companyId]);
+            SQL, [$asOf, $companyId, $payable ? 'bill' : 'invoice']);
 
         $ledger = collect(DB::select(<<<'SQL'
             SELECT l.contact_id, sum(l.debit - l.credit)::text AS balance
@@ -66,6 +68,9 @@ final class ReceivablesReport
         $totals = array_fill_keys([...self::BUCKETS, 'credits', 'total'], $zero());
         foreach ($rows as $contactId => $r) {
             $total = Money::of((string) ($ledger[$contactId] ?? '0'), $currency);
+            if ($payable) {
+                $total = $total->negated(); // what is owed to the supplier is a credit balance
+            }
             $openSum = array_reduce($r['buckets'], fn (Money $s, Money $m) => $s->plus($m), $zero());
             // Credit not yet used (credit notes left, payments not allocated) is the ledger balance less the open invoices.
             $credits = $total->minus($openSum);
@@ -94,7 +99,7 @@ final class ReceivablesReport
      *
      * @return array{from: string, to: string, opening: string, lines: list<array<string, mixed>>, closing: string}
      */
-    public function statement(string $companyId, string $receivableAccountId, string $contactId, string $currency, string $from, string $to): array
+    public function statement(string $companyId, string $receivableAccountId, string $contactId, string $currency, string $from, string $to, bool $payable = false): array
     {
         $opening = (string) (DB::selectOne(<<<'SQL'
             SELECT coalesce(sum(debit - credit), 0)::text AS balance FROM journal_lines
@@ -106,20 +111,22 @@ final class ReceivablesReport
                    coalesce(d.number, p.reference) AS reference, d.id AS document_id, l.debit::text AS debit, l.credit::text AS credit
               FROM journal_lines l
               JOIN journal_entries e ON e.company_id = l.company_id AND e.id = l.journal_entry_id
-              LEFT JOIN documents d ON d.id = e.source_id AND e.source_type IN ('invoice', 'credit_note')
+              LEFT JOIN documents d ON d.id = e.source_id AND e.source_type IN ('invoice', 'credit_note', 'bill')
               LEFT JOIN payments p ON p.id = e.source_id AND e.source_type = 'payment'
              WHERE l.company_id = ?::uuid AND l.account_id = ?::uuid AND l.contact_id = ?::uuid
                AND l.entry_date BETWEEN ?::date AND ?::date
              ORDER BY l.entry_date, e.number, l.line_no
             SQL, [$companyId, $receivableAccountId, $contactId, $from, $to]);
 
-        $balance = Money::of($opening, $currency);
+        $sign = fn (Money $m): Money => $payable ? $m->negated() : $m;
+        $openingBalance = $sign(Money::of($opening, $currency));
+        $balance = $openingBalance;
         $lines = [];
         foreach ($rows as $r) {
-            $balance = $balance->plus(Money::of($r->debit, $currency))->minus(Money::of($r->credit, $currency));
+            $balance = $balance->plus($sign(Money::of($r->debit, $currency)->minus(Money::of($r->credit, $currency))));
             $lines[] = [...(array) $r, 'balance' => $balance->toDecimalString()];
         }
 
-        return ['from' => $from, 'to' => $to, 'opening' => Money::of($opening, $currency)->toDecimalString(), 'lines' => $lines, 'closing' => $balance->toDecimalString()];
+        return ['from' => $from, 'to' => $to, 'opening' => $openingBalance->toDecimalString(), 'lines' => $lines, 'closing' => $balance->toDecimalString()];
     }
 }

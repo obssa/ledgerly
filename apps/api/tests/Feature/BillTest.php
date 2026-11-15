@@ -127,7 +127,7 @@ final class BillTest extends TestCase
         $this->postJson("/api/v1/bills/{$id}/void", ['reason' => 'Entered twice'], $this->h)->assertOk()->assertJsonPath('status', 'void');
         $this->getJson("/api/v1/suppliers/{$this->c['supplier']}", $this->h)->assertJsonPath('open_balance', '0.00');
         $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $this->h)->json('data'));
-        $this->assertNull($tb->firstWhere('account_id', $this->account('2000')), 'nothing owed once the only posted bill is void');
+        $this->assertSame('100.00', $tb->firstWhere('account_id', $this->account('2000'))['debit'], 'once the only posted bill is void, only the fixture\'s advance is left');
     }
 
     public function test_purchasing_staff_enter_bills_and_an_approver_posts_them(): void
