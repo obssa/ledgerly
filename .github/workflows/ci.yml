@@ -24,7 +24,7 @@ jobs:
         options: --health-cmd "pg_isready -U ledgerly_owner" --health-interval 5s --health-retries 20
     env: { PGHOST: localhost, PGPORT: 5432, PGUSER: ledgerly_owner, PGPASSWORD: ledgerly_owner }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Schema, guard tests and concurrency tests
         run: |
           bash apps/api/database/schema/tests/run.sh | tee result.txt
@@ -45,12 +45,12 @@ jobs:
     # every request runs as ledgerly_web, so row-level security applies in the tests (SECURITY.md S1).
     env: { DB_HOST: localhost, PGHOST: localhost, PGUSER: ledgerly_owner, PGPASSWORD: ledgerly_owner }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Database roles, exactly as in local development (creates ledgerly_test)
         run: psql -d ledgerly -v ON_ERROR_STOP=1 -f ../../docker/postgres/init.sql
       - uses: shivammathur/setup-php@v2
         with: { php-version: '${{ matrix.php }}', extensions: pdo_pgsql, bcmath, intl, coverage: none }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.composer/cache
           key: composer-${{ hashFiles('apps/api/composer.lock') }}
@@ -75,12 +75,12 @@ jobs:
     defaults: { run: { working-directory: apps/api } }
     env: { DB_HOST: localhost, DB_SCHEMA: ledgerly, DB_APP_ROLE: cp_lweb, DB_ALLOW_OWNER_ROLE_MEMBERSHIP: 'true', PGHOST: localhost, PGUSER: postgres, PGPASSWORD: postgres }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: cPanel-style roles and database
         run: psql -d postgres -v ON_ERROR_STOP=1 -f database/schema/tests/shared-host-roles.sql
       - uses: shivammathur/setup-php@v2
         with: { php-version: '8.3', extensions: pdo_pgsql, bcmath, intl, coverage: none }   # what the cPanel account runs
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.composer/cache
           key: composer-${{ hashFiles('apps/api/composer.lock') }}
@@ -95,8 +95,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/web } }
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }
       - run: npm ci
       - name: Known vulnerabilities in JavaScript packages
@@ -114,9 +114,9 @@ jobs:
           - { name: api, context: apps/api, dockerfile: apps/api/Dockerfile.production }
           - { name: web, context: apps/web, dockerfile: apps/web/Dockerfile }
     steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}

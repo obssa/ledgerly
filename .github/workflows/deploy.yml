@@ -45,16 +45,16 @@ jobs:
       SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       IMAGE: ghcr.io/${{ github.repository_owner }}/ledgerly-${{ matrix.name }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: '${{ env.SHA }}' }   # the commit CI tested, not whatever main is now
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
@@ -69,7 +69,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
           provenance: mode=max
           sbom: true
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         # GitHub stores attestations only for public repositories (or organisation plans). The image still
         # carries its own provenance and SBOM (above); this adds the signed, GitHub-verifiable record.
         if: ${{ !github.event.repository.private }}
@@ -98,7 +98,7 @@ jobs:
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: '${{ env.SHA }}' }
       - id: sha
         run: echo "sha=$SHA" >> "$GITHUB_OUTPUT"
@@ -107,7 +107,7 @@ jobs:
       - name: API with production packages only
         working-directory: apps/api
         run: composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader --classmap-authoritative
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json }   # the server runs Node 22
       - name: Web app as a standalone Node.js server
         working-directory: apps/web
@@ -123,7 +123,7 @@ jobs:
           echo "$SHA" > bundle/REVISION
           tar -czf "ledgerly-$SHA.tar.gz" -C bundle .
           du -h "ledgerly-$SHA.tar.gz"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: release, path: 'ledgerly-${{ env.SHA }}.tar.gz', retention-days: 14 }
 
   cpanel:
@@ -141,9 +141,9 @@ jobs:
       WEB_URL: ${{ vars.DEPLOY_WEB_URL || 'https://ledgerly.orcamind.dev' }}
       API_URL: ${{ vars.DEPLOY_API_URL || 'https://ledgerly-api.orcamind.dev' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { ref: '${{ env.SHA }}' }   # the deploy scripts of the release being deployed
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: release }
       - name: SSH with a pinned host key
         env:
