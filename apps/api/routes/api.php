@@ -16,10 +16,12 @@ use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\NumberingController;
 use App\Http\Controllers\OpeningBalanceController;
+use App\Http\Controllers\PaymentMadeController;
 use App\Http\Controllers\PaymentReceivedController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TaxRateController;
 use App\Domain\Sales\Models\Document;
+use App\Domain\Sales\Models\Payment;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +41,12 @@ $documentOf = fn (array $types) => fn (string $id) => Str::isUuid($id)
     : abort(404);
 Route::bind('invoice', $documentOf(['invoice', 'credit_note']));
 Route::bind('bill', $documentOf(['bill']));
+// Payments received and payments made share one table too.
+$paymentOf = fn (string $direction) => fn (string $id) => Str::isUuid($id)
+    ? Payment::query()->where('direction', $direction)->findOrFail($id)
+    : abort(404);
+Route::bind('payment', $paymentOf('in'));
+Route::bind('paymentMade', $paymentOf('out'));
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
@@ -121,6 +129,7 @@ Route::prefix('v1')->group(function () {
             Route::get('suppliers', [SupplierController::class, 'index']);
             Route::post('suppliers', [SupplierController::class, 'store']);
             Route::get('suppliers/{supplier}', [SupplierController::class, 'show']);
+            Route::get('suppliers/{supplier}/statement', [SupplierController::class, 'statement']);
             Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
 
             Route::get('bills', [BillController::class, 'index']);
@@ -132,6 +141,12 @@ Route::prefix('v1')->group(function () {
             Route::post('bills/{bill}/approve', [BillController::class, 'approve']);
             Route::post('bills/{bill}/void', [BillController::class, 'void']);
             Route::get('bills/{bill}/history', [BillController::class, 'history']);
+
+            Route::get('payments-made', [PaymentMadeController::class, 'index']);
+            Route::post('payments-made', [PaymentMadeController::class, 'store']);
+            Route::get('payments-made/withholding/{supplier}', [PaymentMadeController::class, 'withholding']);
+            Route::get('payments-made/{paymentMade}', [PaymentMadeController::class, 'show']);
+            Route::post('payments-made/{paymentMade}/reverse', [PaymentMadeController::class, 'reverse']);
 
             Route::get('payments-received', [PaymentReceivedController::class, 'index']);
             Route::post('payments-received', [PaymentReceivedController::class, 'store']);
@@ -145,6 +160,7 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/balance-sheet', [LedgerController::class, 'balanceSheet']);
             Route::get('reports/bin-card', [LedgerController::class, 'binCard']);
             Route::get('reports/ar-ageing', [LedgerController::class, 'arAgeing']);
+            Route::get('reports/ap-ageing', [LedgerController::class, 'apAgeing']);
             Route::get('reports/profit-and-loss', [LedgerController::class, 'profitAndLoss']);
         });
     });

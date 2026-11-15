@@ -57,6 +57,7 @@ final class DemoSetup
         }
 
         $this->addPurchases($owner, $company, $say);
+        $this->addPaymentsMade($owner, $company, $say);
 
         foreach ($roles as $role) {
             if ($owner->table('demo_accounts')->where('role', $role)->exists()) {
@@ -177,6 +178,36 @@ final class DemoSetup
             $user->tokens()->where('name', 'demo-setup')->delete();
         }
         $say('Added the demo suppliers and bills.');
+    }
+
+    /** Module 3 sample: two bills paid, one in full and one in part. Added once, to a demo company with no payment made yet. */
+    private function addPaymentsMade(ConnectionInterface $owner, string $company, callable $say): void
+    {
+        if ($owner->table('payments')->where(['company_id' => $company, 'direction' => 'out'])->exists()) {
+            return;
+        }
+        $bills = $owner->table('documents')->where(['company_id' => $company, 'type' => 'bill', 'status' => 'posted'])
+            ->whereIn('reference', ['ET-8823140', 'YCFCU-2291'])->get(['id', 'contact_id', 'reference', 'issue_date', 'amount_due'])->keyBy('reference');
+        if ($bills->count() < 2) {
+            return; // the sample bills were changed by visitors: leave the demo as it is
+        }
+        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
+        $this->company = $company;
+
+        try {
+            $bank = collect($this->call('GET', 'accounts')['data'])->firstWhere('code', '1100')['id'];
+            $pay = fn (object $bill, string $amount, string $ref) => $this->call('POST', 'payments-made', [
+                'contact_id' => $bill->contact_id, 'account_id' => $bank, 'method' => 'bank_transfer', 'currency' => 'ETB', 'reference' => $ref,
+                'payment_date' => min(now()->format('Y-m-d'), (new DateTimeImmutable((string) $bill->issue_date))->modify('+5 days')->format('Y-m-d')),
+                'amount' => $amount, 'allocations' => [['bill_id' => $bill->id, 'amount' => $amount]],
+            ]);
+            $pay($bills['ET-8823140'], (string) $bills['ET-8823140']->amount_due, 'TT-310045');   // in full
+            $pay($bills['YCFCU-2291'], '120000.00', 'TT-310046');                                  // in part; the union is withholding-exempt
+        } finally {
+            $user->tokens()->where('name', 'demo-setup')->delete();
+        }
+        $say('Added the demo payments made.');
     }
 
     /** Sample books inside the current fiscal year: opening balances, customers, invoices in every state, payments. */

@@ -10,6 +10,7 @@
 | contacts.edit      change or archive a customer or supplier (sales and purchasing staff only view and add)
 | bills.create       enter a supplier's bill as a draft; bills.approve posts it (accountant, approver, owner, admin)
 | payments.receive   record a payment received; payments.reverse reverses one (accountant, owner, admin)
+| payments.pay       pay suppliers' bills (accountant via 'payments.*', owner, admin): money leaves the company
 | company.view       read the company profile and fiscal settings, the chart of accounts (no balances) and the tax
 |                    rates; every role, because every document form names accounts and taxes
 | company.manage     change the profile and settings; owner and admin only (via '*')

@@ -1142,6 +1142,61 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T47: a payment made is to a supplier and settles that supplier's bills; a payment received is from a customer and
+-- settles invoices; nothing is withheld from an exempt supplier (020). Uses supplier c7 (exempt since T46) and a new
+-- supplier c8 with a posted bill of 1,000.00.
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  INSERT INTO contacts (id, company_id, name, is_vendor) VALUES ('00000000-0000-0000-0000-0000000000c8', app_company_id(), 'Fuel station', true);
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e470', app_company_id(), 9470, '2027-06-30', 'ETB', 'bill');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e470', 1, '00000000-0000-0000-0000-000000000a40', 1000, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e470', 2, '00000000-0000-0000-0000-000000000a22', 0, 1000);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due) VALUES
+    ('00000000-0000-0000-0000-0000000000d9', app_company_id(), 'bill', 'BILL-T47', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB', 1000, 1000);
+  UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e470' WHERE id = '00000000-0000-0000-0000-0000000000d9';
+
+  BEGIN
+    INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, amount) VALUES
+      (app_company_id(), 'out', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 10);
+    RAISE EXCEPTION 'FAIL T47a: a payment was made to a customer who is not a supplier';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, amount) VALUES
+      (app_company_id(), 'in', '00000000-0000-0000-0000-0000000000c8', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 10);
+    RAISE EXCEPTION 'FAIL T47b: a payment was received from a supplier who is not a customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, amount, withholding) VALUES
+      (app_company_id(), 'out', '00000000-0000-0000-0000-0000000000c7', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'bank_transfer', 'ETB', 970, 30);
+    RAISE EXCEPTION 'FAIL T47c: tax was withheld from a supplier with an exemption certificate';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- 582 paid + 18 withheld settles 600 of the bill.
+  INSERT INTO payments (id, company_id, direction, contact_id, account_id, payment_date, method, currency, amount, withholding, withholding_certificate) VALUES
+    ('00000000-0000-0000-0000-0000000000e7', app_company_id(), 'out', '00000000-0000-0000-0000-0000000000c8', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'bank_transfer', 'ETB', 582, 18, 'WHT-0001');
+  BEGIN
+    INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e7', '00000000-0000-0000-0000-0000000000d6', 10);
+    RAISE EXCEPTION 'FAIL T47d: a payment made settled an invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000d9', 10);
+    RAISE EXCEPTION 'FAIL T47e: a payment received settled a bill';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e7', '00000000-0000-0000-0000-0000000000d9', 600);
+  IF (SELECT (amount_due, status) FROM documents WHERE id = '00000000-0000-0000-0000-0000000000d9') <> (400.00::numeric(20,2), 'part_paid'::text) THEN
+    RAISE EXCEPTION 'FAIL T47f: the bill did not show 400.00 still to pay';
+  END IF;
+  BEGIN
+    UPDATE payments SET withholding_certificate = 'WHT-0002' WHERE id = '00000000-0000-0000-0000-0000000000e7';
+    RAISE EXCEPTION 'FAIL T47g: a recorded withholding certificate changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T47 payments made go to suppliers and settle their bills, and nothing is withheld from an exempt supplier';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

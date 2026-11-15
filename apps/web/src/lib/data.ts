@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Bill, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Bill, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -266,6 +266,79 @@ export async function getReceiveOptions(customerId: string | null): Promise<Rece
       demo: false,
     };
   });
+}
+
+export interface PayOptions {
+  suppliers: { id: string; name: string }[];
+  supplier: { id: string; name: string; currency: string | null; tax_id: string | null } | null;
+  /** The chosen supplier's open bills, by due date. */
+  bills: Bill[];
+  accounts: { id: string; code: string; name: string; currency: string | null }[];
+  currencies: string[];
+  baseCurrency: string;
+  advice: WithholdingAdvice | null;
+  demo: boolean;
+}
+
+/** What the pay-bills screen offers: suppliers, the chosen one's open bills and withholding advice, accounts to pay from. */
+export async function getPayOptions(supplierId: string | null): Promise<PayOptions> {
+  await connection();
+  if (isDemoMode()) {
+    return { suppliers: [], supplier: null, bills: [], accounts: [], currencies: ["ETB"], baseCurrency: "ETB", advice: null, demo: true };
+  }
+  return withApi(async (ctx) => {
+    const [suppliers, accounts, currencies] = await Promise.all([ledgerly.suppliers({}, ctx), ledgerly.accounts(ctx), ledgerly.currencies(ctx)]);
+    const supplier = suppliers.data.find((s) => s.id === supplierId) ?? null;
+    const [bills, advice] = supplier
+      ? await Promise.all([ledgerly.openBills(supplier.id, ctx), ledgerly.withholdingAdvice(supplier.id, ctx)])
+      : [{ data: [] as Bill[] }, null];
+    return {
+      suppliers: suppliers.data.map((s) => ({ id: s.id, name: s.name })),
+      supplier: supplier ? { id: supplier.id, name: supplier.name, currency: supplier.currency, tax_id: supplier.tax_id } : null,
+      bills: bills.data,
+      accounts: accounts.data
+        .filter((a) => a.is_active && ["bank", "cash", "mobile_money"].includes(a.subtype ?? ""))
+        .map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })),
+      currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
+      baseCurrency: currencies.base_currency,
+      advice,
+      demo: false,
+    };
+  });
+}
+
+export async function getPaymentsMade(): Promise<PaymentReceived[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.paymentsMade(ctx))).data;
+}
+
+export async function getPaymentMade(id: string) {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.paymentMade(id, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export async function getApAgeing(asOf?: string): Promise<ArAgeing | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi((ctx) => ledgerly.apAgeing(asOf, ctx));
+}
+
+export async function getSupplierStatement(id: string, q: { from?: string; to?: string }) {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.supplierStatement(id, q, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 422)) return null;
+    throw error;
+  }
 }
 
 export async function getCreditNotes(): Promise<(Invoice & { original?: { id: string; number: string | null } | null })[]> {

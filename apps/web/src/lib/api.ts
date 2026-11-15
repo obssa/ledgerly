@@ -251,6 +251,17 @@ export interface InvoiceDetail extends Invoice {
   can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean };
 }
 
+/** GET /payments-made/withholding/{supplier}: what the country pack says about withholding on a payment to them. */
+export interface WithholdingAdvice {
+  applies: boolean;
+  rate: string | null;
+  code: string | null;
+  goods_above: string | null;
+  services_above: string | null;
+  note: string;
+  cash_limit: string | null;
+}
+
 /** A payment received (Module 2). Recorded once; reversed, never changed. */
 export interface PaymentReceived {
   id: string;
@@ -424,6 +435,20 @@ export const ledgerly = {
     api<Customer>(`customers/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   openInvoices: (contactId: string, ctx: RequestOptions) =>
     api<{ data: Invoice[] }>("invoices", { ...ctx, query: { contact_id: contactId, open: "1" } }),
+  openBills: (contactId: string, ctx: RequestOptions) =>
+    api<{ data: Bill[] }>("bills", { ...ctx, query: { contact_id: contactId, open: "1" } }),
+  paymentsMade: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-made", ctx),
+  paymentMade: (id: string, ctx: RequestOptions) =>
+    api<PaymentReceived & { withholding_certificate: string | null; contact?: { id: string; name: string; tax_id?: string | null; payout?: Payout }; can: { reverse: boolean } }>(
+      `payments-made/${encodeURIComponent(id)}`, ctx),
+  payBills: (body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<PaymentReceived & { warnings: { type: string; message: string }[] }>("payments-made", { ...ctx, method: "POST", body }),
+  reversePaymentMade: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
+    api<PaymentReceived>(`payments-made/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
+  withholdingAdvice: (supplierId: string, ctx: RequestOptions) => api<WithholdingAdvice>(`payments-made/withholding/${encodeURIComponent(supplierId)}`, ctx),
+  apAgeing: (asOf: string | undefined, ctx: RequestOptions) => api<ArAgeing>("reports/ap-ageing", { ...ctx, query: { as_of: asOf } }),
+  supplierStatement: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) =>
+    api<Omit<CustomerStatement, "customer"> & { supplier: CustomerStatement["customer"] }>(`suppliers/${encodeURIComponent(id)}/statement`, { ...ctx, query: q }),
   paymentsReceived: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-received", ctx),
   paymentReceived: (id: string, ctx: RequestOptions) => api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}`, ctx),
   receivePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<PaymentReceived>("payments-received", { ...ctx, method: "POST", body }),

@@ -87,6 +87,9 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
 
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
           {!bill.demo && <InvoiceActions invoice={bill} />}
+          {!bill.demo && ["posted", "part_paid"].includes(bill.status) && (
+            <Link href={`/payments-made/new?supplier=${encodeURIComponent(bill.contact.id)}`} className="btn justify-center">Pay this bill</Link>
+          )}
           <Card label="Pay to">
             <h2 className="text-[17px] font-bold">Pay to</h2>
             {payout.bank_name || payout.mobile_money_number ? (
