@@ -110,15 +110,15 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 
 **15 Nov 2026, in CI on every pull request (PostgreSQL 13, 16 and 18; PHP 8.3 and 8.4):**
 
-- **Database: 53 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 49 guard checks (T1–T42) and 4
+- **Database: 54 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 50 guard checks (T1–T43) and 4
   two-session concurrency checks (C1–C4).
-- **API: 133 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
+- **API: 143 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
   `ledgerly_web`, so row-level security applies (SECURITY.md S1). `TenantIsolationTest` covers every company route with
   company B's ids in the header, URL and body, and tests row-level security and the Eloquent scope each on its own;
   removing either one fails the suite.
 - **Shared hosting**: the feature tests also pass on PostgreSQL 13 with the role layout of the cPanel account (no role
   creation, `public` writable by everyone, tables in their own schema), in CI on every pull request.
-- **Web: 27 unit tests, lint (0 errors), production build.**
+- **Web: 30 unit tests, lint (0 errors), production build.**
 - **Production images** build and run: the API image migrated a database as the owner, served sign-up and company setup as
   `ledgerly_web`, and runs as a non-root user; the web image runs in demo mode or against the API from the same build.
 
@@ -130,7 +130,7 @@ touches 1 of 16 partitions).
 | Module | Built | Next |
 | --- | --- | --- |
 | 1 Company & Setup | Company setup; profile and settings (legal form, address, tax ID checked per country); the foundation of the books (base currency, calendar, fiscal year start, conversion date) fixed once anything is posted (database rule T38); period lock: accountants close, owners and admins reopen with a reason; foreign currencies and daily exchange rates (T39), a foreign-currency invoice takes the rate of its date and keeps it; opening trial balance on the conversion date (a difference goes to Opening balance equity, flagged; re-entry reverses and replaces); gapless document numbers given at posting (per fiscal year, in the company's calendar) or from a printed book, a posted number never changes (T40); locations, classes and projects on journal lines, only the company's own and of the right kind (T41); several companies under one organisation with a company switcher; every change audited | Data import; open invoices and bills at conversion (with the Customer and Supplier modules); invoice templates (with PDFs); central-bank rate feed |
-| 2 Customer | Customers: added by sales staff, edited and archived by accountants, owners and admins, never deleted (T42); tax ID checked per country; tax exemption with its reason; credit limit; open balance from posted invoices; invoices on screen on the company's own customers, accounts, tax rates and currencies (save, approve, send for approval, void), credit-limit warning on save and approval | Editing drafts on screen, invoice PDF, payments received, credit notes, statements, AR ageing |
+| 2 Customer | Customers: added by sales staff, edited and archived by accountants, owners and admins, never deleted (T42); tax ID checked per country; tax exemption with its reason; credit limit; open balance from posted invoices; invoices on screen on the company's own customers, accounts, tax rates and currencies (save, approve, send for approval, void), credit-limit warning on save and approval; payments received (cash, transfer, cheque, card, mobile money) settling one or more invoices, with tax withheld by the customer and bank fees, foreign currency at each invoice's own rate with the exchange difference booked, customer credit for anything not allocated, reversal of a bounced payment (T43) | Credit notes, editing drafts on screen, invoice PDF, statements, AR ageing |
 
 ## CI/CD
 
@@ -175,5 +175,5 @@ rules Claude Code follows in this repository.
 - Kenya pack and eTIMS connector: second country, not reviewed.
 - Billing provider integration that moves the subscription state machine; nightly `ledger_verify` and
   `audit_log_verify` jobs; load test at the plan's targets.
-- Turning the authenticator off or renewing recovery codes in the web app (the API has both), editing a draft invoice on screen, bills and expenses screens, payments UI, bank
+- Turning the authenticator off or renewing recovery codes in the web app (the API has both), editing a draft invoice on screen, bills and expenses screens, payments made, bank
   statement import and matching UI. Sign-in, sign-up, sign-out and company setup are built (`apps/web/src/app/(auth)`).

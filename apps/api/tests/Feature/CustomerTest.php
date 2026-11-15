@@ -29,7 +29,7 @@ final class CustomerTest extends TestCase
     {
         parent::setUp();
         config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
-        $this->c = $this->companyWithRecords('owner@example.test', 'Abyssinia Coffee');   // one posted invoice of 1,050.00
+        $this->c = $this->companyWithRecords('owner@example.test', 'Abyssinia Coffee');   // one posted invoice of 1,050.00, 50.00 paid
         $this->h = ['X-Company-Id' => $this->c['company']];
     }
 
@@ -76,10 +76,10 @@ final class CustomerTest extends TestCase
     public function test_the_open_balance_is_what_posted_invoices_still_owe(): void
     {
         $this->getJson("/api/v1/customers/{$this->c['contact']}", $this->h)->assertOk()
-            ->assertJsonPath('open_balance', '1050.00')
+            ->assertJsonPath('open_balance', '1000.00')
             ->assertJsonCount(1, 'recent_invoices')
-            ->assertJsonPath('recent_invoices.0.status', 'posted');
-        $this->getJson('/api/v1/customers?search=abyssinia', $this->h)->assertOk()->assertJsonPath('data.0.open_balance', '1050.00');
+            ->assertJsonPath('recent_invoices.0.status', 'part_paid');
+        $this->getJson('/api/v1/customers?search=abyssinia', $this->h)->assertOk()->assertJsonPath('data.0.open_balance', '1000.00');
         $this->getJson('/api/v1/customers?search=%25', $this->h)->assertOk()->assertJsonCount(0, 'data'); // % is a character, not a wildcard
     }
 

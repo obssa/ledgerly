@@ -992,6 +992,60 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T43: a payment is never changed or deleted; it settles only its own customer's invoices in its currency, and never
+-- more than it brought in (016)
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  INSERT INTO contacts (id, company_id, name, is_customer) VALUES ('00000000-0000-0000-0000-0000000000c4', app_company_id(), 'Other customer', true);
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e430', app_company_id(), 9430, '2027-06-30', 'ETB', 'invoice');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e430', 1, '00000000-0000-0000-0000-000000000a11', 1000, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e430', 2, '00000000-0000-0000-0000-000000000a40', 0, 1000);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due) VALUES
+    ('00000000-0000-0000-0000-0000000000d6', app_company_id(), 'invoice', 'INV-T43', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', 1000, 1000);
+  UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e430' WHERE id = '00000000-0000-0000-0000-0000000000d6';
+  -- 600 received + 30 withheld settles at most 630.
+  INSERT INTO payments (id, company_id, direction, contact_id, account_id, payment_date, method, currency, amount, withholding) VALUES
+    ('00000000-0000-0000-0000-0000000000e3', app_company_id(), 'in', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 600, 30),
+    ('00000000-0000-0000-0000-0000000000e4', app_company_id(), 'in', '00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 50, 0);
+
+  BEGIN
+    INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000d6', 630.01);
+    RAISE EXCEPTION 'FAIL T43a: a payment settled more than it brought in';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-0000000000d6', 10);
+    RAISE EXCEPTION 'FAIL T43b: one customer''s payment settled another customer''s invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000d6', 630);
+  IF (SELECT amount_due FROM documents WHERE id = '00000000-0000-0000-0000-0000000000d6') <> 370 THEN
+    RAISE EXCEPTION 'FAIL T43c: the invoice did not show 370 still due';
+  END IF;
+  BEGIN
+    UPDATE payment_allocations SET amount = 1 WHERE payment_id = '00000000-0000-0000-0000-0000000000e3';
+    RAISE EXCEPTION 'FAIL T43d: an allocation was edited';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE payments SET amount = 700 WHERE id = '00000000-0000-0000-0000-0000000000e3';
+    RAISE EXCEPTION 'FAIL T43e: a recorded payment''s amount changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM payments WHERE id = '00000000-0000-0000-0000-0000000000e4';
+    RAISE EXCEPTION 'FAIL T43f: a payment was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  -- Reversal: the allocations go (006 gives the amount back), then the payment is marked reversed.
+  DELETE FROM payment_allocations WHERE payment_id = '00000000-0000-0000-0000-0000000000e3';
+  UPDATE payments SET status = 'reversed' WHERE id = '00000000-0000-0000-0000-0000000000e3';
+  BEGIN
+    INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000d6', 10);
+    RAISE EXCEPTION 'FAIL T43g: a reversed payment settled an invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T43 payments are never changed or deleted and settle only their own customer''s invoices, never more than they brought in';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

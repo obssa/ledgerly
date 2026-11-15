@@ -8,6 +8,7 @@
 | periods.reopen     edit or void inside a closed period or fiscal year; owner and admin only (via '*')
 | invoices.approve   post an invoice; with settings.approval.invoice_above set, not your own above that amount
 | contacts.edit      change or archive a customer or supplier (sales and purchasing staff only view and add)
+| payments.receive   record a payment received; payments.reverse reverses one (accountant, owner, admin)
 | company.view       read the company profile and fiscal settings; every role
 | company.manage     change the profile and settings; owner and admin only (via '*')
 | periods.close      move the period lock date forward
@@ -20,12 +21,12 @@ return [
     'roles' => [
         'owner' => ['*'],
         'admin' => ['*'],
-        'accountant' => ['company.view', 'periods.close', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*'],
-        'bookkeeper' => ['company.view', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'banking.*', 'contacts.*', 'reports.view'],
-        'sales' => ['company.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive'],
+        'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*'],
+        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'banking.*', 'contacts.*', 'reports.view'],
+        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive'],
         'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create'],
-        'approver' => ['company.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'payments.approve'],
-        'viewer' => ['company.view', 'accounting.view', 'invoices.view', 'bills.view', 'reports.view'],
+        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'payments.approve'],
+        'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'reports.view'],
         'custom' => [],
     ],
 ];
