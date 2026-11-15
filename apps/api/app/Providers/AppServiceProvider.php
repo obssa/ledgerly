@@ -37,9 +37,16 @@ class AppServiceProvider extends ServiceProvider
 
         // Named limiters, each with its own counter. (Two unnamed `throttle:n,1` middlewares on one route share
         // a counter and count every request twice: the sign-in limit of 10 a minute was really 5.)
-        // Counted per signed-in user, otherwise per visitor address (ClientAddress), never per web server.
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(120)
-            ->by('api|' . ($request->user()?->getAuthIdentifier() ?? ClientAddress::of($request))));
+        // Counted per signed-in user, otherwise per visitor address (ClientAddress), never per web server. A shared
+        // demo account (config/demo.php) is counted per demo sign-in, so one visitor cannot use up the others' share.
+        RateLimiter::for('api', function (Request $request) {
+            $token = $request->user()?->currentAccessToken();
+            $key = $token !== null && ($token->name ?? null) === 'demo'
+                ? 'demo-token:' . $token->getKey()
+                : ($request->user()?->getAuthIdentifier() ?? ClientAddress::of($request));
+
+            return Limit::perMinute(120)->by('api|' . $key);
+        });
         RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)
             ->by('auth|' . ClientAddress::of($request)));
     }

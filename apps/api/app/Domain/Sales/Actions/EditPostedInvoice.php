@@ -45,8 +45,8 @@ final class EditPostedInvoice
 
     public function handle(Document $invoice, array $data, string $reason, string $userId, Membership $membership): Document
     {
-        if (! in_array($invoice->type, ['invoice', 'credit_note'], true) || ! $invoice->isPosted()) {
-            throw new LedgerException("Only posted invoices and credit notes are edited this way ({$invoice->number} is {$invoice->status}).");
+        if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill'], true) || ! $invoice->isPosted()) {
+            throw new LedgerException("Only posted invoices, credit notes and bills are edited this way ({$invoice->number} is {$invoice->status}).");
         }
         if ($invoice->status !== 'posted') {
             throw new LedgerException("{$invoice->number} has payments allocated to it. Remove the allocation first, then edit.");

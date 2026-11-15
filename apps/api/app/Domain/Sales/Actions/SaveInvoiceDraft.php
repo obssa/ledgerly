@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Creates or replaces a draft invoice: recalculates every line with the TaxCalculator on the server,
- * so totals never depend on what the browser sent.
+ * Creates or replaces a draft invoice, credit note or bill: recalculates every line with the TaxCalculator on the
+ * server, so totals never depend on what the browser sent.
  */
 final class SaveInvoiceDraft
 {
@@ -34,18 +34,18 @@ final class SaveInvoiceDraft
      *              lines: list<array{description: string, quantity: string, unit_price: string, discount_rate?: string,
      *                                account_id: string, tax_rate_id?: ?string, item_id?: ?string}>} $data
      */
-    public function handle(array $data, ?Document $document = null, ?string $userId = null, ?Document $original = null): Document
+    public function handle(array $data, ?Document $document = null, ?string $userId = null, ?Document $original = null, string $newType = 'invoice'): Document
     {
         if ($document && ! $document->isEditable()) {
             throw new LedgerException('Posted invoices are edited through EditPostedInvoice, which keeps their history.');
         }
 
-        return DB::transaction(function () use ($data, $document, $userId, $original) {
+        return DB::transaction(function () use ($data, $document, $userId, $original, $newType) {
             // A credit note corrects one invoice: its customer, currency and rate are the invoice's.
             if ($original === null && $document?->type === 'credit_note') {
                 $original = Document::query()->findOrFail($document->original_document_id);
             }
-            $type = $original !== null ? 'credit_note' : ($document->type ?? 'invoice');
+            $type = $original !== null ? 'credit_note' : ($document->type ?? $newType);
             if ($original !== null) {
                 $data['contact_id'] = $original->contact_id;
                 $data['currency'] = $original->currency;
@@ -89,15 +89,16 @@ final class SaveInvoiceDraft
         $number = isset($data['number']) && trim((string) $data['number']) !== '' ? trim((string) $data['number']) : null;
         $automatic = $this->numbers->isAutomatic($this->company->id(), $type);
 
+        $noun = $type === 'bill' ? 'bill' : 'invoice';
         if ($automatic && $number !== null) {
-            throw ValidationException::withMessages(['number' => ['Invoices are numbered when they are posted. Leave the number empty.']]);
+            throw ValidationException::withMessages(['number' => [ucfirst($noun) . 's are numbered when they are posted. Leave the number empty.']]);
         }
         if (! $automatic && $number === null) {
-            throw ValidationException::withMessages(['number' => ['Type the number from your invoice book.']]);
+            throw ValidationException::withMessages(['number' => ["Type the {$noun} number."]]);
         }
         if ($number !== null && Document::query()->where(['type' => $type, 'number' => $number])
             ->when($document, fn ($q) => $q->whereKeyNot($document->getKey()))->exists()) {
-            throw ValidationException::withMessages(['number' => ["{$number} is already used by another invoice."]]);
+            throw ValidationException::withMessages(['number' => ["{$number} is already used by another {$noun}."]]);
         }
 
         return $number;
@@ -171,6 +172,7 @@ final class SaveInvoiceDraft
                 'prices_include_tax' => $inclusive,
                 'language' => $data['language'] ?? 'en',
                 'notes' => $data['notes'] ?? null,
+                'reference' => isset($data['reference']) && trim((string) $data['reference']) !== '' ? trim((string) $data['reference']) : null,
             ],
             'lines' => $lineRows,
             'totals' => [

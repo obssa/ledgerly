@@ -18,9 +18,10 @@ use Illuminate\Validation\Rule;
  */
 final class TaxRateController extends Controller
 {
+    /** Every role reads the tax rates: every document form applies them. */
     public function index(CurrentCompany $current): JsonResponse
     {
-        $this->authorizeCompany('accounting.view');
+        $this->authorizeCompany('company.view');
 
         return response()->json(['data' => DB::table('tax_rates')
             ->where('company_id', $current->id())

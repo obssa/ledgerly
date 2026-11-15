@@ -139,6 +139,38 @@ export interface Contact {
   tax_id: string | null;
 }
 
+/** Where a supplier is paid: a bank account, a mobile-money wallet, or both. */
+export interface Payout {
+  bank_name?: string;
+  account_name?: string;
+  account_number?: string;
+  mobile_money_provider?: string;
+  mobile_money_number?: string;
+}
+
+/** Module 3: a contact the company buys from (contacts.is_vendor). */
+export interface Supplier {
+  id: string;
+  name: string;
+  tax_id: string | null;
+  email: string | null;
+  phone: string | null;
+  website?: string | null;
+  currency: string | null;
+  payment_terms_days: number;
+  address?: Address;
+  payout?: Payout;
+  default_expense_account_id: string | null;
+  withholding_exempt?: boolean;
+  withholding_exempt_reason?: string | null;
+  notes?: string | null;
+  is_active: boolean;
+  is_customer?: boolean;
+  open_balance: string;
+  recent_bills?: { id: string; number: string | null; reference: string | null; issue_date: string; due_date: string | null; currency: string; total: string; amount_due: string; status: string }[];
+  can?: { create: boolean; edit: boolean; bill?: boolean };
+}
+
 export interface InvoiceLine {
   line_no: number;
   description: string;
@@ -191,6 +223,21 @@ export interface TaxRate {
 }
 
 /** GET /invoices/{id}: the invoice, warnings that do not block, and what the signed-in member may do with it. */
+/** A supplier's bill (Module 3): posted to accounts payable; `reference` is the supplier's own invoice number. */
+export interface Bill extends Invoice {
+  reference: string | null;
+}
+
+export interface BillDetail extends Bill {
+  type: "bill";
+  fx_rate: string;
+  notes: string | null;
+  contact: Contact & { email?: string | null; payout?: Payout };
+  lines: InvoiceLine[];
+  warnings: { type: string; message: string; bill_id?: string }[];
+  can: { edit: boolean; approve: boolean; void: boolean };
+}
+
 export interface InvoiceDetail extends Invoice {
   type: "invoice" | "credit_note";
   /** A credit note names the invoice it corrects. */
@@ -385,6 +432,19 @@ export const ledgerly = {
   arAgeing: (asOf: string | undefined, ctx: RequestOptions) => api<ArAgeing>("reports/ar-ageing", { ...ctx, query: { as_of: asOf } }),
   customerStatement: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) =>
     api<CustomerStatement>(`customers/${encodeURIComponent(id)}/statement`, { ...ctx, query: q }),
+  suppliers: (q: { search?: string; include_archived?: string }, ctx: RequestOptions) =>
+    api<{ data: Supplier[]; can: { create: boolean; edit: boolean; bill: boolean } }>("suppliers", { ...ctx, query: q }),
+  supplier: (id: string, ctx: RequestOptions) => api<Supplier>(`suppliers/${encodeURIComponent(id)}`, ctx),
+  createSupplier: (body: Record<string, unknown>, ctx: RequestOptions) => api<Supplier>("suppliers", { ...ctx, method: "POST", body }),
+  updateSupplier: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<Supplier>(`suppliers/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  bills: (ctx: RequestOptions) => api<{ data: Bill[] }>("bills", ctx),
+  bill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}`, ctx),
+  createBill: (body: Record<string, unknown>, ctx: RequestOptions) => api<BillDetail>("bills", { ...ctx, method: "POST", body }),
+  approveBill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),
+  submitBill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
+  voidBill: (id: string, reason: string, ctx: RequestOptions) =>
+    api<BillDetail>(`bills/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),

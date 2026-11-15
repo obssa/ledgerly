@@ -6,7 +6,20 @@ import { Card } from "@/components/ui";
 import type { InvoiceOptions } from "@/lib/data";
 import { documentAmounts, lineAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { createBill } from "../../bills/actions";
 import { createInvoice } from "../actions";
+
+/** The words and postings that differ between a sales invoice and a supplier's bill; the form is the same. */
+const KIND = {
+  invoice: {
+    party: "Customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Number (from your invoice book)",
+    notes: "Notes for the customer (optional)", noun: "invoice", posting: [["Dr Accounts receivable", "total"], ["Cr Income", "subtotal"], ["Cr Tax payable", "tax"]],
+  },
+  bill: {
+    party: "Supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
+    notes: "Notes (optional)", noun: "bill", posting: [["Dr Expense or asset", "subtotal"], ["Dr VAT receivable", "tax"], ["Cr Accounts payable", "total"]],
+  },
+} as const;
 
 /** Kept for callers and tests that pass tax rates on their own. */
 export interface TaxRateOption {
@@ -38,8 +51,9 @@ const addDays = (date: string, days: number) => {
  * the same exact-decimal rules as the API (src/lib/decimal.ts mirrors TaxCalculator); the API recalculates on save,
  * and its numbers are the ones that post.
  */
-export function InvoiceForm({ options }: { options: InvoiceOptions }) {
-  const [state, action, pending] = useActionState(createInvoice, undefined);
+export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOptions; kind?: keyof typeof KIND }) {
+  const words = KIND[kind];
+  const [state, action, pending] = useActionState(kind === "bill" ? createBill : createInvoice, undefined);
   const today = new Date().toISOString().slice(0, 10);
   const firstRate = options.taxRates[0]?.id ?? "";
   const firstAccount = options.accounts[0]?.id ?? "";
@@ -68,8 +82,8 @@ export function InvoiceForm({ options }: { options: InvoiceOptions }) {
 
   if (options.customers.length === 0) {
     return (
-      <Card label="No customers yet">
-        <p className="text-sm">Add a customer first. <Link href="/customers/new" className="font-bold text-brand">New customer</Link></p>
+      <Card label={`No ${words.parties} yet`}>
+        <p className="text-sm">Add a {words.party.toLowerCase()} first. <Link href={words.newParty} className="font-bold text-brand">New {words.party.toLowerCase()}</Link></p>
       </Card>
     );
   }
@@ -79,22 +93,28 @@ export function InvoiceForm({ options }: { options: InvoiceOptions }) {
       <input type="hidden" name="lines" value={linesJson} />
       <div className="flex min-w-0 flex-[2_1_560px] flex-col gap-4">
         {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
-        <Card label="Customer and terms">
+        <Card label={`${words.party} and terms`}>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
             <div className="sm:col-span-2">
-              <label className="field-label" htmlFor="contact_id">Customer</label>
+              <label className="field-label" htmlFor="contact_id">{words.party}</label>
               <select className={`field ${bad("contact_id") ? "!border-bad" : ""}`} id="contact_id" name="contact_id" value={customerId}
                 onChange={(e) => {
                   setCustomerId(e.target.value);
                   const c = options.customers.find((x) => x.id === e.target.value);
                   if (c?.currency && options.currencies.includes(c.currency)) setCurrency(c.currency);
+                  // A supplier's usual expense account goes on the lines that still have the first account.
+                  const usual = c?.default_account_id;
+                  if (usual && options.accounts.some((a) => a.id === usual)) {
+                    setLines((ls) => ls.map((l) => (l.accountId === firstAccount ? { ...l, accountId: usual } : l)));
+                  }
                 }}>
-                <option value="">Choose a customer</option>
+                <option value="">Choose a {words.party.toLowerCase()}</option>
                 {options.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {customer && <p className="mt-1.5 text-[13px] text-muted">{customer.tax_id ? <>TIN <span className="num">{customer.tax_id}</span> · </> : "No TIN · "}Terms {customer.payment_terms_days} days</p>}
             </div>
-            {options.manualNumbers && <Field name="number" label="Number (from your invoice book)" invalid={bad("number")} />}
+            {kind === "bill" && <Field name="reference" label="Supplier's invoice number" hint="As printed on their invoice" invalid={bad("reference")} />}
+            {options.manualNumbers && <Field name="number" label={words.numberLabel} invalid={bad("number")} />}
             <div>
               <label className="field-label" htmlFor="issue_date">Issue date</label>
               <input className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
@@ -122,7 +142,7 @@ export function InvoiceForm({ options }: { options: InvoiceOptions }) {
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">Income account</th><th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+                <tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">{words.account}</th><th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
               </thead>
               <tbody>
                 {lines.map((l, i) => {
@@ -140,7 +160,7 @@ export function InvoiceForm({ options }: { options: InvoiceOptions }) {
                         </select>
                       </td>
                       <td>
-                        <select aria-label="Income account" className="field w-[160px]" value={l.accountId} onChange={(e) => update(l.key, { accountId: e.target.value })}>
+                        <select aria-label={words.account} className="field w-[160px]" value={l.accountId} onChange={(e) => update(l.key, { accountId: e.target.value })}>
                           {options.accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
                         </select>
                       </td>
@@ -162,7 +182,7 @@ export function InvoiceForm({ options }: { options: InvoiceOptions }) {
           </div>
         </Card>
         <Card label="Notes">
-          <label className="field-label" htmlFor="notes">Notes for the customer (optional)</label>
+          <label className="field-label" htmlFor="notes">{words.notes}</label>
           <textarea className="field min-h-[72px]" id="notes" name="notes" maxLength={2000} />
         </Card>
       </div>
@@ -171,13 +191,15 @@ export function InvoiceForm({ options }: { options: InvoiceOptions }) {
         <Card label="Posting preview">
           <h2 className="text-[17px] font-bold">On approval this posts</h2>
           <dl className="num mt-2 text-[13px]">
-            <div className="flex justify-between py-1"><dt>Dr Accounts receivable</dt><dd>{formatAmount(totals.total, currency)}</dd></div>
-            <div className="flex justify-between py-1"><dt>Cr Income</dt><dd>{formatAmount(totals.subtotal, currency)}</dd></div>
-            <div className="flex justify-between py-1"><dt>Cr Tax payable</dt><dd>{formatAmount(totals.tax, currency)}</dd></div>
+            {words.posting.map(([label, amount]) => (
+              <div key={label} className="flex justify-between py-1"><dt>{label}</dt><dd>{formatAmount(totals[amount], currency)}</dd></div>
+            ))}
           </dl>
           <p className="mt-3 text-[13px] text-muted">
-            {options.manualNumbers ? "The number is the one you type." : "The invoice gets its number when it is posted."} Where e-invoicing applies,
-            posting also sends it to the tax authority.
+            {options.manualNumbers ? "The number is the one you type." : `The ${words.noun} gets its number when it is posted.`}{" "}
+            {kind === "bill"
+              ? "VAT is reclaimable only when the company is VAT-registered; otherwise it is part of the cost."
+              : "Where e-invoicing applies, posting also sends it to the tax authority."}
           </p>
         </Card>
         {options.demo ? (

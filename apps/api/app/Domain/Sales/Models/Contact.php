@@ -8,7 +8,7 @@ use App\Domain\Tenancy\Models\BelongsToCompany;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
-/** Customers and vendors live in one table; a contact can be both. */
+/** Customers and suppliers live in one table; a contact can be both (is_customer, is_vendor). */
 class Contact extends Model
 {
     use BelongsToCompany;
@@ -17,6 +17,7 @@ class Contact extends Model
     protected $fillable = [
         'name', 'is_customer', 'is_vendor', 'tax_id', 'email', 'phone', 'website', 'currency', 'payment_terms_days',
         'address', 'custom_fields', 'credit_limit', 'tax_exempt', 'tax_exempt_reason', 'delivery_address', 'notes', 'is_active',
+        'payout', 'default_expense_account_id', 'withholding_exempt', 'withholding_exempt_reason',
     ];
 
     protected $hidden = ['company_id', 'custom_fields'];
@@ -31,6 +32,8 @@ class Contact extends Model
             'custom_fields' => 'array',
             'tax_exempt' => 'boolean',
             'is_active' => 'boolean',
+            'payout' => 'array',
+            'withholding_exempt' => 'boolean',
         ];
     }
 }

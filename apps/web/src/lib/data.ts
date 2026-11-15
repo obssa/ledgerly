@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Bill, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -24,7 +24,12 @@ async function withApi<T>(call: (ctx: { token: string; companyId: string }) => P
     if (error instanceof ApiError && error.status === 403 && (error.body as { type?: string } | null)?.type === "MfaEnrolmentRequired") {
       redirect("/security");
     }
-    if (error instanceof ApiError && (error.status === 400 || error.status === 403)) redirect("/onboarding"); // no usable company
+    // No usable company: not chosen yet, or not a member (any more).
+    if (error instanceof ApiError && (error.status === 400 || (error.status === 403 && (error.body as { type?: string } | null)?.type === "NotAMember"))) {
+      redirect("/onboarding");
+    }
+    // A member whose role does not include this page.
+    if (error instanceof ApiError && error.status === 403) redirect("/no-access");
     throw error;
   }
 }
@@ -100,7 +105,8 @@ export async function getCustomer(id: string): Promise<(Customer & { demo: boole
 }
 
 export interface InvoiceOptions {
-  customers: { id: string; name: string; tax_id: string | null; currency: string | null; payment_terms_days: number }[];
+  /** The customers for an invoice, the suppliers for a bill. */
+  customers: { id: string; name: string; tax_id: string | null; currency: string | null; payment_terms_days: number; default_account_id?: string | null }[];
   accounts: { id: string; code: string; name: string }[];
   taxRates: { id: string; code: string; name: string; rate: string }[];
   currencies: string[];
@@ -141,6 +147,78 @@ export async function getInvoiceOptions(): Promise<InvoiceOptions> {
       demo: false,
     };
   });
+}
+
+/** What the new-bill screen offers: active suppliers, cost accounts (expense, fixed asset, prepayment), VAT and TOT in force. */
+export async function getBillOptions(): Promise<InvoiceOptions> {
+  await connection();
+  if (isDemoMode()) {
+    return { customers: [], accounts: [], taxRates: demoTaxRates, currencies: ["ETB"], baseCurrency: "ETB", manualNumbers: false, demo: true };
+  }
+  return withApi(async (ctx) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const [suppliers, accounts, rates, currencies, numbering] = await Promise.all([
+      ledgerly.suppliers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
+    ]);
+    return {
+      customers: suppliers.data.map((s) => ({ id: s.id, name: s.name, tax_id: s.tax_id, currency: s.currency, payment_terms_days: s.payment_terms_days, default_account_id: s.default_expense_account_id })),
+      accounts: accounts.data
+        .filter((a) => a.is_active && (a.type === "expense" || (a.type === "asset" && ["fixed_asset", "prepayment"].includes(a.subtype ?? ""))))
+        .map((a) => ({ id: a.id, code: a.code, name: a.name })),
+      taxRates: rates.data
+        .filter((r) => (r.kind === "vat" || r.kind === "tot") && r.effective_from <= today && (r.effective_to === null || r.effective_to >= today))
+        .map((r) => ({ id: r.id, code: r.code, name: r.name, rate: r.rate })),
+      currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
+      baseCurrency: currencies.base_currency,
+      manualNumbers: numbering.data.find((n) => n.doc_type === "bill")?.mode === "manual",
+      demo: false,
+    };
+  });
+}
+
+export async function getSuppliers(q: { search?: string; archived?: boolean }): Promise<{ data: Supplier[]; can: { create: boolean; edit: boolean; bill: boolean }; demo: boolean }> {
+  await connection();
+  if (isDemoMode()) return { data: [], can: { create: false, edit: false, bill: false }, demo: true };
+  const result = await withApi((ctx) => ledgerly.suppliers({ search: q.search || undefined, include_archived: q.archived ? "1" : undefined }, ctx));
+  return { ...result, demo: false };
+}
+
+/** One supplier, or null when it is not one of this company's. */
+export async function getSupplier(id: string): Promise<(Supplier & { demo: boolean }) | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return { ...(await withApi((ctx) => ledgerly.supplier(id, ctx))), demo: false };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+/** Expense and asset accounts a supplier's bills may default to. */
+export async function getCostAccounts(): Promise<{ id: string; code: string; name: string }[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  const { data } = await withApi((ctx) => ledgerly.accounts(ctx));
+  return data.filter((a) => a.is_active && (a.type === "expense" || a.type === "asset")).map((a) => ({ id: a.id, code: a.code, name: a.name }));
+}
+
+export async function getBills(): Promise<Bill[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.bills(ctx))).data;
+}
+
+/** One bill, or null when it is not one of this company's. */
+export async function getBill(id: string): Promise<(BillDetail & { demo: boolean }) | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return { ...(await withApi((ctx) => ledgerly.bill(id, ctx))), demo: false };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 /** One invoice, or null when it is not one of this company's. */

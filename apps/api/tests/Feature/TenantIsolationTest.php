@@ -9,6 +9,8 @@ use App\Domain\Tenancy\Models\Company;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use App\Domain\Tenancy\Support\DatabaseTenantContext;
 use App\Models\User;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -44,6 +46,8 @@ final class TenantIsolationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Every company route, twice over, as one user: more than the API's 120 a minute. Not what this test is about.
+        $this->withoutMiddleware([ThrottleRequests::class, ThrottleRequestsWithRedis::class]);
         config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
 
         $this->b = $this->companyWithRecords('b@example.test', 'Company B Trading');
@@ -130,6 +134,13 @@ final class TenantIsolationTest extends TestCase
             'credit note for B\'s invoice' => ['POST', "/api/v1/invoices/{$this->b['invoice']}/credit-notes", ['issue_date' => '2026-11-05', 'notes' => 'Planted',
                 'lines' => [['description' => 'x', 'quantity' => '1', 'unit_price' => '1', 'account_id' => $this->a['sales']]]]],
             'credit applied to B\'s invoice' => ['POST', "/api/v1/credit-notes/{$this->a['credit_note']}/apply", ['invoice_id' => $this->b['invoice'], 'amount' => '1']],
+            'bill from B\'s supplier' => ['POST', '/api/v1/bills', ['contact_id' => $this->b['supplier'], 'issue_date' => '2026-11-05', 'currency' => 'ETB',
+                'lines' => [['description' => 'Rent', 'quantity' => '1', 'unit_price' => '10', 'account_id' => $this->a['rent']]]]],
+            'bill to B\'s expense account' => ['POST', '/api/v1/bills', ['contact_id' => $this->a['supplier'], 'issue_date' => '2026-11-05', 'currency' => 'ETB',
+                'lines' => [['description' => 'Rent', 'quantity' => '1', 'unit_price' => '10', 'account_id' => $this->b['rent']]]]],
+            'edit A\'s draft bill onto B\'s supplier' => ['PUT', "/api/v1/bills/{$this->a['bill']}", ['contact_id' => $this->b['supplier'], 'issue_date' => '2026-11-05', 'currency' => 'ETB',
+                'lines' => [['description' => 'Rent', 'quantity' => '1', 'unit_price' => '10', 'account_id' => $this->a['rent']]]]],
+            'supplier defaulting to B\'s account' => ['POST', '/api/v1/suppliers', ['name' => 'Planted', 'default_expense_account_id' => $this->b['rent']]],
             'transfer out of B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->b['bank'], 'to_account_id' => $this->a['bank'], 'amount' => '10']],
             'transfer into B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->a['bank'], 'to_account_id' => $this->b['bank'], 'amount' => '10']],
             'deposit into B\'s bank' => ['POST', '/api/v1/banking/deposits', ['date' => '2026-11-05', 'bank_account_id' => $this->b['bank'], 'receipts' => ['10']]],

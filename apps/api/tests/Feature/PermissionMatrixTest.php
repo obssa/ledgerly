@@ -42,12 +42,12 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/opening-balances' => 'accounting.view',
         'PUT api/v1/opening-balances' => 'accounting.opening',
 
-        'GET api/v1/accounts' => 'accounting.view',
+        'GET api/v1/accounts' => 'company.view',
         'GET api/v1/journal-entries' => 'accounting.view',
         'POST api/v1/journal-entries' => 'journals.create',
         'POST api/v1/journal-entries/{entry}/reverse' => 'journals.create',
 
-        'GET api/v1/tax-rates' => 'accounting.view',
+        'GET api/v1/tax-rates' => 'company.view',
         'POST api/v1/tax-rates' => 'tax.manage',
 
         'GET api/v1/customers' => 'contacts.view',
@@ -69,6 +69,21 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/invoices/{invoice}/credit-notes' => 'invoices.create',
         'GET api/v1/credit-notes' => 'invoices.view',
         'POST api/v1/credit-notes/{creditNote}/apply' => 'payments.receive',
+
+        'GET api/v1/suppliers' => 'contacts.view',
+        'POST api/v1/suppliers' => 'contacts.create',
+        'GET api/v1/suppliers/{supplier}' => 'contacts.view',
+        'PUT api/v1/suppliers/{supplier}' => 'contacts.edit',
+
+        'GET api/v1/bills' => 'bills.view',
+        'POST api/v1/bills' => 'bills.create',
+        'GET api/v1/bills/{bill}' => 'bills.view',
+        'PUT api/v1/bills/{bill}' => 'bills.create',   // a draft, as here; a posted bill asks for transactions.edit
+        'POST api/v1/bills/{bill}/submit' => 'bills.create',
+        'POST api/v1/bills/{bill}/reject' => 'bills.approve',
+        'POST api/v1/bills/{bill}/approve' => 'bills.approve',
+        'POST api/v1/bills/{bill}/void' => 'transactions.edit',
+        'GET api/v1/bills/{bill}/history' => 'bills.view',
 
         'GET api/v1/payments-received' => 'payments.view',
         'POST api/v1/payments-received' => 'payments.receive',
