@@ -101,6 +101,37 @@ export interface Dimension {
   is_active: boolean;
 }
 
+export interface Address {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  region?: string;
+  postal_code?: string;
+  country?: string;
+}
+
+/** A customer (Module 2). Amounts are decimal strings; open_balance is in the base currency. */
+export interface Customer {
+  id: string;
+  name: string;
+  tax_id: string | null;
+  email: string | null;
+  phone: string | null;
+  website?: string | null;
+  currency: string | null;
+  payment_terms_days: number;
+  credit_limit: string | null;
+  tax_exempt?: boolean;
+  tax_exempt_reason?: string | null;
+  address?: Address;
+  delivery_address?: Address;
+  notes?: string | null;
+  is_active: boolean;
+  open_balance: string;
+  recent_invoices?: { id: string; number: string | null; issue_date: string; due_date: string | null; currency: string; total: string; amount_due: string; status: string }[];
+  can?: { create: boolean; edit: boolean };
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -267,6 +298,12 @@ export const ledgerly = {
     api<Dimension>(`dimensions/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   numbering: (ctx: RequestOptions) => api<{ data: Numbering[] }>("numbering", ctx),
   saveNumbering: (body: Omit<Numbering, "next_number">, ctx: RequestOptions) => api<Numbering>("numbering", { ...ctx, method: "PUT", body }),
+  customers: (q: { search?: string; include_archived?: string }, ctx: RequestOptions) =>
+    api<{ data: Customer[]; can: { create: boolean; edit: boolean } }>("customers", { ...ctx, query: q }),
+  customer: (id: string, ctx: RequestOptions) => api<Customer>(`customers/${encodeURIComponent(id)}`, ctx),
+  createCustomer: (body: Record<string, unknown>, ctx: RequestOptions) => api<Customer>("customers", { ...ctx, method: "POST", body }),
+  updateCustomer: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<Customer>(`customers/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}`, ctx),
   approveInvoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}/approve`, { ...ctx, method: "POST" }),

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,7 +12,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
     label: "Money in",
     items: [
       { href: "/invoices", label: "Sales and invoices" },
-      { href: "/customers", label: "Customers", soon: true },
+      { href: "/customers", label: "Customers" },
       { href: "/products", label: "Products and services", soon: true },
     ],
   },
@@ -43,11 +43,13 @@ const groups: { label?: string; items: NavItem[] }[] = [
   },
 ];
 
+const footer: NavItem[] = [
+  { href: "/settings", label: "Company settings" },
+  { href: "/security", label: "Sign-in security" },
+];
+
 /** `company` is rendered on the server (CompanyBadge) and passed in, since this component runs in the browser. */
 export function Sidebar({ company }: { company: ReactNode }) {
-  const pathname = usePathname();
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
-
   return (
     <nav aria-label="Main" className="flex-[1_1_240px] max-w-full bg-side px-3.5 py-5 text-side-text lg:max-w-[260px]">
       <div className="flex items-center gap-2.5 px-3 pb-5">
@@ -60,6 +62,28 @@ export function Sidebar({ company }: { company: ReactNode }) {
 
       {company}
 
+      {/* On pages like /customers/[id] the path is known only per request: the menu shows without the highlight
+          until then, so the page itself can still be prerendered. */}
+      <Suspense fallback={<Links pathname={null} />}>
+        <CurrentLinks />
+      </Suspense>
+    </nav>
+  );
+}
+
+function CurrentLinks() {
+  return <Links pathname={usePathname()} />;
+}
+
+function Links({ pathname }: { pathname: string | null }) {
+  const isActive = (href: string) => pathname !== null && (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const cls = (href: string) =>
+    `flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium hover:bg-side-hover hover:text-white ${
+      isActive(href) ? "bg-side-hover font-bold text-white" : ""
+    }`;
+
+  return (
+    <>
       {groups.map((group, i) => (
         <div key={i} className={i === 0 ? "mt-3" : ""}>
           {group.label && <div className="px-3 pb-1.5 pt-[18px] text-[11px] font-bold uppercase tracking-[0.08em] text-side-label">{group.label}</div>}
@@ -69,9 +93,7 @@ export function Sidebar({ company }: { company: ReactNode }) {
               href={item.soon ? "#" : item.href}
               aria-current={isActive(item.href) ? "page" : undefined}
               aria-disabled={item.soon || undefined}
-              className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium hover:bg-side-hover hover:text-white ${
-                isActive(item.href) ? "bg-side-hover font-bold text-white" : ""
-              }`}
+              className={cls(item.href)}
             >
               {item.label}
               {item.soon && <span className="text-[10px] font-semibold uppercase tracking-wide text-side-label">soon</span>}
@@ -81,21 +103,12 @@ export function Sidebar({ company }: { company: ReactNode }) {
       ))}
 
       <div className="mt-[18px] border-t border-[#23493f] pt-3">
-        <Link
-          href="/settings"
-          aria-current={isActive("/settings") ? "page" : undefined}
-          className={`block rounded-lg px-3 py-2 text-sm font-medium hover:bg-side-hover hover:text-white ${isActive("/settings") ? "bg-side-hover font-bold text-white" : ""}`}
-        >
-          Company settings
-        </Link>
-        <Link
-          href="/security"
-          aria-current={isActive("/security") ? "page" : undefined}
-          className={`block rounded-lg px-3 py-2 text-sm font-medium hover:bg-side-hover hover:text-white ${isActive("/security") ? "bg-side-hover font-bold text-white" : ""}`}
-        >
-          Sign-in security
-        </Link>
+        {footer.map((item) => (
+          <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className={cls(item.href)}>
+            {item.label}
+          </Link>
+        ))}
       </div>
-    </nav>
+    </>
   );
 }

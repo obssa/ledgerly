@@ -16,8 +16,10 @@ class Contact extends Model
 
     protected $fillable = [
         'name', 'is_customer', 'is_vendor', 'tax_id', 'email', 'phone', 'website', 'currency', 'payment_terms_days',
-        'address', 'custom_fields',
+        'address', 'custom_fields', 'credit_limit', 'tax_exempt', 'tax_exempt_reason', 'delivery_address', 'notes', 'is_active',
     ];
+
+    protected $hidden = ['company_id', 'custom_fields'];
 
     protected function casts(): array
     {
@@ -25,7 +27,10 @@ class Contact extends Model
             'is_customer' => 'boolean',
             'is_vendor' => 'boolean',
             'address' => 'array',
+            'delivery_address' => 'array',
             'custom_fields' => 'array',
+            'tax_exempt' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 }
