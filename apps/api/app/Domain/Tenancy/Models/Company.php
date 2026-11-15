@@ -18,6 +18,7 @@ class Company extends Model
         'fiscal_year_start_month', 'calendar', 'accounting_basis', 'industry', 'tin',
         'vat_registered', 'vat_number', 'framework', 'conversion_date', 'books_closed_until', 'settings',
         'timezone', 'phone', 'email', 'website',
+        'legal_form', 'address_line1', 'address_line2', 'city', 'region', 'postal_code',
     ];
 
     protected function casts(): array

@@ -1,4 +1,4 @@
-import type { Invoice, ProfitAndLoss } from "./api";
+import type { CompanySettings, Invoice, ProfitAndLoss } from "./api";
 
 /** Sample data for demo mode (no LEDGERLY_API_URL). Fictional company and customers. */
 
@@ -9,6 +9,37 @@ export const demoCompany = {
   country_code: "ET",
   base_currency: "ETB",
   city: "Addis Ababa",
+};
+
+/** Company settings as GET /company returns them, for the demo company. */
+export const demoCompanySettings: CompanySettings = {
+  ...demoCompany,
+  version: "demo",
+  framework: "ifrs_sme",
+  status: "live",
+  legal_form: "private_limited",
+  industry: "retail_wholesale",
+  tin: "0012345678",
+  vat_registered: true,
+  vat_number: "1234567",
+  phone: "+251 11 555 0100",
+  email: "accounts@example.com",
+  website: null,
+  address_line1: "Bole Road",
+  address_line2: null,
+  region: "Addis Ababa",
+  postal_code: null,
+  timezone: "Africa/Addis_Ababa",
+  accounting_basis: "accrual",
+  calendar: "gregorian",
+  fiscal_year_start_month: 7,
+  conversion_date: "2026-07-07",
+  books_closed_until: "2026-09-30",
+  books_started: true,
+  locked_fields: ["base_currency", "calendar", "fiscal_year_start_month", "conversion_date"],
+  fiscal_years: [{ starts_on: "2026-07-08", ends_on: "2027-07-07", status: "open" }],
+  can: { manage: false, close_periods: false, reopen_periods: false },
+  options: { tax_id_label: "TIN", calendars: ["gregorian", "ethiopian"], legal_forms: ["sole_proprietor", "private_limited", "share_company"] },
 };
 
 const c = (id: string, name: string, tin: string | null = null) => ({ id, name, tax_id: tin });

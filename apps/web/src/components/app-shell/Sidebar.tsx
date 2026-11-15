@@ -74,8 +74,12 @@ export function Sidebar({ company }: { company: ReactNode }) {
       ))}
 
       <div className="mt-[18px] border-t border-[#23493f] pt-3">
-        <Link href="/onboarding" className="block rounded-lg px-3 py-2 text-sm font-medium hover:bg-side-hover hover:text-white">
-          Company setup
+        <Link
+          href="/settings"
+          aria-current={isActive("/settings") ? "page" : undefined}
+          className={`block rounded-lg px-3 py-2 text-sm font-medium hover:bg-side-hover hover:text-white ${isActive("/settings") ? "bg-side-hover font-bold text-white" : ""}`}
+        >
+          Company settings
         </Link>
         <Link
           href="/security"

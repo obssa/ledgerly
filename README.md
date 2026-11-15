@@ -108,22 +108,28 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 
 ## Verified
 
-**14 Nov 2026, first run of the Laravel layer (Docker, PostgreSQL 18, PHP 8.4) and in CI:**
+**15 Nov 2026, in CI on every pull request (PostgreSQL 13, 16 and 18; PHP 8.3 and 8.4):**
 
-- **Database: 48 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 44 guard checks (T1–T37) and 4
+- **Database: 49 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 45 guard checks (T1–T38) and 4
   two-session concurrency checks (C1–C4).
-- **API: 60 tests pass** (44 unit, 16 feature). Feature tests build the schema as the owner and run every request as
+- **API: 105 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
   `ledgerly_web`, so row-level security applies (SECURITY.md S1). `TenantIsolationTest` covers every company route with
   company B's ids in the header, URL and body, and tests row-level security and the Eloquent scope each on its own;
   removing either one fails the suite.
 - **Shared hosting**: the feature tests also pass on PostgreSQL 13 with the role layout of the cPanel account (no role
   creation, `public` writable by everyone, tables in their own schema), in CI on every pull request.
-- **Web: 10 unit tests, lint (0 errors), production build.**
+- **Web: 17 unit tests, lint (0 errors), production build.**
 - **Production images** build and run: the API image migrated a database as the owner, served sign-up and company setup as
   `ledgerly_web`, and runs as a non-root user; the web image runs in demo mode or against the API from the same build.
 
 Earlier, in the build sandbox: benchmark on 3.9 million lines / 300 companies (balances equal the ledger, partition pruning
 touches 1 of 16 partitions).
+
+## Feature progress (Release 1, in the order of the module document)
+
+| Module | Built | Next |
+| --- | --- | --- |
+| 1 Company & Setup | Company setup; profile and settings (legal form, address, tax ID checked per country); the foundation of the books (base currency, calendar, fiscal year start, conversion date) fixed once anything is posted (database rule T38); period lock: accountants close, owners and admins reopen with a reason; every change audited | Currencies and exchange rates, opening balances, numbering, locations and dimensions, company switcher, data import |
 
 ## CI/CD
 

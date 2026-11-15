@@ -54,6 +54,12 @@ final class CompanyController extends Controller
         $data = $request->validate([
             'legal_name' => ['required', 'string', 'max:200'],
             'trading_name' => ['nullable', 'string', 'max:200'],
+            'legal_form' => ['nullable', Rule::in(CompanySettingsController::LEGAL_FORMS)],
+            'address_line1' => ['nullable', 'string', 'max:200'],
+            'address_line2' => ['nullable', 'string', 'max:200'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'region' => ['nullable', 'string', 'max:100'],
+            'postal_code' => ['nullable', 'string', 'max:20'],
             'country_code' => ['required', 'string', 'size:2', 'alpha'],
             'base_currency' => ['nullable', Rule::in(Currency::all())],
             'industry' => ['nullable', Rule::in(array_keys(CountryPack::industries()))],

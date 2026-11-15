@@ -759,6 +759,47 @@ BEGIN
 END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false) \gset ignore_
 
+-- T38: the foundation of the books is fixed once anything is posted (011); company A has posted entries since T1
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false) \gset ignore_
+SELECT set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  UPDATE companies SET legal_form = 'private_limited', city = 'Addis Ababa', trading_name = 'A Trading' WHERE id = app_company_id();
+  IF NOT FOUND THEN RAISE EXCEPTION 'FAIL T38a: the owner could not change the profile'; END IF;
+  BEGIN
+    UPDATE companies SET base_currency = 'USD' WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T38b: the base currency changed after posting';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE companies SET fiscal_year_start_month = 7 WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T38c: the fiscal year start changed after posting';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE companies SET conversion_date = '2026-06-30' WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T38d: the conversion date changed after posting';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE companies SET legal_form = 'kingdom' WHERE id = app_company_id();
+    RAISE EXCEPTION 'FAIL T38e: an unknown legal form was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+END $$;
+RESET ROLE;
+DO $$ BEGIN
+  BEGIN
+    UPDATE companies SET calendar = 'ethiopian' WHERE id = '00000000-0000-0000-0000-00000000000a';
+    RAISE EXCEPTION 'FAIL T38f: the owner role changed the calendar after posting';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- Nothing posted yet: the foundation may still change.
+  INSERT INTO companies (id, organisation_id, legal_name, country_code, base_currency)
+    VALUES ('00000000-0000-0000-0000-0000000000d8', '00000000-0000-0000-0000-0000000000a0', 'Company D8', 'ET', 'ETB');
+  UPDATE companies SET base_currency = 'USD', fiscal_year_start_month = 7, calendar = 'ethiopian', conversion_date = '2026-07-07'
+   WHERE id = '00000000-0000-0000-0000-0000000000d8';
+  DELETE FROM companies WHERE id = '00000000-0000-0000-0000-0000000000d8';
+  RAISE NOTICE 'PASS T38 the foundation of the books is fixed once anything is posted, for every role';
+END $$;
+SET ROLE ledgerly_web;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

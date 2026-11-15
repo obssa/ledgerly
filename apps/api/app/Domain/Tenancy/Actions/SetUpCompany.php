@@ -28,7 +28,8 @@ final class SetUpCompany
      * @param array{organisation_id?: string, legal_name: string, trading_name?: ?string, country_code: string,
      *              industry?: ?string, tin?: ?string, vat_registered?: bool, vat_number?: ?string,
      *              calendar?: string, fiscal_year_start_month?: int, base_currency?: string, timezone?: string,
-     *              phone?: ?string, email?: ?string, website?: ?string, conversion_date?: ?string} $data
+     *              phone?: ?string, email?: ?string, website?: ?string, conversion_date?: ?string, legal_form?: ?string,
+     *              address_line1?: ?string, address_line2?: ?string, city?: ?string, region?: ?string, postal_code?: ?string} $data
      */
     public function handle(User $owner, array $data): Company
     {
@@ -68,6 +69,12 @@ final class SetUpCompany
                 'tin' => $data['tin'] ?? null,
                 'vat_registered' => $data['vat_registered'] ?? false,
                 'vat_number' => $data['vat_number'] ?? null,
+                'legal_form' => $data['legal_form'] ?? null,
+                'address_line1' => $data['address_line1'] ?? null,
+                'address_line2' => $data['address_line2'] ?? null,
+                'city' => $data['city'] ?? null,
+                'region' => $data['region'] ?? null,
+                'postal_code' => $data['postal_code'] ?? null,
             ]);
             $company->id = $companyId;
             $company->save();
