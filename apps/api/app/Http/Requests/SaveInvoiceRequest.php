@@ -5,11 +5,39 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Domain\Ledger\Currency;
+use App\Domain\Sales\Models\Document;
+use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class SaveInvoiceRequest extends FormRequest
 {
+    /**
+     * Checked before the rules below run: a form request validates before the controller's first line, so
+     * without this a role that may not save invoices got a validation answer (422) instead of a refusal
+     * (SECURITY.md S4, found by PermissionMatrixTest). The controller checks again.
+     */
+    public function authorize(): bool
+    {
+        $membership = app(CurrentCompany::class)->membership();
+
+        return $membership !== null && $membership->can($this->permission());
+    }
+
+    protected function failedAuthorization(): never
+    {
+        throw new HttpException(403, "Your role does not allow {$this->permission()}.");
+    }
+
+    /** Saving a draft needs invoices.create; changing a posted invoice needs transactions.edit. */
+    private function permission(): string
+    {
+        $invoice = $this->route('invoice');
+
+        return $invoice instanceof Document && $invoice->isPosted() ? 'transactions.edit' : 'invoices.create';
+    }
+
     public function rules(): array
     {
         return [
