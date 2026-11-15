@@ -1,8 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Company, type Invoice, type ProfitAndLoss } from "./api";
-import { demoCompany, demoInvoices, demoProfitAndLoss } from "./demo";
+import { ApiError, isDemoMode, ledgerly, type Company, type CompanySettings, type Invoice, type ProfitAndLoss } from "./api";
+import { demoCompany, demoCompanySettings, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
 /**
@@ -35,6 +35,13 @@ export async function getSecurityStatus(): Promise<{ mfaEnabled: boolean; demo: 
   if (isDemoMode()) return { mfaEnabled: false, demo: true };
   const { user } = await withApi(({ token }) => ledgerly.me(token));
   return { mfaEnabled: user.mfa_enabled, demo: false };
+}
+
+/** The profile and fiscal settings of the company being worked in. In the demo nothing can be changed. */
+export async function getCompanySettings(): Promise<CompanySettings & { demo: boolean }> {
+  await connection();
+  if (isDemoMode()) return { ...demoCompanySettings, demo: true };
+  return { ...(await withApi((ctx) => ledgerly.companySettings(ctx))), demo: false };
 }
 
 export async function getInvoices(): Promise<Invoice[]> {

@@ -11,6 +11,45 @@ export interface Company {
   base_currency: string;
 }
 
+/** GET /company: the profile and fiscal settings of the company being worked in (Module 1). */
+export interface CompanySettings {
+  id: string;
+  /** Send back on save: the API refuses the save (409) if someone else changed the settings first. */
+  version: string;
+  country_code: string;
+  framework: string;
+  status: string;
+  legal_name: string;
+  trading_name: string | null;
+  legal_form: string | null;
+  industry: string | null;
+  tin: string | null;
+  vat_registered: boolean;
+  vat_number: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  timezone: string;
+  accounting_basis: "accrual" | "cash";
+  base_currency: string;
+  calendar: "gregorian" | "ethiopian";
+  fiscal_year_start_month: number;
+  conversion_date: string | null;
+  /** Nothing may post on or before this date. */
+  books_closed_until: string | null;
+  /** True once anything is posted: the fields in locked_fields can no longer change. */
+  books_started: boolean;
+  locked_fields: string[];
+  fiscal_years: { starts_on: string; ends_on: string; status: string }[];
+  can: { manage: boolean; close_periods: boolean; reopen_periods: boolean };
+  options: { tax_id_label: string; calendars: string[]; legal_forms: string[] };
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -156,6 +195,10 @@ export const ledgerly = {
     api<{ token: string }>("auth/password", { method: "POST", body, token }),
   companies: (token: string) => api<{ data: Company[] }>("companies", { token }),
   createCompany: (body: Record<string, unknown>, token: string) => api<Company>("companies", { method: "POST", body, token }),
+  companySettings: (ctx: RequestOptions) => api<CompanySettings>("company", ctx),
+  saveCompanySettings: (body: Record<string, unknown>, ctx: RequestOptions) => api<CompanySettings>("company", { ...ctx, method: "PUT", body }),
+  setPeriodLock: (body: { books_closed_until: string | null; reason?: string }, ctx: RequestOptions) =>
+    api<{ books_closed_until: string | null }>("company/period-lock", { ...ctx, method: "PUT", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}`, ctx),
   approveInvoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}/approve`, { ...ctx, method: "POST" }),

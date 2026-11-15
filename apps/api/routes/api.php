@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
@@ -42,6 +43,10 @@ Route::prefix('v1')->group(function () {
         Route::get('company-options', [CompanyController::class, 'options']);
 
         Route::middleware(['company', 'idempotent'])->group(function () {
+            Route::get('company', [CompanySettingsController::class, 'show']);
+            Route::put('company', [CompanySettingsController::class, 'update']);
+            Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);
+
             Route::get('accounts', [LedgerController::class, 'accounts']);
             Route::get('journal-entries', [LedgerController::class, 'entries']);
             Route::post('journal-entries', [LedgerController::class, 'storeEntry']);
