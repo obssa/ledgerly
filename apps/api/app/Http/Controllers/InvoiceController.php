@@ -8,6 +8,7 @@ use App\Domain\Sales\Actions\ApproveInvoice;
 use App\Domain\Sales\Actions\EditPostedInvoice;
 use App\Domain\Sales\Actions\InvoiceWorkflow;
 use App\Domain\Sales\Actions\SaveInvoiceDraft;
+use App\Domain\Sales\CreditCheck;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Sales\Models\DocumentVersion;
 use App\Domain\Tenancy\Support\CurrentCompany;
@@ -18,6 +19,29 @@ use Illuminate\Support\Facades\DB;
 
 final class InvoiceController extends Controller
 {
+    public function __construct(private readonly CreditCheck $credit, private readonly CurrentCompany $current)
+    {
+    }
+
+    /**
+     * An invoice as the screens use it: the document, warnings that do not block (credit limit), and what the
+     * signed-in member may do with it (the API checks again on every call).
+     */
+    private function present(Document $invoice, int $status = 200): JsonResponse
+    {
+        $membership = $this->current->membership();
+
+        return response()->json([
+            ...$invoice->toArray(),
+            'warnings' => in_array($invoice->status, ['void', 'paid'], true) ? [] : $this->credit->warnings($this->current->get(), $invoice),
+            'can' => [
+                'edit' => (bool) $membership?->can($invoice->isPosted() ? 'transactions.edit' : 'invoices.create'),
+                'approve' => (bool) $membership?->can('invoices.approve'),
+                'void' => (bool) $membership?->can('transactions.edit'),
+            ],
+        ], $status);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('invoices.view');
@@ -37,14 +61,14 @@ final class InvoiceController extends Controller
     {
         $this->authorizeCompany('invoices.view');
 
-        return response()->json($invoice->load(['lines', 'contact', 'einvoiceSubmissions']));
+        return $this->present($invoice->load(['lines', 'contact:id,name,tax_id,email', 'einvoiceSubmissions']));
     }
 
     public function store(SaveInvoiceRequest $request, SaveInvoiceDraft $save): JsonResponse
     {
         $this->authorizeCompany('invoices.create');
 
-        return response()->json($save->handle($request->validated(), null, $request->user()->getKey()), 201);
+        return $this->present($save->handle($request->validated(), null, $request->user()->getKey()), 201);
     }
 
     /** Drafts are saved directly; posted invoices go through EditPostedInvoice, which keeps their history. */
@@ -53,13 +77,13 @@ final class InvoiceController extends Controller
         if (! $invoice->isPosted()) {
             $this->authorizeCompany('invoices.create');
 
-            return response()->json($save->handle($request->validated(), $invoice, $request->user()->getKey()));
+            return $this->present($save->handle($request->validated(), $invoice, $request->user()->getKey()));
         }
 
         $this->authorizeCompany('transactions.edit');
         $reason = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:500']])['reason'];
 
-        return response()->json($edit->handle(
+        return $this->present($edit->handle(
             $invoice, $request->validated(), $reason, $request->user()->getKey(), app(CurrentCompany::class)->membership(),
         ));
     }
@@ -100,7 +124,7 @@ final class InvoiceController extends Controller
         $this->authorizeCompany('invoices.approve');
         $version = $request->validate(['lock_version' => ['nullable', 'integer', 'min:1']])['lock_version'] ?? null;
 
-        return response()->json($approve->handle($invoice, $request->user()->getKey(), $version === null ? null : (int) $version));
+        return $this->present($approve->handle($invoice, $request->user()->getKey(), $version === null ? null : (int) $version));
     }
 
     /** Void a posted, unpaid invoice: its entry is reversed, the number is kept, the reason is audited. */

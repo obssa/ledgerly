@@ -1,0 +1,51 @@
+/**
+ * Turns the invoice form into the body of POST /invoices. The lines travel as one JSON field (the form edits them in
+ * the browser); anything that is not a list of lines becomes an empty list, so the API names the problem. Amounts
+ * stay decimal strings, thousands separators removed. Empty optional fields are left out.
+ */
+
+export interface InvoiceLineInput {
+  description: string;
+  quantity: string;
+  unit_price: string;
+  account_id: string;
+  tax_rate_id: string | null;
+}
+
+const clean = (v: unknown): string => (typeof v === "string" ? v.replace(/[,\s]/g, "") : "");
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+
+export function parseLines(json: FormDataEntryValue | null): InvoiceLineInput[] {
+  if (typeof json !== "string") return [];
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 500).map((l: Record<string, unknown>) => ({
+    description: str(l?.description),
+    quantity: clean(l?.quantity),
+    unit_price: clean(l?.unit_price),
+    account_id: str(l?.account_id),
+    tax_rate_id: str(l?.tax_rate_id) || null,
+  }));
+}
+
+export function invoiceBody(form: FormData): Record<string, unknown> {
+  const value = (name: string) => {
+    const v = form.get(name);
+    return typeof v === "string" ? v.trim() : "";
+  };
+  const body: Record<string, unknown> = {
+    contact_id: value("contact_id"),
+    issue_date: value("issue_date"),
+    currency: value("currency"),
+    prices_include_tax: form.get("prices_include_tax") === "on",
+    lines: parseLines(form.get("lines")),
+  };
+  for (const name of ["due_date", "notes", "number"]) if (value(name) !== "") body[name] = value(name);
+  if (clean(form.get("fx_rate")) !== "") body.fx_rate = clean(form.get("fx_rate"));
+  return body;
+}

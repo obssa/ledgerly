@@ -1,8 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Customer, type Dimension, type Invoice, type Numbering, type OpeningBalances, type ProfitAndLoss } from "./api";
-import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
+import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Customer, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type ProfitAndLoss } from "./api";
+import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
 /**
@@ -93,6 +93,62 @@ export async function getCustomer(id: string): Promise<(Customer & { demo: boole
   }
   try {
     return { ...(await withApi((ctx) => ledgerly.customer(id, ctx))), demo: false };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export interface InvoiceOptions {
+  customers: { id: string; name: string; tax_id: string | null; currency: string | null; payment_terms_days: number }[];
+  accounts: { id: string; code: string; name: string }[];
+  taxRates: { id: string; code: string; name: string; rate: string }[];
+  currencies: string[];
+  baseCurrency: string;
+  /** Manual numbering: the number is typed from the invoice book. */
+  manualNumbers: boolean;
+  demo: boolean;
+}
+
+/** What the new-invoice screen offers: active customers, income accounts, sales tax rates in force, currencies. */
+export async function getInvoiceOptions(): Promise<InvoiceOptions> {
+  await connection();
+  if (isDemoMode()) {
+    return {
+      customers: demoCustomers.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days })),
+      accounts: [{ id: "sales", code: "4000", name: "Sales" }],
+      taxRates: demoTaxRates,
+      currencies: ["ETB", "USD"],
+      baseCurrency: "ETB",
+      manualNumbers: false,
+      demo: true,
+    };
+  }
+  return withApi(async (ctx) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const [customers, accounts, rates, currencies, numbering] = await Promise.all([
+      ledgerly.customers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
+    ]);
+    return {
+      customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days })),
+      accounts: accounts.data.filter((a) => a.type === "income" && a.is_active).map((a) => ({ id: a.id, code: a.code, name: a.name })),
+      taxRates: rates.data
+        .filter((r) => r.kind !== "withholding" && r.effective_from <= today && (r.effective_to === null || r.effective_to >= today))
+        .map((r) => ({ id: r.id, code: r.code, name: r.name, rate: r.rate })),
+      currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
+      baseCurrency: currencies.base_currency,
+      manualNumbers: numbering.data.find((n) => n.doc_type === "invoice")?.mode === "manual",
+      demo: false,
+    };
+  });
+}
+
+/** One invoice, or null when it is not one of this company's. */
+export async function getInvoice(id: string): Promise<(InvoiceDetail & { demo: boolean }) | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return { ...(await withApi((ctx) => ledgerly.invoice(id, ctx))), demo: false };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
