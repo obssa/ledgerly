@@ -20,7 +20,7 @@ class Document extends Model
 
     protected $fillable = [
         'type', 'number', 'contact_id', 'issue_date', 'due_date', 'currency', 'fx_rate', 'prices_include_tax',
-        'language', 'notes', 'location_id', 'custom_fields', 'created_by', 'original_document_id',
+        'language', 'notes', 'location_id', 'custom_fields', 'created_by', 'original_document_id', 'reference',
     ];
 
     protected function casts(): array

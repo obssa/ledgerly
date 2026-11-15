@@ -22,6 +22,7 @@ return [
         'accountant' => ['label' => 'Accountant', 'about' => 'Books, periods, rates, every document'],
         'bookkeeper' => ['label' => 'Bookkeeper', 'about' => 'Day-to-day entries; approval needed to post'],
         'sales' => ['label' => 'Sales', 'about' => 'Customers, draft invoices, payments received'],
+        'purchasing' => ['label' => 'Purchasing', 'about' => 'Suppliers and draft bills'],
         'approver' => ['label' => 'Approver', 'about' => 'Reviews and approves invoices'],
         'viewer' => ['label' => 'Viewer', 'about' => 'Read-only, including reports'],
     ],

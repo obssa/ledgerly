@@ -45,7 +45,7 @@ export function invoiceBody(form: FormData): Record<string, unknown> {
     prices_include_tax: form.get("prices_include_tax") === "on",
     lines: parseLines(form.get("lines")),
   };
-  for (const name of ["due_date", "notes", "number"]) if (value(name) !== "") body[name] = value(name);
+  for (const name of ["due_date", "notes", "number", "reference"]) if (value(name) !== "") body[name] = value(name);
   if (clean(form.get("fx_rate")) !== "") body.fx_rate = clean(form.get("fx_rate"));
   return body;
 }

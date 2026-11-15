@@ -25,9 +25,10 @@ final class LedgerController extends Controller
     {
     }
 
+    /** The chart of accounts, without balances: every role reads it, because every document form names accounts. */
     public function accounts(): JsonResponse
     {
-        $this->authorizeCompany('accounting.view');
+        $this->authorizeCompany('company.view');
 
         return response()->json(['data' => Account::query()->orderBy('code')->get()]);
     }

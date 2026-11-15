@@ -1109,6 +1109,39 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T46: sales documents name a customer and purchase documents a supplier; a supplier's default account is the
+-- company's own expense or asset account; a withholding exemption names its certificate (019).
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  INSERT INTO contacts (id, company_id, name, is_vendor) VALUES ('00000000-0000-0000-0000-0000000000c7', app_company_id(), 'Coffee farm', true);
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency) VALUES (app_company_id(), 'bill', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB');
+    RAISE EXCEPTION 'FAIL T46a: a bill was stored for a customer who is not a supplier';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency) VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c7', '2027-06-30', 'ETB');
+    RAISE EXCEPTION 'FAIL T46b: an invoice was stored for a supplier who is not a customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO documents (company_id, type, contact_id, issue_date, currency, reference) VALUES (app_company_id(), 'bill', '00000000-0000-0000-0000-0000000000c7', '2027-06-30', 'ETB', 'F-1182');
+  BEGIN
+    UPDATE contacts SET default_expense_account_id = '00000000-0000-0000-0000-000000000a40' WHERE id = '00000000-0000-0000-0000-0000000000c7';
+    RAISE EXCEPTION 'FAIL T46c: an income account became a supplier''s default expense account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE contacts SET default_expense_account_id = '00000000-0000-0000-0000-000000000b11' WHERE id = '00000000-0000-0000-0000-0000000000c7';
+    RAISE EXCEPTION 'FAIL T46d: another company''s account became a supplier''s default account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE contacts SET withholding_exempt = true WHERE id = '00000000-0000-0000-0000-0000000000c7';
+    RAISE EXCEPTION 'FAIL T46e: a withholding exemption was stored without its certificate';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE contacts SET withholding_exempt = true, withholding_exempt_reason = 'Certificate WHT-EX-2027-114' WHERE id = '00000000-0000-0000-0000-0000000000c7';
+  RAISE NOTICE 'PASS T46 sales documents name customers, bills name suppliers, and supplier defaults stay in the company';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

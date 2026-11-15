@@ -67,6 +67,8 @@ final class DemoLoginTest extends TestCase
         $invoices = $this->withToken($token)->getJson('/api/v1/invoices', $h)->assertOk()->json('data');
         $this->assertCount(7, $invoices, 'six posted invoices and a draft');
         $this->withToken($token)->getJson('/api/v1/credit-notes', $h)->assertOk()->assertJsonCount(1, 'data');
+        $bills = collect($this->withToken($token)->getJson('/api/v1/bills', $h)->assertOk()->json('data'));
+        $this->assertSame(['awaiting_approval', 'posted', 'posted', 'posted'], $bills->pluck('status')->sort()->values()->all(), 'suppliers and bills too');
         $ageing = $this->withToken($token)->getJson('/api/v1/reports/ar-ageing', $h)->assertOk();
         $this->assertNotSame('0.00', $ageing->json('totals.total'));
 
@@ -130,7 +132,7 @@ final class DemoLoginTest extends TestCase
         $this->assertSame(1, $this->owner()->table('companies')->count());
 
         // A role added to the configuration later gets its account on the next run.
-        config(['demo.roles.purchasing' => ['label' => 'Purchasing', 'about' => 'Suppliers and bills']]);
+        config(['demo.roles.admin' => ['label' => 'Admin', 'about' => 'Everything']]);
         app(DemoSetup::class)->run(fn () => null);
         $this->assertSame($users + 1, $this->owner()->table('users')->count());
     }

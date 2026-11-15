@@ -1,12 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
-import type { InvoiceDetail } from "@/lib/api";
+import type { BillDetail, InvoiceDetail } from "@/lib/api";
+import { billAction } from "../../bills/actions";
 import { invoiceAction } from "../actions";
 
-/** What can be done with this invoice now, for this role. The API checks again on every call. */
-export function InvoiceActions({ invoice }: { invoice: InvoiceDetail }) {
-  const [state, action, pending] = useActionState(invoiceAction, undefined);
+/** What can be done with this invoice or bill now, for this role. The API checks again on every call. */
+export function InvoiceActions({ invoice }: { invoice: InvoiceDetail | BillDetail }) {
+  const bill = invoice.type === "bill";
+  const [state, action, pending] = useActionState(bill ? billAction : invoiceAction, undefined);
   const open = invoice.status === "draft" || invoice.status === "awaiting_approval";
   const posted = invoice.status === "posted";
   // A registered e-invoice is corrected with a credit note, not voided (tax-authority rule; the API refuses too).
@@ -42,8 +44,10 @@ export function InvoiceActions({ invoice }: { invoice: InvoiceDetail }) {
           <input type="hidden" name="action" value="void" />
           <label className="field-label" htmlFor="reason">Void: reason</label>
           <input className="field" id="reason" name="reason" minLength={3} maxLength={500} />
-          <p className="mt-1.5 text-[13px] text-muted">The entry is reversed and the number kept. A registered e-invoice is corrected with a credit note instead.</p>
-          <button type="submit" className="btn mt-2" disabled={pending}>Void invoice</button>
+          <p className="mt-1.5 text-[13px] text-muted">
+            The entry is reversed and the number kept.{bill ? "" : " A registered e-invoice is corrected with a credit note instead."}
+          </p>
+          <button type="submit" className="btn mt-2" disabled={pending}>{bill ? "Void bill" : "Void invoice"}</button>
         </form>
       )}
     </div>

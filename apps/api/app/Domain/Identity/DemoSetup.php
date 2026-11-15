@@ -56,6 +56,8 @@ final class DemoSetup
             $say("Created the demo company {$company}.");
         }
 
+        $this->addPurchases($owner, $company, $say);
+
         foreach ($roles as $role) {
             if ($owner->table('demo_accounts')->where('role', $role)->exists()) {
                 continue;
@@ -115,12 +117,72 @@ final class DemoSetup
         return $this->company;
     }
 
-    /** Sample books inside the current fiscal year: opening balances, customers, invoices in every state, payments. */
-    private function books(DateTimeImmutable $today, DateTimeImmutable $fiscalStart): void
+    /** A date inside the sample window (the last 85 days, within the current fiscal year): 0 is its start, 1 today. */
+    private function dayIn(DateTimeImmutable $today, DateTimeImmutable $fiscalStart): \Closure
     {
         $from = max($fiscalStart, $today->modify('-85 days'));
         $span = (int) $from->diff($today)->days;
-        $day = fn (float $f): string => $from->modify('+' . (int) floor($f * $span) . ' days')->format('Y-m-d');
+
+        return fn (float $f): string => $from->modify('+' . (int) floor($f * $span) . ' days')->format('Y-m-d');
+    }
+
+    /**
+     * Module 3 sample: suppliers and bills. Added to a demo company that has no supplier yet, so a demo set up before
+     * suppliers existed gets them on the next deploy.
+     */
+    private function addPurchases(ConnectionInterface $owner, string $company, callable $say): void
+    {
+        if ($owner->table('contacts')->where(['company_id' => $company, 'is_vendor' => true])->exists()) {
+            return;
+        }
+        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
+        $this->company = $company;
+
+        try {
+            $today = new DateTimeImmutable('today');
+            $day = $this->dayIn($today, (new FiscalCalendar('gregorian', 7))->yearContaining($today)['start']);
+            $accounts = collect($this->call('GET', 'accounts')['data']);
+            $account = fn (string $code): string => $accounts->firstWhere('code', $code)['id'];
+            $vat = collect($this->call('GET', 'tax-rates')['data'])->firstWhere('code', 'VAT15')['id'];
+
+            $supplier = fn (array $s): string => $this->call('POST', 'suppliers', $s)['id'];
+            $telecom = $supplier(['name' => 'Ethio Telecom', 'tax_id' => '0000030603', 'payment_terms_days' => 15, 'default_expense_account_id' => $account('6300'),
+                'payout' => ['bank_name' => 'Commercial Bank of Ethiopia', 'account_name' => 'Ethio Telecom', 'account_number' => '1000004567891']]);
+            $farmers = $supplier(['name' => 'Yirgacheffe Coffee Farmers Cooperative Union', 'tax_id' => '0011223344', 'payment_terms_days' => 30,
+                'default_expense_account_id' => $account('5000'), 'payout' => ['bank_name' => 'Cooperative Bank of Oromia', 'account_number' => '1023400098765'],
+                'withholding_exempt' => true, 'withholding_exempt_reason' => 'Cooperative exemption certificate WHT-EX-2026-031']);
+            $packaging = $supplier(['name' => 'Addis Packaging PLC', 'payment_terms_days' => 30, 'default_expense_account_id' => $account('6800'),
+                'payout' => ['mobile_money_provider' => 'telebirr', 'mobile_money_number' => '+251 911 234 567']]);
+
+            $bill = function (string $contact, float $f, int $terms, string $ref, array $lines, bool $post = true, bool $submit = false) use ($day): void {
+                $issued = $day($f);
+                $id = $this->call('POST', 'bills', ['contact_id' => $contact, 'issue_date' => $issued, 'reference' => $ref, 'currency' => 'ETB',
+                    'due_date' => (new DateTimeImmutable($issued))->modify("+{$terms} days")->format('Y-m-d'), 'lines' => $lines])['id'];
+                if ($submit) {
+                    $this->call('POST', "bills/{$id}/submit");
+                } elseif ($post) {
+                    $this->call('POST', "bills/{$id}/approve");
+                }
+            };
+            $line = fn (string $what, string $qty, string $price, string $acc, ?string $tax) => [
+                'description' => $what, 'quantity' => $qty, 'unit_price' => $price, 'account_id' => $account($acc), 'tax_rate_id' => $tax,
+            ];
+
+            $bill($farmers, 0.1, 30, 'YCFCU-2291', [$line('Green coffee, Yirgacheffe grade 1 (kg)', '400', '450', '5000', null)]);   // 180,000.00, overdue
+            $bill($telecom, 0.35, 15, 'ET-8823140', [$line('Internet and phone lines', '1', '3200', '6300', $vat)]);                   // 3,680.00, overdue
+            $bill($telecom, 0.7, 15, 'ET-8869902', [$line('Internet and phone lines', '1', '3200', '6300', $vat)]);                    // 3,680.00
+            $bill($packaging, 0.9, 30, 'AP-0457', [$line('Coffee bags, 1 kg, printed', '2000', '12', '6800', $vat)], submit: true);   // awaiting approval
+        } finally {
+            $user->tokens()->where('name', 'demo-setup')->delete();
+        }
+        $say('Added the demo suppliers and bills.');
+    }
+
+    /** Sample books inside the current fiscal year: opening balances, customers, invoices in every state, payments. */
+    private function books(DateTimeImmutable $today, DateTimeImmutable $fiscalStart): void
+    {
+        $day = $this->dayIn($today, $fiscalStart);
 
         $accounts = collect($this->call('GET', 'accounts')['data']);
         $account = fn (string $code): string => $accounts->firstWhere('code', $code)['id'];

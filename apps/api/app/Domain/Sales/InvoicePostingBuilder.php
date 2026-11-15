@@ -10,10 +10,11 @@ use App\Domain\Ledger\Money;
 use DateTimeImmutable;
 
 /**
- * Turns an approved sales invoice (or credit note) into a balanced journal draft:
+ * Turns an approved invoice, credit note or bill into a balanced journal draft:
  *
  *   Invoice:      Dr Accounts receivable (total)   Cr Income per account   Cr Tax payable per tax account
  *   Credit note:  the same lines with sides swapped
+ *   Bill:         Cr Accounts payable (total)      Dr Expense or asset per account   Dr VAT receivable
  *
  * Foreign-currency documents: each credit group is converted to the base currency first and the receivable
  * is the sum of the converted credits, so rounding can never unbalance the entry.
@@ -35,15 +36,19 @@ final class InvoicePostingBuilder
         string $receivableAccountId,
         array $lines,
         bool $isCreditNote = false,
+        ?string $sourceType = null,
     ): JournalDraft {
+        $sourceType ??= $isCreditNote ? 'credit_note' : 'invoice';
+        // The control account (receivable or payable) is debited for an invoice, credited for a credit note or a bill.
+        $controlOnCredit = in_array($sourceType, ['credit_note', 'bill'], true);
         $draft = new JournalDraft(
             companyId: $companyId,
             date: $issueDate,
             baseCurrency: $baseCurrency,
             currency: $currency,
             fxRate: $fxRate,
-            memo: ($isCreditNote ? 'Credit note ' : 'Invoice ') . $documentNumber,
-            sourceType: $isCreditNote ? 'credit_note' : 'invoice',
+            memo: ['invoice' => 'Invoice ', 'credit_note' => 'Credit note ', 'bill' => 'Bill '][$sourceType] . $documentNumber,
+            sourceType: $sourceType,
             sourceId: $documentId,
         );
 
@@ -73,12 +78,12 @@ final class InvoicePostingBuilder
             $creditLines[] = [$accountId, $baseAmount, $txnAmount];
         }
 
-        $draft->add($isCreditNote
+        $draft->add($controlOnCredit
             ? JournalLineDraft::credit($receivableAccountId, $receivableBase, $receivableTxn, $documentNumber, $customerId)
             : JournalLineDraft::debit($receivableAccountId, $receivableBase, $receivableTxn, $documentNumber, $customerId));
 
         foreach ($creditLines as [$accountId, $base, $txn]) {
-            $draft->add($isCreditNote
+            $draft->add($controlOnCredit
                 ? JournalLineDraft::debit($accountId, $base, $txn, $documentNumber, $customerId)
                 : JournalLineDraft::credit($accountId, $base, $txn, $documentNumber, $customerId));
         }

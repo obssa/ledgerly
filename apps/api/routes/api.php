@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankingController;
+use App\Http\Controllers\BillController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CreditNoteController;
@@ -16,7 +17,10 @@ use App\Http\Controllers\MfaController;
 use App\Http\Controllers\NumberingController;
 use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\PaymentReceivedController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TaxRateController;
+use App\Domain\Sales\Models\Document;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -25,6 +29,16 @@ use Illuminate\Support\Facades\Route;
 | Every authenticated request is one database transaction with the tenant set (RunInTenantTransaction).
 | POST and PUT requests may send an Idempotency-Key header and are then safe to repeat (Idempotency).
 */
+
+/*
+| Invoices and bills share one table. Each route finds only its own kind, so a bill's id on an invoice route is not
+| found, and the other way round. Resolved inside the request's tenant transaction, through the company-scoped model.
+*/
+$documentOf = fn (array $types) => fn (string $id) => Str::isUuid($id)
+    ? Document::query()->whereIn('type', $types)->findOrFail($id)
+    : abort(404);
+Route::bind('invoice', $documentOf(['invoice', 'credit_note']));
+Route::bind('bill', $documentOf(['bill']));
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
@@ -103,6 +117,21 @@ Route::prefix('v1')->group(function () {
             Route::post('invoices/{invoice}/credit-notes', [CreditNoteController::class, 'store']);
             Route::get('credit-notes', [CreditNoteController::class, 'index']);
             Route::post('credit-notes/{creditNote}/apply', [CreditNoteController::class, 'apply']);
+
+            Route::get('suppliers', [SupplierController::class, 'index']);
+            Route::post('suppliers', [SupplierController::class, 'store']);
+            Route::get('suppliers/{supplier}', [SupplierController::class, 'show']);
+            Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
+
+            Route::get('bills', [BillController::class, 'index']);
+            Route::post('bills', [BillController::class, 'store']);
+            Route::get('bills/{bill}', [BillController::class, 'show']);
+            Route::put('bills/{bill}', [BillController::class, 'update']);
+            Route::post('bills/{bill}/submit', [BillController::class, 'submit']);
+            Route::post('bills/{bill}/reject', [BillController::class, 'reject']);
+            Route::post('bills/{bill}/approve', [BillController::class, 'approve']);
+            Route::post('bills/{bill}/void', [BillController::class, 'void']);
+            Route::get('bills/{bill}/history', [BillController::class, 'history']);
 
             Route::get('payments-received', [PaymentReceivedController::class, 'index']);
             Route::post('payments-received', [PaymentReceivedController::class, 'store']);

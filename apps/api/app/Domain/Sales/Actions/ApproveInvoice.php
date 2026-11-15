@@ -22,11 +22,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Approve = post to the ledger + queue tax-authority clearance, in one transaction.
+ * Approve = post to the ledger + queue tax-authority clearance (invoices and credit notes), in one transaction.
+ * Bills post the same way, to accounts payable, with no clearance: the supplier registers its own invoice.
  * State machine: draft or awaiting_approval -> posted.
  *
- * The one optional approval step: when the company sets settings.approval.invoice_above, an invoice
- * above that amount cannot be approved by the person who created it.
+ * The one optional approval step: when the company sets settings.approval.invoice_above (bill_above for bills),
+ * a document above that amount cannot be approved by the person who created it.
  *
  * The clearance job leaves only after the request's transaction commits, retries on its own, and stores
  * the registration number and QR. The response therefore shows the submission as queued; the client
@@ -46,8 +47,8 @@ final class ApproveInvoice
 
     public function handle(Document $invoice, ?string $userId = null, ?int $lockVersion = null): Document
     {
-        if (! in_array($invoice->type, ['invoice', 'credit_note'], true)) {
-            throw new LedgerException("Document {$invoice->label()} is not an invoice or credit note.");
+        if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill'], true)) {
+            throw new LedgerException("Document {$invoice->label()} is not an invoice, credit note or bill.");
         }
 
         $company = $this->current->get();
@@ -58,7 +59,7 @@ final class ApproveInvoice
             $invoice->assertVersion($lockVersion);
             $this->states->assert('invoice', $invoice->status, 'posted', $invoice->label());
 
-            $limit = $company->settings['approval']['invoice_above'] ?? null;
+            $limit = $company->settings['approval'][$invoice->type === 'bill' ? 'bill_above' : 'invoice_above'] ?? null;
             if ($limit !== null && $userId !== null && $invoice->created_by === $userId) {
                 $totalBase = Money::of($invoice->total, $invoice->currency)->convertTo($company->base_currency, (string) $invoice->fx_rate);
                 if (Money::of((string) $limit, $company->base_currency)->minus($totalBase)->isNegative()) {
@@ -77,7 +78,7 @@ final class ApproveInvoice
             // Gapless: the number is taken in this transaction, so a posting that fails takes none.
             if ($invoice->number === null) {
                 if (! $this->numbers->isAutomatic($company->getKey(), $invoice->type)) {
-                    throw new LedgerException('This company numbers invoices by hand: type the number from the invoice book first.');
+                    throw new LedgerException("This company numbers {$invoice->type}s by hand: type the number first.");
                 }
                 $invoice->number = $this->numbers->take($company, $invoice->type, DateTimeImmutable::createFromInterface($invoice->issue_date));
             }
@@ -100,7 +101,7 @@ final class ApproveInvoice
                 }
             }
 
-            if ($connector = $this->connectors->forCountry($company->country_code)) {
+            if ($invoice->type !== 'bill' && ($connector = $this->connectors->forCountry($company->country_code))) {
                 $submission = EInvoiceSubmission::query()->create([
                     'document_id' => $invoice->getKey(),
                     'authority' => $connector->authority(),
@@ -113,10 +114,13 @@ final class ApproveInvoice
         });
     }
 
-    /** The balanced journal draft for an invoice or credit note as its lines stand now (lines must be loaded). */
+    /** The balanced journal draft for an invoice, credit note or bill as its lines stand now (lines must be loaded). */
     public function journalDraftFor(Document $invoice): JournalDraft
     {
         $company = $this->current->get();
+        if ($invoice->type === 'bill') {
+            return $this->billDraft($invoice);
+        }
 
         // Each tax kind posts to its own liability account. VAT, GST and sales tax share one; a country
         // pack that has a turnover tax adds its own account.
@@ -145,6 +149,48 @@ final class ApproveInvoice
             receivableAccountId: Account::system('accounts_receivable')->getKey(),
             lines: $lines,
             isCreditNote: $invoice->type === 'credit_note',
+        );
+    }
+
+    /**
+     * A bill: each line's cost to its expense or asset account, input VAT to VAT receivable, the total to accounts
+     * payable. Input VAT is reclaimable only for a VAT-registered company; otherwise, and for any other kind of tax,
+     * the tax is part of the cost.
+     */
+    private function billDraft(Document $bill): JournalDraft
+    {
+        $company = $this->current->get();
+        $kinds = DB::table('tax_rates')->whereIn('id', $bill->lines->pluck('tax_rate_id')->filter())->pluck('kind', 'id');
+        $vatReceivable = null;
+
+        $lines = [];
+        foreach ($bill->lines as $line) {
+            $subtotal = Money::of($line->line_subtotal, $bill->currency);
+            $tax = Money::of($line->line_tax, $bill->currency);
+            $reclaimable = ! $tax->isZero() && $company->vat_registered && ($kinds[$line->tax_rate_id] ?? null) === 'vat';
+            if ($reclaimable) {
+                $vatReceivable ??= Account::system('vat_receivable')->getKey();
+            }
+            $lines[] = [
+                'income_account_id' => $line->account_id,
+                'subtotal' => $reclaimable ? $subtotal : $subtotal->plus($tax),
+                'tax' => $reclaimable ? $tax : Money::zero($bill->currency),
+                'tax_account_id' => $reclaimable ? $vatReceivable : null,
+            ];
+        }
+
+        return $this->builder->build(
+            companyId: $company->getKey(),
+            documentId: $bill->getKey(),
+            documentNumber: $bill->number,
+            issueDate: DateTimeImmutable::createFromInterface($bill->issue_date),
+            baseCurrency: $company->base_currency,
+            currency: $bill->currency,
+            fxRate: (string) $bill->fx_rate,
+            customerId: $bill->contact_id,
+            receivableAccountId: Account::system('accounts_payable')->getKey(),
+            lines: $lines,
+            sourceType: 'bill',
         );
     }
 }

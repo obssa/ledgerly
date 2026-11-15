@@ -48,7 +48,7 @@ final class ResolveCompany
             ->first();
 
         if (! $membership) {
-            return response()->json(['message' => 'You do not have access to this company.'], 403);
+            return response()->json(['message' => 'You do not have access to this company.', 'type' => 'NotAMember'], 403);
         }
 
         // Owners and admins can change everything, so they work only with a second factor (SECURITY.md S2).

@@ -75,6 +75,18 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | **Authenticator code at sign-in** | **Not built** |
 | **Email verification, password reset, sign out everywhere** | **Not built** |
 
+### Suppliers and bills (Module 3)
+| Control | State |
+|---|---|
+| Bills name suppliers and invoices name customers, in the database (T46); bill and invoice routes reach only their own kind | Tested |
+| A supplier's payout details are changed only by `contacts.edit` roles; each change is audited as `payout_changed` with the old and new details | Tested |
+| Duplicate bills (same supplier and reference, or same total on the same date) are flagged on the bill | Tested |
+| The chart of accounts (no balances) and the tax rates are readable by every role: every document form names them | Tested |
+
+Product decision (CLAUDE.md, light controls): no second approver for payout changes and no three-way match. The audit
+record and the duplicate warning are the controls; `settings.approval.bill_above` is the one optional approval step
+(like `invoice_above`, read by the API but not yet settable from the settings screen).
+
 ### Demo sign-in (off unless `DEMO_LOGINS=true`)
 One shared account per role in a demo company, one click from the sign-in page (`config/demo.php`).
 | Control | State |
