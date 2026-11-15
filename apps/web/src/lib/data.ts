@@ -190,6 +190,19 @@ export async function getReceiveOptions(customerId: string | null): Promise<Rece
   });
 }
 
+export async function getCreditNotes(): Promise<(Invoice & { original?: { id: string; number: string | null } | null })[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.creditNotes(ctx))).data;
+}
+
+/** A customer's open invoices in one currency, oldest first: where a credit note's leftover credit can go. */
+export async function getOpenInvoices(contactId: string, currency: string): Promise<Invoice[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.openInvoices(contactId, ctx))).data.filter((i) => i.currency === currency);
+}
+
 export async function getPaymentsReceived(): Promise<PaymentReceived[]> {
   await connection();
   if (isDemoMode()) return [];

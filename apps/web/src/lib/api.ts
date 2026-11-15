@@ -192,12 +192,16 @@ export interface TaxRate {
 
 /** GET /invoices/{id}: the invoice, warnings that do not block, and what the signed-in member may do with it. */
 export interface InvoiceDetail extends Invoice {
+  type: "invoice" | "credit_note";
+  /** A credit note names the invoice it corrects. */
+  original_document_id: string | null;
+  original?: { id: string; number: string | null } | null;
   fx_rate: string;
   notes: string | null;
   contact: Contact & { email?: string | null };
   lines: InvoiceLine[];
   warnings: { type: string; message: string }[];
-  can: { edit: boolean; approve: boolean; void: boolean };
+  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean };
 }
 
 /** A payment received (Module 2). Recorded once; reversed, never changed. */
@@ -359,6 +363,12 @@ export const ledgerly = {
   submitInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
   voidInvoice: (id: string, reason: string, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
+  createCreditNote: (invoiceId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ id: string }>(`invoices/${encodeURIComponent(invoiceId)}/credit-notes`, { ...ctx, method: "POST", body }),
+  creditNotes: (ctx: RequestOptions) =>
+    api<{ data: (Invoice & { original?: { id: string; number: string | null } | null })[] }>("credit-notes", ctx),
+  applyCredit: (creditNoteId: string, body: { invoice_id: string; amount: string }, ctx: RequestOptions) =>
+    api<unknown>(`credit-notes/${encodeURIComponent(creditNoteId)}/apply`, { ...ctx, method: "POST", body }),
   taxRates: (ctx: RequestOptions) => api<{ data: TaxRate[] }>("tax-rates", ctx),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>
     api<ProfitAndLoss>("reports/profit-and-loss", { ...ctx, query: q }),

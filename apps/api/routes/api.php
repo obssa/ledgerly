@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanySettingsController;
+use App\Http\Controllers\CreditNoteController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DimensionController;
@@ -90,6 +91,10 @@ Route::prefix('v1')->group(function () {
             Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve']);
             Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void']);
             Route::get('invoices/{invoice}/history', [InvoiceController::class, 'history']);
+
+            Route::post('invoices/{invoice}/credit-notes', [CreditNoteController::class, 'store']);
+            Route::get('credit-notes', [CreditNoteController::class, 'index']);
+            Route::post('credit-notes/{creditNote}/apply', [CreditNoteController::class, 'apply']);
 
             Route::get('payments-received', [PaymentReceivedController::class, 'index']);
             Route::post('payments-received', [PaymentReceivedController::class, 'store']);

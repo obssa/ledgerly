@@ -19,7 +19,7 @@ trait CompanyFixtures
 
     /**
      * A company set up through the API by its own owner, with a posted invoice, a draft, a manual entry, a tax
-     * rate, a foreign currency with a rate, a location, a payment of 50.00 on the posted invoice, a customer, an item and a warehouse. @return array<string, string>
+     * rate, a foreign currency with a rate, a location, a payment of 50.00 on the posted invoice, a draft credit note on it, a customer, an item and a warehouse. @return array<string, string>
      */
     protected function companyWithRecords(string $email, string $name): array
     {
@@ -58,6 +58,8 @@ trait CompanyFixtures
             'contact_id' => $ids['contact'], 'account_id' => $ids['bank'], 'payment_date' => '2026-11-03', 'method' => 'cash',
             'currency' => 'ETB', 'amount' => '50', 'allocations' => [['invoice_id' => $ids['invoice'], 'amount' => '50']],
         ], $h)->assertCreated()->json('id');
+        $ids['credit_note'] = $this->postJson("/api/v1/invoices/{$ids['invoice']}/credit-notes", ['issue_date' => '2026-11-04', 'notes' => 'One bag returned',
+            'lines' => [['description' => 'Coffee returned', 'quantity' => '1', 'unit_price' => '100', 'account_id' => $ids['sales']]]], $h)->assertCreated()->json('id');
         $ids['draft'] = $this->postJson('/api/v1/invoices', $invoice(), $h)->assertCreated()->json('id');
 
         $ids['entry'] = $this->postJson('/api/v1/journal-entries', ['date' => '2026-11-04', 'memo' => 'Opening cash', 'lines' => [
@@ -74,7 +76,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(43, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(46, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -88,6 +90,7 @@ trait CompanyFixtures
             'dimension' => $ids['dimension'],
             'customer' => $ids['contact'],
             'payment' => $ids['payment'],
+            'creditNote' => $ids['credit_note'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

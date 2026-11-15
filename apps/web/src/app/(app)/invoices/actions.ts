@@ -50,6 +50,31 @@ export async function createInvoice(_: FormState | undefined, form: FormData): P
   redirect(`/invoices/${encodeURIComponent(id)}`);
 }
 
+/** A draft credit note for a posted invoice; it opens on its own page, where it is approved like an invoice. */
+export async function createCreditNote(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const invoiceId = text(form, "invoice_id") ?? "";
+  const body = invoiceBody(form);
+  let id: string;
+  try {
+    id = (await ledgerly.createCreditNote(invoiceId, { issue_date: body.issue_date, notes: body.notes, lines: body.lines }, ctx)).id;
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(`/invoices/${encodeURIComponent(id)}`);
+}
+
+export async function applyCredit(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.applyCredit(text(form, "credit_note_id") ?? "", { invoice_id: text(form, "invoice_id") ?? "", amount: (text(form, "amount") ?? "").replace(/,/g, "") }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Credit applied." };
+}
+
 export async function invoiceAction(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   const id = text(form, "id") ?? "";
