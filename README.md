@@ -110,9 +110,9 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 
 **15 Nov 2026, in CI on every pull request (PostgreSQL 13, 16 and 18; PHP 8.3 and 8.4):**
 
-- **Database: 55 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 51 guard checks (T1–T44) and 4
+- **Database: 56 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 52 guard checks (T1–T45) and 4
   two-session concurrency checks (C1–C4).
-- **API: 149 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
+- **API: 155 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
   `ledgerly_web`, so row-level security applies (SECURITY.md S1). `TenantIsolationTest` covers every company route with
   company B's ids in the header, URL and body, and tests row-level security and the Eloquent scope each on its own;
   removing either one fails the suite.

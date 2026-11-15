@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Identity\DemoAccounts;
 use App\Domain\Identity\EmailTokens;
 use App\Models\User;
 use App\Notifications\ResetPasswordLink;
@@ -94,7 +95,7 @@ final class AccountController extends Controller
             // After the response has gone out: the time the answer takes must not show whether the account exists.
             defer(function () use ($email) {
                 $user = User::query()->where('email', $email)->first();
-                if (! $user) {
+                if (! $user || DemoAccounts::isDemo($user)) { // a shared demo account has no inbox and no password to reset
                     return;
                 }
                 $minutes = (int) config('security.password.reset_minutes');

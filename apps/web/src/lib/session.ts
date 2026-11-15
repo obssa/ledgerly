@@ -9,6 +9,8 @@ import { cookies } from "next/headers";
 export const TOKEN_COOKIE = "ledgerly_token";
 export const COMPANY_COOKIE = "ledgerly_company";
 const NAME_COOKIE = "ledgerly_name";
+/** Set for a demo sign-in: the role's label, shown in the demo banner. */
+const DEMO_COOKIE = "ledgerly_demo";
 
 /** The API's tokens expire after SANCTUM_TOKEN_MINUTES (720); the cookie goes with them. */
 const MAX_AGE_SECONDS = 60 * 60 * 12;
@@ -25,6 +27,8 @@ export interface Session {
   token?: string;
   companyId?: string;
   name?: string;
+  /** The demo role's label when signed in to the shared demo company. */
+  demo?: string;
 }
 
 export async function getSession(): Promise<Session> {
@@ -33,13 +37,20 @@ export async function getSession(): Promise<Session> {
     token: jar.get(TOKEN_COOKIE)?.value,
     companyId: jar.get(COMPANY_COOKIE)?.value,
     name: jar.get(NAME_COOKIE)?.value,
+    demo: jar.get(DEMO_COOKIE)?.value,
   };
 }
 
-export async function startSession(token: string, name: string): Promise<void> {
+/** A demo session lasts as long as its API token (DEMO_TOKEN_MINUTES, 120). */
+const DEMO_MAX_AGE_SECONDS = 60 * 60 * 2;
+
+export async function startSession(token: string, name: string, demo?: string): Promise<void> {
   const jar = await cookies();
-  jar.set(TOKEN_COOKIE, token, options);
-  jar.set(NAME_COOKIE, name, options);
+  const opts = demo ? { ...options, maxAge: DEMO_MAX_AGE_SECONDS } : options;
+  jar.set(TOKEN_COOKIE, token, opts);
+  jar.set(NAME_COOKIE, name, opts);
+  if (demo) jar.set(DEMO_COOKIE, demo, opts);
+  else jar.delete(DEMO_COOKIE);
   jar.delete(COMPANY_COOKIE);
   jar.delete(CHALLENGE_COOKIE);
 }
@@ -64,10 +75,11 @@ export async function replaceToken(token: string): Promise<void> {
 }
 
 export async function selectCompany(companyId: string): Promise<void> {
-  (await cookies()).set(COMPANY_COOKIE, companyId, options);
+  const jar = await cookies();
+  jar.set(COMPANY_COOKIE, companyId, jar.get(DEMO_COOKIE) ? { ...options, maxAge: DEMO_MAX_AGE_SECONDS } : options);
 }
 
 export async function endSession(): Promise<void> {
   const jar = await cookies();
-  for (const name of [TOKEN_COOKIE, COMPANY_COOKIE, NAME_COOKIE, CHALLENGE_COOKIE]) jar.delete(name);
+  for (const name of [TOKEN_COOKIE, COMPANY_COOKIE, NAME_COOKIE, CHALLENGE_COOKIE, DEMO_COOKIE]) jar.delete(name);
 }

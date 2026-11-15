@@ -21,6 +21,8 @@ ROOT="${LEDGERLY_ROOT:-$HOME/ledgerly}"
 PHP="${PHP_BIN:-/opt/alt/php83/usr/bin/php}"
 WEB_APP_ROOT="${LEDGERLY_WEB_APP_ROOT:-$HOME/ledgerly-web}"
 KEEP=5
+DEMO_LOGINS="${DEMO_LOGINS:-}"   # true | false | empty (leave the server's setting as it is)
+case "$DEMO_LOGINS" in true|false|'') ;; *) echo "DEMO_LOGINS must be true or false"; exit 1 ;; esac
 
 IFS= read -r OWNER_PASSWORD || true
 [ -n "${OWNER_PASSWORD:-}" ] || { echo "The owner database password was not given on stdin."; exit 1; }
@@ -53,6 +55,17 @@ as_owner() { DB_OWNER_USERNAME="$OWNER_USERNAME" DB_OWNER_PASSWORD="$OWNER_PASSW
 echo "== Migrate as the owner (before any config cache, so the password is never cached)"
 as_owner ledgerly:create-schema
 as_owner migrate --database=owner --force
+
+# Demo sign-in (config/demo.php): set from the repository variable DEMO_LOGINS, then the demo company and its shared
+# accounts are added if missing. A failed demo setup does not stop the release: the books matter, the demo does not.
+if [ -n "$DEMO_LOGINS" ]; then
+  sed -i '/^DEMO_LOGINS=/d' "$ROOT/shared/api.env"
+  printf 'DEMO_LOGINS=%s\n' "$DEMO_LOGINS" >> "$ROOT/shared/api.env"
+fi
+if grep -q '^DEMO_LOGINS=true' .env; then
+  echo "== Demo sign-in"
+  as_owner ledgerly:demo-setup || echo "WARNING: the demo setup failed; this release goes live without it"
+fi
 unset OWNER_PASSWORD
 
 echo "== The API's login must be restricted, or this release does not go live"

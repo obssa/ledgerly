@@ -170,10 +170,12 @@ jobs:
         id: switch
         env:
           OWNER_PASSWORD: ${{ secrets.DEPLOY_DB_OWNER_PASSWORD }}
+          DEMO_LOGINS: ${{ vars.DEMO_LOGINS }}   # true turns on demo sign-in (config/demo.php), false turns it off
         run: |
           test -n "$OWNER_PASSWORD" || { echo "DEPLOY_DB_OWNER_PASSWORD is not set"; exit 1; }
+          case "$DEMO_LOGINS" in true|false|'') ;; *) echo "DEMO_LOGINS must be true or false"; exit 1 ;; esac
           # The owner password goes over stdin only: never into a file or a command line on the server.
-          printf '%s\n' "$OWNER_PASSWORD" | ssh target "PHP_BIN='$PHP_BIN' bash ~/ledgerly/deploy/release.sh '$SHA'"
+          printf '%s\n' "$OWNER_PASSWORD" | ssh target "PHP_BIN='$PHP_BIN' DEMO_LOGINS='$DEMO_LOGINS' bash ~/ledgerly/deploy/release.sh '$SHA'"
       - name: Smoke test the live site
         run: bash scripts/deploy/cpanel/smoke.sh "$WEB_URL" "$API_URL"
       - name: Roll back

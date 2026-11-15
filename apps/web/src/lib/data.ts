@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -217,6 +217,18 @@ export async function getPaymentReceived(id: string): Promise<PaymentReceived | 
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
+  }
+}
+
+/** The demo sign-in buttons, or null when demo sign-in is off. Never breaks the sign-in page. */
+export async function getDemoOptions(): Promise<DemoOptions | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    const options = await ledgerly.demoOptions();
+    return options.roles.length > 0 ? options : null;
+  } catch {
+    return null;
   }
 }
 

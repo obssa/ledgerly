@@ -14,6 +14,7 @@ PostgreSQL before the first paying customer; `deploy.yml` already publishes cont
 | PostgreSQL 13 | `orcamiib_ledgerly`, schema `ledgerly` | owner login `orcamiib_lowner` (deploy only), app login `orcamiib_lweb` |
 | cron | `schedule:run` and `queue:work` every minute | no Redis or long-running workers on shared hosting |
 | Email | confirmation and password-reset links, from `no-reply@orcamind.dev` | the server's `sendmail` (`MAIL_MAILER=sendmail` in `shared/api.env`); the domain publishes SPF and DKIM for this server |
+| Demo sign-in | one button per role on the sign-in page, into a shared demo company | repository variable `DEMO_LOGINS` (`true`/`false`): each deploy writes it to `shared/api.env` and, when on, runs `ledgerly:demo-setup` as the owner (SECURITY.md, Demo sign-in) |
 
 ```
 ~/ledgerly/releases/<sha>/{api,web}    one folder per release (newest 5 kept)
