@@ -54,7 +54,9 @@ final class BillTest extends TestCase
 
         $draft = $this->postJson('/api/v1/bills', $this->bill(), $this->h)->assertCreated()
             ->assertJsonPath('status', 'draft')->assertJsonPath('number', null)->assertJsonPath('total', '1150.00')
-            ->assertJsonPath('reference', 'ET-55821')->assertJsonPath('warnings', [])->json('id');
+            ->assertJsonPath('reference', 'ET-55821')->assertJsonPath('warnings', [])
+            ->assertJsonPath('issue_date', '2026-11-10')->assertJsonPath('due_date', '2026-11-25')   // plain dates, not timestamps
+            ->json('id');
 
         $bill = $this->postJson("/api/v1/bills/{$draft}/approve", [], $this->h)->assertOk()
             ->assertJsonPath('status', 'posted')->assertJsonPath('number', 'BILL-2027-0002')   // the fixture's bill is 0001

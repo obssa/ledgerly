@@ -26,8 +26,8 @@ class Document extends Model
     protected function casts(): array
     {
         return [
-            'issue_date' => 'date',
-            'due_date' => 'date',
+            'issue_date' => 'date:Y-m-d',   // sent as 2026-11-16, not a timestamp
+            'due_date' => 'date:Y-m-d',
             'prices_include_tax' => 'boolean',
             'custom_fields' => 'array',
             'lock_version' => 'integer',
