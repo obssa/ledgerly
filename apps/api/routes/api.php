@@ -8,6 +8,7 @@ use App\Http\Controllers\CompanySettingsController;
 use App\Http\Controllers\CreditNoteController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DemoController;
 use App\Http\Controllers\DimensionController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
@@ -32,21 +33,27 @@ Route::prefix('v1')->group(function () {
     Route::post('auth/email/verify', [AccountController::class, 'verifyEmail'])->middleware('throttle:auth');
     Route::post('auth/password/forgot', [AccountController::class, 'forgotPassword'])->middleware('throttle:auth');
     Route::post('auth/password/reset', [AccountController::class, 'resetPassword'])->middleware('throttle:auth');
+    Route::get('auth/demo', [DemoController::class, 'index']);
+    Route::post('auth/demo', [DemoController::class, 'login'])->middleware('throttle:auth');
 
     Route::middleware(['auth:sanctum', 'tenant.tx'])->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
         Route::get('auth/me', [AuthController::class, 'me']);
-        Route::post('auth/logout-everywhere', [AccountController::class, 'logoutEverywhere']);
-        Route::post('auth/email/resend', [AccountController::class, 'resendVerification']);
-        Route::post('auth/password', [AccountController::class, 'changePassword']);
-
-        Route::post('auth/mfa/enrol', [MfaController::class, 'enrol']);
-        Route::post('auth/mfa/confirm', [MfaController::class, 'confirm']);
-        Route::post('auth/mfa/recovery-codes', [MfaController::class, 'recoveryCodes']);
-        Route::delete('auth/mfa', [MfaController::class, 'disable']);
-
         Route::get('companies', [CompanyController::class, 'index']);
-        Route::post('companies', [CompanyController::class, 'store']);
+
+        // Not for the shared demo accounts (config/demo.php).
+        Route::middleware('not.demo')->group(function () {
+            Route::post('auth/logout-everywhere', [AccountController::class, 'logoutEverywhere']);
+            Route::post('auth/email/resend', [AccountController::class, 'resendVerification']);
+            Route::post('auth/password', [AccountController::class, 'changePassword']);
+
+            Route::post('auth/mfa/enrol', [MfaController::class, 'enrol']);
+            Route::post('auth/mfa/confirm', [MfaController::class, 'confirm']);
+            Route::post('auth/mfa/recovery-codes', [MfaController::class, 'recoveryCodes']);
+            Route::delete('auth/mfa', [MfaController::class, 'disable']);
+
+            Route::post('companies', [CompanyController::class, 'store']);
+        });
         Route::get('company-options', [CompanyController::class, 'options']);
 
         Route::middleware(['company', 'idempotent'])->group(function () {

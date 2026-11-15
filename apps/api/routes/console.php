@@ -40,3 +40,18 @@ Artisan::command('ledgerly:check-database-roles', function () {
 
     return $problems === [] ? 0 : 1;
 })->purpose('Check that the application database login cannot bypass row-level security');
+
+/*
+| Run by the deploy as the owner role when DEMO_LOGINS=true: the demo company and one shared account per role
+| (App\Domain\Identity\DemoSetup). Adds only what is missing, so it is safe on every deploy.
+*/
+Artisan::command('ledgerly:demo-setup', function (\App\Domain\Identity\DemoSetup $setup) {
+    if (! config('demo.enabled')) {
+        $this->info('Demo sign-in is off (DEMO_LOGINS): nothing to set up.');
+
+        return 0;
+    }
+    $setup->run(fn (string $line) => $this->info($line));
+
+    return 0;
+})->purpose('Set up the demo company and its shared sign-in accounts (DEMO_LOGINS=true)');

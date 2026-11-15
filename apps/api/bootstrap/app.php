@@ -3,6 +3,7 @@
 use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Ledger\Exceptions\StaleDocument;
 use App\Domain\Tenancy\Http\ResolveCompany;
+use App\Http\Middleware\EnsureNotDemo;
 use App\Http\Middleware\Idempotency;
 use App\Http\Middleware\RunInTenantTransaction;
 use App\Http\Middleware\SecurityHeaders;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.tx' => RunInTenantTransaction::class,
             'company' => ResolveCompany::class,
             'idempotent' => Idempotency::class,
+            'not.demo' => EnsureNotDemo::class,
         ]);
         // Order matters: transaction → tenant → idempotency → route-model binding. The tenant must be set
         // before binding runs, or row-level security hides the bound model (404).

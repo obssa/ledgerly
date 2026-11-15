@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Tenancy\Http;
 
 use App\Domain\Tenancy\Models\Company;
+use App\Domain\Identity\DemoAccounts;
 use App\Domain\Tenancy\Models\Membership;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use App\Domain\Tenancy\Support\DatabaseTenantContext;
@@ -51,7 +52,10 @@ final class ResolveCompany
         }
 
         // Owners and admins can change everything, so they work only with a second factor (SECURITY.md S2).
-        if (in_array($membership->role, (array) config('security.mfa.required_roles'), true) && ! $user->mfa_enabled) {
+        // Not the shared demo accounts: every visitor uses them, so a second factor would protect nothing, and the
+        // database keeps them in the demo company only (018_demo_accounts.sql), so this never opens a real company.
+        if (in_array($membership->role, (array) config('security.mfa.required_roles'), true) && ! $user->mfa_enabled
+            && ! DemoAccounts::isDemo($user)) {
             return response()->json([
                 'message' => 'Set up an authenticator app to work in this company: it is required for owners and admins.',
                 'type' => 'MfaEnrolmentRequired',

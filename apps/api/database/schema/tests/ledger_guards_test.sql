@@ -1109,6 +1109,50 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
+-- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
+DO $$ BEGIN
+  PERFORM count(*) FROM demo_accounts;   -- sign-in reads it before anyone is in the context
+  BEGIN
+    INSERT INTO demo_accounts (user_id, company_id, role) VALUES ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-00000000000c', 'bookkeeper');
+    RAISE EXCEPTION 'FAIL T45a: the application role made an account a demo account';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+RESET ROLE;
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO demo_accounts (user_id, company_id, role) VALUES ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-00000000000c', 'owner');
+    RAISE EXCEPTION 'FAIL T45b: a demo account was stored with a role it does not have';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO demo_accounts (user_id, company_id, role) VALUES ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-00000000000a', 'bookkeeper');
+    RAISE EXCEPTION 'FAIL T45c: a demo account was stored for a company it is not a member of';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO demo_accounts (user_id, company_id, role) VALUES ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-00000000000c', 'bookkeeper');
+  BEGIN
+    INSERT INTO memberships (company_id, user_id, role) VALUES ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000c3', 'viewer');
+    RAISE EXCEPTION 'FAIL T45d: a demo account joined another company';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+END $$;
+SET ROLE ledgerly_web;
+DO $$ DECLARE n int; BEGIN
+  IF NOT EXISTS (SELECT 1 FROM demo_accounts WHERE user_id = '00000000-0000-0000-0000-0000000000c3') THEN
+    RAISE EXCEPTION 'FAIL T45e: the application role cannot read the demo accounts';
+  END IF;
+  BEGIN
+    UPDATE demo_accounts SET role = 'owner';
+    RAISE EXCEPTION 'FAIL T45f: the application role changed a demo account';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM demo_accounts;
+    RAISE EXCEPTION 'FAIL T45g: the application role removed a demo account';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T45 demo accounts are set only by the owner role, match their membership and stay in the demo company';
+END $$;
+RESET ROLE;
+DELETE FROM demo_accounts;
+SET ROLE ledgerly_web;
+
 -- T34: the application role cannot create objects, read partitions, or become another role
 DO $$ BEGIN
   BEGIN

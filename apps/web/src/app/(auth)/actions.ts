@@ -39,6 +39,24 @@ export async function signIn(_: FormState | undefined, form: FormData): Promise<
   redirect(next);
 }
 
+/**
+ * One click into the shared demo company as a role (the API offers it only when DEMO_LOGINS is on). The role
+ * comes from the button pressed; the API checks it against the roles it offers.
+ */
+export async function demoSignIn(form: FormData): Promise<void> {
+  const role = text(form, "role") ?? "";
+  if (!/^[a-z]{1,20}$/.test(role)) redirect("/sign-in?demo=unavailable");
+  let next = "/sign-in?demo=unavailable";
+  try {
+    const { token, user } = await ledgerly.demoLogin(role);
+    await startSession(token, user.name, role.charAt(0).toUpperCase() + role.slice(1));
+    next = await afterSignIn(token);
+  } catch {
+    // Off, not set up, or too many tries: the sign-in page says so.
+  }
+  redirect(next);
+}
+
 /** Second step of sign-in: six digits from the authenticator app, or one of the recovery codes. */
 export async function verifyCode(_: FormState | undefined, form: FormData): Promise<FormState> {
   const challenge = await heldChallenge();

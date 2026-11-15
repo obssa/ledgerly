@@ -317,6 +317,12 @@ export interface AuthResult {
   token: string;
 }
 
+/** GET /auth/demo: the demo company and the roles one can sign in as (404 when demo sign-in is off). */
+export interface DemoOptions {
+  company: string;
+  roles: { role: string; label: string; about: string }[];
+}
+
 /** The password was right, but an authenticator code is needed before a token is issued. */
 export interface MfaChallenge {
   mfa_required: true;
@@ -328,6 +334,8 @@ export const ledgerly = {
   loginWithCode: (body: { challenge: string; code?: string; recovery_code?: string }) =>
     api<AuthResult>("auth/login/mfa", { method: "POST", body }),
   me: (token: string) => api<{ user: User }>("auth/me", { token }),
+  demoOptions: () => api<DemoOptions>("auth/demo"),
+  demoLogin: (role: string) => api<AuthResult & { role: string }>("auth/demo", { method: "POST", body: { role } }),
   mfaEnrol: (token: string) => api<{ secret: string; otpauth_uri: string }>("auth/mfa/enrol", { method: "POST", token }),
   mfaConfirm: (code: string, token: string) => api<{ recovery_codes: string[] }>("auth/mfa/confirm", { method: "POST", body: { code }, token }),
   register: (body: { name: string; email: string; password: string }) => api<AuthResult>("auth/register", { method: "POST", body }),

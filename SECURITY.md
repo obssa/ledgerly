@@ -75,6 +75,22 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | **Authenticator code at sign-in** | **Not built** |
 | **Email verification, password reset, sign out everywhere** | **Not built** |
 
+### Demo sign-in (off unless `DEMO_LOGINS=true`)
+One shared account per role in a demo company, one click from the sign-in page (`config/demo.php`).
+| Control | State |
+|---|---|
+| Which accounts are demo accounts is a table only the owner role writes (`018_demo_accounts.sql`, T45); the deploy fills it | Tested |
+| A demo account is an active member of the demo company only; the database refuses it any other membership | Tested |
+| Setup always creates new users with random passwords; it never adopts an existing account with a demo address | Tested |
+| Demo accounts cannot change password, authenticator or email, sign out other devices, create a company, or get a reset email | Tested |
+| Demo owner works without an authenticator (a shared second factor protects nothing); this can only reach the demo company | Tested |
+| Demo sessions last 2 hours; the sign-in is rate-limited like the password sign-in | Tested |
+| Turned on and off by the repository variable `DEMO_LOGINS`; the deploy writes it to the server's settings | Written |
+
+Every visitor shares the demo data and can change it. Turn demo sign-in off (`DEMO_LOGINS=false`) before real
+customers use the same database. When e-invoicing goes live (`EINVOICE_FORCE_SANDBOX=false`), keep the demo company on the
+sandbox connector first.
+
 ### Requests
 | Control | State |
 |---|---|

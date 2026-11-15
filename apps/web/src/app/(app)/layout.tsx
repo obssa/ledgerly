@@ -3,11 +3,22 @@ import { connection } from "next/server";
 import { Sidebar } from "@/components/app-shell/Sidebar";
 import { Topbar } from "@/components/app-shell/Topbar";
 import { CompanyBadge, UserMenu } from "@/components/app-shell/ShellParts";
+import Link from "next/link";
 import { isDemoMode } from "@/lib/api";
+import { getSession } from "@/lib/session";
 
 /** Decided per request, so one built image can run in demo mode or against an API. */
 async function DemoBanner() {
   await connection();
+  const { demo } = await getSession();
+  if (demo) {
+    return (
+      <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
+        Demo company, signed in as {demo}. Everyone trying the demo shares this data, so don&apos;t enter anything real.{" "}
+        <Link href="/sign-up" className="underline">Create your own account</Link>
+      </p>
+    );
+  }
   if (!isDemoMode()) return null;
   return (
     <p className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
