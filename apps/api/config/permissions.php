@@ -11,6 +11,7 @@
 | company.manage     change the profile and settings; owner and admin only (via '*')
 | periods.close      move the period lock date forward
 | accounting.rates   enter or correct exchange rates (accountant via 'accounting.*')
+| accounting.opening enter or replace the opening balances (accountant via 'accounting.*')
 */
 
 return [
