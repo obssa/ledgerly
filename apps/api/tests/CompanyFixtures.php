@@ -48,11 +48,11 @@ trait CompanyFixtures
         $this->putJson('/api/v1/currencies', ['currency' => 'USD', 'enabled' => true], $h)->assertOk();
         $this->postJson('/api/v1/exchange-rates', ['currency' => 'USD', 'rate_date' => '2026-11-02', 'rate' => '134.523333'], $h)->assertCreated();
 
-        $invoice = fn (string $number) => ['contact_id' => $ids['contact'], 'number' => $number, 'issue_date' => '2026-11-02', 'currency' => 'ETB',
+        $invoice = fn () => ['contact_id' => $ids['contact'], 'issue_date' => '2026-11-02', 'currency' => 'ETB',
             'lines' => [['description' => 'Coffee', 'quantity' => '2', 'unit_price' => '500', 'account_id' => $ids['sales'], 'tax_rate_id' => $ids['tax_rate']]]];
-        $ids['invoice'] = $this->postJson('/api/v1/invoices', $invoice('INV-1'), $h)->assertCreated()->json('id');
+        $ids['invoice'] = $this->postJson('/api/v1/invoices', $invoice(), $h)->assertCreated()->json('id');
         $this->postJson("/api/v1/invoices/{$ids['invoice']}/approve", [], $h)->assertOk();
-        $ids['draft'] = $this->postJson('/api/v1/invoices', $invoice('INV-2'), $h)->assertCreated()->json('id');
+        $ids['draft'] = $this->postJson('/api/v1/invoices', $invoice(), $h)->assertCreated()->json('id');
 
         $ids['entry'] = $this->postJson('/api/v1/journal-entries', ['date' => '2026-11-04', 'memo' => 'Opening cash', 'lines' => [
             ['account_id' => $ids['bank'], 'debit' => '1000'], ['account_id' => $ids['equity'], 'credit' => '1000'],
@@ -68,7 +68,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(30, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(32, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }

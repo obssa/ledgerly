@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useId, type ReactNode } from "react";
-import type { CompanySettings, Currencies } from "@/lib/api";
+import type { CompanySettings, Currencies, Numbering } from "@/lib/api";
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
 import { VAT_SHOWN } from "@/lib/settings";
-import { addExchangeRate, saveCompanySettings, setCurrency, setPeriodLock } from "./actions";
+import { addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock } from "./actions";
 
 type Settings = CompanySettings & { demo: boolean };
 
@@ -211,6 +211,53 @@ export function CurrenciesPanel({ settings, currencies }: { settings: Settings; 
         </form>
       )}
     </div>
+  );
+}
+
+const DOC_TYPES: Record<string, string> = { invoice: "Invoices", credit_note: "Credit notes" };
+
+/**
+ * Numbering per document type. Automatic numbers are given in order when a document is posted, so they have no gaps;
+ * manual numbering is for pre-printed, authority-approved invoice books. The counter is never set by hand.
+ */
+export function NumberingPanel({ settings, numbering }: { settings: Settings; numbering: Numbering[] }) {
+  const manage = settings.can.manage && !settings.demo;
+  return (
+    <div className="mt-3 flex flex-col gap-4">
+      {numbering.map((n) => <NumberingRow key={n.doc_type} n={n} manage={manage} />)}
+    </div>
+  );
+}
+
+function NumberingRow({ n, manage }: { n: Numbering; manage: boolean }) {
+  const [state, action, pending] = useActionState(saveNumbering, undefined);
+  return (
+    <form action={action} className="border-t border-line pt-3" noValidate>
+      <input type="hidden" name="doc_type" value={n.doc_type} />
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[15px] font-bold">{DOC_TYPES[n.doc_type] ?? n.doc_type}</h3>
+        <span className="text-[13px] text-muted">
+          {n.mode === "manual" ? "Typed from the invoice book" : <>Next: <strong className="num text-ink">{n.next_number}</strong></>}
+        </span>
+      </div>
+      <Message state={state} />
+      <fieldset disabled={!manage} className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-2.5">
+        <legend className="sr-only">{DOC_TYPES[n.doc_type] ?? n.doc_type} numbering</legend>
+        <Select name="mode" label="Numbers" defaultValue={n.mode}>
+          <option value="automatic">Automatic</option>
+          <option value="manual">From a printed book</option>
+        </Select>
+        <TextField name="prefix" label="Prefix" defaultValue={n.prefix} invalid={Boolean(state?.fields?.prefix)} />
+        <Select name="padding" label="Digits" defaultValue={String(n.padding)}>
+          {[3, 4, 5, 6, 7, 8].map((d) => <option key={d} value={d}>{d}</option>)}
+        </Select>
+      </fieldset>
+      <label className="mt-2 flex items-center gap-2.5 text-sm">
+        <input type="checkbox" name="include_year" defaultChecked={n.include_year} disabled={!manage} className="size-4" />
+        Fiscal year in the number (restarts at 1 each year)
+      </label>
+      {manage && <button type="submit" className="btn mt-3" disabled={pending}>{pending ? "Saving…" : "Save"}</button>}
+    </form>
   );
 }
 

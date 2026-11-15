@@ -9,7 +9,7 @@ export default function NewInvoicePage() {
     <>
       <PageTitle
         eyebrow="Sales and invoices / New invoice"
-        title={<>Invoice <span className="num font-semibold">INV-2019-0419</span> <Pill>Draft</Pill></>}
+        title={<>New invoice <Pill>Draft</Pill></>}
       />
       <InvoiceForm taxRates={demoTaxRates} currency="ETB" />
     </>

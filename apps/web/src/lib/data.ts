@@ -1,8 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Invoice, type OpeningBalances, type ProfitAndLoss } from "./api";
-import { demoCompany, demoCompanySettings, demoCurrencies, demoInvoices, demoProfitAndLoss } from "./demo";
+import { ApiError, isDemoMode, ledgerly, type Account, type Company, type CompanySettings, type Currencies, type Invoice, type Numbering, type OpeningBalances, type ProfitAndLoss } from "./api";
+import { demoCompany, demoCompanySettings, demoCurrencies, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
 /**
@@ -58,6 +58,14 @@ export async function getOpeningBalances(): Promise<{ opening: OpeningBalances; 
     const [opening, accounts] = await Promise.all([ledgerly.openingBalances(ctx), ledgerly.accounts(ctx)]);
     return { opening, accounts: accounts.data };
   });
+}
+
+/** Numbering of the document types in use so far (invoices and credit notes). */
+export async function getNumbering(): Promise<Numbering[]> {
+  await connection();
+  const types = ["invoice", "credit_note"];
+  if (isDemoMode()) return demoNumbering;
+  return (await withApi((ctx) => ledgerly.numbering(ctx))).data.filter((n) => types.includes(n.doc_type));
 }
 
 export async function getInvoices(): Promise<Invoice[]> {

@@ -1,6 +1,6 @@
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanySettings, getCurrencies } from "@/lib/data";
-import { CompanyProfileForm, CurrenciesPanel, PeriodLockForm } from "./SettingsForms";
+import { getCompanySettings, getCurrencies, getNumbering } from "@/lib/data";
+import { CompanyProfileForm, CurrenciesPanel, NumberingPanel, PeriodLockForm } from "./SettingsForms";
 
 export const metadata = { title: "Company settings" };
 
@@ -9,7 +9,7 @@ export const metadata = { title: "Company settings" };
  * accountant closes periods. What a role cannot change is shown read-only (the API refuses it anyway).
  */
 export default async function SettingsPage() {
-  const [settings, currencies] = await Promise.all([getCompanySettings(), getCurrencies()]);
+  const [settings, currencies, numbering] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering()]);
   const year = settings.fiscal_years.at(-1);
 
   return (
@@ -49,6 +49,14 @@ export default async function SettingsPage() {
               Books are kept in {currencies.base_currency}. An invoice in another currency takes the rate of its own date and keeps it.
             </p>
             <CurrenciesPanel settings={settings} currencies={currencies} />
+          </Card>
+
+          <Card label="Numbering">
+            <h2 className="text-[19px] font-bold">Numbering</h2>
+            <p className="mt-1.5 text-sm text-muted">
+              Drafts have no number. A number is given when the document is posted, in order and without gaps.
+            </p>
+            <NumberingPanel settings={settings} numbering={numbering} />
           </Card>
 
           <Card label="Fiscal year">

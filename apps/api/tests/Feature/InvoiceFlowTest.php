@@ -46,7 +46,7 @@ final class InvoiceFlowTest extends TestCase
 
         $invoiceId = $this->postJson('/api/v1/invoices', [
             'contact_id' => $customer,
-            'number' => 'INV-2019-0419',
+            
             'issue_date' => '2026-11-02',
             'due_date' => '2026-12-02',
             'currency' => 'ETB',
@@ -78,7 +78,7 @@ final class InvoiceFlowTest extends TestCase
         $this->assertSame('436300.00', $tb->firstWhere('code', '4000')['credit']);
 
         // A posted invoice already registered with the tax authority is corrected with a credit note, not edited.
-        $this->putJson("/api/v1/invoices/{$invoiceId}", ['reason' => 'Wrong price', 'contact_id' => $customer, 'number' => 'INV-2019-0419', 'issue_date' => '2026-11-02', 'currency' => 'ETB', 'lines' => [['description' => 'x', 'quantity' => '1', 'unit_price' => '1', 'account_id' => $sales]]], $headers)
+        $this->putJson("/api/v1/invoices/{$invoiceId}", ['reason' => 'Wrong price', 'contact_id' => $customer, 'issue_date' => '2026-11-02', 'currency' => 'ETB', 'lines' => [['description' => 'x', 'quantity' => '1', 'unit_price' => '1', 'account_id' => $sales]]], $headers)
             ->assertStatus(422)
             ->assertJsonPath('type', 'LedgerException');
     }
@@ -97,7 +97,7 @@ final class InvoiceFlowTest extends TestCase
         $this->owner()->table('contacts')->insert(['id' => $customer, 'company_id' => $companyId, 'name' => 'Sheger Grand Hotel', 'is_customer' => true]);
 
         $invoice = fn (string $qty, ?string $reason = null) => array_filter([
-            'reason' => $reason, 'contact_id' => $customer, 'number' => 'INV-0001', 'issue_date' => '2026-11-02', 'currency' => 'ETB',
+            'reason' => $reason, 'contact_id' => $customer, 'issue_date' => '2026-11-02', 'currency' => 'ETB',
             'lines' => [['description' => 'Roasted coffee 1 kg', 'quantity' => $qty, 'unit_price' => '1150', 'account_id' => $sales, 'tax_rate_id' => $vat15]],
         ]);
         $id = $this->postJson('/api/v1/invoices', $invoice('240'), $headers)->assertCreated()->json('id');
@@ -238,7 +238,7 @@ final class InvoiceFlowTest extends TestCase
         $this->owner()->table('contacts')->insert(['id' => $customer, 'company_id' => $companyId, 'name' => 'Sheger Grand Hotel', 'is_customer' => true]);
 
         $invoice = fn (string $qty) => [
-            'contact_id' => $customer, 'number' => 'INV-0001', 'issue_date' => '2026-11-02', 'currency' => 'ETB',
+            'contact_id' => $customer, 'issue_date' => '2026-11-02', 'currency' => 'ETB',
             'lines' => [['description' => 'Roasted coffee 1 kg', 'quantity' => $qty, 'unit_price' => '1150', 'account_id' => $sales, 'tax_rate_id' => $vat15]],
         ];
 

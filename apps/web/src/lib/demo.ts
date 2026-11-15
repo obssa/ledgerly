@@ -1,4 +1,4 @@
-import type { CompanySettings, Currencies, Invoice, ProfitAndLoss } from "./api";
+import type { CompanySettings, Currencies, Invoice, Numbering, ProfitAndLoss } from "./api";
 
 /** Sample data for demo mode (no LEDGERLY_API_URL). Fictional company and customers. */
 
@@ -47,10 +47,15 @@ export const demoCurrencies: Currencies = {
   data: [{ currency: "USD", is_enabled: true, latest_rate: "134.523333", latest_rate_date: "2026-11-02" }],
 };
 
+export const demoNumbering: Numbering[] = [
+  { doc_type: "invoice", mode: "automatic", prefix: "INV-", include_year: true, padding: 4, next_number: "INV-2019-0420" },
+  { doc_type: "credit_note", mode: "automatic", prefix: "CN-", include_year: true, padding: 4, next_number: "CN-2019-0012" },
+];
+
 const c = (id: string, name: string, tin: string | null = null) => ({ id, name, tax_id: tin });
 
 const invoices: Invoice[] = [
-  { id: "i419", number: "INV-2019-0419", status: "draft", contact: c("c1", "Sheger Grand Hotel", "0012345678"), issue_date: "2026-11-02", due_date: "2026-12-02", currency: "ETB", subtotal: "436300.00", tax_total: "65445.00", total: "501745.00", amount_due: "501745.00" },
+  { id: "i419", number: null, status: "draft", contact: c("c1", "Sheger Grand Hotel", "0012345678"), issue_date: "2026-11-02", due_date: "2026-12-02", currency: "ETB", subtotal: "436300.00", tax_total: "65445.00", total: "501745.00", amount_due: "501745.00" },
   { id: "i412", number: "INV-2019-0412", status: "posted", contact: c("c5", "Lalibela Lodge Group"), issue_date: "2026-10-28", due_date: "2026-11-27", currency: "ETB", subtotal: "72000.00", tax_total: "10800.00", total: "82800.00", amount_due: "82800.00", einvoice_submissions: [{ authority: "ET_MOR", status: "rejected", clearance_number: null, qr_payload: null, last_error: "Buyer TIN not found" }] },
   { id: "i406", number: "INV-2019-0406", status: "posted", contact: c("c4", "Harar Hills Café"), issue_date: "2026-09-24", due_date: "2026-10-24", currency: "ETB", subtotal: "36347.83", tax_total: "5452.17", total: "41800.00", amount_due: "41800.00" },
   { id: "i401", number: "INV-2019-0401", status: "posted", contact: c("c3", "Rift Valley Roasters Ltd"), issue_date: "2026-09-15", due_date: "2026-10-15", currency: "USD", subtotal: "1240.00", tax_total: "0.00", total: "1240.00", amount_due: "1240.00" },

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Domain\Sales\Actions;
 
 use App\Domain\Ledger\ExchangeRates;
+use App\Domain\Sales\DocumentNumbers;
 use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Ledger\Money;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Tax\TaxCalculator;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Creates or replaces a draft invoice: recalculates every line with the TaxCalculator on the server,
@@ -22,6 +24,7 @@ final class SaveInvoiceDraft
         private readonly CurrentCompany $company,
         private readonly TaxCalculator $tax,
         private readonly ExchangeRates $rates,
+        private readonly DocumentNumbers $numbers,
     ) {
     }
 
@@ -39,6 +42,7 @@ final class SaveInvoiceDraft
 
         return DB::transaction(function () use ($data, $document, $userId) {
             $calc = $this->calculate($data);
+            $calc['header']['number'] = $this->draftNumber($data, $document);
 
             if ($document) {
                 $document = Document::query()->lockForUpdate()->findOrFail($document->getKey());
@@ -60,6 +64,29 @@ final class SaveInvoiceDraft
 
             return $document->refresh()->load('lines'); // refresh: the database bumped lock_version
         });
+    }
+
+    /**
+     * Automatic numbering: a draft has no number; it gets one when posted. Manual numbering (pre-printed books):
+     * the number typed on the draft, unique per company and type (database constraint).
+     */
+    private function draftNumber(array $data, ?Document $document): ?string
+    {
+        $number = isset($data['number']) && trim((string) $data['number']) !== '' ? trim((string) $data['number']) : null;
+        $automatic = $this->numbers->isAutomatic($this->company->id(), 'invoice');
+
+        if ($automatic && $number !== null) {
+            throw ValidationException::withMessages(['number' => ['Invoices are numbered when they are posted. Leave the number empty.']]);
+        }
+        if (! $automatic && $number === null) {
+            throw ValidationException::withMessages(['number' => ['Type the number from your invoice book.']]);
+        }
+        if ($number !== null && Document::query()->where(['type' => 'invoice', 'number' => $number])
+            ->when($document, fn ($q) => $q->whereKeyNot($document->getKey()))->exists()) {
+            throw ValidationException::withMessages(['number' => ["{$number} is already used by another invoice."]]);
+        }
+
+        return $number;
     }
 
     /**
@@ -107,7 +134,6 @@ final class SaveInvoiceDraft
         return [
             'header' => [
                 'contact_id' => $data['contact_id'],
-                'number' => $data['number'],
                 'issue_date' => $data['issue_date'],
                 'due_date' => $data['due_date'] ?? null,
                 'currency' => $currency,

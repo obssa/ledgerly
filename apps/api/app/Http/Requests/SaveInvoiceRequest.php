@@ -42,7 +42,7 @@ final class SaveInvoiceRequest extends FormRequest
     {
         return [
             'contact_id' => ['required', 'uuid', Rule::exists('contacts', 'id')->where('is_customer', true)],
-            'number' => ['required', 'string', 'max:40'],
+            'number' => ['nullable', 'string', 'max:40'],   // automatic numbering: none until posted (DocumentNumbers)
             'issue_date' => ['required', 'date_format:Y-m-d'],
             'due_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:issue_date'],
             'currency' => ['required', Rule::in(Currency::all())],

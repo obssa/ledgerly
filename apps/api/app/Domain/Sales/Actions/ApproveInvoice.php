@@ -11,6 +11,7 @@ use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Ledger\JournalDraft;
 use App\Domain\Ledger\Models\Account;
 use App\Domain\Ledger\Money;
+use App\Domain\Sales\DocumentNumbers;
 use App\Domain\Ledger\PostingService;
 use App\Domain\Sales\InvoicePostingBuilder;
 use App\Domain\Sales\Models\Document;
@@ -38,13 +39,14 @@ final class ApproveInvoice
         private readonly PostingService $posting,
         private readonly ConnectorRegistry $connectors,
         private readonly StateMachine $states,
+        private readonly DocumentNumbers $numbers,
     ) {
     }
 
     public function handle(Document $invoice, ?string $userId = null, ?int $lockVersion = null): Document
     {
         if (! in_array($invoice->type, ['invoice', 'credit_note'], true)) {
-            throw new LedgerException("Document {$invoice->number} is not an invoice or credit note.");
+            throw new LedgerException("Document {$invoice->label()} is not an invoice or credit note.");
         }
 
         $company = $this->current->get();
@@ -53,16 +55,23 @@ final class ApproveInvoice
             // Lock the row: two people approving at once must not post twice.
             $invoice = Document::query()->lockForUpdate()->findOrFail($invoice->getKey());
             $invoice->assertVersion($lockVersion);
-            $this->states->assert('invoice', $invoice->status, 'posted', $invoice->number);
+            $this->states->assert('invoice', $invoice->status, 'posted', $invoice->label());
 
             $limit = $company->settings['approval']['invoice_above'] ?? null;
             if ($limit !== null && $userId !== null && $invoice->created_by === $userId) {
                 $totalBase = Money::of($invoice->total, $invoice->currency)->convertTo($company->base_currency, (string) $invoice->fx_rate);
                 if (Money::of((string) $limit, $company->base_currency)->minus($totalBase)->isNegative()) {
-                    throw new LedgerException("{$invoice->number} is above the approval limit; someone other than its creator must approve it.");
+                    throw new LedgerException("{$invoice->label()} is above the approval limit; someone other than its creator must approve it.");
                 }
             }
 
+            // Gapless: the number is taken in this transaction, so a posting that fails takes none.
+            if ($invoice->number === null) {
+                if (! $this->numbers->isAutomatic($company->getKey(), $invoice->type)) {
+                    throw new LedgerException('This company numbers invoices by hand: type the number from the invoice book first.');
+                }
+                $invoice->number = $this->numbers->take($company, $invoice->type, DateTimeImmutable::createFromInterface($invoice->issue_date));
+            }
             $entry = $this->posting->post($this->journalDraftFor($invoice->load('lines')), $userId);
 
             $invoice->status = 'posted';

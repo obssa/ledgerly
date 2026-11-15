@@ -17,6 +17,7 @@ use App\Domain\Tenancy\Models\Membership;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Edits a posted invoice or credit note without losing anything:
@@ -61,6 +62,10 @@ final class EditPostedInvoice
         }
         if (EInvoiceSubmission::query()->where('document_id', $invoice->getKey())->where('status', 'submitted')->exists()) {
             throw new LedgerException("{$invoice->number} is being registered with the tax authority right now; try again when it has an answer.");
+        }
+
+        if (isset($data['number']) && $data['number'] !== '' && $data['number'] !== $invoice->number) {
+            throw ValidationException::withMessages(['number' => ["{$invoice->number} is posted; its number never changes."]]);
         }
 
         $company = $this->current->get();

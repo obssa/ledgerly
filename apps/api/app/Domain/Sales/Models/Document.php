@@ -50,6 +50,12 @@ class Document extends Model
     }
 
     /** Not yet in the ledger: saved freely. Once posted, changes go through EditPostedInvoice. */
+    /** The number, or "the draft" while an automatically numbered draft has none yet. */
+    public function label(): string
+    {
+        return $this->number ?? 'the draft';
+    }
+
     public function isEditable(): bool
     {
         return in_array($this->status, ['draft', 'awaiting_approval'], true);

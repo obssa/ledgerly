@@ -80,6 +80,16 @@ export interface OpeningBalances {
   can: { enter: boolean };
 }
 
+/** GET /numbering: how each type of document is numbered, and the number the next posted one would get. */
+export interface Numbering {
+  doc_type: string;
+  mode: "automatic" | "manual";
+  prefix: string;
+  include_year: boolean;
+  padding: number;
+  next_number: string;
+}
+
 export interface Contact {
   id: string;
   name: string;
@@ -108,7 +118,8 @@ export interface EInvoiceSubmission {
 
 export interface Invoice {
   id: string;
-  number: string;
+  /** null for a draft while numbering is automatic: the number is given when the invoice is posted. */
+  number: string | null;
   /** Invoice state machine: draft → awaiting_approval → posted → part_paid → paid; void. */
   status: "draft" | "awaiting_approval" | "posted" | "part_paid" | "paid" | "void";
   /** Send back on save: the API refuses the save (409) if someone else changed the invoice first. */
@@ -238,6 +249,8 @@ export const ledgerly = {
   openingBalances: (ctx: RequestOptions) => api<OpeningBalances>("opening-balances", ctx),
   saveOpeningBalances: (lines: { account_id: string; debit?: string; credit?: string }[], ctx: RequestOptions) =>
     api<OpeningBalances>("opening-balances", { ...ctx, method: "PUT", body: { lines } }),
+  numbering: (ctx: RequestOptions) => api<{ data: Numbering[] }>("numbering", ctx),
+  saveNumbering: (body: Omit<Numbering, "next_number">, ctx: RequestOptions) => api<Numbering>("numbering", { ...ctx, method: "PUT", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}`, ctx),
   approveInvoice: (id: string, ctx: RequestOptions) => api<Invoice>(`invoices/${id}/approve`, { ...ctx, method: "POST" }),
