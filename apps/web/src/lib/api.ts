@@ -550,6 +550,12 @@ export const ledgerly = {
   adjustStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ move_id: string; amount: string; unit_cost: string }>("stock/adjustments", { ...ctx, method: "POST", body }),
   binCard: (q: { item_id: string; warehouse_id: string; from: string; to: string }, ctx: RequestOptions) => api<BinCard>("reports/bin-card", { ...ctx, query: q }),
+  transferStock: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ value: string }>("stock/transfers", { ...ctx, method: "POST", body }),
+  reorder: (ctx: RequestOptions) =>
+    api<{ data: { item: { id: string; sku: string | null; name: string; unit: string; reorder_point: string; purchase_price: string | null }; on_hand: string }[] }>("stock/reorder", ctx),
+  inventoryValuation: (asOf: string | undefined, ctx: RequestOptions) =>
+    api<{ as_of: string; rows: { item_id: string; name: string; sku: string | null; unit: string; warehouse: string; quantity: string; value: string }[]; stock_value: string; inventory_account: string; difference: string }>(
+      "reports/inventory-valuation", { ...ctx, query: { as_of: asOf } }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),

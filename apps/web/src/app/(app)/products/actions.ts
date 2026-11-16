@@ -79,3 +79,18 @@ export async function createWarehouse(_: FormState | undefined, form: FormData):
   refresh();
   return { notice: "Warehouse added." };
 }
+
+export async function transferStock(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let value: string;
+  try {
+    value = (await ledgerly.transferStock({
+      item_id: text(form, "item_id") ?? "", from_warehouse_id: text(form, "from_warehouse_id") ?? "", to_warehouse_id: text(form, "to_warehouse_id") ?? "",
+      date: text(form, "date") ?? "", quantity: amount(text(form, "quantity")), ...(text(form, "reference") ? { reference: text(form, "reference") } : {}),
+    }, ctx)).value;
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: `Moved, at a cost of ${value}.` };
+}

@@ -17,6 +17,7 @@ use App\Domain\Tenancy\Support\CurrentCompany;
 use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class LedgerController extends Controller
@@ -155,6 +156,32 @@ final class LedgerController extends Controller
         $company = $this->current->get();
 
         return response()->json($report->ageing($company->getKey(), Account::system('accounts_payable')->getKey(), $company->base_currency, $asOf, 'bill'));
+    }
+
+    /**
+     * Inventory valuation at a date: quantity and value per item and warehouse from the stock moves, next to the
+     * inventory account in the ledger. They are equal by construction; a difference would mean a posting outside the
+     * stock ledger (a manual journal on the inventory account) and is shown, not hidden.
+     */
+    public function inventoryValuation(Request $request): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $company = $this->current->get();
+        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? $this->current->today();
+        $base = $company->base_currency;
+
+        $rows = DB::table('stock_moves as m')->join('items as i', 'i.id', '=', 'm.item_id')->join('warehouses as w', 'w.id', '=', 'm.warehouse_id')
+            ->where('m.company_id', $company->getKey())->where('m.moved_on', '<=', $asOf)
+            ->groupBy('m.item_id', 'i.name', 'i.sku', 'i.unit', 'm.warehouse_id', 'w.name')
+            ->orderBy('i.name')->orderBy('w.name')
+            ->selectRaw('m.item_id, i.name, i.sku, i.unit, m.warehouse_id, w.name AS warehouse, sum(m.quantity)::numeric(18,2)::text AS quantity, sum(m.amount)::numeric(20,2)::text AS value')
+            ->get()->filter(fn ($r) => $r->quantity !== '0.00' || $r->value !== '0.00')->values();
+        $stock = $rows->reduce(fn (Money $s, $r) => $s->plus(Money::of($r->value, $base)), Money::zero($base));
+        $ledger = Money::of((string) DB::table('journal_lines')->where(['company_id' => $company->getKey(), 'account_id' => Account::system('inventory')->getKey()])
+            ->where('entry_date', '<=', $asOf)->selectRaw('coalesce(sum(debit - credit), 0)::numeric(20,2)::text AS b')->value('b'), $base);
+
+        return response()->json(['as_of' => $asOf, 'rows' => $rows, 'stock_value' => $stock->toDecimalString(),
+            'inventory_account' => $ledger->toDecimalString(), 'difference' => $ledger->minus($stock)->toDecimalString()]);
     }
 
     public function binCard(Request $request, ReportService $reports): JsonResponse

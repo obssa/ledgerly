@@ -51,6 +51,63 @@ final class StockController extends Controller
         return response()->json(['data' => $rows, 'total_value' => $total->toDecimalString()]);
     }
 
+    /**
+     * Moves stock from one warehouse to another: out at the source's weighted average, in at exactly that value. Inventory
+     * is one account for every warehouse, so nothing posts to the ledger.
+     */
+    public function transfer(Request $request, StockLedger $stock, AuditLogger $audit): JsonResponse
+    {
+        $this->authorizeCompany('inventory.transfer');
+        $data = $request->validate([
+            'item_id' => ['required', 'uuid'],
+            'from_warehouse_id' => ['required', 'uuid'],
+            'to_warehouse_id' => ['required', 'uuid', 'different:from_warehouse_id'],
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
+            'quantity' => ['required', 'decimal:0,2', 'gt:0'],
+            'reference' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        return DB::transaction(function () use ($data, $stock, $audit, $request) {
+            $company = $this->current->get();
+            $item = Item::query()->where('is_active', true)->find($data['item_id']);
+            if ($item === null || ! $item->isStock()) {
+                throw ValidationException::withMessages(['item_id' => ['Choose an active stock item of this company.']]);
+            }
+            $from = Warehouse::query()->find($data['from_warehouse_id'])
+                ?? throw ValidationException::withMessages(['from_warehouse_id' => ['Not a warehouse of this company.']]);
+            $to = Warehouse::query()->where('is_active', true)->find($data['to_warehouse_id'])
+                ?? throw ValidationException::withMessages(['to_warehouse_id' => ['Choose an active warehouse of this company.']]);
+            $date = new DateTimeImmutable($data['date']);
+            $reference = $data['reference'] ?? "Transfer to {$to->name}";
+            $group = (string) \Illuminate\Support\Str::uuid7();
+
+            $out = $stock->move($company->getKey(), $company->base_currency, $item->getKey(), $from->getKey(), $date, 'transfer_out',
+                '-' . $data['quantity'], '0', $reference, null, $request->user()->getKey(), null, $group);
+            $in = $stock->move($company->getKey(), $company->base_currency, $item->getKey(), $to->getKey(), $date, 'transfer_in',
+                (string) $data['quantity'], '0', $data['reference'] ?? "Transfer from {$from->name}", null, $request->user()->getKey(),
+                $out['amount']->negated()->toDecimalString(), $group);
+
+            $audit->record($company->getKey(), 'stock_transferred', 'item', $item->getKey(), null, [
+                'from' => $from->name, 'to' => $to->name, 'quantity' => (string) $data['quantity'], 'value' => $in['amount']->toDecimalString(),
+            ], userId: $request->user()->getKey());
+
+            return response()->json(['transfer_group' => $group, 'value' => $in['amount']->toDecimalString(), 'unit_cost' => $in['unit_cost']], 201);
+        });
+    }
+
+    /** Stock items at or below their reorder point, across all warehouses. */
+    public function reorder(): JsonResponse
+    {
+        $this->authorizeCompany('inventory.view');
+        $items = Item::query()->where(['is_active' => true, 'type' => 'inventory'])->whereNotNull('reorder_point')->orderBy('name')->get();
+        $onHand = StockBalance::query()->whereIn('item_id', $items->pluck('id'))->groupBy('item_id')
+            ->selectRaw('item_id, sum(quantity)::numeric(18,2)::text AS quantity')->pluck('quantity', 'item_id');
+        $base = $this->current->get()->base_currency;
+
+        return response()->json(['data' => $items->filter(fn (Item $i) => ! Money::of((string) $i->reorder_point, $base)->minus(Money::of((string) ($onHand[$i->getKey()] ?? '0'), $base))->isNegative())
+            ->map(fn (Item $i) => ['item' => $i->only(['id', 'sku', 'name', 'unit', 'reorder_point', 'purchase_price']), 'on_hand' => (string) ($onHand[$i->getKey()] ?? '0.00')])->values()]);
+    }
+
     public function adjust(Request $request, StockLedger $stock, PostingService $posting, AuditLogger $audit): JsonResponse
     {
         $this->authorizeCompany('inventory.adjust');

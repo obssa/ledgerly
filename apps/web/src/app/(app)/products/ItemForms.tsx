@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import type { Item } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
-import { adjustStock, createItem, createWarehouse, saveItem } from "./actions";
+import { adjustStock, createItem, createWarehouse, saveItem, transferStock } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -74,6 +74,35 @@ export function NewWarehouse() {
         <input className="field" id="wh_name" name="name" maxLength={120} />
       </div>
       <button type="submit" className="btn" disabled={pending}>Add</button>
+    </form>
+  );
+}
+
+/** Moves stock between warehouses at its average cost; nothing posts to the ledger. */
+export function TransferStock({ items, warehouses }: { items: { id: string; name: string }[]; warehouses: { id: string; name: string }[] }) {
+  const [state, action, pending] = useActionState(transferStock, undefined);
+  const today = new Date().toISOString().slice(0, 10);
+  const bad = (n: string) => Boolean(state?.fields?.[n]);
+  return (
+    <form action={action} noValidate className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] items-end gap-3">
+      <div className="col-span-full"><Message state={state} /></div>
+      <div>
+        <label className="field-label" htmlFor="t_item">Item</label>
+        <select className="field" id="t_item" name="item_id">{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
+      </div>
+      <div>
+        <label className="field-label" htmlFor="t_from">From</label>
+        <select className="field" id="t_from" name="from_warehouse_id">{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select>
+      </div>
+      <div>
+        <label className="field-label" htmlFor="t_to">To</label>
+        <select className={`field ${bad("to_warehouse_id") ? "!border-bad" : ""}`} id="t_to" name="to_warehouse_id" defaultValue={warehouses[1]?.id}>
+          {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+        </select>
+      </div>
+      <Field name="quantity" label="Quantity" invalid={bad("quantity")} />
+      <Field name="date" label="Date" type="date" defaultValue={today} />
+      <button type="submit" className="btn" disabled={pending}>{pending ? "Moving…" : "Move stock"}</button>
     </form>
   );
 }
