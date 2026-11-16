@@ -4,11 +4,15 @@ import { getTaxCentre } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { FileReturn } from "./TaxForms";
 import { Worksheet } from "./Worksheet";
+import type { FilingStatus } from "@/lib/api";
 
 export const metadata = { title: "Tax centre" };
 
 const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const KINDS = [["vat", "VAT"], ["withholding", "Withholding tax"]] as const;
+const STATUS: Record<FilingStatus, [string, "good" | "warn" | "bad" | "neutral"]> = {
+  paid: ["Filed and paid", "good"], filed: ["Filed, not paid", "warn"], overdue: ["Overdue", "bad"], due_soon: ["Due soon", "warn"], due: ["Due", "neutral"], open: ["Period open", "neutral"],
+};
 
 /** Module 7: the VAT and withholding worksheets of any period, built from the ledger, filing a return and the returns filed. */
 export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">) {
@@ -30,6 +34,12 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
             <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={centre.sheet.to} /></div>
             <button type="submit" className="btn">Show</button>
           </form>
+          {(centre.calendar.overdue > 0 || centre.calendar.due_soon > 0) && (
+            <p role="status" className={`mb-4 rounded-lg px-3 py-2 text-[13px] font-semibold ${centre.calendar.overdue > 0 ? "bg-bad-tint text-bad" : "bg-warn-tint text-warn"}`}>
+              {centre.calendar.overdue > 0 && <>{centre.calendar.overdue} return{centre.calendar.overdue === 1 ? "" : "s"} overdue. </>}
+              {centre.calendar.due_soon > 0 && <>{centre.calendar.due_soon} due within ten days.</>} See the filing calendar below.
+            </p>
+          )}
           <Worksheet sheet={centre.sheet} />
           {(centre.sheet.filed ?? []).length > 0 ? (
             <p role="status" className="mb-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">
@@ -43,6 +53,39 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
               <FileReturn kind={centre.sheet.kind} from={centre.sheet.from} to={centre.sheet.to} />
             </Card>
           ) : null}
+          <Card className="mb-4 !p-2" label="Filing calendar">
+            <h2 className="px-3 pt-2 text-[15px] font-bold">Filing calendar</h2>
+            <div className="grid gap-4 overflow-x-auto md:grid-cols-2">
+              {KINDS.filter(([k]) => centre.calendar.kinds[k]).map(([k, label]) => (
+                <table key={k} className="tbl">
+                  <caption className="px-3 pt-2 text-left text-[14px] font-bold">{label}</caption>
+                  <thead><tr><th scope="col">Period</th><th scope="col">Due</th><th scope="col">Where it stands</th></tr></thead>
+                  <tbody>
+                    {(centre.calendar.kinds[k]?.periods ?? []).slice(0, 6).map((p) => (
+                      <tr key={p.period_start}>
+                        <td><Link href={`/tax?${new URLSearchParams({ kind: k, from: p.period_start, to: p.period_end }).toString()}`} className="num hover:underline">{p.period_start.slice(0, 7)}</Link></td>
+                        <td className="num">{p.due_on}</td>
+                        <td>{p.return ? <Link href={`/tax/returns/${encodeURIComponent(p.return.id)}`}><Pill tone={STATUS[p.status][1]}>{STATUS[p.status][0]}</Pill></Link> : <Pill tone={STATUS[p.status][1]}>{STATUS[p.status][0]}</Pill>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ))}
+            </div>
+            {KINDS.map(([k]) => centre.calendar.kinds[k]?.note).filter(Boolean).map((note) => <p key={note} className="px-3 pb-1 text-[12px] text-muted">{note}</p>)}
+            {Object.keys(centre.calendar.kinds).length === 0 && <p className="px-3 pb-2 text-[13px] text-muted">The country pack sets no filing dates for this company&apos;s country yet.</p>}
+          </Card>
+          <Card className="mb-4" label="Tax audit file">
+            <h2 className="mb-2 text-[15px] font-bold">Tax audit file</h2>
+            <p className="mb-3 text-[13px] text-muted">For the tax authority or an auditor: every document and every ledger line of the period above, as CSV.</p>
+            <div className="flex flex-wrap gap-2">
+              {(["documents", "ledger"] as const).map((part) => (
+                <a key={part} className="btn" href={`/tax/audit-file?${new URLSearchParams({ part, from: centre.sheet.from, to: centre.sheet.to }).toString()}`}>
+                  {part === "documents" ? "Download the documents" : "Download the ledger lines"}
+                </a>
+              ))}
+            </div>
+          </Card>
           <Card className="!p-2" label="Returns filed">
             <h2 className="px-3 pt-2 text-[15px] font-bold">Returns filed</h2>
             <div className="overflow-x-auto">

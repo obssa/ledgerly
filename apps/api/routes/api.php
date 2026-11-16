@@ -167,6 +167,8 @@ Route::prefix('v1')->group(function () {
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
             Route::get('tax/worksheet', [TaxReturnController::class, 'worksheet']);
+            Route::get('tax/calendar', [TaxReturnController::class, 'calendar']);
+            Route::get('tax/audit-file', [TaxReturnController::class, 'auditFile']);
             Route::get('tax-returns', [TaxReturnController::class, 'index']);
             Route::post('tax-returns', [TaxReturnController::class, 'store']);
             Route::get('tax-returns/{taxReturn}', [TaxReturnController::class, 'show'])->whereUuid('taxReturn');

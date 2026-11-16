@@ -364,6 +364,16 @@ export interface TaxWorksheet {
   can?: { file: boolean };
 }
 
+export type FilingStatus = "paid" | "filed" | "overdue" | "due_soon" | "due" | "open";
+
+export interface TaxCalendar {
+  today: string;
+  overdue: number;
+  due_soon: number;
+  kinds: Partial<Record<TaxKind, { note: string | null; periods: { period_start: string; period_end: string; due_on: string; status: FilingStatus;
+    return: { id: string; filed_on: string; settled_on: string | null } | null }[] }>>;
+}
+
 export interface TaxReturn {
   id: string;
   kind: TaxKind;
@@ -844,6 +854,9 @@ export const ledgerly = {
   postDueRecurring: (ctx: RequestOptions) =>
     api<{ data: { id: string; name: string; posted: number[]; error: string | null }[]; posted: number }>("recurring-journals/post-due", { ...ctx, method: "POST", body: {} }),
   taxWorksheet: (q: { kind?: string; from?: string; to?: string }, ctx: RequestOptions) => api<TaxWorksheet>("tax/worksheet", { ...ctx, query: q }),
+  taxCalendar: (ctx: RequestOptions) => api<TaxCalendar>("tax/calendar", ctx),
+  taxAuditFile: (q: { part: string; from?: string; to?: string }, ctx: RequestOptions) =>
+    api<{ filename: string; csv: string; rows: number; truncated: boolean }>("tax/audit-file", { ...ctx, query: q }),
   taxReturns: (ctx: RequestOptions) => api<{ data: TaxReturn[]; can: { file: boolean } }>("tax-returns", ctx),
   taxReturn: (id: string, ctx: RequestOptions) => api<TaxReturn>(`tax-returns/${encodeURIComponent(id)}`, ctx),
   fileTaxReturn: (body: Record<string, unknown>, ctx: RequestOptions) => api<TaxReturn>("tax-returns", { ...ctx, method: "POST", body }),
