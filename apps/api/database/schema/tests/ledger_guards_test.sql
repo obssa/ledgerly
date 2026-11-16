@@ -2107,6 +2107,41 @@ DO $$ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T64 audit adjustments go into a closed year until it is signed off, then the year stays as it is';
 END $$;
+-- T65: reviews of unusual entries (038). An entry is reviewed once, by the person signed in, in its own company, and
+-- the review is never changed or removed. Company A, as user f1, on T1's entry e001.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO journal_entry_reviews (company_id, journal_entry_id, reviewed_by) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e001', '00000000-0000-0000-0000-0000000000f2');
+    RAISE EXCEPTION 'FAIL T65a: an entry was marked reviewed by someone else';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO journal_entry_reviews (company_id, journal_entry_id, reviewed_by) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000eeee1', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T65b: a review named an entry that is not this company''s';
+  EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO journal_entry_reviews (company_id, journal_entry_id, reviewed_by) VALUES
+      ('00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-00000000e001', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T65c: a review was written into another company';
+  EXCEPTION WHEN insufficient_privilege OR foreign_key_violation THEN NULL; END;
+  INSERT INTO journal_entry_reviews (company_id, journal_entry_id, reviewed_by, flags, note) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e001', '00000000-0000-0000-0000-0000000000f1', '{round_amount}', 'Agreed to the contract');
+  BEGIN
+    INSERT INTO journal_entry_reviews (company_id, journal_entry_id, reviewed_by) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e001', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T65d: an entry was reviewed twice';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    UPDATE journal_entry_reviews SET note = 'Changed my mind' WHERE journal_entry_id = '00000000-0000-0000-0000-00000000e001';
+    RAISE EXCEPTION 'FAIL T65e: a review was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM journal_entry_reviews WHERE journal_entry_id = '00000000-0000-0000-0000-00000000e001';
+    RAISE EXCEPTION 'FAIL T65f: a review was removed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T65 an entry is reviewed once, by the person signed in, and the review is kept as it was';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

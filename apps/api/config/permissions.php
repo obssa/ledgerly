@@ -34,6 +34,8 @@
 | accounting.revalue revalue foreign-currency balances at a month end (accountant via 'accounting.*')
 | journals.approve   approve or reject a manual journal above settings.approval.journal_above, not one you asked for
 |                    (accountant via 'journals.*', approver)
+| journals.review    mark an entry of the review queue of unusual entries reviewed, with a note (accountant via
+|                    'journals.*', approver)
 */
 
 return [
@@ -44,7 +46,7 @@ return [
         'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'banking.*', 'contacts.*', 'reports.view'],
         'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view'],
         'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer'],
-        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve'],
+        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review'],
         'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'banking.view', 'reports.view'],
         'custom' => [],
     ],
