@@ -167,6 +167,10 @@ final class TenantIsolationTest extends TestCase
             'transfer out of B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->b['bank'], 'to_account_id' => $this->a['bank'], 'amount' => '10']],
             'transfer into B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->a['bank'], 'to_account_id' => $this->b['bank'], 'amount' => '10']],
             'deposit into B\'s bank' => ['POST', '/api/v1/banking/deposits', ['date' => '2026-11-05', 'bank_account_id' => $this->b['bank'], 'receipts' => ['10']]],
+            'statement into B\'s bank' => ['POST', "/api/v1/bank-accounts/{$this->b['bank']}/statements", ['csv' => "Date,Description,Amount\n05/11/2026,Planted,-10\n"]],
+            'statement line matched to B\'s entry' => ['POST', "/api/v1/statement-lines/{$this->a['statement_fuel']}/match", ['journal_line_id' => $this->b['bank_line']]],
+            'statement line categorised to B\'s account' => ['POST', "/api/v1/statement-lines/{$this->a['statement_line']}/categorise", ['account_id' => $this->b['rent']]],
+            'statement line categorised for B\'s supplier' => ['POST', "/api/v1/statement-lines/{$this->a['statement_line']}/categorise", ['account_id' => $this->a['rent'], 'contact_id' => $this->b['supplier']]],
         ];
 
         foreach ($attempts as $what => [$method, $uri, $body]) {
@@ -265,7 +269,7 @@ final class TenantIsolationTest extends TestCase
     /** @return array<string, int> */
     private function ledgerCounts(): array
     {
-        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys'])
+        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions'])
             ->mapWithKeys(fn ($t) => [$t => $this->owner()->table($t)->count()])->all();
     }
 

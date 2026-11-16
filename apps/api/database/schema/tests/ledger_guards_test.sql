@@ -1462,6 +1462,68 @@ DO $$ BEGIN
   UPDATE accounts SET currency = 'USD' WHERE id = '00000000-0000-0000-0000-000000000a53';   -- no entries yet: still free
   RAISE NOTICE 'PASS T53 an account with entries keeps its type, kind and currency';
 END $$;
+-- T54: imported statement lines (027). What the bank said stays; a line is explained by one journal line on the same
+-- account for the same amount; excluded lines say why; nothing is deleted. Uses a10 of company A and the T48 expense
+-- entry e480, whose line 2 takes 250.00 out of a10.
+DO $$ DECLARE jl uuid; other uuid; BEGIN
+  SELECT id INTO jl FROM journal_lines WHERE journal_entry_id = '00000000-0000-0000-0000-00000000e480' AND line_no = 2;
+  SELECT id INTO other FROM journal_lines WHERE journal_entry_id = '00000000-0000-0000-0000-00000000e480' AND line_no = 1;
+  INSERT INTO bank_transactions (id, company_id, account_id, posted_on, description, amount, source, external_id, reference) VALUES
+    ('00000000-0000-0000-0000-00000000b541', app_company_id(), '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'POS PURCHASE', -250, 'statement', 'FT27181', 'FT27181'),
+    ('00000000-0000-0000-0000-00000000b542', app_company_id(), '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'SERVICE CHARGE', -12.5, 'statement', 'FT27182', NULL);
+  BEGIN
+    INSERT INTO bank_transactions (company_id, account_id, posted_on, description, amount, source) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a40', '2027-06-30', 'x', 1, 'statement');
+    RAISE EXCEPTION 'FAIL T54a: a statement line was put on an income account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO bank_transactions (company_id, account_id, posted_on, description, amount, source) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000b11', '2027-06-30', 'x', 1, 'statement');
+    RAISE EXCEPTION 'FAIL T54b: a statement line was put on another company''s account';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE bank_transactions SET amount = -251 WHERE id = '00000000-0000-0000-0000-00000000b541';
+    RAISE EXCEPTION 'FAIL T54c: what the bank said was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE bank_transactions SET status = 'matched' WHERE id = '00000000-0000-0000-0000-00000000b541';
+    RAISE EXCEPTION 'FAIL T54d: a line was matched to nothing';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE bank_transactions SET status = 'matched', journal_line_id = jl WHERE id = '00000000-0000-0000-0000-00000000b542';
+    RAISE EXCEPTION 'FAIL T54e: a line was matched to an entry for another amount';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE bank_transactions SET status = 'matched', journal_line_id = other WHERE id = '00000000-0000-0000-0000-00000000b541';
+    RAISE EXCEPTION 'FAIL T54f: a line was matched to an entry on another account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE bank_transactions SET status = 'excluded' WHERE id = '00000000-0000-0000-0000-00000000b542';
+    RAISE EXCEPTION 'FAIL T54g: a line was excluded without a reason';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE bank_transactions SET status = 'matched', journal_line_id = jl WHERE id = '00000000-0000-0000-0000-00000000b541';
+  BEGIN
+    UPDATE bank_transactions SET status = 'categorised', journal_line_id = jl WHERE id = '00000000-0000-0000-0000-00000000b541';
+    RAISE EXCEPTION 'FAIL T54h: a matched line changed how it is explained without an undo';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO bank_transactions (company_id, account_id, posted_on, description, amount, source, status, journal_line_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'POS PURCHASE again', -250, 'statement', 'matched', jl);
+    RAISE EXCEPTION 'FAIL T54i: one entry explained two statement lines';
+  EXCEPTION WHEN check_violation OR unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO bank_transactions (company_id, account_id, posted_on, description, amount, source, external_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'POS PURCHASE', -250, 'statement', 'FT27181');
+    RAISE EXCEPTION 'FAIL T54j: the same bank reference was imported twice';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  UPDATE bank_transactions SET status = 'imported', journal_line_id = NULL WHERE id = '00000000-0000-0000-0000-00000000b541';
+  UPDATE bank_transactions SET status = 'excluded', note = 'Duplicate of the card statement' WHERE id = '00000000-0000-0000-0000-00000000b542';
+  BEGIN
+    DELETE FROM bank_transactions WHERE id = '00000000-0000-0000-0000-00000000b542';
+    RAISE EXCEPTION 'FAIL T54k: a statement line was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T54 statement lines keep what the bank said and are explained by one entry on the same account for the same amount';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

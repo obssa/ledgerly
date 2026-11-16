@@ -163,6 +163,30 @@ export interface BankRegister {
   lines: { date: string; entry: number; source_type: string; memo: string | null; description: string | null; contact: string | null; in: string; out: string; balance: string }[];
 }
 
+/** Module 5: one line of a bank, wallet or cash statement, and how it is explained in the books. */
+export interface StatementLine {
+  id: string;
+  account_id: string;
+  date: string;
+  description: string;
+  reference: string | null;
+  amount: string;
+  balance_after: string | null;
+  status: "imported" | "matched" | "categorised" | "excluded" | "reconciled";
+  note: string | null;
+  source: string;
+  entry: { id: string; number: number; date: string; memo: string | null; source_type: string; status: string } | null;
+  suggestions?: { journal_line_id: string; entry: number; date: string; memo: string | null; description: string | null; contact: string | null; source_type: string; days_apart: number }[];
+}
+
+export interface StatementLines {
+  account: { id: string; code: string; name: string; currency: string };
+  status: StatementLine["status"] | "all";
+  counts: Record<StatementLine["status"], number>;
+  data: StatementLine[];
+  can: { review: boolean };
+}
+
 /** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
 export interface Item {
   id: string;
@@ -586,6 +610,12 @@ export const ledgerly = {
   updateBankAccount: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<BankAccount>(`bank-accounts/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   bankRegister: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) => api<BankRegister>(`bank-accounts/${encodeURIComponent(id)}/register`, { ...ctx, query: q }),
   transferMoney: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ number: number }>("banking/transfers", { ...ctx, method: "POST", body }),
+  statementLines: (id: string, status: string, ctx: RequestOptions) =>
+    api<StatementLines>(`bank-accounts/${encodeURIComponent(id)}/statement-lines`, { ...ctx, query: { status } }),
+  importStatement: (id: string, body: { csv: string; file_name?: string }, ctx: RequestOptions) =>
+    api<{ imported: number; skipped: number; from: string; to: string }>(`bank-accounts/${encodeURIComponent(id)}/statements`, { ...ctx, method: "POST", body }),
+  reviewStatementLine: (id: string, step: "match" | "categorise" | "exclude" | "undo", body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<StatementLine>(`statement-lines/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   depositReceipts: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ number: number }>("banking/deposits", { ...ctx, method: "POST", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),

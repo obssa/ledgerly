@@ -116,6 +116,10 @@ final class PostingService
             if ($entry->status !== 'posted') {
                 throw new LedgerException("Journal entry {$entry->number} is already reversed.");
             }
+            // A bank statement line explained by this entry would be left pointing at money that never moved (027).
+            if (DB::table('bank_transactions')->where('company_id', $entry->company_id)->whereIn('journal_line_id', $entry->lines->pluck('id')->all())->exists()) {
+                throw new LedgerException("Journal entry {$entry->number} is matched to a bank statement line: undo the match on the statement first.");
+            }
 
             $baseCurrency = DB::table('companies')->where('id', $entry->company_id)->value('base_currency');
             $reversal = new JournalDraft(

@@ -73,6 +73,10 @@ final class DemoLoginTest extends TestCase
         $this->withToken($token)->getJson('/api/v1/expenses', $h)->assertOk()->assertJsonCount(2, 'data');
         $this->withToken($token)->getJson('/api/v1/supplier-credits', $h)->assertOk()->assertJsonPath('data.0.status', 'paid');
         $this->withToken($token)->getJson('/api/v1/stock', $h)->assertOk()->assertJsonPath('total_value', '557000.00');   // 215 x 640 + 900 x 450 + 1,200 x 12
+        $bank = collect($this->withToken($token)->getJson('/api/v1/bank-accounts', $h)->assertOk()->json('data'))->firstWhere('code', '1100')['id'];
+        $statement = $this->withToken($token)->getJson("/api/v1/bank-accounts/{$bank}/statement-lines", $h)->assertOk()->assertJsonPath('counts.categorised', 1);
+        $this->assertGreaterThanOrEqual(2, $statement->json('counts.imported'), 'a statement with lines to review');
+        $this->assertNotEmpty(collect($statement->json('data'))->pluck('suggestions')->flatten(1)->all(), 'and lines the books already hold, ready to match');
         $ageing = $this->withToken($token)->getJson('/api/v1/reports/ar-ageing', $h)->assertOk();
         $this->assertNotSame('0.00', $ageing->json('totals.total'));
 

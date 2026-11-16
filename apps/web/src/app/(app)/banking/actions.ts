@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { getSession } from "@/lib/session";
+import { statementFrom } from "@/lib/statements";
 
 /* Server Functions behind banking. The API checks who may open accounts (banking.manage), transfer and deposit. */
 
@@ -82,4 +83,40 @@ export async function depositReceipts(_: FormState | undefined, form: FormData):
   }
   refresh();
   return { notice: "Deposited and posted." };
+}
+
+export async function importStatement(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const statement = await statementFrom(form);
+  if ("error" in statement) return { error: statement.error, fields: { file: [statement.error] } };
+  let result: { imported: number; skipped: number; from: string; to: string };
+  try {
+    result = await ledgerly.importStatement(text(form, "account_id") ?? "", { csv: statement.csv, ...(statement.fileName ? { file_name: statement.fileName } : {}) }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  const skipped = result.skipped > 0 ? `; ${result.skipped} already imported, skipped` : "";
+  return { notice: `Imported ${result.imported} line${result.imported === 1 ? "" : "s"} from ${result.from} to ${result.to}${skipped}.` };
+}
+
+const STEPS = { match: "Matched.", categorise: "Categorised and posted.", exclude: "Excluded.", undo: "Back to review." } as const;
+
+/** One review step on a statement line; the step and its fields come from the form that was submitted. */
+export async function reviewStatementLine(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const step = text(form, "step") as keyof typeof STEPS | undefined;
+  if (!step || !(step in STEPS)) return { error: "Choose what to do with the line." };
+  const body: Record<string, string> = {};
+  for (const field of ["journal_line_id", "account_id", "contact_id", "memo", "reason"]) {
+    const v = text(form, field);
+    if (v) body[field] = v;
+  }
+  try {
+    await ledgerly.reviewStatementLine(text(form, "line_id") ?? "", step, body, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: STEPS[step] };
 }
