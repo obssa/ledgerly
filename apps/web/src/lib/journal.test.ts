@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { journalAccounts, journalBody, journalTotals } from "./journal";
+import { journalAccounts, journalBody, journalTotals, recurringBody } from "./journal";
 
 describe("journalTotals", () => {
   it("adds debits and credits exactly and says when the entry balances", () => {
@@ -39,5 +39,24 @@ describe("journalAccounts", () => {
       a({ code: "6100" }), a({ code: "1200", subtype: "receivable", system_key: "accounts_receivable" }), a({ code: "1300", system_key: "inventory" }),
       a({ code: "1101", currency: "USD" }), a({ code: "6200", is_active: false }), a({ code: "1100", currency: "ETB" }), a({ code: "3100", system_key: "retained_earnings" }),
     ], "ETB").map((x) => x.code)).toEqual(["1100", "6100"]);
+  });
+});
+
+describe("reverse_on and recurringBody", () => {
+  const lines = JSON.stringify([{ account_id: "rent", debit: "300", credit: "", description: "" }, { account_id: "equity", debit: "", credit: "300", description: "" }]);
+  it("sends when a journal reverses only when one is given", () => {
+    const f = new FormData();
+    f.append("date", "2026-11-30");
+    f.append("memo", "Audit fee accrued");
+    f.append("lines", lines);
+    expect(journalBody(f)).not.toHaveProperty("reverse_on");
+    f.append("reverse_on", "2026-12-01");
+    expect(journalBody(f).reverse_on).toBe("2026-12-01");
+  });
+  it("sends a template's name and schedule with its lines, and no end as null", () => {
+    const f = new FormData();
+    for (const [k, v] of [["name", " Office rent "], ["memo", "Rent for the month"], ["frequency", "monthly"], ["next_on", "2026-12-31"], ["ends_on", ""], ["lines", lines]]) f.append(k, v);
+    expect(recurringBody(f)).toEqual({ name: "Office rent", memo: "Rent for the month", frequency: "monthly", next_on: "2026-12-31", ends_on: null,
+      lines: [{ account_id: "rent", debit: "300" }, { account_id: "equity", credit: "300" }] });
   });
 });

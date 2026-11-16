@@ -64,6 +64,13 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/journal-requests/{journalRequest}/approve' => 'journals.approve',
         'POST api/v1/journal-requests/{journalRequest}/reject' => 'journals.approve',
         'POST api/v1/journal-requests/{journalRequest}/withdraw' => 'journals.create',
+        'GET api/v1/recurring-journals' => 'accounting.view',
+        'POST api/v1/recurring-journals' => 'journals.create',
+        'POST api/v1/recurring-journals/post-due' => 'journals.create',
+        'GET api/v1/recurring-journals/{recurringJournal}' => 'accounting.view',
+        'PUT api/v1/recurring-journals/{recurringJournal}' => 'journals.create',
+        'POST api/v1/recurring-journals/{recurringJournal}/pause' => 'journals.create',
+        'POST api/v1/recurring-journals/{recurringJournal}/resume' => 'journals.create',
         'POST api/v1/journal-entries/{entry}/reverse' => 'journals.create',
 
         'GET api/v1/tax-rates' => 'company.view',

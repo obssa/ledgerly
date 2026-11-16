@@ -112,6 +112,9 @@ trait CompanyFixtures
         $this->owner()->table('journal_requests')->insert(['id' => $ids['journal_request'], 'company_id' => $company, 'entry_date' => '2026-11-08',
             'memo' => 'Bonus provision', 'total' => '50.00', 'requested_by' => $this->owner()->table('memberships')->where(['company_id' => $company, 'role' => 'owner'])->value('user_id'),
             'lines' => json_encode([['account_id' => $ids['rent'], 'debit' => '50'], ['account_id' => $ids['equity'], 'credit' => '50']])]);
+        // Monthly rent as a recurring journal, first due on 1 Dec (so nothing posts yet).
+        $ids['recurring_journal'] = $this->postJson('/api/v1/recurring-journals', ['name' => 'Monthly rent', 'memo' => 'Rent for the month', 'frequency' => 'monthly',
+            'next_on' => '2026-12-01', 'lines' => [['account_id' => $ids['rent'], 'debit' => '40'], ['account_id' => $ids['equity'], 'credit' => '40']]], $h)->assertCreated()->json('id');
         // A reconciliation of the bank to 8 Nov in progress, its difference not yet zero.
         $ids['reconciliation'] = $this->postJson("/api/v1/bank-accounts/{$ids['bank']}/reconciliations", ['statement_date' => '2026-11-08', 'ending_balance' => '1'], $h)
             ->assertCreated()->json('id');
@@ -126,7 +129,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(134, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(141, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -155,6 +158,7 @@ trait CompanyFixtures
             'account' => $ids['rent'],
             'journalRequest' => $ids['journal_request'],
             'fiscalYear' => $ids['fiscal_year'],
+            'recurringJournal' => $ids['recurring_journal'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

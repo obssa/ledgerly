@@ -2004,6 +2004,54 @@ DO $$ DECLARE was date; BEGIN
   UPDATE companies SET books_closed_until = was WHERE id = app_company_id();
   RAISE NOTICE 'PASS T62 a year closes with one closing entry dated its last day and its books locked';
 END $$;
+-- T63: recurring and auto-reversing journals (036). Templates repeat monthly, quarterly or yearly within their end; a
+-- journal waiting for approval reverses after its own date and never changes when. Company A, as user f1.
+DO $$ DECLARE lines jsonb := '[{"account_id": "x", "debit": "900"}, {"account_id": "y", "credit": "900"}]'; BEGIN
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false);
+  BEGIN
+    INSERT INTO recurring_journals (company_id, name, memo, lines, total, frequency, next_on, posts_as) VALUES
+      (app_company_id(), 'Weekly cleaning', 'Cleaning', lines, 900, 'weekly', '2027-07-01', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T63a: a template repeated weekly';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO recurring_journals (company_id, name, memo, lines, total, frequency, next_on, ends_on, posts_as) VALUES
+      (app_company_id(), 'Rent', 'Rent', lines, 900, 'monthly', '2027-07-01', '2027-06-30', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T63b: an active template''s next date was after its end';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO recurring_journals (company_id, name, memo, lines, total, frequency, next_on, posts_as) VALUES
+      (app_company_id(), 'Rent', 'Rent', lines, 900, 'monthly', '2027-07-01', '00000000-0000-0000-0000-0000000000f2');
+    RAISE EXCEPTION 'FAIL T63g: a template was set up to post as someone else';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO recurring_journals (id, company_id, name, memo, lines, total, frequency, next_on, ends_on, posts_as) VALUES
+    ('00000000-0000-0000-0000-0000000006c1', app_company_id(), 'Office rent', 'Office rent for the month', lines, 900, 'monthly', '2027-07-01', '2027-12-31', '00000000-0000-0000-0000-0000000000f1');
+  -- The last one is posted: the template ends.
+  UPDATE recurring_journals SET next_on = '2028-01-01', is_active = false WHERE id = '00000000-0000-0000-0000-0000000006c1';
+  -- The scheduler sees which templates are due, but only outside any company's context.
+  INSERT INTO recurring_journals (id, company_id, name, memo, lines, total, frequency, next_on, posts_as) VALUES
+    ('00000000-0000-0000-0000-0000000006c3', app_company_id(), 'Depreciation', 'Monthly depreciation', lines, 900, 'monthly', '2027-08-31', '00000000-0000-0000-0000-0000000000f1');
+  IF EXISTS (SELECT 1 FROM recurring_journals_due('2027-09-01')) THEN
+    RAISE EXCEPTION 'FAIL T63e: due templates were listed inside a company''s context';
+  END IF;
+  PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+  IF (SELECT array_agg(template_id) FROM recurring_journals_due('2027-09-01')) IS DISTINCT FROM ARRAY['00000000-0000-0000-0000-0000000006c3'::uuid] THEN
+    RAISE EXCEPTION 'FAIL T63f: the scheduler did not see exactly the active template that is due';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+
+  BEGIN
+    INSERT INTO journal_requests (company_id, entry_date, memo, lines, total, requested_by, reverse_on) VALUES
+      (app_company_id(), '2027-06-30', 'Accrual reversing too early', lines, 900, '00000000-0000-0000-0000-0000000000f1', '2027-06-30');
+    RAISE EXCEPTION 'FAIL T63c: a journal reversed on its own date';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_requests (id, company_id, entry_date, memo, lines, total, requested_by, reverse_on) VALUES
+    ('00000000-0000-0000-0000-0000000006c2', app_company_id(), '2027-06-30', 'June accrual', lines, 900, '00000000-0000-0000-0000-0000000000f1', '2027-07-01');
+  BEGIN
+    UPDATE journal_requests SET reverse_on = '2027-07-31' WHERE id = '00000000-0000-0000-0000-0000000006c2';
+    RAISE EXCEPTION 'FAIL T63d: when a journal reverses was changed after it was asked';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T63 recurring journals repeat within their end and a journal reverses after its date, as asked';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -76,12 +76,19 @@ final class JournalController extends Controller
      * A manual journal: balanced lines on the company's own active accounts, not on accounts kept by documents. Above the
      * company's approval limit (settings.approval.journal_above) it is not posted but waits for someone else to approve
      * it (202, the request); otherwise it posts at once (201, the entry).
+     *
+     * With reverse_on (an accrual, a prepayment), its reversal is posted with it, dated that day: after the journal and
+     * within a year of it. A journal waiting for approval keeps the date and reverses when it is approved.
      */
     public function store(Request $request): JsonResponse
     {
         $this->authorizeCompany('journals.create');
-        $data = $request->validate(ManualJournal::rules($this->current->today()),
-            ['memo.required' => 'Say what the entry is for: the memo is how it is found again.']);
+        $data = $request->validate([...ManualJournal::rules($this->current->today()), 'reverse_on' => ['nullable', 'date_format:Y-m-d', 'after:date']],
+            ['memo.required' => 'Say what the entry is for: the memo is how it is found again.', 'reverse_on.after' => 'A journal reverses on a day after its own date.']);
+        $reverseOn = $data['reverse_on'] ?? null;
+        if ($reverseOn !== null && $reverseOn > (new DateTimeImmutable($data['date']))->modify('+1 year')->format('Y-m-d')) {
+            throw ValidationException::withMessages(['reverse_on' => ['A journal reverses within a year of its date.']]);
+        }
         $company = $this->current->get();
         $draft = ManualJournal::draft($company, $data['date'], $data['memo'], $data['lines']);
 
@@ -91,16 +98,30 @@ final class JournalController extends Controller
             DB::table('journal_requests')->insert([
                 'id' => $id, 'company_id' => $company->getKey(), 'entry_date' => $data['date'], 'memo' => $data['memo'],
                 'lines' => json_encode(array_values($data['lines']), JSON_THROW_ON_ERROR), 'total' => $draft->totalDebit()->toDecimalString(),
-                'requested_by' => $request->user()->getKey(),
+                'requested_by' => $request->user()->getKey(), 'reverse_on' => $reverseOn,
             ]);
             $this->audit->record($company->getKey(), 'journal_requested', 'journal_request', $id, null,
-                ['memo' => $data['memo'], 'total' => $draft->totalDebit()->toDecimalString(), 'limit' => $limit->toDecimalString()], userId: $request->user()->getKey());
+                ['memo' => $data['memo'], 'total' => $draft->totalDebit()->toDecimalString(), 'limit' => $limit->toDecimalString(), 'reverse_on' => $reverseOn],
+                userId: $request->user()->getKey());
 
             return response()->json(['request' => app(JournalRequestController::class)->present($id)], 202);
         }
         $entry = $this->guarded(fn () => $this->posting->post($draft, $request->user()->getKey()));
+        if ($reverseOn !== null) {
+            $this->autoReverse($entry, $reverseOn, $request->user()->getKey());
+        }
 
-        return response()->json($this->present($entry), 201);
+        return response()->json($this->present($entry->refresh()), 201);
+    }
+
+    /** Post the reversal a journal was set up with, dated $on, and record it. */
+    public function autoReverse(JournalEntry $entry, string $on, string $userId): JournalEntry
+    {
+        $reversal = $this->guarded(fn () => $this->posting->reverse($entry->getKey(), new DateTimeImmutable($on), $userId));
+        $this->audit->record($this->current->id(), 'journal_reversed', 'journal_entry', $entry->getKey(), ['status' => 'posted'],
+            ['status' => 'reversed', 'reversal' => $reversal->number, 'date' => $on], 'Set to reverse when it was entered', userId: $userId);
+
+        return $reversal;
     }
 
     /** Reverse a manual journal on a day on or after it, saying why. Entries made by documents are reversed through them. */

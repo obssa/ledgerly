@@ -1,10 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import type { Account, Dimension } from "@/lib/api";
+import type { Account, Dimension, RecurringJournal } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
-import { emptyLine, journalTotals, type JournalLineInput } from "@/lib/journal";
-import { decideJournalRequest, postJournal, reverseJournal } from "./actions";
+import { emptyLine, FREQUENCIES, journalTotals, type JournalLineInput } from "@/lib/journal";
+import { decideJournalRequest, postDueRecurring, postJournal, recurringStep, reverseJournal, saveRecurring } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -14,30 +14,17 @@ function Message({ state }: { state: FormState | undefined }) {
 
 const KINDS = [["location", "location_id", "Location"], ["class", "class_id", "Class"], ["project", "project_id", "Project"]] as const;
 
-/** A manual journal: date, memo, and balanced lines; dimensions per line when the company uses them. */
-export function NewJournal({ accounts, dimensions }: { accounts: Account[]; dimensions: Dimension[] }) {
-  const [state, action, pending] = useActionState(postJournal, undefined);
-  const today = new Date().toISOString().slice(0, 10);
-  const [lines, setLines] = useState<JournalLineInput[]>([emptyLine(), emptyLine()]);
+/** The lines of a journal: accounts, descriptions, dimensions when the company uses them, and the running balance. */
+function JournalLines({ lines, setLines, accounts, dimensions, bad }: {
+  lines: JournalLineInput[]; setLines: (lines: JournalLineInput[]) => void; accounts: Account[]; dimensions: Dimension[]; bad: (name: string) => boolean;
+}) {
   const totals = journalTotals(lines);
   const used = KINDS.filter(([kind]) => dimensions.some((d) => d.kind === kind));
   const set = (i: number, patch: Partial<JournalLineInput>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-  const bad = (n: string) => Boolean(state?.fields?.[n]);
 
   return (
-    <form action={action} noValidate className="grid gap-4">
-      <Message state={state} />
+    <>
       <input type="hidden" name="lines" value={JSON.stringify(lines)} />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-        <div>
-          <label className="field-label" htmlFor="date">Date</label>
-          <input className={`field ${bad("date") ? "!border-bad" : ""}`} id="date" name="date" type="date" max={today} defaultValue={today} />
-        </div>
-        <div className="col-span-2 min-w-0">
-          <label className="field-label" htmlFor="memo">Memo</label>
-          <input className={`field ${bad("memo") ? "!border-bad" : ""}`} id="memo" name="memo" maxLength={500} placeholder="What the entry is for, such as November rent accrued" />
-        </div>
-      </div>
       <div className="overflow-x-auto">
         <table className="tbl">
           <thead>
@@ -92,11 +79,120 @@ export function NewJournal({ accounts, dimensions }: { accounts: Account[]; dime
           </tfoot>
         </table>
       </div>
+      <div><button type="button" className="btn" onClick={() => setLines([...lines, emptyLine()])}>Add a line</button></div>
+    </>
+  );
+}
+
+/** A manual journal: date, memo, and balanced lines; optionally the day it reverses (an accrual, a prepayment). */
+export function NewJournal({ accounts, dimensions }: { accounts: Account[]; dimensions: Dimension[] }) {
+  const [state, action, pending] = useActionState(postJournal, undefined);
+  const today = new Date().toISOString().slice(0, 10);
+  const [lines, setLines] = useState<JournalLineInput[]>([emptyLine(), emptyLine()]);
+  const bad = (n: string) => Boolean(state?.fields?.[n]);
+
+  return (
+    <form action={action} noValidate className="grid gap-4">
+      <Message state={state} />
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+        <div>
+          <label className="field-label" htmlFor="date">Date</label>
+          <input className={`field ${bad("date") ? "!border-bad" : ""}`} id="date" name="date" type="date" max={today} defaultValue={today} />
+        </div>
+        <div className="col-span-2 min-w-0">
+          <label className="field-label" htmlFor="memo">Memo</label>
+          <input className={`field ${bad("memo") ? "!border-bad" : ""}`} id="memo" name="memo" maxLength={500} placeholder="What the entry is for, such as November rent accrued" />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="reverse_on">Reverse on (optional)</label>
+          <input className={`field ${bad("reverse_on") ? "!border-bad" : ""}`} id="reverse_on" name="reverse_on" type="date" aria-describedby="reverse_on_help" />
+          <p id="reverse_on_help" className="mt-1 text-[12px] text-muted">For an accrual: its reversal posts with it, dated this day.</p>
+        </div>
+      </div>
+      <JournalLines lines={lines} setLines={setLines} accounts={accounts} dimensions={dimensions} bad={bad} />
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn" onClick={() => setLines([...lines, emptyLine()])}>Add a line</button>
         <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Posting…" : "Post entry"}</button>
         <span className="text-[13px] text-muted">A posted entry is never edited: to correct it, reverse it and post again.</span>
       </div>
+    </form>
+  );
+}
+
+/** Set up or edit a recurring journal: a name, a schedule, and the lines each posting carries. */
+export function RecurringForm({ accounts, dimensions, template }: { accounts: Account[]; dimensions: Dimension[]; template?: RecurringJournal }) {
+  const [state, action, pending] = useActionState(saveRecurring, undefined);
+  const today = new Date().toISOString().slice(0, 10);
+  const [lines, setLines] = useState<JournalLineInput[]>(template?.lines?.map((l) => ({
+    account_id: l.account_id, debit: l.debit ?? "", credit: l.credit ?? "", description: l.description ?? "",
+    ...(l.location_id ? { location_id: l.location_id } : {}), ...(l.class_id ? { class_id: l.class_id } : {}), ...(l.project_id ? { project_id: l.project_id } : {}),
+  })) ?? [emptyLine(), emptyLine()]);
+  const bad = (n: string) => Boolean(state?.fields?.[n]);
+
+  return (
+    <form action={action} noValidate className="grid gap-4">
+      <Message state={state} />
+      {template && <input type="hidden" name="id" value={template.id} />}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+        <div className="min-w-0">
+          <label className="field-label" htmlFor="name">Name</label>
+          <input className={`field ${bad("name") ? "!border-bad" : ""}`} id="name" name="name" maxLength={120} defaultValue={template?.name} placeholder="Office rent" />
+        </div>
+        <div className="col-span-2 min-w-0">
+          <label className="field-label" htmlFor="memo">Memo on each entry</label>
+          <input className={`field ${bad("memo") ? "!border-bad" : ""}`} id="memo" name="memo" maxLength={500} defaultValue={template?.memo} placeholder="Office rent for the month" />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="frequency">Repeats</label>
+          <select className={`field ${bad("frequency") ? "!border-bad" : ""}`} id="frequency" name="frequency" defaultValue={template?.frequency ?? "monthly"}>
+            {FREQUENCIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="field-label" htmlFor="next_on">{template ? "Next entry on" : "First entry on"}</label>
+          <input className={`field ${bad("next_on") ? "!border-bad" : ""}`} id="next_on" name="next_on" type="date" defaultValue={template?.next_on ?? today} />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="ends_on">Last entry by (optional)</label>
+          <input className={`field ${bad("ends_on") ? "!border-bad" : ""}`} id="ends_on" name="ends_on" type="date" defaultValue={template?.ends_on ?? ""} />
+        </div>
+      </div>
+      <JournalLines lines={lines} setLines={setLines} accounts={accounts} dimensions={dimensions} bad={bad} />
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : template ? "Save changes" : "Set up recurring journal"}</button>
+        <span className="text-[13px] text-muted">
+          Each entry posts on its date without approval, so the total stays within the company&apos;s approval limit. {template ? "Saving makes it post as you." : ""}
+        </span>
+      </div>
+    </form>
+  );
+}
+
+/** Pause a recurring journal, or resume it from its next date or a later one. */
+export function RecurringStep({ id, active, nextOn }: { id: string; active: boolean; nextOn: string }) {
+  const [state, action, pending] = useActionState(recurringStep, undefined);
+  return (
+    <form action={action} noValidate className="flex flex-wrap items-end gap-2">
+      <div className="w-full"><Message state={state} /></div>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="step" value={active ? "pause" : "resume"} />
+      {!active && (
+        <div>
+          <label className="field-label" htmlFor="resume_next_on">Resume from</label>
+          <input className="field" id="resume_next_on" name="next_on" type="date" defaultValue={nextOn} />
+        </div>
+      )}
+      <button type="submit" className="btn" disabled={pending}>{active ? "Pause" : "Resume"}</button>
+    </form>
+  );
+}
+
+/** Post every recurring journal that has come due now, instead of waiting for the hourly run. */
+export function PostDue({ due }: { due: number }) {
+  const [state, action, pending] = useActionState(postDueRecurring, undefined);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <button type="submit" className="btn btn-primary" disabled={pending || due === 0}>{pending ? "Posting…" : `Post what is due (${due})`}</button>
+      <Message state={state} />
     </form>
   );
 }
