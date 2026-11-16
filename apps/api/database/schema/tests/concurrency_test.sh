@@ -9,7 +9,7 @@ cat <<SQL
 SET ROLE ledgerly_web;
 BEGIN;
 SELECT set_config('app.company_id', '$1', true);
-INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-0000000c$2', '$1', $2, '2026-11-20', 'ETB');
+INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-0000000c$2', '$1', $2, '2026-11-20', 'ETB', 'test');
 INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
   ('$1', '00000000-0000-0000-0000-0000000c$2', 1, '$3', 10, 0), ('$1', '00000000-0000-0000-0000-0000000c$2', 2, '$3', 0, 10);
 SELECT pg_sleep($4);

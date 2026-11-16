@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -53,6 +53,34 @@ export async function getCurrencies(): Promise<Currencies> {
   await connection();
   if (isDemoMode()) return demoCurrencies;
   return withApi((ctx) => ledgerly.currencies(ctx));
+}
+
+/** Entries of the books, newest first, 50 a page. */
+export async function getJournal(q: { from?: string; to?: string; source?: string; search?: string; page?: string }): Promise<{ data: JournalRow[]; page: number; more: boolean; can: { create: boolean }; demo: boolean }> {
+  await connection();
+  if (isDemoMode()) return { data: [], page: 1, more: false, can: { create: false }, demo: true };
+  return { ...(await withApi((ctx) => ledgerly.journal(q, ctx))), demo: false };
+}
+
+export async function getJournalEntry(id: string): Promise<JournalDetail | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.journalEntry(id, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+/** What the manual journal form needs: the accounts it may use, the active dimensions, and the company's currency. */
+export async function getJournalOptions(): Promise<{ accounts: Account[]; dimensions: Dimension[]; baseCurrency: string } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi(async (ctx) => {
+    const [accounts, dimensions, currencies] = await Promise.all([ledgerly.accounts(ctx), ledgerly.dimensions(ctx), ledgerly.currencies(ctx)]);
+    return { accounts: accounts.data, dimensions: dimensions.data.filter((d) => d.is_active), baseCurrency: currencies.base_currency };
+  });
 }
 
 /** The chart of accounts with balances (archived accounts too, when asked). */

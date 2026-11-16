@@ -49,8 +49,8 @@ END $$;
 -- T2: an unbalanced entry is refused
 DO $$ BEGIN
   BEGIN
-    INSERT INTO journal_entries (id, company_id, number, entry_date, currency)
-      VALUES ('00000000-0000-0000-0000-00000000e002', app_company_id(), 2, '2026-11-02', 'ETB');
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type)
+      VALUES ('00000000-0000-0000-0000-00000000e002', app_company_id(), 2, '2026-11-02', 'ETB', 'test');
     INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
       (app_company_id(), '00000000-0000-0000-0000-00000000e002', 1, '00000000-0000-0000-0000-000000000a11', 100, 0),
       (app_company_id(), '00000000-0000-0000-0000-00000000e002', 2, '00000000-0000-0000-0000-000000000a40', 0, 99.99);
@@ -64,8 +64,8 @@ END $$;
 -- T3: a single-line entry is refused
 DO $$ BEGIN
   BEGIN
-    INSERT INTO journal_entries (id, company_id, number, entry_date, currency)
-      VALUES ('00000000-0000-0000-0000-00000000e003', app_company_id(), 3, '2026-11-02', 'ETB');
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type)
+      VALUES ('00000000-0000-0000-0000-00000000e003', app_company_id(), 3, '2026-11-02', 'ETB', 'test');
     INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
       (app_company_id(), '00000000-0000-0000-0000-00000000e003', 1, '00000000-0000-0000-0000-000000000a11', 100, 0);
     SET CONSTRAINTS ALL IMMEDIATE;
@@ -78,8 +78,8 @@ END $$;
 -- T4: an entry with no lines is refused
 DO $$ BEGIN
   BEGIN
-    INSERT INTO journal_entries (id, company_id, number, entry_date, currency)
-      VALUES ('00000000-0000-0000-0000-00000000e004', app_company_id(), 4, '2026-11-02', 'ETB');
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type)
+      VALUES ('00000000-0000-0000-0000-00000000e004', app_company_id(), 4, '2026-11-02', 'ETB', 'test');
     SET CONSTRAINTS ALL IMMEDIATE;
     RAISE EXCEPTION 'FAIL T4: entry without lines was accepted';
   EXCEPTION WHEN check_violation THEN
@@ -111,8 +111,8 @@ UPDATE companies SET books_closed_until = '2026-09-30' WHERE id = '00000000-0000
 SET ROLE ledgerly_web;
 DO $$ BEGIN
   BEGIN
-    INSERT INTO journal_entries (company_id, number, entry_date, currency)
-      VALUES (app_company_id(), 6, '2026-09-15', 'ETB');
+    INSERT INTO journal_entries (company_id, number, entry_date, currency, source_type)
+      VALUES (app_company_id(), 6, '2026-09-15', 'ETB', 'test');
     RAISE EXCEPTION 'FAIL T6: entry in closed period accepted';
   EXCEPTION WHEN check_violation THEN
     RAISE NOTICE 'PASS T6 closed period refused';
@@ -122,8 +122,8 @@ END $$;
 -- T7: a line cannot use another company's account
 DO $$ BEGIN
   BEGIN
-    INSERT INTO journal_entries (id, company_id, number, entry_date, currency)
-      VALUES ('00000000-0000-0000-0000-00000000e007', app_company_id(), 7, '2026-11-02', 'ETB');
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type)
+      VALUES ('00000000-0000-0000-0000-00000000e007', app_company_id(), 7, '2026-11-02', 'ETB', 'test');
     INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
       (app_company_id(), '00000000-0000-0000-0000-00000000e007', 1, '00000000-0000-0000-0000-000000000b11', 10, 0);
     RAISE EXCEPTION 'FAIL T7: cross-company account accepted';
@@ -439,7 +439,7 @@ DO $$
 DECLARE n integer;
 BEGIN
   BEGIN
-    INSERT INTO journal_entries (company_id, number, entry_date, currency) VALUES (app_company_id(), 23, '2026-11-10', 'ETB');
+    INSERT INTO journal_entries (company_id, number, entry_date, currency, source_type) VALUES (app_company_id(), 23, '2026-11-10', 'ETB', 'test');
     RAISE EXCEPTION 'FAIL T23b: posting accepted while suspended';
   EXCEPTION WHEN check_violation THEN NULL; END;
   SELECT count(*) INTO n FROM journal_lines;
@@ -451,7 +451,7 @@ UPDATE companies SET status = 'live'     WHERE id = '00000000-0000-0000-0000-000
 UPDATE companies SET status = 'archived' WHERE id = '00000000-0000-0000-0000-00000000000a';
 SET ROLE ledgerly_web;
 DO $$ BEGIN
-  INSERT INTO journal_entries (company_id, number, entry_date, currency) VALUES (app_company_id(), 23, '2026-11-10', 'ETB');
+  INSERT INTO journal_entries (company_id, number, entry_date, currency, source_type) VALUES (app_company_id(), 23, '2026-11-10', 'ETB', 'test');
   RAISE EXCEPTION 'FAIL T23d: posting accepted in an archived company';
 EXCEPTION WHEN check_violation THEN
   RAISE NOTICE 'PASS T23 suspended subscription and archived company are read-only (reads still work)';
@@ -923,20 +923,20 @@ BEGIN
     ('00000000-0000-0000-0000-000000000d41', app_company_id(), 'location', 'HQ', 'Head office'),
     ('00000000-0000-0000-0000-000000000d42', app_company_id(), 'class', 'RETAIL', 'Retail');
 
-  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e410', app_company_id(), 9410, '2027-06-30', 'ETB');
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e410', app_company_id(), 9410, '2027-06-30', 'ETB', 'test');
   INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, location_id, class_id) VALUES
     (app_company_id(), '00000000-0000-0000-0000-00000000e410', 1, '00000000-0000-0000-0000-000000000a11', 10, 0,
      '00000000-0000-0000-0000-000000000d41', '00000000-0000-0000-0000-000000000d42'),
     (app_company_id(), '00000000-0000-0000-0000-00000000e410', 2, '00000000-0000-0000-0000-000000000a40', 0, 10, NULL, NULL);
 
   BEGIN
-    INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e411', app_company_id(), 9411, '2027-06-30', 'ETB');
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e411', app_company_id(), 9411, '2027-06-30', 'ETB', 'test');
     INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, location_id) VALUES
       (app_company_id(), '00000000-0000-0000-0000-00000000e411', 1, '00000000-0000-0000-0000-000000000a11', 10, 0, '00000000-0000-0000-0000-000000000d43');
     RAISE EXCEPTION 'FAIL T41b: a line named company B''s location';
   EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN
-    INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e412', app_company_id(), 9412, '2027-06-30', 'ETB');
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e412', app_company_id(), 9412, '2027-06-30', 'ETB', 'test');
     INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, location_id) VALUES
       (app_company_id(), '00000000-0000-0000-0000-00000000e412', 1, '00000000-0000-0000-0000-000000000a11', 10, 0, '00000000-0000-0000-0000-000000000d42');
     RAISE EXCEPTION 'FAIL T41c: a class was used as a location';
@@ -949,7 +949,7 @@ BEGIN
 
   -- Turned off: still valid on old entries, so they can be reversed.
   UPDATE dimensions SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000d41';
-  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e413', app_company_id(), 9413, '2027-06-30', 'ETB');
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e413', app_company_id(), 9413, '2027-06-30', 'ETB', 'test');
   INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, location_id) VALUES
     (app_company_id(), '00000000-0000-0000-0000-00000000e413', 1, '00000000-0000-0000-0000-000000000a40', 10, 0, '00000000-0000-0000-0000-000000000d41'),
     (app_company_id(), '00000000-0000-0000-0000-00000000e413', 2, '00000000-0000-0000-0000-000000000a11', 0, 10, '00000000-0000-0000-0000-000000000d41');
@@ -1529,10 +1529,10 @@ END $$;
 -- Uses a new wallet a55 of company A with three entries: 1,000.00 in (1 Jun), 300.00 out (10 Jun), 50.00 in (25 Jun).
 DO $$ DECLARE l_in uuid; l_out uuid; l_late uuid; l_sales uuid; n int; st text; BEGIN
   INSERT INTO accounts (id, company_id, code, name, type, subtype) VALUES ('00000000-0000-0000-0000-000000000a55', app_company_id(), '1155', 'Recon wallet', 'asset', 'mobile_money');
-  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES
-    ('00000000-0000-0000-0000-00000000e551', app_company_id(), 9551, '2027-06-01', 'ETB'),
-    ('00000000-0000-0000-0000-00000000e552', app_company_id(), 9552, '2027-06-10', 'ETB'),
-    ('00000000-0000-0000-0000-00000000e553', app_company_id(), 9553, '2027-06-25', 'ETB');
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES
+    ('00000000-0000-0000-0000-00000000e551', app_company_id(), 9551, '2027-06-01', 'ETB', 'test'),
+    ('00000000-0000-0000-0000-00000000e552', app_company_id(), 9552, '2027-06-10', 'ETB', 'test'),
+    ('00000000-0000-0000-0000-00000000e553', app_company_id(), 9553, '2027-06-25', 'ETB', 'test');
   INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
     (app_company_id(), '00000000-0000-0000-0000-00000000e551', 1, '00000000-0000-0000-0000-000000000a55', 1000, 0, 1000),
     (app_company_id(), '00000000-0000-0000-0000-00000000e551', 2, '00000000-0000-0000-0000-000000000a40', 0, 1000, -1000),
@@ -1586,7 +1586,7 @@ DO $$ DECLARE l_in uuid; l_out uuid; l_late uuid; l_sales uuid; n int; st text; 
   IF st <> 'reconciled' THEN RAISE EXCEPTION 'FAIL T55g: the statement line was left %', st; END IF;
 
   BEGIN
-    INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e554', app_company_id(), 9554, '2027-06-15', 'ETB');
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e554', app_company_id(), 9554, '2027-06-15', 'ETB', 'test');
     INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
       (app_company_id(), '00000000-0000-0000-0000-00000000e554', 1, '00000000-0000-0000-0000-000000000a55', 5, 0, 5),
       (app_company_id(), '00000000-0000-0000-0000-00000000e554', 2, '00000000-0000-0000-0000-000000000a40', 0, 5, -5);
@@ -1641,7 +1641,7 @@ DO $$ DECLARE l_in uuid; l_out uuid; l_late uuid; l_sales uuid; n int; st text; 
     ('00000000-0000-0000-0000-00000000c553', app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-20', 0, 700);
   INSERT INTO reconciliation_lines (company_id, reconciliation_id, journal_line_id) VALUES (app_company_id(), '00000000-0000-0000-0000-00000000c553', l_in);
   DELETE FROM reconciliations WHERE id = '00000000-0000-0000-0000-00000000c553';
-  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e555', app_company_id(), 9555, '2027-06-15', 'ETB');
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e555', app_company_id(), 9555, '2027-06-15', 'ETB', 'test');
   INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
     (app_company_id(), '00000000-0000-0000-0000-00000000e555', 1, '00000000-0000-0000-0000-000000000a55', 5, 0, 5),
     (app_company_id(), '00000000-0000-0000-0000-00000000e555', 2, '00000000-0000-0000-0000-000000000a40', 0, 5, -5);
@@ -1695,9 +1695,9 @@ END $$;
 -- on 1 Jun 2027, and a 20.00 shortage posted on 3 Jun.
 DO $$ BEGIN
   INSERT INTO accounts (id, company_id, code, name, type, subtype) VALUES ('00000000-0000-0000-0000-000000000a57', app_company_id(), '1057', 'Petty cash T57', 'asset', 'cash');
-  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES
-    ('00000000-0000-0000-0000-00000000e571', app_company_id(), 9571, '2027-06-01', 'ETB'),
-    ('00000000-0000-0000-0000-00000000e572', app_company_id(), 9572, '2027-06-03', 'ETB');
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES
+    ('00000000-0000-0000-0000-00000000e571', app_company_id(), 9571, '2027-06-01', 'ETB', 'test'),
+    ('00000000-0000-0000-0000-00000000e572', app_company_id(), 9572, '2027-06-03', 'ETB', 'test');
   INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
     (app_company_id(), '00000000-0000-0000-0000-00000000e571', 1, '00000000-0000-0000-0000-000000000a57', 500, 0, 500),
     (app_company_id(), '00000000-0000-0000-0000-00000000e571', 2, '00000000-0000-0000-0000-000000000a40', 0, 500, -500),
@@ -1824,6 +1824,28 @@ DO $$ BEGIN
   UPDATE accounts SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000a5b';
   UPDATE accounts SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000a5a';
   RAISE NOTICE 'PASS T58 the chart keeps system accounts, archives only empty accounts and keeps sub-accounts in one type, no deeper than four levels';
+END $$;
+-- T59: manual journals (032) never touch accounts kept by their documents; other entries (an invoice) still post to
+-- them. Uses receivable a11, sales a40 and bank a10 of company A.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e591', app_company_id(), 9591, '2027-06-30', 'ETB', 'manual');
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e591', 1, '00000000-0000-0000-0000-000000000a11', 100, 0, 100),
+      (app_company_id(), '00000000-0000-0000-0000-00000000e591', 2, '00000000-0000-0000-0000-000000000a40', 0, 100, -100);
+    RAISE EXCEPTION 'FAIL T59a: a manual journal posted to the receivables';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES
+    ('00000000-0000-0000-0000-00000000e592', app_company_id(), 9592, '2027-06-30', 'ETB', 'invoice'),
+    ('00000000-0000-0000-0000-00000000e593', app_company_id(), 9593, '2027-06-30', 'ETB', 'manual');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e592', 1, '00000000-0000-0000-0000-000000000a11', 100, 0, 100),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e592', 2, '00000000-0000-0000-0000-000000000a40', 0, 100, -100),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e593', 1, '00000000-0000-0000-0000-000000000a10', 100, 0, 100),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e593', 2, '00000000-0000-0000-0000-000000000a40', 0, 100, -100);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  RAISE NOTICE 'PASS T59 manual journals leave the accounts kept by documents alone';
 END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_

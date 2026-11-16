@@ -6,6 +6,7 @@ use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CashCountController;
 use App\Http\Controllers\ChartController;
+use App\Http\Controllers\JournalController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\CompanyController;
@@ -127,9 +128,10 @@ Route::prefix('v1')->group(function () {
             Route::get('chart', [ChartController::class, 'index']);
             Route::post('accounts', [ChartController::class, 'store']);
             Route::put('accounts/{account}', [ChartController::class, 'update']);
-            Route::get('journal-entries', [LedgerController::class, 'entries']);
-            Route::post('journal-entries', [LedgerController::class, 'storeEntry']);
-            Route::post('journal-entries/{entry}/reverse', [LedgerController::class, 'reverse']);
+            Route::get('journal-entries', [JournalController::class, 'index']);
+            Route::post('journal-entries', [JournalController::class, 'store']);
+            Route::get('journal-entries/{entry}', [JournalController::class, 'show']);
+            Route::post('journal-entries/{entry}/reverse', [JournalController::class, 'reverse']);
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
             Route::post('tax-rates', [TaxRateController::class, 'store']);

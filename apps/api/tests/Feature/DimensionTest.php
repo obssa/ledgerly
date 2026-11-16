@@ -65,7 +65,7 @@ final class DimensionTest extends TestCase
         // Turned off: no new entries, but the old one still reverses with its dimensions.
         $this->putJson("/api/v1/dimensions/{$this->c['dimension']}", ['is_active' => false], $this->h)->assertOk();
         $this->entry(['location_id' => $this->c['dimension']])->assertUnprocessable()->assertJsonValidationErrors('lines.0.location_id');
-        $this->postJson("/api/v1/journal-entries/{$entry}/reverse", ['date' => '2026-11-06'], $this->h)->assertCreated();
+        $this->postJson("/api/v1/journal-entries/{$entry}/reverse", ['date' => '2026-11-06', 'reason' => 'Posted to the wrong location'], $this->h)->assertCreated();
         // The tagged line and its mirror in the reversal.
         $this->assertSame(2, $this->owner()->table('journal_lines')->where('location_id', $this->c['dimension'])->count());
     }

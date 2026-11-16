@@ -91,6 +91,7 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | Cheques: a cheque number is used once per bank account and kept by a cancelled cheque; only a cheque received bounces, reversed on or after the day it came in, the bounce date written once with the reversal (T56); bouncing needs `payments.reverse` | Tested |
 | Petty cash: only cash accounts keep a float; a cash count (`banking.count`) names who counted, is never changed or removed, and leaves the books holding what was counted, its difference posted to cash over and short (T57) | Tested |
 | Chart of accounts (`accounting.chart`, accountants): accounts are never deleted; system accounts keep their key and stay active; only an empty account with nothing active under it is archived; sub-accounts stay within their company and type (T58) | Tested |
+| Manual journals (`journals.create`): never on accounts kept by documents, checked by the database (T59); only manual journals are reversed by hand, with a reason in the audit log; entries made by documents are corrected through the document | Tested |
 
 Product decision (CLAUDE.md, light controls): no second approver for payout changes and no three-way match. The audit
 record and the duplicate warning are the controls; `settings.approval.bill_above` is the one optional approval step
