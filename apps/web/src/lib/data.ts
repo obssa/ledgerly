@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type JournalRequest, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -668,6 +668,24 @@ export async function getInvoices(): Promise<Invoice[]> {
   await connection();
   if (isDemoMode()) return demoInvoices;
   return (await withApi((ctx) => ledgerly.invoices(ctx))).data;
+}
+
+/** The general ledger for a period (one account, or all; optionally one location, class or project). null in the demo. */
+export async function getGeneralLedger(q: Record<string, string | undefined>): Promise<GeneralLedger | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.generalLedger(q, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 422) return null;
+    throw error;
+  }
+}
+
+export async function getTrialBalance(asOf: string): Promise<TrialBalanceRow[] | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return (await withApi((ctx) => ledgerly.trialBalance(asOf, ctx))).data;
 }
 
 export async function getProfitAndLoss(q: { from: string; to: string; compare_from?: string; compare_to?: string }): Promise<ProfitAndLoss> {

@@ -28,6 +28,7 @@ export default async function AccountPage({ params }: PageProps<"/accounts/[id]"
           <div><dt className="text-muted">Balance</dt><dd className="num font-semibold">{formatAmount(naturalBalance(account.type, account.balance))}</dd></div>
         </dl>
         {account.is_system && <p className="mt-3 text-[13px] text-muted">A system account: the books post to it on their own (invoices, bills, payments, tax). It can be renamed and re-coded, not archived.</p>}
+        <p className="mt-3 text-[13px]"><Link href={`/reports/general-ledger?account_id=${encodeURIComponent(account.id)}`} className="font-semibold text-brand hover:underline">Transactions on this account</Link></p>
         {account.is_money && <p className="mt-3 text-[13px] text-muted">A bank, wallet or cash account: its details, register and statement are under <Link href={`/banking/${encodeURIComponent(account.id)}`} className="font-semibold text-brand hover:underline">Banking and cash</Link>.</p>}
       </Card>
       {chart.can.manage && (

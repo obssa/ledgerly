@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Ledger\Models\Account;
+use App\Domain\Ledger\Models\Dimension;
 use App\Domain\Ledger\Money;
 use App\Domain\Reports\ReceivablesReport;
 use App\Domain\Reports\ReportService;
@@ -12,6 +13,7 @@ use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class LedgerController extends Controller
 {
@@ -33,6 +35,39 @@ final class LedgerController extends Controller
         $asOf = $request->validate(['as_of' => ['required', 'date_format:Y-m-d']])['as_of'];
 
         return response()->json(['data' => $reports->trialBalance($this->current->id(), $asOf)]);
+    }
+
+    /**
+     * General ledger for a period (Module 6): every account's opening, lines with running balance and closing; or one
+     * account (account transactions); optionally one location, class or project. Ids are loaded through the company scope.
+     */
+    public function generalLedger(Request $request, ReportService $reports): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $q = $request->validate([
+            'from' => ['required', 'date_format:Y-m-d'],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'account_id' => ['nullable', 'uuid'],
+            'location_id' => ['nullable', 'uuid'],
+            'class_id' => ['nullable', 'uuid'],
+            'project_id' => ['nullable', 'uuid'],
+        ]);
+        if (isset($q['account_id']) && ! Account::query()->whereKey($q['account_id'])->exists()) {
+            throw ValidationException::withMessages(['account_id' => ['Choose an account of this company.']]);
+        }
+        $dimensions = [];
+        foreach (Dimension::COLUMNS as $kind => $column) {
+            if (! empty($q[$column])) {
+                if (! Dimension::query()->where(['id' => $q[$column], 'kind' => $kind])->exists()) {
+                    throw ValidationException::withMessages([$column => ["Choose a {$kind} of this company."]]);
+                }
+                $dimensions[$column] = $q[$column];
+            }
+        }
+        $company = $this->current->get();
+
+        return response()->json(['from' => $q['from'], 'to' => $q['to'], 'currency' => $company->base_currency,
+            ...$reports->generalLedger($company->getKey(), $company->base_currency, $q['from'], $q['to'], $q['account_id'] ?? null, $dimensions)]);
     }
 
     /** Balance sheet; `equation.balanced` reports whether Assets = Liabilities + Equity holds. */
