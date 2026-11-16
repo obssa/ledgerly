@@ -95,6 +95,7 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | Manual journals above `settings.approval.journal_above` wait as requests: asked and decided by the person signed in (the database checks it), approved or rejected by someone other than the asker (`journals.approve`), decided once, never changed or deleted (T60); an approval checks the journal again before posting | Tested |
 | Period close (`periods.close`): the close checklist informs the close and its open items are kept in the `period_closed` audit record; reopening needs `periods.reopen` (owner, admin) and a reason | Tested |
 | Currency revaluation (`accounting.revalue`, accountants): one run per date, made by the person signed in, naming its own revaluation entry and the reversal dated after it; kept as made, never changed or deleted (T61) | Tested |
+| Year-end close (`periods.close`; reopening `periods.reopen`, owner and admin, with a reason): one standing closing entry per fiscal year, dated its last day; a year is closed only with it and with the books locked through its end (T62); a year already locked is closed by an owner or admin, the lock stepping back a day only for the closing entry | Tested |
 
 Product decision (CLAUDE.md, light controls): no second approver for payout changes and no three-way match. The audit
 record and the duplicate warning are the controls; `settings.approval.bill_above` is the one optional approval step

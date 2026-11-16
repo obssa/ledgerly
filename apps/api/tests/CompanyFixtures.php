@@ -106,6 +106,7 @@ trait CompanyFixtures
         $ids['petty_cash'] = $this->owner()->table('accounts')->where(['company_id' => $company, 'code' => '1010'])->value('id');
         $this->postJson("/api/v1/bank-accounts/{$ids['petty_cash']}/cash-counts", ['counted_on' => '2026-11-08', 'counted_by_name' => "{$name} cashier", 'counted' => '0'], $h)
             ->assertCreated()->assertJsonPath('difference', '0.00');
+        $ids['fiscal_year'] = $this->owner()->table('fiscal_years')->where('company_id', $company)->orderBy('starts_on')->value('id');
         // A manual journal waiting for approval (asked by the owner), as if above the company's limit.
         $ids['journal_request'] = (string) \Illuminate\Support\Str::uuid7();
         $this->owner()->table('journal_requests')->insert(['id' => $ids['journal_request'], 'company_id' => $company, 'entry_date' => '2026-11-08',
@@ -125,7 +126,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(130, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(134, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -153,6 +154,7 @@ trait CompanyFixtures
             'reconciliation' => $ids['reconciliation'],
             'account' => $ids['rent'],
             'journalRequest' => $ids['journal_request'],
+            'fiscalYear' => $ids['fiscal_year'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -702,6 +702,24 @@ export async function getRevaluationPreview(asOf: string, rates: Record<string, 
     }
     throw error;
   }
+}
+
+/** The fiscal years, and (for the one that can be closed now) what closing it moves to retained earnings. */
+export async function getYearEnd(): Promise<{ years: FiscalYear[]; closing: { year: FiscalYear; net_profit: string; lines: { code: string; name: string; type: string; balance: string }[] } | null } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi(async (ctx) => {
+    const years = (await ledgerly.fiscalYears(ctx)).data;
+    const closable = years.find((y) => y.can_close);
+    if (!closable) return { years, closing: null };
+    try {
+      const preview = await ledgerly.yearClosing(closable.id, ctx);
+      return { years, closing: { year: closable, ...preview } };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) return { years, closing: null };
+      throw error;
+    }
+  });
 }
 
 /** The close checklist for a period end; null in the demo or for roles that do not close periods. */

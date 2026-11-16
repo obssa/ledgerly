@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCloseChecklist } from "@/lib/data";
-import { CloseForm } from "./CloseForm";
+import { getCloseChecklist, getYearEnd } from "@/lib/data";
+import { formatAmount } from "@/lib/format";
+import { CloseForm, CloseYear, ReopenYear } from "./CloseForm";
 
 export const metadata = { title: "Close the books" };
 
@@ -9,7 +10,8 @@ const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.tes
 
 /** Module 6: the close checklist for a period end, and closing the books through it. */
 export default async function ClosePage({ searchParams }: PageProps<"/close">) {
-  const checklist = await getCloseChecklist(date((await searchParams).period_end));
+  const asked = date((await searchParams).period_end);
+  const [checklist, yearEnd] = await Promise.all([getCloseChecklist(asked), getYearEnd()]);
 
   return (
     <>
@@ -45,6 +47,33 @@ export default async function ClosePage({ searchParams }: PageProps<"/close">) {
           </Card>
           {(!checklist.books_closed_until || checklist.books_closed_until < checklist.period_end) && (
             <Card className="max-w-[900px]" label="Close"><CloseForm periodEnd={checklist.period_end} warnings={checklist.warnings} /></Card>
+          )}
+          {yearEnd && (
+            <Card className="mt-4" label="Year-end">
+              <h2 className="mb-2 text-[15px] font-bold">Year-end</h2>
+              <ul className="grid gap-1.5 text-[14px]">
+                {yearEnd.years.map((y) => (
+                  <li key={y.id} className="flex flex-wrap items-center gap-2">
+                    <span className="num">{y.starts_on} to {y.ends_on}</span>
+                    <Pill tone={y.status === "closed" ? "good" : y.status === "reopened" ? "warn" : "neutral"}>{y.status === "closed" ? "Closed" : y.status === "reopened" ? "Reopened" : "Open"}</Pill>
+                    {y.closed_by && y.status === "closed" && <span className="text-[13px] text-muted">by {y.closed_by}</span>}
+                  </li>
+                ))}
+              </ul>
+              {yearEnd.closing && (
+                <div className="mt-4 border-t border-line pt-4">
+                  <h3 className="mb-2 text-[14px] font-bold">Close the year to <span className="num">{yearEnd.closing.year.ends_on}</span></h3>
+                  <p className="mb-2 text-[14px]">{yearEnd.closing.net_profit.startsWith("-") ? "Loss" : "Profit"} of the year: <span className="num font-semibold">{formatAmount(yearEnd.closing.net_profit.replace("-", ""))}</span>, from {yearEnd.closing.lines.length} income and expense account{yearEnd.closing.lines.length === 1 ? "" : "s"}.</p>
+                  <CloseYear id={yearEnd.closing.year.id} endsOn={yearEnd.closing.year.ends_on} netProfit={yearEnd.closing.net_profit} />
+                </div>
+              )}
+              {yearEnd.years.filter((y) => y.can_reopen).map((y) => (
+                <div key={y.id} className="mt-4 border-t border-line pt-4">
+                  <h3 className="mb-2 text-[14px] font-bold">Reopen the year to <span className="num">{y.ends_on}</span></h3>
+                  <ReopenYear id={y.id} />
+                </div>
+              ))}
+            </Card>
           )}
           <p className="mt-3 text-[13px] text-muted">Reopening a closed period is done under <Link href="/settings" className="font-semibold text-brand hover:underline">Company settings</Link>, by an owner or admin, with a reason.</p>
         </>
