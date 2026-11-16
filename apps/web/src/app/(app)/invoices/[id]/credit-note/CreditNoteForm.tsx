@@ -2,9 +2,10 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { Card } from "@/components/ui";
-import type { InvoiceDetail } from "@/lib/api";
+import type { BillDetail, InvoiceDetail } from "@/lib/api";
 import { documentAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { createSupplierCredit } from "../../../bills/actions";
 import { createCreditNote } from "../../actions";
 
 interface Line { key: number; description: string; quantity: string; unitPrice: string; taxRateId: string; accountId: string }
@@ -16,8 +17,9 @@ const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
  * quantities, remove the rest. The customer, currency and rate are the invoice's; the API never lets the credit notes
  * of an invoice add up to more than the invoice.
  */
-export function CreditNoteForm({ invoice, taxRates }: { invoice: InvoiceDetail; taxRates: { id: string; name: string; rate: string }[] }) {
-  const [state, action, pending] = useActionState(createCreditNote, undefined);
+export function CreditNoteForm({ invoice, taxRates }: { invoice: InvoiceDetail | BillDetail; taxRates: { id: string; name: string; rate: string }[] }) {
+  const bill = invoice.type === "bill";   // a supplier credit: what the supplier gives back on this bill
+  const [state, action, pending] = useActionState(bill ? createSupplierCredit : createCreditNote, undefined);
   const today = new Date().toISOString().slice(0, 10);
   const [lines, setLines] = useState<Line[]>(invoice.lines.map((l, i) => ({
     key: i + 1, description: l.description, quantity: l.quantity, unitPrice: l.unit_price, taxRateId: l.tax_rate_id ?? "", accountId: l.account_id,
@@ -37,15 +39,22 @@ export function CreditNoteForm({ invoice, taxRates }: { invoice: InvoiceDetail; 
       {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
       <input type="hidden" name="invoice_id" value={invoice.id} />
       <input type="hidden" name="lines" value={json} />
-      <Card label="Credit note">
+      <Card label={bill ? "Supplier credit" : "Credit note"}>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+          {bill && (
+            <div>
+              <label className="field-label" htmlFor="reference">Supplier&apos;s credit note number</label>
+              <input className="field" id="reference" name="reference" maxLength={60} />
+            </div>
+          )}
           <div>
             <label className="field-label" htmlFor="issue_date">Date</label>
             <input className="field" id="issue_date" name="issue_date" type="date" defaultValue={today} min={invoice.issue_date} />
           </div>
           <div className="sm:col-span-2">
-            <label className="field-label" htmlFor="notes">Reason (printed on the credit note)</label>
-            <input className={`field ${state?.fields?.notes ? "!border-bad" : ""}`} id="notes" name="notes" maxLength={2000} placeholder="For example: two bags returned, damaged in transit" />
+            <label className="field-label" htmlFor="notes">{bill ? "Reason" : "Reason (printed on the credit note)"}</label>
+            <input className={`field ${state?.fields?.notes ? "!border-bad" : ""}`} id="notes" name="notes" maxLength={2000}
+              placeholder={bill ? "For example: 200 bags returned, misprinted" : "For example: two bags returned, damaged in transit"} />
           </div>
         </div>
       </Card>
@@ -73,7 +82,7 @@ export function CreditNoteForm({ invoice, taxRates }: { invoice: InvoiceDetail; 
           <div className="mt-1 flex justify-between border-t-2 border-ink pt-2 font-extrabold"><dt>Credit</dt><dd className="num">{formatMoney(totals.total, invoice.currency)}</dd></div>
         </dl>
       </Card>
-      <div><button type="submit" className="btn btn-primary min-w-[200px] justify-center" disabled={pending}>{pending ? "Saving…" : "Save credit note"}</button></div>
+      <div><button type="submit" className="btn btn-primary min-w-[200px] justify-center" disabled={pending}>{pending ? "Saving…" : bill ? "Save supplier credit" : "Save credit note"}</button></div>
     </form>
   );
 }

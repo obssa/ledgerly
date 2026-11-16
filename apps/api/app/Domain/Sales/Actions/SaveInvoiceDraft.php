@@ -41,11 +41,11 @@ final class SaveInvoiceDraft
         }
 
         return DB::transaction(function () use ($data, $document, $userId, $original, $newType) {
-            // A credit note corrects one invoice: its customer, currency and rate are the invoice's.
-            if ($original === null && $document?->type === 'credit_note') {
+            // A credit note corrects one invoice, a supplier credit one bill: its contact, currency and rate are the original's.
+            if ($original === null && in_array($document?->type, ['credit_note', 'vendor_credit'], true)) {
                 $original = Document::query()->findOrFail($document->original_document_id);
             }
-            $type = $original !== null ? 'credit_note' : ($document->type ?? $newType);
+            $type = $original !== null ? self::creditFor($original) : ($document->type ?? $newType);
             if ($original !== null) {
                 $data['contact_id'] = $original->contact_id;
                 $data['currency'] = $original->currency;
@@ -89,7 +89,7 @@ final class SaveInvoiceDraft
         $number = isset($data['number']) && trim((string) $data['number']) !== '' ? trim((string) $data['number']) : null;
         $automatic = $this->numbers->isAutomatic($this->company->id(), $type);
 
-        $noun = in_array($type, ['bill', 'expense'], true) ? $type : 'invoice';
+        $noun = match ($type) { 'bill', 'expense' => $type, 'vendor_credit' => 'supplier credit', default => 'invoice' };
         if ($automatic && $number !== null) {
             throw ValidationException::withMessages(['number' => [ucfirst($noun) . 's are numbered when they are posted. Leave the number empty.']]);
         }
@@ -104,12 +104,18 @@ final class SaveInvoiceDraft
         return $number;
     }
 
+    /** The kind of credit that corrects a document: a credit note for an invoice, a supplier credit for a bill. */
+    public static function creditFor(Document $original): string
+    {
+        return $original->type === 'bill' ? 'vendor_credit' : 'credit_note';
+    }
+
     /**
-     * The credit notes of one invoice never add up to more than the invoice (also a database rule, 017).
+     * The credits of one invoice or bill never add up to more than it (also a database rule, 017 and 022).
      */
     public function assertCreditable(Document $original, string $total, ?Document $except = null): void
     {
-        $credited = (string) (Document::query()->where(['type' => 'credit_note', 'original_document_id' => $original->getKey()])
+        $credited = (string) (Document::query()->where(['type' => self::creditFor($original), 'original_document_id' => $original->getKey()])
             ->whereIn('status', ['posted', 'part_paid', 'paid'])
             ->when($except, fn ($q) => $q->whereKeyNot($except->getKey()))
             ->sum('total'));

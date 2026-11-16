@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getBill } from "@/lib/data";
+import { getBill, getOpenBills } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { ApplyCredit } from "../../invoices/[id]/ApplyCredit";
 import { InvoiceActions } from "../../invoices/[id]/InvoiceActions";
 
 export const metadata = { title: "Bill" };
@@ -22,14 +23,20 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
   const { posted } = await searchParams;
   const bill = await getBill(id);
   if (!bill) notFound();
-  const status = STATUS[bill.status] ?? { label: bill.status, tone: "neutral" as const };
+  const credit = bill.type === "vendor_credit";
+  const status = credit && bill.status === "paid" ? { label: "Applied", tone: "good" as const }
+    : credit && ["posted", "part_paid"].includes(bill.status) ? { label: "Credit left", tone: "warn" as const }
+    : STATUS[bill.status] ?? { label: bill.status, tone: "neutral" as const };
   const payout = bill.contact.payout ?? {};
+  const kind = credit ? "Supplier credit" : "Bill";
+  const canApply = credit && Boolean(bill.can.apply) && ["posted", "part_paid"].includes(bill.status) && bill.amount_due !== "0.00" && !bill.demo;
+  const openBills = canApply ? await getOpenBills(bill.contact.id, bill.currency) : [];
 
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / Bill</>}
-        title={<>Bill {bill.number ? <span className="num">{bill.number}</span> : "(draft)"} <Pill tone={status.tone}>{status.label}</Pill></>}
+        eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / {kind}</>}
+        title={<>{kind} {bill.number ? <span className="num">{bill.number}</span> : "(draft)"} <Pill tone={status.tone}>{status.label}</Pill></>}
       />
       {posted === "0" && bill.status !== "posted" && (
         <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
@@ -50,7 +57,10 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
               <div className="text-[13px] text-muted">Supplier</div>
               <Link href={`/suppliers/${encodeURIComponent(bill.contact.id)}`} className="font-bold hover:underline">{bill.contact.name}</Link>
               {bill.contact.tax_id && <div className="num text-[13px] text-muted">TIN {bill.contact.tax_id}</div>}
-              <div className="mt-1 text-[13px]">Their invoice <span className="num font-semibold">{bill.reference ?? "—"}</span></div>
+              <div className="mt-1 text-[13px]">{credit ? "Their credit note" : "Their invoice"} <span className="num font-semibold">{bill.reference ?? "—"}</span></div>
+              {credit && bill.original && (
+                <div className="mt-1 text-[13px]">Corrects <Link href={`/bills/${encodeURIComponent(bill.original.id)}`} className="num font-semibold hover:underline">{bill.original.number}</Link></div>
+              )}
             </div>
             <div className="text-right">
               <div><span className="text-muted">Issued</span> <span className="num">{bill.issue_date}</span></div>
@@ -80,16 +90,20 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
             <div className="flex justify-between py-1"><dt>Subtotal</dt><dd className="num">{formatAmount(bill.subtotal)}</dd></div>
             <div className="flex justify-between py-1"><dt>Tax</dt><dd className="num">{formatAmount(bill.tax_total)}</dd></div>
             <div className="mt-1 flex justify-between border-t-2 border-ink pt-2 text-lg font-extrabold"><dt>Total</dt><dd className="num">{formatMoney(bill.total, bill.currency)}</dd></div>
-            <div className="flex justify-between py-1 font-semibold"><dt>Still to pay</dt><dd className="num">{formatMoney(bill.amount_due, bill.currency)}</dd></div>
+            <div className="flex justify-between py-1 font-semibold"><dt>{credit ? "Credit left" : "Still to pay"}</dt><dd className="num">{formatMoney(bill.amount_due, bill.currency)}</dd></div>
           </dl>
           {bill.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{bill.notes}</p>}
         </Card>
 
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
           {!bill.demo && <InvoiceActions invoice={bill} />}
-          {!bill.demo && ["posted", "part_paid"].includes(bill.status) && (
+          {!credit && !bill.demo && ["posted", "part_paid"].includes(bill.status) && (
             <Link href={`/payments-made/new?supplier=${encodeURIComponent(bill.contact.id)}`} className="btn justify-center">Pay this bill</Link>
           )}
+          {!credit && !bill.demo && bill.can.credit && ["posted", "part_paid", "paid"].includes(bill.status) && (
+            <Link href={`/bills/${encodeURIComponent(bill.id)}/credit`} className="btn justify-center">Record a supplier credit</Link>
+          )}
+          {canApply && <ApplyCredit creditNoteId={bill.id} left={bill.amount_due} invoices={openBills} bills />}
           <Card label="Pay to">
             <h2 className="text-[17px] font-bold">Pay to</h2>
             {payout.bank_name || payout.mobile_money_number ? (

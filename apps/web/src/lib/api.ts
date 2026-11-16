@@ -229,13 +229,15 @@ export interface Bill extends Invoice {
 }
 
 export interface BillDetail extends Bill {
-  type: "bill";
+  /** A supplier credit (vendor_credit) is read and approved through the bill routes, like a credit note through invoices. */
+  type: "bill" | "vendor_credit";
   fx_rate: string;
   notes: string | null;
   contact: Contact & { email?: string | null; payout?: Payout };
   lines: InvoiceLine[];
+  original?: { id: string; number: string | null; reference: string | null } | null;
   warnings: { type: string; message: string; bill_id?: string }[];
-  can: { edit: boolean; approve: boolean; void: boolean };
+  can: { edit: boolean; approve: boolean; void: boolean; credit?: boolean; apply?: boolean };
 }
 
 /** An expense paid on the spot (Module 3): posted at once against the account it was paid from. */
@@ -475,6 +477,12 @@ export const ledgerly = {
   updateSupplier: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<Supplier>(`suppliers/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   bills: (ctx: RequestOptions) => api<{ data: Bill[] }>("bills", ctx),
+  supplierCredits: (ctx: RequestOptions) =>
+    api<{ data: (Bill & { original?: { id: string; number: string | null } | null })[] }>("supplier-credits", ctx),
+  createSupplierCredit: (billId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<BillDetail>(`bills/${encodeURIComponent(billId)}/credits`, { ...ctx, method: "POST", body }),
+  applySupplierCredit: (creditId: string, body: { bill_id: string; amount: string }, ctx: RequestOptions) =>
+    api<unknown>(`supplier-credits/${encodeURIComponent(creditId)}/apply`, { ...ctx, method: "POST", body }),
   bill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}`, ctx),
   createBill: (body: Record<string, unknown>, ctx: RequestOptions) => api<BillDetail>("bills", { ...ctx, method: "POST", body }),
   approveBill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),

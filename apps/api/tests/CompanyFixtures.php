@@ -70,6 +70,9 @@ trait CompanyFixtures
         $ids['posted_bill'] = $this->postJson('/api/v1/bills', $bill('R-100'), $h)->assertCreated()->json('id');
         $this->postJson("/api/v1/bills/{$ids['posted_bill']}/approve", [], $h)->assertOk();
         $ids['bill'] = $this->postJson('/api/v1/bills', $bill('R-101'), $h)->assertCreated()->json('id');
+        $ids['supplier_credit'] = $this->postJson("/api/v1/bills/{$ids['posted_bill']}/credits", ['issue_date' => '2026-11-06', 'reference' => 'RC-1',
+            'notes' => 'Rent overcharged', 'lines' => [['description' => 'Rent correction', 'quantity' => '1', 'unit_price' => '40', 'account_id' => $ids['rent']]]], $h)
+            ->assertCreated()->json('id');
         // An expense paid from the bank: 115.00 of fuel (7 Nov).
         $ids['expense'] = $this->postJson('/api/v1/expenses', ['contact_id' => $ids['supplier'], 'paid_from_account_id' => $ids['bank'],
             'payment_method' => 'cash', 'reference' => 'R-7781', 'issue_date' => '2026-11-07', 'currency' => 'ETB',
@@ -92,7 +95,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(72, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(75, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -111,6 +114,7 @@ trait CompanyFixtures
             'bill' => $ids['bill'],         // a draft, like the invoice
             'paymentMade' => $ids['payment_made'],
             'expense' => $ids['expense'],
+            'supplierCredit' => $ids['supplier_credit'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");
