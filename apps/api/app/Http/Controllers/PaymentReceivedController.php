@@ -29,7 +29,7 @@ final class PaymentReceivedController extends Controller
         $this->authorizeCompany('payments.view');
         $q = $request->validate(['contact_id' => ['nullable', 'uuid']]);
 
-        return response()->json(Payment::query()->where('direction', 'in')
+        return response()->json(Payment::query()->where(['direction' => 'in', 'kind' => 'payment'])
             ->when($q['contact_id'] ?? null, fn ($b, $id) => $b->where('contact_id', $id))
             ->with('contact:id,name')->withCount('allocations')
             ->orderByDesc('payment_date')->orderByDesc('created_at')
@@ -45,7 +45,8 @@ final class PaymentReceivedController extends Controller
 
         return response()->json([...$payment->toArray(), 'unallocated' => $payment->unallocated(),
             'can' => ['allocate' => (bool) app(\App\Domain\Tenancy\Support\CurrentCompany::class)->membership()?->can('payments.receive'),
-                'reverse' => (bool) app(\App\Domain\Tenancy\Support\CurrentCompany::class)->membership()?->can('payments.reverse')]]);
+                'reverse' => (bool) app(\App\Domain\Tenancy\Support\CurrentCompany::class)->membership()?->can('payments.reverse'),
+                'refund' => (bool) app(\App\Domain\Tenancy\Support\CurrentCompany::class)->membership()?->can('payments.pay')]]);
     }
 
     public function store(Request $request, ReceivePayment $receive): JsonResponse

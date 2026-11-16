@@ -55,11 +55,13 @@ final class PaymentAllocationTest extends TestCase
 
     public function test_an_advance_to_a_supplier_settles_a_later_bill(): void
     {
-        // The fixture's advance of 100.00 against its posted rent bill of 400.00.
-        $this->getJson("/api/v1/payments-made/{$this->c['payment_made']}", $this->h)->assertJsonPath('unallocated', '100.00');
-        $this->postJson("/api/v1/payments-made/{$this->c['payment_made']}/allocate", ['allocations' => [['bill_id' => $this->c['posted_bill'], 'amount' => '100']]], $this->h)
+        // The fixture's advance of 100.00 (10.00 refunded) against its posted rent bill of 400.00.
+        $this->getJson("/api/v1/payments-made/{$this->c['payment_made']}", $this->h)->assertJsonPath('unallocated', '90.00');
+        $this->postJson("/api/v1/payments-made/{$this->c['payment_made']}/allocate", ['allocations' => [['bill_id' => $this->c['posted_bill'], 'amount' => '90.01']]], $this->h)
+            ->assertUnprocessable();
+        $this->postJson("/api/v1/payments-made/{$this->c['payment_made']}/allocate", ['allocations' => [['bill_id' => $this->c['posted_bill'], 'amount' => '90']]], $this->h)
             ->assertOk();
-        $this->getJson("/api/v1/bills/{$this->c['posted_bill']}", $this->h)->assertJsonPath('status', 'part_paid')->assertJsonPath('amount_due', '300.00');
+        $this->getJson("/api/v1/bills/{$this->c['posted_bill']}", $this->h)->assertJsonPath('status', 'part_paid')->assertJsonPath('amount_due', '310.00');
 
         // Not a bill, another supplier's bill, more than is left: refused.
         $this->postJson("/api/v1/payments-made/{$this->c['payment_made']}/allocate", ['allocations' => [['bill_id' => $this->c['invoice'], 'amount' => '1']]], $this->h)

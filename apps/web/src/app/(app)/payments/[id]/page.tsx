@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getOpenInvoices, getPaymentReceived } from "@/lib/data";
+import { getMoneyAccounts, getOpenInvoices, getPaymentReceived } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { RefundPanel } from "../../refunds/RefundPanel";
 import { AllocateLeft } from "./AllocateLeft";
 import { ReversePayment } from "./ReversePayment";
 
@@ -14,6 +15,8 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
   if (!payment) notFound();
   const canAllocate = payment.status === "posted" && payment.can.allocate && payment.unallocated !== "0.00";
   const invoices = canAllocate && payment.contact ? await getOpenInvoices(payment.contact.id, payment.currency) : [];
+  const canRefund = payment.status === "posted" && payment.can.refund && payment.unallocated !== "0.00";
+  const moneyAccounts = canRefund ? await getMoneyAccounts(payment.currency) : [];
 
   return (
     <>
@@ -48,6 +51,7 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
         {payment.status === "posted" && (
           <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
             {canAllocate && <AllocateLeft id={payment.id} left={payment.unallocated} documents={invoices} />}
+            {canRefund && payment.contact && <RefundPanel side="customer" contactId={payment.contact.id} currency={payment.currency} left={payment.unallocated} paymentId={payment.id} accounts={moneyAccounts} />}
             {payment.can.reverse && <ReversePayment id={payment.id} />}
           </aside>
         )}

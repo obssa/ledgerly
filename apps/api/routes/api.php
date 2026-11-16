@@ -19,6 +19,7 @@ use App\Http\Controllers\NumberingController;
 use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\PaymentMadeController;
 use App\Http\Controllers\PaymentReceivedController;
+use App\Http\Controllers\RefundController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierCreditController;
 use App\Http\Controllers\TaxRateController;
@@ -46,11 +47,12 @@ Route::bind('bill', $documentOf(['bill', 'vendor_credit']));
 Route::bind('expense', $documentOf(['expense']));
 Route::bind('supplierCredit', $documentOf(['vendor_credit']));
 // Payments received and payments made share one table too.
-$paymentOf = fn (string $direction) => fn (string $id) => Str::isUuid($id)
-    ? Payment::query()->where('direction', $direction)->findOrFail($id)
+$paymentOf = fn (array $where) => fn (string $id) => Str::isUuid($id)
+    ? Payment::query()->where($where)->findOrFail($id)
     : abort(404);
-Route::bind('payment', $paymentOf('in'));
-Route::bind('paymentMade', $paymentOf('out'));
+Route::bind('payment', $paymentOf(['direction' => 'in', 'kind' => 'payment']));
+Route::bind('paymentMade', $paymentOf(['direction' => 'out', 'kind' => 'payment']));
+Route::bind('refund', $paymentOf(['kind' => 'refund']));
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
@@ -161,6 +163,12 @@ Route::prefix('v1')->group(function () {
             Route::get('payments-made/{paymentMade}', [PaymentMadeController::class, 'show']);
             Route::post('payments-made/{paymentMade}/reverse', [PaymentMadeController::class, 'reverse']);
             Route::post('payments-made/{paymentMade}/allocate', [PaymentMadeController::class, 'allocate']);
+
+            Route::get('refunds', [RefundController::class, 'index']);
+            Route::post('refunds/customer', [RefundController::class, 'storeCustomer']);
+            Route::post('refunds/supplier', [RefundController::class, 'storeSupplier']);
+            Route::get('refunds/{refund}', [RefundController::class, 'show']);
+            Route::post('refunds/{refund}/reverse', [RefundController::class, 'reverse']);
 
             Route::get('payments-received', [PaymentReceivedController::class, 'index']);
             Route::post('payments-received', [PaymentReceivedController::class, 'store']);

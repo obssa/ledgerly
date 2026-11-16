@@ -49,8 +49,7 @@ final class AllocatePayment
                 throw ValidationException::withMessages(['allocations' => ['This payment is reversed: it settles nothing.']]);
             }
             $currency = $payment->currency;
-            $allocated = Money::of((string) DB::table('payment_allocations')->where('payment_id', $payment->getKey())->sum('amount'), $currency);
-            $left = Money::of((string) $payment->amount, $currency)->plus(Money::of((string) $payment->withholding, $currency))->minus($allocated);
+            $left = Money::of($payment->unallocated(), $currency);   // less its allocations and standing refunds
 
             // Every id from the request is loaded through the company-scoped model, locked in a fixed order.
             $docs = Document::query()->whereIn('id', array_column($requested, 'document_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');

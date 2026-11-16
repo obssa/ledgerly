@@ -34,7 +34,7 @@ final class PaymentMadeController extends Controller
         $this->authorizeCompany('payments.view');
         $q = $request->validate(['contact_id' => ['nullable', 'uuid']]);
 
-        return response()->json(Payment::query()->where('direction', 'out')
+        return response()->json(Payment::query()->where(['direction' => 'out', 'kind' => 'payment'])
             ->when($q['contact_id'] ?? null, fn ($b, $id) => $b->where('contact_id', $id))
             ->with('contact:id,name')->withCount('allocations')
             ->orderByDesc('payment_date')->orderByDesc('created_at')
@@ -48,7 +48,8 @@ final class PaymentMadeController extends Controller
         return response()->json([
             ...$paymentMade->load(['contact:id,name,tax_id,payout', 'allocations.document:id,number,reference,issue_date,total,amount_due,status'])->toArray(),
             'unallocated' => $paymentMade->unallocated(),
-            'can' => ['reverse' => (bool) $this->current->membership()?->can('payments.reverse'), 'allocate' => (bool) $this->current->membership()?->can('payments.pay')],
+            'can' => ['reverse' => (bool) $this->current->membership()?->can('payments.reverse'), 'allocate' => (bool) $this->current->membership()?->can('payments.pay'),
+                'refund' => (bool) $this->current->membership()?->can('payments.receive')],
         ]);
     }
 

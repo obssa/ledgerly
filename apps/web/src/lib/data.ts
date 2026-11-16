@@ -352,6 +352,32 @@ export async function getPayOptions(supplierId: string | null): Promise<PayOptio
   });
 }
 
+/** Bank, cash and wallet accounts in one currency: where a refund is paid from or into. */
+export async function getMoneyAccounts(currency: string): Promise<{ id: string; code: string; name: string }[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  const [{ data }, currencies] = await withApi((ctx) => Promise.all([ledgerly.accounts(ctx), ledgerly.currencies(ctx)]));
+  return data.filter((a) => a.is_active && ["bank", "cash", "mobile_money"].includes(a.subtype ?? "") && (a.currency ?? currencies.base_currency) === currency)
+    .map((a) => ({ id: a.id, code: a.code, name: a.name }));
+}
+
+export async function getRefunds() {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.refunds(ctx))).data;
+}
+
+export async function getRefund(id: string) {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.refund(id, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 export async function getPaymentsMade(): Promise<PaymentReceived[]> {
   await connection();
   if (isDemoMode()) return [];
@@ -405,7 +431,7 @@ export async function getPaymentsReceived(): Promise<PaymentReceived[]> {
   return (await withApi((ctx) => ledgerly.paymentsReceived(ctx))).data;
 }
 
-export async function getPaymentReceived(id: string): Promise<(PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean } }) | null> {
+export async function getPaymentReceived(id: string): Promise<(PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean; refund: boolean } }) | null> {
   await connection();
   if (isDemoMode()) return null;
   try {

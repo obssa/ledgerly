@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getBill, getOpenBills } from "@/lib/data";
+import { getBill, getMoneyAccounts, getOpenBills } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { ApplyCredit } from "../../invoices/[id]/ApplyCredit";
+import { RefundPanel } from "../../refunds/RefundPanel";
 import { InvoiceActions } from "../../invoices/[id]/InvoiceActions";
 
 export const metadata = { title: "Bill" };
@@ -31,6 +32,8 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
   const kind = credit ? "Supplier credit" : "Bill";
   const canApply = credit && Boolean(bill.can.apply) && ["posted", "part_paid"].includes(bill.status) && bill.amount_due !== "0.00" && !bill.demo;
   const openBills = canApply ? await getOpenBills(bill.contact.id, bill.currency) : [];
+  const canRefund = credit && Boolean(bill.can.refund) && ["posted", "part_paid"].includes(bill.status) && bill.amount_due !== "0.00" && !bill.demo;
+  const moneyAccounts = canRefund ? await getMoneyAccounts(bill.currency) : [];
 
   return (
     <>
@@ -104,6 +107,7 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
             <Link href={`/bills/${encodeURIComponent(bill.id)}/credit`} className="btn justify-center">Record a supplier credit</Link>
           )}
           {canApply && <ApplyCredit creditNoteId={bill.id} left={bill.amount_due} invoices={openBills} bills />}
+          {canRefund && <RefundPanel side="supplier" contactId={bill.contact.id} currency={bill.currency} left={bill.amount_due} creditId={bill.id} accounts={moneyAccounts} />}
           <Card label="Pay to">
             <h2 className="text-[17px] font-bold">Pay to</h2>
             {payout.bank_name || payout.mobile_money_number ? (

@@ -30,6 +30,9 @@ final class ReversePayment
             if ($payment->status !== 'posted') {
                 throw new LedgerException('This payment is already reversed.');
             }
+            if (Payment::query()->where(['refunds_payment_id' => $payment->getKey(), 'status' => 'posted'])->exists()) {
+                throw new LedgerException('Part of this payment was refunded: reverse the refund first.');
+            }
 
             $reversal = $this->posting->reverse($payment->journal_entry_id, new DateTimeImmutable($date), $userId);
             // Exchange differences booked when the payment was applied later go with it.

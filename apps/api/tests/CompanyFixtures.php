@@ -19,7 +19,7 @@ trait CompanyFixtures
 
     /**
      * A company set up through the API by its own owner, with a posted invoice, a draft, a manual entry, a tax
-     * rate, a foreign currency with a rate, a location, a payment of 50.00 on the posted invoice, a draft credit note on it, a customer, a supplier with a posted and a draft bill an advance of 100.00 and an expense of 115.00, an item and a warehouse. @return array<string, string>
+     * rate, a foreign currency with a rate, a location, a payment of 50.00 on the posted invoice, a draft credit note on it, a customer, a supplier with a posted and a draft bill an advance of 100.00 (10.00 of it refunded) and an expense of 115.00, an item and a warehouse. @return array<string, string>
      */
     protected function companyWithRecords(string $email, string $name): array
     {
@@ -80,6 +80,9 @@ trait CompanyFixtures
         // An advance of 100.00 to the supplier (6 Nov), not allocated to a bill.
         $ids['payment_made'] = $this->postJson('/api/v1/payments-made', ['contact_id' => $ids['supplier'], 'account_id' => $ids['bank'],
             'payment_date' => '2026-11-06', 'method' => 'bank_transfer', 'currency' => 'ETB', 'amount' => '100'], $h)->assertCreated()->json('id');
+        // The supplier gives 10.00 of the advance back (8 Nov), so 90.00 of it is left.
+        $ids['refund'] = $this->postJson('/api/v1/refunds/supplier', ['contact_id' => $ids['supplier'], 'account_id' => $ids['bank'], 'payment_date' => '2026-11-08',
+            'method' => 'bank_transfer', 'currency' => 'ETB', 'amount' => '10', 'payment_id' => $ids['payment_made']], $h)->assertCreated()->json('id');
 
         $ids['entry'] = $this->postJson('/api/v1/journal-entries', ['date' => '2026-11-04', 'memo' => 'Opening cash', 'lines' => [
             ['account_id' => $ids['bank'], 'debit' => '1000'], ['account_id' => $ids['equity'], 'credit' => '1000'],
@@ -95,7 +98,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(77, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(82, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -115,6 +118,7 @@ trait CompanyFixtures
             'paymentMade' => $ids['payment_made'],
             'expense' => $ids['expense'],
             'supplierCredit' => $ids['supplier_credit'],
+            'refund' => $ids['refund'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");
@@ -126,7 +130,7 @@ trait CompanyFixtures
             'api/v1/reports/trial-balance', 'api/v1/reports/balance-sheet' => ['as_of' => '2026-12-31'],
             'api/v1/reports/profit-and-loss' => ['from' => '2026-07-08', 'to' => '2027-07-07'],
             'api/v1/exchange-rates' => ['currency' => 'USD', 'from' => '2026-07-08', 'to' => '2027-07-07'],
-            'api/v1/payments-received/{payment}/reverse', 'api/v1/payments-made/{paymentMade}/reverse' => [],
+            'api/v1/payments-received/{payment}/reverse', 'api/v1/payments-made/{paymentMade}/reverse', 'api/v1/refunds/{refund}/reverse' => [],
             'api/v1/reports/bin-card' => ['item_id' => $ids['item'], 'warehouse_id' => $ids['warehouse'], 'from' => '2026-07-08', 'to' => '2027-07-07'],
             default => [],
         };

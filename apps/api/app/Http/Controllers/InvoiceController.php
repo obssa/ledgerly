@@ -40,6 +40,7 @@ final class InvoiceController extends Controller
                 'void' => (bool) $membership?->can('transactions.edit'),
                 'credit' => (bool) $membership?->can('invoices.create'),
                 'apply' => (bool) $membership?->can('payments.receive'),
+                'refund' => (bool) $membership?->can('payments.pay'),   // paying a customer's credit back
             ],
         ], $status);
     }
