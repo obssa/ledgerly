@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Card, PageTitle } from "@/components/ui";
-import { getBinCard, getItem, getWarehouses } from "@/lib/data";
+import { getBinCard, getItem, getWarehouses, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Bin card" };
@@ -19,7 +19,7 @@ export default async function BinCardPage({ searchParams }: PageProps<"/inventor
   const warehouseId = uuid(q.warehouse);
   if (!itemId || !warehouseId) notFound();
   await connection();
-  const to = date(q.to) ?? new Date().toISOString().slice(0, 10);
+  const to = date(q.to) ?? (await getCompanyToday());
   const from = date(q.from) ?? `${to.slice(0, 4)}-01-01`;
   const [item, warehouses, card] = await Promise.all([getItem(itemId), getWarehouses(), getBinCard({ item_id: itemId, warehouse_id: warehouseId, from, to })]);
   if (!item || !card) notFound();

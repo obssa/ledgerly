@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getTrialBalance } from "@/lib/data";
+import { getTrialBalance, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { defaultPeriod, trialTotals } from "@/lib/ledger";
 
@@ -11,7 +11,7 @@ const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.tes
 /** Module 6: every account's balance at a date, debits against credits; each account opens its general ledger. */
 export default async function TrialBalancePage({ searchParams }: PageProps<"/reports/trial-balance">) {
   const asked = date((await searchParams).as_of);   // read the request first: the date below is then per request
-  const asOf = asked ?? new Date().toISOString().slice(0, 10);
+  const asOf = asked ?? (await getCompanyToday());
   const rows = await getTrialBalance(asOf);
   const totals = trialTotals(rows ?? []);
   const from = defaultPeriod(asOf).from;

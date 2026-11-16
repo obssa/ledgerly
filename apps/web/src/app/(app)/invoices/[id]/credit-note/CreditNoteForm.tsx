@@ -7,6 +7,7 @@ import { documentAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { createSupplierCredit } from "../../../bills/actions";
 import { createCreditNote } from "../../actions";
+import { todayIn } from "@/lib/dates";
 
 interface Line { key: number; description: string; quantity: string; unitPrice: string; taxRateId: string; accountId: string }
 
@@ -20,7 +21,7 @@ const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
 export function CreditNoteForm({ invoice, taxRates }: { invoice: InvoiceDetail | BillDetail; taxRates: { id: string; name: string; rate: string }[] }) {
   const bill = invoice.type === "bill";   // a supplier credit: what the supplier gives back on this bill
   const [state, action, pending] = useActionState(bill ? createSupplierCredit : createCreditNote, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const [lines, setLines] = useState<Line[]>(invoice.lines.map((l, i) => ({
     key: i + 1, description: l.description, quantity: l.quantity, unitPrice: l.unit_price, taxRateId: l.tax_rate_id ?? "", accountId: l.account_id,
   })));

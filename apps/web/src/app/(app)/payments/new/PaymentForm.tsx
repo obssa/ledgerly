@@ -6,6 +6,7 @@ import type { ReceiveOptions } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { allocateOldestFirst, paymentTotals } from "@/lib/payments";
 import { receivePayment } from "../actions";
+import { todayIn } from "@/lib/dates";
 
 const METHODS: Record<string, string> = {
   bank_transfer: "Bank transfer", cash: "Cash", cheque: "Cheque", mobile_money: "Mobile money (telebirr, M-PESA …)", card: "Card", other: "Other",
@@ -17,7 +18,7 @@ const METHODS: Record<string, string> = {
  */
 export function PaymentForm({ options }: { options: ReceiveOptions & { customer: NonNullable<ReceiveOptions["customer"]> } }) {
   const [state, action, pending] = useActionState(receivePayment, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const currency = options.customer.currency && options.currencies.includes(options.customer.currency) ? options.customer.currency : options.baseCurrency;
   const invoices = options.invoices.filter((i) => i.currency === currency);
   const accounts = options.accounts.filter((a) => (a.currency ?? options.baseCurrency) === currency);

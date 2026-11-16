@@ -119,7 +119,7 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
   removing either one fails the suite.
 - **Shared hosting**: the feature tests also pass on PostgreSQL 13 with the role layout of the cPanel account (no role
   creation, `public` writable by everyone, tables in their own schema), in CI on every pull request.
-- **Web: 61 unit tests, lint (0 errors), production build.**
+- **Web: 63 unit tests, lint (0 errors), production build.**
 - **Production images** build and run: the API image migrated a database as the owner, served sign-up and company setup as
   `ledgerly_web`, and runs as a non-root user; the web image runs in demo mode or against the API from the same build.
 

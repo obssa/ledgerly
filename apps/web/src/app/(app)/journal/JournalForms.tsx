@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import type { Account, Dimension, RecurringJournal } from "@/lib/api";
+import { todayIn } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
 import { emptyLine, FREQUENCIES, journalTotals, type JournalLineInput } from "@/lib/journal";
 import { decideJournalRequest, postDueRecurring, postJournal, reclassify, recurringStep, reverseJournal, saveRecurring } from "./actions";
@@ -87,7 +88,7 @@ export function JournalLines({ lines, setLines, accounts, dimensions, bad }: {
 /** A manual journal: date, memo, and balanced lines; optionally the day it reverses (an accrual, a prepayment). */
 export function NewJournal({ accounts, dimensions }: { accounts: Account[]; dimensions: Dimension[] }) {
   const [state, action, pending] = useActionState(postJournal, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const [lines, setLines] = useState<JournalLineInput[]>([emptyLine(), emptyLine()]);
   const bad = (n: string) => Boolean(state?.fields?.[n]);
 
@@ -121,7 +122,7 @@ export function NewJournal({ accounts, dimensions }: { accounts: Account[]; dime
 /** Set up or edit a recurring journal: a name, a schedule, and the lines each posting carries. */
 export function RecurringForm({ accounts, dimensions, template }: { accounts: Account[]; dimensions: Dimension[]; template?: RecurringJournal }) {
   const [state, action, pending] = useActionState(saveRecurring, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const [lines, setLines] = useState<JournalLineInput[]>(template?.lines?.map((l) => ({
     account_id: l.account_id, debit: l.debit ?? "", credit: l.credit ?? "", description: l.description ?? "",
     ...(l.location_id ? { location_id: l.location_id } : {}), ...(l.class_id ? { class_id: l.class_id } : {}), ...(l.project_id ? { project_id: l.project_id } : {}),
@@ -172,7 +173,7 @@ type ReclassLine = { line_id: string; date: string; entry: number; entry_id: str
 /** Reclassify in bulk: tick lines of one account, choose where they go; one manual journal moves them. */
 export function ReclassifyForm({ lines, accounts, fromAccountId }: { lines: ReclassLine[]; accounts: Account[]; fromAccountId: string }) {
   const [state, action, pending] = useActionState(reclassify, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const bad = (n: string) => Boolean(state?.fields?.[n]);
   return (
     <form action={action} noValidate className="grid gap-4">
@@ -257,7 +258,7 @@ export function PostDue({ due }: { due: number }) {
 
 export function ReverseJournal({ id, date }: { id: string; date: string }) {
   const [state, action, pending] = useActionState(reverseJournal, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   return (
     <form action={action} noValidate className="flex flex-wrap items-end gap-2">
       <div className="w-full"><Message state={state} /></div>

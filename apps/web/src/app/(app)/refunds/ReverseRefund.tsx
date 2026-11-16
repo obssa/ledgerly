@@ -3,11 +3,12 @@
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
 import { reverseRefund } from "./actions";
+import { todayIn } from "@/lib/dates";
 
 /** A refund that did not go through: the entry is reversed and the credit is back. Needs a reason. */
 export function ReverseRefund({ id }: { id: string }) {
   const [state, action, pending] = useActionState(reverseRefund, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   return (
     <Card label="Reverse refund">
       <h2 className="text-[17px] font-bold">Reverse this refund</h2>

@@ -4,11 +4,12 @@ import { useActionState } from "react";
 import { Card } from "@/components/ui";
 import { reversePaymentMade } from "../../payments-made/actions";
 import { reversePayment } from "../actions";
+import { todayIn } from "@/lib/dates";
 
 /** A bounced cheque or returned transfer: the entry is reversed and the invoices (or bills) are open again. Needs a reason. */
 export function ReversePayment({ id, made = false }: { id: string; made?: boolean }) {
   const [state, action, pending] = useActionState(made ? reversePaymentMade : reversePayment, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
 
   return (
     <Card label="Reverse payment">

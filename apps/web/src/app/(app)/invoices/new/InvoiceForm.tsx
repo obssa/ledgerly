@@ -9,6 +9,7 @@ import { formatAmount, formatMoney } from "@/lib/format";
 import { createBill } from "../../bills/actions";
 import { createExpense } from "../../expenses/actions";
 import { createInvoice } from "../actions";
+import { todayIn } from "@/lib/dates";
 
 /** The words and postings that differ between a sales invoice and a supplier's bill; the form is the same. */
 const KIND = {
@@ -64,7 +65,7 @@ const addDays = (date: string, days: number) => {
 export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOptions; kind?: keyof typeof KIND }) {
   const words = KIND[kind];
   const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : createInvoice, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const firstRate = options.taxRates[0]?.id ?? "";
   const firstAccount = options.accounts[0]?.id ?? "";
 

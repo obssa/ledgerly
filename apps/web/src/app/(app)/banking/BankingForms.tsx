@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import type { BankAccount } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
 import { createBankAccount, depositReceipts, saveBankAccount, transferMoney } from "./actions";
+import { todayIn } from "@/lib/dates";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -82,7 +83,7 @@ export function ArchiveBankAccount({ account }: { account: BankAccount }) {
 /** A transfer between two of the company's money accounts. Across currencies: what arrived, at the day's rate unless given. */
 export function TransferMoney({ accounts, base }: { accounts: BankAccount[]; base: string }) {
   const [state, action, pending] = useActionState(transferMoney, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const bad = (n: string) => Boolean(state?.fields?.[n]);
   const [fromId, setFromId] = useState(accounts[0]?.id ?? "");
   const [toId, setToId] = useState(accounts[1]?.id ?? "");
@@ -120,7 +121,7 @@ export function TransferMoney({ accounts, base }: { accounts: BankAccount[]; bas
 
 export function DepositReceipts({ banks }: { banks: BankAccount[] }) {
   const [state, action, pending] = useActionState(depositReceipts, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   return (
     <form action={action} noValidate className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] items-end gap-3">
       <div className="col-span-full"><Message state={state} /></div>

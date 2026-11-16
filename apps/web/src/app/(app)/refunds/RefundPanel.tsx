@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { Card } from "@/components/ui";
 import { formatAmount } from "@/lib/format";
 import { recordRefund } from "./actions";
+import { todayIn } from "@/lib/dates";
 
 const METHODS: Record<string, string> = {
   bank_transfer: "Bank transfer", cash: "Cash", mobile_money: "Mobile money (telebirr, M-PESA …)", cheque: "Cheque", card: "Card", other: "Other",
@@ -18,7 +19,7 @@ export function RefundPanel({ side, contactId, currency, left, creditId, payment
   accounts: { id: string; code: string; name: string }[];
 }) {
   const [state, action, pending] = useActionState(recordRefund, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const out = side === "customer";
   return (
     <Card label="Refund">

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { Bill } from "@/lib/api";
-import { getBills } from "@/lib/data";
+import { getBills, getCompanyToday } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Bills" };
@@ -20,7 +20,7 @@ function status(b: Bill, today: string) {
 export default async function BillsPage() {
   const bills = await getBills();
   await connection();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = await getCompanyToday();
 
   return (
     <>

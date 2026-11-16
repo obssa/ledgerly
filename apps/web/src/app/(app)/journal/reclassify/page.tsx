@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
-import { getGeneralLedger, getJournalOptions } from "@/lib/data";
+import { getCompanyToday, getGeneralLedger, getJournalOptions } from "@/lib/data";
 import { journalAccounts } from "@/lib/journal";
 import { defaultPeriod } from "@/lib/ledger";
 import { ReclassifyForm } from "../JournalForms";
@@ -13,7 +13,7 @@ const uuid = (v: unknown) => (typeof v === "string" && /^[0-9a-f-]{36}$/.test(v)
 /** Module 6, accountant tools: lines posted to the wrong account, moved to the right one in bulk by one manual journal. */
 export default async function ReclassifyPage({ searchParams }: PageProps<"/journal/reclassify">) {
   const q = await searchParams;
-  const period = defaultPeriod(new Date().toISOString().slice(0, 10));
+  const period = defaultPeriod(await getCompanyToday());
   const filters = { from: date(q.from) ?? period.from, to: date(q.to) ?? period.to, account_id: uuid(q.account_id) };
   const [gl, options] = await Promise.all([filters.account_id ? getGeneralLedger(filters) : Promise.resolve(null), getJournalOptions()]);
   const accounts = options ? journalAccounts(options.accounts, options.baseCurrency) : [];
