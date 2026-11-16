@@ -94,6 +94,7 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | Manual journals (`journals.create`): never on accounts kept by documents, checked by the database (T59); only manual journals are reversed by hand, with a reason in the audit log; entries made by documents are corrected through the document | Tested |
 | Manual journals above `settings.approval.journal_above` wait as requests: asked and decided by the person signed in (the database checks it), approved or rejected by someone other than the asker (`journals.approve`), decided once, never changed or deleted (T60); an approval checks the journal again before posting | Tested |
 | Period close (`periods.close`): the close checklist informs the close and its open items are kept in the `period_closed` audit record; reopening needs `periods.reopen` (owner, admin) and a reason | Tested |
+| Currency revaluation (`accounting.revalue`, accountants): one run per date, made by the person signed in, naming its own revaluation entry and the reversal dated after it; kept as made, never changed or deleted (T61) | Tested |
 
 Product decision (CLAUDE.md, light controls): no second approver for payout changes and no three-way match. The audit
 record and the duplicate warning are the controls; `settings.approval.bill_above` is the one optional approval step

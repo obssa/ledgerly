@@ -578,6 +578,34 @@ export interface CloseChecklist {
   can: { reopen: boolean };
 }
 
+/** Module 6: a month-end revaluation of foreign balances, previewed or posted. */
+export interface RevaluationLine {
+  kind: "account" | "invoice" | "credit_note" | "bill" | "vendor_credit";
+  label: string;
+  currency: string;
+  amount: string;
+  booked: string;
+  rate: string;
+  restated: string;
+  difference: string;
+  document_id: string | null;
+  account_id: string;
+}
+
+export interface RevaluationPreview {
+  as_of: string;
+  rates: Record<string, string>;
+  lines: RevaluationLine[];
+  net: string;
+}
+
+export interface RevaluationRun extends RevaluationPreview {
+  id: string;
+  by: string | null;
+  entry: { id: string; number: number };
+  reversal: { id: string; number: number; date: string };
+}
+
 export interface ProfitAndLossRow {
   code: string;
   name: string;
@@ -849,6 +877,10 @@ export const ledgerly = {
   applyCredit: (creditNoteId: string, body: { invoice_id: string; amount: string }, ctx: RequestOptions) =>
     api<unknown>(`credit-notes/${encodeURIComponent(creditNoteId)}/apply`, { ...ctx, method: "POST", body }),
   taxRates: (ctx: RequestOptions) => api<{ data: TaxRate[] }>("tax-rates", ctx),
+  revaluations: (ctx: RequestOptions) => api<{ data: RevaluationRun[]; can: { revalue: boolean } }>("revaluations", ctx),
+  revaluationPreview: (asOf: string, rates: Record<string, string>, ctx: RequestOptions) =>
+    api<RevaluationPreview>("revaluations/preview", { ...ctx, query: { as_of: asOf, ...Object.fromEntries(Object.entries(rates).map(([k, v]) => [`rates[${k}]`, v])) } }),
+  postRevaluation: (body: { as_of: string; rates: Record<string, string> }, ctx: RequestOptions) => api<RevaluationRun>("revaluations", { ...ctx, method: "POST", body }),
   closeChecklist: (periodEnd: string | undefined, ctx: RequestOptions) => api<CloseChecklist>("close-checklist", { ...ctx, query: { period_end: periodEnd } }),
   generalLedger: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<GeneralLedger>("reports/general-ledger", { ...ctx, query: q }),
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
