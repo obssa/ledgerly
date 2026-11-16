@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { getSession } from "@/lib/session";
+import { countTotal, denominationsFrom } from "@/lib/cash";
 import { reconciliationBody } from "@/lib/reconcile";
 import { statementFrom } from "@/lib/statements";
 
@@ -52,6 +53,7 @@ export async function saveBankAccount(_: FormState | undefined, form: FormData):
   const ctx = await context();
   try {
     await ledgerly.updateBankAccount(text(form, "id") ?? "", { ...(form.has("name") ? { name: text(form, "name") ?? "" } : {}),
+      ...(form.has("float_amount") ? { float_amount: amount(text(form, "float_amount")) || null } : {}),
       ...(form.has("is_active") ? { is_active: form.get("is_active") === "true" } : {}), ...(details(form) ? { bank_details: details(form) } : {}) }, ctx);
   } catch (error) {
     return refusal(error);
@@ -175,4 +177,30 @@ export async function discardReconciliation(_: FormState | undefined, form: Form
     return refusal(error);
   }
   redirect(`/banking/${encodeURIComponent(accountId)}/reconcile`);
+}
+
+/** Count a cash box: by name, with the notes and coins (or the total); a difference is posted to cash over and short. */
+export async function countCash(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let pieces: Record<string, number>;
+  try {
+    pieces = denominationsFrom(form);
+  } catch {
+    return { error: "Enter whole numbers of notes and coins.", fields: { denominations: ["Whole numbers only."] } };
+  }
+  const counted = amount(text(form, "counted"));
+  let result: { counted: string; difference: string; entry: number | null };
+  try {
+    result = await ledgerly.countCash(text(form, "account_id") ?? "", {
+      counted_on: text(form, "counted_on") ?? "", counted_by_name: text(form, "counted_by_name") ?? "",
+      ...(Object.keys(pieces).length > 0 ? { denominations: pieces } : { counted: counted || countTotal(pieces) }),
+      ...(text(form, "note") ? { note: text(form, "note") } : {}),
+    }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  const diff = result.difference;
+  return { notice: diff === "0.00" ? `Counted ${result.counted}: as the books say.`
+    : `Counted ${result.counted}: ${diff.startsWith("-") ? `${diff.slice(1)} short` : `${diff} over`}, posted to cash over and short (entry #${result.entry}).` };
 }

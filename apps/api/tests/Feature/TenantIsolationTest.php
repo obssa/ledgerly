@@ -215,7 +215,7 @@ final class TenantIsolationTest extends TestCase
 
         // Fixtures are real: B has rows in the tables that matter (otherwise the check below proves nothing).
         foreach (['companies', 'organisations', 'users', 'user_recovery_codes', 'user_email_tokens', 'memberships', 'accounts', 'journal_entries', 'journal_lines', 'account_balances',
-            'documents', 'document_lines', 'contacts', 'tax_rates', 'audit_log', 'einvoice_submissions', 'fiscal_years'] as $table) {
+            'documents', 'document_lines', 'contacts', 'tax_rates', 'audit_log', 'einvoice_submissions', 'fiscal_years', 'bank_transactions', 'reconciliations', 'cash_counts'] as $table) {
             $row = $tables->firstWhere('name', $table);
             $this->assertNotNull($row, "{$table} has no row-level security");
             $this->assertGreaterThan(0, $bRows($table, (bool) $row->has_company, $this->owner()), "fixture: company B has no {$table} rows");

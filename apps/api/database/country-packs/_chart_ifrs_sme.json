@@ -306,6 +306,13 @@
       "system_key": "bad_debt"
     },
     {
+      "code": "6980",
+      "name": "Cash over and short",
+      "type": "expense",
+      "subtype": "operating",
+      "system_key": "cash_over_short"
+    },
+    {
       "code": "6990",
       "name": "Rounding differences",
       "type": "expense",

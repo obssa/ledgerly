@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankingController;
+use App\Http\Controllers\CashCountController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\CompanyController;
@@ -211,6 +212,8 @@ Route::prefix('v1')->group(function () {
             Route::put('bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
             Route::get('bank-accounts/{bankAccount}/register', [BankAccountController::class, 'register']);
             Route::get('bank-accounts/{bankAccount}/cheques', [ChequeController::class, 'index']);
+            Route::get('bank-accounts/{bankAccount}/cash-counts', [CashCountController::class, 'index']);
+            Route::post('bank-accounts/{bankAccount}/cash-counts', [CashCountController::class, 'store']);
             Route::get('bank-accounts/{bankAccount}/statement-lines', [StatementController::class, 'index']);
             Route::post('bank-accounts/{bankAccount}/statements', [StatementController::class, 'import']);
             Route::post('statement-lines/{statementLine}/match', [StatementController::class, 'match']);

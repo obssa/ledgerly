@@ -9,6 +9,7 @@ use App\Domain\Ledger\Currency;
 use App\Domain\Ledger\Models\Account;
 use App\Domain\Ledger\Money;
 use App\Domain\Tenancy\Support\CurrentCompany;
+use Brick\Math\BigDecimal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,8 +63,12 @@ final class BankAccountController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'kind' => ['required', Rule::in(self::KINDS)],
             'currency' => ['nullable', Rule::in(Currency::all())],
+            'float_amount' => ['nullable', 'decimal:0,2', 'gt:0'],
             ...$this->detailRules(),
         ]);
+        if (isset($data['float_amount']) && $data['kind'] !== 'cash') {
+            throw ValidationException::withMessages(['float_amount' => ['Only a cash box or petty cash account keeps a float.']]);
+        }
         $currency = $data['currency'] ?? $company->base_currency;
         if ($currency !== $company->base_currency
             && ! DB::table('company_currencies')->where(['company_id' => $company->getKey(), 'currency' => $currency, 'is_enabled' => true])->exists()) {
@@ -87,6 +92,7 @@ final class BankAccountController extends Controller
             'code' => $code, 'name' => $data['name'], 'type' => 'asset', 'subtype' => $data['kind'],
             'currency' => $currency === $company->base_currency ? null : $currency,
             'bank_details' => $this->details($data) ?: (object) [],   // an empty object, never a list (026)
+            'float_amount' => $data['float_amount'] ?? null,
         ]);
         $this->audit->record($company->getKey(), 'created', 'bank_account', $account->getKey(), null,
             ['code' => $code, 'name' => $data['name'], 'kind' => $data['kind'], 'currency' => $currency, 'bank_details' => $this->details($data)],
@@ -101,20 +107,24 @@ final class BankAccountController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
             'is_active' => ['sometimes', 'boolean'],
+            'float_amount' => ['sometimes', 'nullable', 'decimal:0,2', 'gt:0'],
             ...$this->detailRules(),
         ]);
-        $before = ['name' => $bankAccount->name, 'is_active' => $bankAccount->is_active, 'bank_details' => $bankAccount->bank_details ?? []];
+        if (array_key_exists('float_amount', $data) && $data['float_amount'] !== null && $bankAccount->subtype !== 'cash') {
+            throw ValidationException::withMessages(['float_amount' => ['Only a cash box or petty cash account keeps a float.']]);
+        }
+        $before = ['name' => $bankAccount->name, 'is_active' => $bankAccount->is_active, 'bank_details' => $bankAccount->bank_details ?? [], 'float_amount' => $bankAccount->float_amount];
         if (array_key_exists('is_active', $data) && ! $data['is_active']) {
             $balance = $this->balances([$bankAccount->getKey()])[$bankAccount->getKey()] ?? null;
             if ($balance !== null && $balance->base !== '0.00') {
                 throw ValidationException::withMessages(['is_active' => ["{$bankAccount->name} still holds {$balance->base}: move it out before archiving."]]);
             }
         }
-        $bankAccount->fill(array_intersect_key($data, array_flip(['name', 'is_active'])));
+        $bankAccount->fill(array_intersect_key($data, array_flip(['name', 'is_active', 'float_amount'])));
         if (array_intersect_key($data, array_flip(array_map(fn ($k) => "bank_details.{$k}", self::DETAILS))) !== [] || array_key_exists('bank_details', $data)) {
             $bankAccount->bank_details = $this->details($data) ?: (object) [];
         }
-        $after = ['name' => $bankAccount->name, 'is_active' => $bankAccount->is_active, 'bank_details' => $bankAccount->bank_details ?? []];
+        $after = ['name' => $bankAccount->name, 'is_active' => $bankAccount->is_active, 'bank_details' => $bankAccount->bank_details ?? [], 'float_amount' => $bankAccount->float_amount];
         $changes = AuditLogger::diff($before, $after);
         if ($changes !== []) {
             $bankAccount->save();
@@ -155,7 +165,7 @@ final class BankAccountController extends Controller
                 'out' => $move->isNegative() ? $move->negated()->toDecimalString() : '0.00', 'balance' => $balance->toDecimalString()];
         });
 
-        return response()->json(['account' => $this->present($bankAccount, null), 'currency' => $foreign ? $bankAccount->currency : $base, 'from' => $from, 'to' => $to,
+        return response()->json(['account' => $this->present($bankAccount, $this->balances([$bankAccount->getKey()])[$bankAccount->getKey()] ?? null), 'currency' => $foreign ? $bankAccount->currency : $base, 'from' => $from, 'to' => $to,
             'opening' => $foreign ? (string) $opening->txn : (string) $opening->base, 'lines' => $lines, 'closing' => $balance->toDecimalString()]);
     }
 
@@ -176,12 +186,16 @@ final class BankAccountController extends Controller
     {
         $base = $this->current->get()->base_currency;
         $foreign = $a->currency !== null && $a->currency !== $base;
+        $short = $a->float_amount === null ? null : BigDecimal::of((string) $a->float_amount)->minus(BigDecimal::of((string) ($balance->base ?? '0')));
 
         return [
             'id' => $a->getKey(), 'code' => $a->code, 'name' => $a->name, 'kind' => $a->system_key === 'undeposited_funds' ? 'undeposited_funds' : $a->subtype,
             'currency' => $a->currency ?? $base, 'is_active' => (bool) $a->is_active, 'bank_details' => (object) ($a->bank_details ?? []),
             'balance' => $foreign ? ($balance->txn ?? '0.00') : ($balance->base ?? '0.00'),
             'balance_base' => $balance->base ?? '0.00',
+            // A petty cash float, and what it takes to bring the box back up to it.
+            'float_amount' => $a->float_amount === null ? null : (string) $a->float_amount,
+            'top_up' => $short === null ? null : (string) ($short->isNegative() ? BigDecimal::zero() : $short)->toScale(2),
         ];
     }
 

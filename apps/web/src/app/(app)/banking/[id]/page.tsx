@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getBankRegister } from "@/lib/data";
+import { getBankAccounts, getBankRegister, getCashCounts } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { ArchiveBankAccount, EditBankAccount } from "../BankingForms";
+import { CashCountForm, FloatForm, TopUpForm } from "../PettyCashForms";
 
 export const metadata = { title: "Bank account" };
 
@@ -16,6 +17,9 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
   const register = await getBankRegister(id, { from: date(q.from), to: date(q.to) });
   if (!register) notFound();
   const a = register.account;
+  const isCash = a.kind === "cash";
+  const [counts, accounts] = isCash ? await Promise.all([getCashCounts(id), getBankAccounts()]) : [null, null];
+  const sources = (accounts?.data ?? []).filter((x) => x.id !== a.id && x.kind !== "undeposited_funds" && x.currency === a.currency && x.is_active);
 
   return (
     <>
@@ -53,6 +57,39 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
           </table>
         </div>
       </Card>
+      {isCash && (
+        <Card className="mt-4 max-w-[900px]" label="Petty cash">
+          <h2 className="mb-1 text-[15px] font-bold">Petty cash</h2>
+          <p className="mb-3 text-[14px] text-muted">
+            {a.float_amount ? <>Kept at a float of <span className="num font-semibold text-ink">{formatAmount(a.float_amount)}</span>; {a.top_up === "0.00" ? "it is full." : <>it takes <span className="num font-semibold text-ink">{formatAmount(a.top_up ?? "0")}</span> to top it up.</>}</> : "No float set."}
+            {" "}Spend from it with an <Link href="/expenses/new" className="font-semibold text-brand hover:underline">expense</Link> paid from this account (a voucher, with its receipt number).
+          </p>
+          {accounts?.can.manage && <div className="mb-4"><FloatForm account={a} /></div>}
+          {accounts?.can.transfer && sources.length > 0 && <div className="mb-2"><h3 className="mb-1 text-[14px] font-bold">Top up</h3><TopUpForm account={a} sources={sources} /></div>}
+        </Card>
+      )}
+      {isCash && counts && (
+        <Card className="mt-4 max-w-[900px]" label="Cash counts">
+          <h2 className="mb-2 text-[15px] font-bold">Cash counts</h2>
+          {counts.can.count && <div className="mb-4"><CashCountForm account={a} /></div>}
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead><tr><th scope="col">Counted on</th><th scope="col">By</th><th scope="col" className="!text-right">Counted</th><th scope="col" className="!text-right">Books</th><th scope="col" className="!text-right">Difference</th><th scope="col">Note</th></tr></thead>
+              <tbody>
+                {counts.data.length === 0 && <tr><td colSpan={6} className="text-muted">Not counted yet.</td></tr>}
+                {counts.data.map((k) => (
+                  <tr key={k.id}>
+                    <td className="num">{k.counted_on}</td><td>{k.counted_by}</td>
+                    <td className="num text-right">{formatAmount(k.counted)}</td><td className="num text-right">{formatAmount(k.book_balance)}</td>
+                    <td className={`num text-right font-semibold ${k.difference === "0.00" ? "" : k.difference.startsWith("-") ? "text-bad" : "text-good"}`}>{formatAmount(k.difference)}{k.entry ? <span className="ml-1 text-[12px] text-muted">#{k.entry}</span> : null}</td>
+                    <td className="text-[13px] text-muted">{k.note ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       {a.kind !== "undeposited_funds" && (
         <Card className="mt-4 max-w-[900px]" label="Details">
           <div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-[15px] font-bold">Details</h2><ArchiveBankAccount account={a} /></div>
