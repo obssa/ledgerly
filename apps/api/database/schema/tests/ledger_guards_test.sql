@@ -1764,6 +1764,67 @@ DO $$ BEGIN
   EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
   RAISE NOTICE 'PASS T57 floats are for cash, and a cash count says who counted and leaves the books holding what was counted';
 END $$;
+-- T58: the chart of accounts (031). System accounts keep their key and stay active; an account is archived only when it
+-- holds nothing and nothing active sits under it; sub-accounts share their parent's type, never loop, and go at most four
+-- levels deep; codes are plain; accounts are never deleted. Uses a11 (receivable, a system account), a10 (the bank, with
+-- entries) and new income accounts a58..a5c of company A.
+DO $$ BEGIN
+  BEGIN
+    UPDATE accounts SET system_key = 'something_else' WHERE id = '00000000-0000-0000-0000-000000000a11';
+    RAISE EXCEPTION 'FAIL T58a: a system account lost its key';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE accounts SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000a11';
+    RAISE EXCEPTION 'FAIL T58b: a system account was archived';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE accounts SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000a10';
+    RAISE EXCEPTION 'FAIL T58c: an account holding money was archived';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO accounts (id, company_id, code, name, type) VALUES
+    ('00000000-0000-0000-0000-000000000a58', app_company_id(), '4580', 'Other sales', 'income');
+  INSERT INTO accounts (id, company_id, code, name, type, parent_id) VALUES
+    ('00000000-0000-0000-0000-000000000a59', app_company_id(), '4581', 'Sales of samples', 'income', '00000000-0000-0000-0000-000000000a58'),
+    ('00000000-0000-0000-0000-000000000a5a', app_company_id(), '4582', 'Sample packs', 'income', '00000000-0000-0000-0000-000000000a59'),
+    ('00000000-0000-0000-0000-000000000a5b', app_company_id(), '4583', 'Sample packs, 250 g', 'income', '00000000-0000-0000-0000-000000000a5a');
+  BEGIN
+    INSERT INTO accounts (company_id, code, name, type, parent_id) VALUES (app_company_id(), '4584', 'Too deep', 'income', '00000000-0000-0000-0000-000000000a5b');
+    RAISE EXCEPTION 'FAIL T58d: an account went five levels deep';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO accounts (company_id, code, name, type, parent_id) VALUES (app_company_id(), '1590', 'Asset under income', 'asset', '00000000-0000-0000-0000-000000000a58');
+    RAISE EXCEPTION 'FAIL T58e: a sub-account sat under an account of another type';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO accounts (company_id, code, name, type, parent_id) VALUES (app_company_id(), '4590', 'Under B', 'income', '00000000-0000-0000-0000-000000000b11');
+    RAISE EXCEPTION 'FAIL T58f: a sub-account sat under another company''s account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE accounts SET parent_id = '00000000-0000-0000-0000-000000000a5a' WHERE id = '00000000-0000-0000-0000-000000000a58';
+    RAISE EXCEPTION 'FAIL T58g: an account sat under its own sub-account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE accounts SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000a58';
+    RAISE EXCEPTION 'FAIL T58h: an account was archived with active sub-accounts';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE accounts SET type = 'expense' WHERE id = '00000000-0000-0000-0000-000000000a58';
+    RAISE EXCEPTION 'FAIL T58i: an account changed type away from its sub-accounts';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO accounts (company_id, code, name, type) VALUES (app_company_id(), 'bad code!', 'Bad', 'income');
+    RAISE EXCEPTION 'FAIL T58j: an account got a code with spaces and marks';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM accounts WHERE id = '00000000-0000-0000-0000-000000000a5b';
+    RAISE EXCEPTION 'FAIL T58k: an account was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  -- Archived from the bottom up, when empty: allowed.
+  UPDATE accounts SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000a5b';
+  UPDATE accounts SET is_active = false WHERE id = '00000000-0000-0000-0000-000000000a5a';
+  RAISE NOTICE 'PASS T58 the chart keeps system accounts, archives only empty accounts and keeps sub-accounts in one type, no deeper than four levels';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

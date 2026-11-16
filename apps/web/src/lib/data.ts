@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -53,6 +53,13 @@ export async function getCurrencies(): Promise<Currencies> {
   await connection();
   if (isDemoMode()) return demoCurrencies;
   return withApi((ctx) => ledgerly.currencies(ctx));
+}
+
+/** The chart of accounts with balances (archived accounts too, when asked). */
+export async function getChart(archived = false): Promise<{ data: ChartAccount[]; kinds: Record<string, string[]>; can: { manage: boolean }; demo: boolean }> {
+  await connection();
+  if (isDemoMode()) return { data: [], kinds: {}, can: { manage: false }, demo: true };
+  return { ...(await withApi((ctx) => ledgerly.chart(archived, ctx))), demo: false };
 }
 
 /** The opening balances and the accounts they can be entered on. null in the demo, which has no ledger to change. */

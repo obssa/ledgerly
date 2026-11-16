@@ -30,6 +30,7 @@
 | accounting.rates   enter or correct exchange rates (accountant via 'accounting.*')
 | accounting.opening enter or replace the opening balances (accountant via 'accounting.*')
 | accounting.dimensions  add, rename and turn off locations, classes and projects (accountant via 'accounting.*')
+| accounting.chart   add, rename, re-code, group and archive accounts of the chart (accountant via 'accounting.*')
 */
 
 return [
