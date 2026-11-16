@@ -405,7 +405,7 @@ export async function getPaymentsReceived(): Promise<PaymentReceived[]> {
   return (await withApi((ctx) => ledgerly.paymentsReceived(ctx))).data;
 }
 
-export async function getPaymentReceived(id: string): Promise<PaymentReceived | null> {
+export async function getPaymentReceived(id: string): Promise<(PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean } }) | null> {
   await connection();
   if (isDemoMode()) return null;
   try {

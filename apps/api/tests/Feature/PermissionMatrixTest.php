@@ -98,6 +98,8 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/payments-made/withholding/{supplier}' => 'payments.pay',
         'GET api/v1/payments-made/{paymentMade}' => 'payments.view',
         'POST api/v1/payments-made/{paymentMade}/reverse' => 'payments.reverse',
+        'POST api/v1/payments-made/{paymentMade}/allocate' => 'payments.pay',
+        'POST api/v1/payments-received/{payment}/allocate' => 'payments.receive',
         'GET api/v1/reports/ap-ageing' => 'reports.view',
 
         'GET api/v1/payments-received' => 'payments.view',

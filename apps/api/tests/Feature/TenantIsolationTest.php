@@ -152,6 +152,8 @@ final class TenantIsolationTest extends TestCase
             'expense for B\'s supplier' => ['POST', '/api/v1/expenses', ['contact_id' => $this->b['supplier'], 'paid_from_account_id' => $this->a['bank'],
                 'payment_method' => 'cash', 'issue_date' => '2026-11-07', 'currency' => 'ETB',
                 'lines' => [['description' => 'Fuel', 'quantity' => '1', 'unit_price' => '10', 'account_id' => $this->a['rent']]]]],
+            'A\'s payment allocated to B\'s invoice' => ['POST', "/api/v1/payments-received/{$this->a['payment']}/allocate", ['allocations' => [['invoice_id' => $this->b['invoice'], 'amount' => '1']]]],
+            'A\'s advance allocated to B\'s bill' => ['POST', "/api/v1/payments-made/{$this->a['payment_made']}/allocate", ['allocations' => [['bill_id' => $this->b['posted_bill'], 'amount' => '1']]]],
             'supplier defaulting to B\'s account' => ['POST', '/api/v1/suppliers', ['name' => 'Planted', 'default_expense_account_id' => $this->b['rent']]],
             'transfer out of B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->b['bank'], 'to_account_id' => $this->a['bank'], 'amount' => '10']],
             'transfer into B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->a['bank'], 'to_account_id' => $this->b['bank'], 'amount' => '10']],

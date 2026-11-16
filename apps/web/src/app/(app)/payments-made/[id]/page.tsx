@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getPaymentMade } from "@/lib/data";
+import { getOpenBills, getPaymentMade } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { AllocateLeft } from "../../payments/[id]/AllocateLeft";
 import { ReversePayment } from "../../payments/[id]/ReversePayment";
 
 export const metadata = { title: "Payment made" };
@@ -12,6 +13,8 @@ export default async function PaymentMadePage({ params, searchParams }: PageProp
   const { cash } = await searchParams;
   const payment = await getPaymentMade(id);
   if (!payment) notFound();
+  const canAllocate = payment.status === "posted" && payment.can.allocate && payment.unallocated !== "0.00";
+  const bills = canAllocate && payment.contact ? await getOpenBills(payment.contact.id, payment.currency) : [];
 
   return (
     <>
@@ -49,8 +52,11 @@ export default async function PaymentMadePage({ params, searchParams }: PageProp
             </ul>
           )}
         </Card>
-        {payment.status === "posted" && payment.can.reverse && (
-          <aside className="min-w-0 flex-[1_1_300px]"><ReversePayment id={payment.id} made /></aside>
+        {payment.status === "posted" && (
+          <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+            {canAllocate && <AllocateLeft id={payment.id} left={payment.unallocated} documents={bills} made />}
+            {payment.can.reverse && <ReversePayment id={payment.id} made />}
+          </aside>
         )}
       </div>
     </>
