@@ -63,3 +63,28 @@ export async function billAction(_: FormState | undefined, form: FormData): Prom
   refresh();
   return { notice: action === "approve" ? "Posted." : action === "submit" ? "Sent for approval." : "Voided. The number is kept and the entry reversed." };
 }
+
+/** A draft supplier credit for a posted bill; it opens on its own page, where it is approved like a bill. */
+export async function createSupplierCredit(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const billId = text(form, "invoice_id") ?? "";
+  const body = invoiceBody(form);
+  let id: string;
+  try {
+    id = (await ledgerly.createSupplierCredit(billId, { issue_date: body.issue_date, notes: body.notes, reference: body.reference, lines: body.lines }, ctx)).id;
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(`/bills/${encodeURIComponent(id)}`);
+}
+
+export async function applySupplierCredit(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.applySupplierCredit(text(form, "credit_note_id") ?? "", { bill_id: text(form, "invoice_id") ?? "", amount: (text(form, "amount") ?? "").replace(/,/g, "") }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Credit applied." };
+}

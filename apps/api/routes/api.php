@@ -20,6 +20,7 @@ use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\PaymentMadeController;
 use App\Http\Controllers\PaymentReceivedController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierCreditController;
 use App\Http\Controllers\TaxRateController;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Sales\Models\Payment;
@@ -41,8 +42,9 @@ $documentOf = fn (array $types) => fn (string $id) => Str::isUuid($id)
     ? Document::query()->whereIn('type', $types)->findOrFail($id)
     : abort(404);
 Route::bind('invoice', $documentOf(['invoice', 'credit_note']));
-Route::bind('bill', $documentOf(['bill']));
+Route::bind('bill', $documentOf(['bill', 'vendor_credit']));
 Route::bind('expense', $documentOf(['expense']));
+Route::bind('supplierCredit', $documentOf(['vendor_credit']));
 // Payments received and payments made share one table too.
 $paymentOf = fn (string $direction) => fn (string $id) => Str::isUuid($id)
     ? Payment::query()->where('direction', $direction)->findOrFail($id)
@@ -143,6 +145,10 @@ Route::prefix('v1')->group(function () {
             Route::post('bills/{bill}/approve', [BillController::class, 'approve']);
             Route::post('bills/{bill}/void', [BillController::class, 'void']);
             Route::get('bills/{bill}/history', [BillController::class, 'history']);
+
+            Route::post('bills/{bill}/credits', [SupplierCreditController::class, 'store']);
+            Route::get('supplier-credits', [SupplierCreditController::class, 'index']);
+            Route::post('supplier-credits/{supplierCredit}/apply', [SupplierCreditController::class, 'apply']);
 
             Route::get('expenses', [ExpenseController::class, 'index']);
             Route::post('expenses', [ExpenseController::class, 'store']);

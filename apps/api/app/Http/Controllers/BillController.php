@@ -16,6 +16,7 @@ use App\Http\Requests\SaveBillRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Module 3, bills: what suppliers invoice the company. Saved as a draft, optionally sent for approval, then posted
@@ -35,11 +36,13 @@ final class BillController extends Controller
 
         return response()->json([
             ...$bill->toArray(),
-            'warnings' => $this->duplicates->warnings($bill),
+            'warnings' => $bill->type === 'bill' ? $this->duplicates->warnings($bill) : [],
             'can' => [
                 'edit' => (bool) $membership?->can($bill->isPosted() ? 'transactions.edit' : 'bills.create'),
                 'approve' => (bool) $membership?->can('bills.approve'),
                 'void' => (bool) $membership?->can('transactions.edit'),
+                'credit' => (bool) $membership?->can('bills.create'),
+                'apply' => (bool) $membership?->can('payments.pay'),
             ],
         ], $status);
     }
@@ -73,7 +76,7 @@ final class BillController extends Controller
     {
         $this->authorizeCompany('bills.view');
 
-        return $this->present($bill->load(['lines', 'contact:id,name,tax_id,email,payout']));
+        return $this->present($bill->load(['lines', 'contact:id,name,tax_id,email,payout', 'original:id,number,reference']));
     }
 
     public function store(SaveBillRequest $request, SaveInvoiceDraft $save): JsonResponse
@@ -126,6 +129,10 @@ final class BillController extends Controller
     {
         $this->authorizeCompany('transactions.edit');
         $reason = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:500']])['reason'];
+        if ($bill->type === 'vendor_credit' && $bill->isPosted()) {
+            // It may already be applied to bills: a posted supplier credit stays, like a credit note.
+            throw ValidationException::withMessages(['reason' => ['A posted supplier credit is not voided. Enter a bill for the difference instead.']]);
+        }
 
         return $this->present($workflow->void($bill, $reason, $request->user()->getKey(), $this->current->membership()));
     }

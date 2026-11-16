@@ -16,6 +16,7 @@ use DateTimeImmutable;
  *   Credit note:  the same lines with sides swapped
  *   Bill:         Cr Accounts payable (total)      Dr Expense or asset per account   Dr VAT receivable
  *   Expense:      Cr the bank, cash or wallet it was paid from, with the same debits as a bill
+ *   Supplier credit: a bill's lines with sides swapped (Dr Accounts payable, Cr cost and VAT receivable)
  *
  * Foreign-currency documents: each credit group is converted to the base currency first and the receivable
  * is the sum of the converted credits, so rounding can never unbalance the entry.
@@ -48,7 +49,7 @@ final class InvoicePostingBuilder
             baseCurrency: $baseCurrency,
             currency: $currency,
             fxRate: $fxRate,
-            memo: ['invoice' => 'Invoice ', 'credit_note' => 'Credit note ', 'bill' => 'Bill ', 'expense' => 'Expense '][$sourceType] . $documentNumber,
+            memo: ['invoice' => 'Invoice ', 'credit_note' => 'Credit note ', 'bill' => 'Bill ', 'expense' => 'Expense ', 'vendor_credit' => 'Supplier credit '][$sourceType] . $documentNumber,
             sourceType: $sourceType,
             sourceId: $documentId,
         );

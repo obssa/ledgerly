@@ -47,8 +47,8 @@ final class ApproveInvoice
 
     public function handle(Document $invoice, ?string $userId = null, ?int $lockVersion = null): Document
     {
-        if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill', 'expense'], true)) {
-            throw new LedgerException("Document {$invoice->label()} is not an invoice, credit note, bill or expense.");
+        if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill', 'expense', 'vendor_credit'], true)) {
+            throw new LedgerException("Document {$invoice->label()} is not an invoice, bill, expense or credit.");
         }
 
         $company = $this->current->get();
@@ -59,7 +59,7 @@ final class ApproveInvoice
             $invoice->assertVersion($lockVersion);
             $this->states->assert('invoice', $invoice->status, 'posted', $invoice->label());
 
-            $limit = $company->settings['approval'][$invoice->type === 'bill' ? 'bill_above' : 'invoice_above'] ?? null;
+            $limit = $company->settings['approval'][in_array($invoice->type, ['bill', 'vendor_credit'], true) ? 'bill_above' : 'invoice_above'] ?? null;
             if ($limit !== null && $userId !== null && $invoice->created_by === $userId) {
                 $totalBase = Money::of($invoice->total, $invoice->currency)->convertTo($company->base_currency, (string) $invoice->fx_rate);
                 if (Money::of((string) $limit, $company->base_currency)->minus($totalBase)->isNegative()) {
@@ -67,7 +67,7 @@ final class ApproveInvoice
                 }
             }
 
-            $original = $invoice->type === 'credit_note' ? Document::query()->lockForUpdate()->findOrFail($invoice->original_document_id) : null;
+            $original = in_array($invoice->type, ['credit_note', 'vendor_credit'], true) ? Document::query()->lockForUpdate()->findOrFail($invoice->original_document_id) : null;
             if ($original !== null) {
                 if (! in_array($original->status, ['posted', 'part_paid', 'paid'], true)) {
                     throw new LedgerException("{$original->label()} is not posted, so it cannot be credited.");
@@ -91,7 +91,7 @@ final class ApproveInvoice
             }
             $invoice->save();
 
-            // A credit note settles what its invoice still owes; the rest stays as the customer's credit.
+            // A credit settles what its invoice (or bill) still owes; the rest stays as credit to apply later.
             if ($original !== null && in_array($original->status, ['posted', 'part_paid'], true)) {
                 $apply = Money::of((string) $invoice->total, $invoice->currency);
                 $due = Money::of((string) $original->amount_due, $invoice->currency);
@@ -121,7 +121,7 @@ final class ApproveInvoice
     public function journalDraftFor(Document $invoice): JournalDraft
     {
         $company = $this->current->get();
-        if (in_array($invoice->type, ['bill', 'expense'], true)) {
+        if (in_array($invoice->type, ['bill', 'expense', 'vendor_credit'], true)) {
             return $this->billDraft($invoice);
         }
 

@@ -7,7 +7,7 @@ import { invoiceAction } from "../actions";
 
 /** What can be done with this invoice or bill now, for this role. The API checks again on every call. */
 export function InvoiceActions({ invoice }: { invoice: InvoiceDetail | BillDetail }) {
-  const bill = invoice.type === "bill";
+  const bill = invoice.type === "bill" || invoice.type === "vendor_credit";   // both go through the bill routes
   const [state, action, pending] = useActionState(bill ? billAction : invoiceAction, undefined);
   const open = invoice.status === "draft" || invoice.status === "awaiting_approval";
   const posted = invoice.status === "posted";
@@ -38,7 +38,7 @@ export function InvoiceActions({ invoice }: { invoice: InvoiceDetail | BillDetai
           Registered with the tax authority: correct it with a credit note and, if needed, a new invoice.
         </p>
       )}
-      {posted && !registered && invoice.can.void && invoice.type !== "credit_note" && (
+      {posted && !registered && invoice.can.void && invoice.type !== "credit_note" && invoice.type !== "vendor_credit" && (
         <form action={action} className="rounded-xl border border-line p-3">
           <input type="hidden" name="id" value={invoice.id} />
           <input type="hidden" name="action" value="void" />

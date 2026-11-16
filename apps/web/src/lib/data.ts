@@ -235,6 +235,19 @@ export async function getCostAccounts(): Promise<{ id: string; code: string; nam
   return data.filter((a) => a.is_active && (a.type === "expense" || a.type === "asset")).map((a) => ({ id: a.id, code: a.code, name: a.name }));
 }
 
+export async function getSupplierCredits() {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.supplierCredits(ctx))).data;
+}
+
+/** A supplier's open bills in one currency, by due date: what a supplier credit can be applied to. */
+export async function getOpenBills(contactId: string, currency: string): Promise<Bill[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.openBills(contactId, ctx))).data.filter((b) => b.currency === currency);
+}
+
 export async function getBills(): Promise<Bill[]> {
   await connection();
   if (isDemoMode()) return [];

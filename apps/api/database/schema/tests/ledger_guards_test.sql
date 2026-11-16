@@ -1239,6 +1239,61 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T49: a supplier credit names a posted bill of its supplier, never credits more than it, and its applications move both
+-- amounts due; a credit note never settles a bill nor a supplier credit an invoice (022). Uses bill BILL-T47 of
+-- supplier c8 (1,000.00, 400.00 still to pay after T47) and invoice INV-T43.
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency) VALUES (app_company_id(), 'vendor_credit', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB');
+    RAISE EXCEPTION 'FAIL T49a: a supplier credit without its bill was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, original_document_id)
+      VALUES (app_company_id(), 'vendor_credit', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB', '00000000-0000-0000-0000-0000000000d6');
+    RAISE EXCEPTION 'FAIL T49b: a supplier credit named an invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- A posted supplier credit of 300.00 on BILL-T47.
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e490', app_company_id(), 9490, '2027-06-30', 'ETB', 'vendor_credit');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e490', 1, '00000000-0000-0000-0000-000000000a22', 300, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e490', 2, '00000000-0000-0000-0000-000000000a40', 0, 300);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due, original_document_id) VALUES
+    ('00000000-0000-0000-0000-0000000000db', app_company_id(), 'vendor_credit', 'VC-T49', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB', 300, 300, '00000000-0000-0000-0000-0000000000d9');
+  UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e490' WHERE id = '00000000-0000-0000-0000-0000000000db';
+
+  -- A second one of 800.00 would credit 1,100.00 of a 1,000.00 bill.
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e491', app_company_id(), 9491, '2027-06-30', 'ETB', 'vendor_credit');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e491', 1, '00000000-0000-0000-0000-000000000a22', 800, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e491', 2, '00000000-0000-0000-0000-000000000a40', 0, 800);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due, original_document_id) VALUES
+    ('00000000-0000-0000-0000-0000000000dc', app_company_id(), 'vendor_credit', 'VC-T49B', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB', 800, 800, '00000000-0000-0000-0000-0000000000d9');
+  BEGIN
+    UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e491' WHERE id = '00000000-0000-0000-0000-0000000000dc';
+    RAISE EXCEPTION 'FAIL T49c: supplier credits credited more than the bill';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  BEGIN
+    INSERT INTO credit_applications (company_id, credit_note_id, invoice_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000db', '00000000-0000-0000-0000-0000000000d6', 10);
+    RAISE EXCEPTION 'FAIL T49d: a supplier credit settled an invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO credit_applications (company_id, credit_note_id, invoice_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000d7', '00000000-0000-0000-0000-0000000000d9', 10);
+    RAISE EXCEPTION 'FAIL T49e: a credit note settled a bill';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO credit_applications (company_id, credit_note_id, invoice_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000db', '00000000-0000-0000-0000-0000000000d9', 300);
+  IF (SELECT amount_due FROM documents WHERE id = '00000000-0000-0000-0000-0000000000d9') <> 100
+     OR (SELECT (amount_due, status) FROM documents WHERE id = '00000000-0000-0000-0000-0000000000db') <> (0.00::numeric(20,2), 'paid'::text) THEN
+    RAISE EXCEPTION 'FAIL T49f: applying 300.00 did not leave 100.00 to pay on the bill and the credit used up';
+  END IF;
+  RAISE NOTICE 'PASS T49 supplier credits name their bill, never credit more than it, and settle only bills of their supplier';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

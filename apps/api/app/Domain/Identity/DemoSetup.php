@@ -59,6 +59,7 @@ final class DemoSetup
         $this->addPurchases($owner, $company, $say);
         $this->addPaymentsMade($owner, $company, $say);
         $this->addExpenses($owner, $company, $say);
+        $this->addSupplierCredit($owner, $company, $say);
 
         foreach ($roles as $role) {
             if ($owner->table('demo_accounts')->where('role', $role)->exists()) {
@@ -209,6 +210,36 @@ final class DemoSetup
             $user->tokens()->where('name', 'demo-setup')->delete();
         }
         $say('Added the demo payments made.');
+    }
+
+    /** Module 3 sample: a supplier credit for a day of internet outage on Ethio Telecom's open bill. Added once. */
+    private function addSupplierCredit(ConnectionInterface $owner, string $company, callable $say): void
+    {
+        if ($owner->table('documents')->where(['company_id' => $company, 'type' => 'vendor_credit'])->exists()) {
+            return;
+        }
+        $bill = $owner->table('documents')->where(['company_id' => $company, 'type' => 'bill', 'reference' => 'ET-8869902'])
+            ->whereIn('status', ['posted', 'part_paid'])->first(['id', 'issue_date']);
+        if ($bill === null) {
+            return; // the sample bill was paid or changed by visitors
+        }
+        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
+        $this->company = $company;
+
+        try {
+            $lines = $this->call('GET', "bills/{$bill->id}")['lines'];
+            $credit = $this->call('POST', "bills/{$bill->id}/credits", [
+                'issue_date' => min(now()->format('Y-m-d'), (new DateTimeImmutable((string) $bill->issue_date))->modify('+3 days')->format('Y-m-d')),
+                'reference' => 'ET-CR-55120', 'notes' => 'Two days of internet outage credited',
+                'lines' => [['description' => 'Outage credit, 2 days', 'quantity' => '1', 'unit_price' => '213.33',
+                    'account_id' => $lines[0]['account_id'], 'tax_rate_id' => $lines[0]['tax_rate_id']]],
+            ])['id'];
+            $this->call('POST', "bills/{$credit}/approve");
+        } finally {
+            $user->tokens()->where('name', 'demo-setup')->delete();
+        }
+        $say('Added the demo supplier credit.');
     }
 
     /** Module 3 sample: expenses paid on the spot, from cash and from the bank. Added once. */
