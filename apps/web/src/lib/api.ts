@@ -550,6 +550,25 @@ export interface CustomerStatement {
   lines: { date: string; entry: number; source_type: string; memo: string | null; reference: string | null; document_id: string | null; debit: string; credit: string; balance: string }[];
 }
 
+/** Module 6: the general ledger for a period, account by account (amounts are debit minus credit, base currency). */
+export interface GeneralLedger {
+  from: string;
+  to: string;
+  currency: string;
+  truncated: boolean;
+  accounts: { account_id: string; code: string; name: string; type: string; opening: string; debits: string; credits: string; closing: string;
+    lines: { date: string; entry_id: string; entry: number; source_type: string; memo: string | null; description: string | null; contact: string | null; debit: string; credit: string; balance: string }[] }[];
+}
+
+export interface TrialBalanceRow {
+  account_id: string;
+  code: string;
+  name: string;
+  type: string;
+  debit: string;
+  credit: string;
+}
+
 export interface ProfitAndLossRow {
   code: string;
   name: string;
@@ -821,6 +840,8 @@ export const ledgerly = {
   applyCredit: (creditNoteId: string, body: { invoice_id: string; amount: string }, ctx: RequestOptions) =>
     api<unknown>(`credit-notes/${encodeURIComponent(creditNoteId)}/apply`, { ...ctx, method: "POST", body }),
   taxRates: (ctx: RequestOptions) => api<{ data: TaxRate[] }>("tax-rates", ctx),
+  generalLedger: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<GeneralLedger>("reports/general-ledger", { ...ctx, query: q }),
+  trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>
     api<ProfitAndLoss>("reports/profit-and-loss", { ...ctx, query: q }),
 };

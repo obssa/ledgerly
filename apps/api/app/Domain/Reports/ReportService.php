@@ -175,4 +175,65 @@ final class ReportService
 
         return $keyed;
     }
+
+    /** Lines a general ledger report shows at most; past this the report says so and asks for a shorter period. */
+    public const GL_MAX_LINES = 5000;
+
+    /**
+     * The general ledger for a period: for each account (or the one asked for), the balance brought forward, every
+     * posted line with its entry, memo, contact and a running balance, and the balance at the end. Optionally only the
+     * lines of one location, class or project (the balances then count only those lines too). Amounts are base
+     * currency, debit minus credit; accounts without a balance or a line are left out unless asked for by name.
+     *
+     * @param array{location_id?: string, class_id?: string, project_id?: string} $dimensions
+     * @return array{accounts: list<array<string, mixed>>, truncated: bool}
+     */
+    public function generalLedger(string $companyId, string $base, string $from, string $to, ?string $accountId = null, array $dimensions = []): array
+    {
+        $scoped = function ($q) use ($companyId, $accountId, $dimensions) {
+            $q->where('l.company_id', $companyId)->when($accountId, fn ($b, $id) => $b->where('l.account_id', $id));
+            foreach ($dimensions as $column => $id) {
+                $q->where("l.{$column}", $id);   // column names come from a fixed list (Dimension::COLUMNS), never the request
+            }
+
+            return $q;
+        };
+        $opening = $scoped(DB::table('journal_lines as l'))->where('l.entry_date', '<', $from)->groupBy('l.account_id')
+            ->select('l.account_id')->selectRaw('sum(l.debit - l.credit)::numeric(20,2)::text AS balance')->pluck('balance', 'account_id');
+        $lines = $scoped(DB::table('journal_lines as l'))
+            ->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'l.company_id')->on('e.id', '=', 'l.journal_entry_id'))
+            ->leftJoin('contacts as c', 'c.id', '=', 'l.contact_id')
+            ->whereBetween('l.entry_date', [$from, $to])
+            ->orderBy('l.entry_date')->orderBy('e.number')->orderBy('l.line_no')->limit(self::GL_MAX_LINES + 1)
+            ->get(['l.account_id', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.memo', 'l.description', 'c.name as contact', 'l.debit', 'l.credit']);
+        $truncated = $lines->count() > self::GL_MAX_LINES;
+        $lines = $lines->take(self::GL_MAX_LINES)->groupBy('account_id');
+
+        $ids = collect([...$opening->keys(), ...$lines->keys(), ...($accountId ? [$accountId] : [])])->unique()->values();
+        $accounts = DB::table('accounts')->where('company_id', $companyId)->whereIn('id', $ids->all())->orderBy('code')->get(['id', 'code', 'name', 'type']);
+
+        return [
+            'accounts' => $accounts->map(function ($a) use ($opening, $lines, $base) {
+                $balance = Money::of((string) ($opening[$a->id] ?? '0'), $base);
+                $start = $balance;
+                $debits = Money::zero($base);
+                $credits = Money::zero($base);
+                $rows = collect($lines[$a->id] ?? [])->map(function ($l) use (&$balance, &$debits, &$credits, $base) {
+                    $d = Money::of((string) $l->debit, $base);
+                    $c = Money::of((string) $l->credit, $base);
+                    $balance = $balance->plus($d)->minus($c);
+                    $debits = $debits->plus($d);
+                    $credits = $credits->plus($c);
+
+                    return ['date' => $l->date, 'entry_id' => $l->entry_id, 'entry' => (int) $l->entry, 'source_type' => $l->source_type, 'memo' => $l->memo,
+                        'description' => $l->description, 'contact' => $l->contact, 'debit' => $d->toDecimalString(), 'credit' => $c->toDecimalString(),
+                        'balance' => $balance->toDecimalString()];
+                })->values()->all();
+
+                return ['account_id' => $a->id, 'code' => $a->code, 'name' => $a->name, 'type' => $a->type, 'opening' => $start->toDecimalString(),
+                    'lines' => $rows, 'debits' => $debits->toDecimalString(), 'credits' => $credits->toDecimalString(), 'closing' => $balance->toDecimalString()];
+            })->values()->all(),
+            'truncated' => $truncated,
+        ];
+    }
 }

@@ -172,6 +172,8 @@ final class TenantIsolationTest extends TestCase
             'statement into B\'s bank' => ['POST', "/api/v1/bank-accounts/{$this->b['bank']}/statements", ['csv' => "Date,Description,Amount\n05/11/2026,Planted,-10\n"]],
             'statement line matched to B\'s entry' => ['POST', "/api/v1/statement-lines/{$this->a['statement_fuel']}/match", ['journal_line_id' => $this->b['bank_line']]],
             'statement line categorised to B\'s account' => ['POST', "/api/v1/statement-lines/{$this->a['statement_line']}/categorise", ['account_id' => $this->b['rent']]],
+            'general ledger of B\'s bank' => ['GET', "/api/v1/reports/general-ledger?from=2026-07-08&to=2027-07-07&account_id={$this->b['bank']}", []],
+            'general ledger of B\'s location' => ['GET', "/api/v1/reports/general-ledger?from=2026-07-08&to=2027-07-07&location_id={$this->b['dimension']}", []],
             'statement line categorised for B\'s supplier' => ['POST', "/api/v1/statement-lines/{$this->a['statement_line']}/categorise", ['account_id' => $this->a['rent'], 'contact_id' => $this->b['supplier']]],
             'reconciliation of B\'s bank' => ['POST', "/api/v1/bank-accounts/{$this->b['bank']}/reconciliations", ['statement_date' => '2026-11-09', 'ending_balance' => '1']],
             'reconciliation ticking B\'s entry' => ['PUT', "/api/v1/reconciliations/{$this->a['reconciliation']}", ['cleared' => [$this->b['bank_line']]]],

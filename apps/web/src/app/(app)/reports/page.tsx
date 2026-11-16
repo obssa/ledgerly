@@ -31,7 +31,7 @@ const cycle = [
 ];
 
 /** Reports that have their own page; the others are on the way. */
-const LINKS: Record<string, string> = { "AR ageing": "/reports/ar-ageing", "AP ageing": "/reports/ap-ageing", "Customer statements": "/customers", "Supplier statements": "/suppliers", "Inventory valuation": "/reports/inventory-valuation", "Bin card (stock card)": "/inventory" };
+const LINKS: Record<string, string> = { "Trial balance": "/reports/trial-balance", "General ledger": "/reports/general-ledger", "Journal report": "/journal", "AR ageing": "/reports/ar-ageing", "AP ageing": "/reports/ap-ageing", "Customer statements": "/customers", "Supplier statements": "/suppliers", "Inventory valuation": "/reports/inventory-valuation", "Bin card (stock card)": "/inventory" };
 
 export default async function ReportsPage() {
   const pl = await getProfitAndLoss({ from: "2026-10-01", to: "2026-10-31", compare_from: "2026-09-01", compare_to: "2026-09-30" });
