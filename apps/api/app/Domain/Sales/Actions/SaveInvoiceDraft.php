@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Sales\Actions;
 
+use App\Domain\Inventory\Models\Item;
 use App\Domain\Ledger\ExchangeRates;
+use App\Domain\Ledger\Models\Account;
 use App\Domain\Sales\DocumentNumbers;
 use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Ledger\Money;
@@ -53,6 +55,9 @@ final class SaveInvoiceDraft
             }
 
             $calc = $this->calculate($data);
+            if ($type === 'bill') {
+                $calc['lines'] = $this->stockLinesToInventory($calc['lines']);
+            }
             $calc['header']['number'] = $this->draftNumber($data, $document, $type);
             if ($original !== null) {
                 $this->assertCreditable($original, $calc['totals']['total'], $document);
@@ -102,6 +107,24 @@ final class SaveInvoiceDraft
         }
 
         return $number;
+    }
+
+    /**
+     * A bill line with a stock item is inventory, not an expense: its account is the inventory account, whatever was
+     * chosen, and posting brings the goods in (DocumentStock).
+     *
+     * @param list<array<string, mixed>> $lines
+     * @return list<array<string, mixed>>
+     */
+    private function stockLinesToInventory(array $lines): array
+    {
+        $stock = Item::query()->whereIn('id', array_filter(array_column($lines, 'item_id')))->where('type', 'inventory')->pluck('id')->all();
+        if ($stock === []) {
+            return $lines;
+        }
+        $inventory = Account::system('inventory')->getKey();
+
+        return array_map(fn (array $l) => in_array($l['item_id'], $stock, true) ? [...$l, 'account_id' => $inventory] : $l, $lines);
     }
 
     /** The kind of credit that corrects a document: a credit note for an invoice, a supplier credit for a bill. */
@@ -182,6 +205,7 @@ final class SaveInvoiceDraft
                 // An expense says where it was paid from and how (021); other documents leave these empty.
                 'paid_from_account_id' => $data['paid_from_account_id'] ?? null,
                 'payment_method' => $data['payment_method'] ?? null,
+                'warehouse_id' => $data['warehouse_id'] ?? null,   // where stock lines leave from or arrive in (025)
             ],
             'lines' => $lineRows,
             'totals' => [

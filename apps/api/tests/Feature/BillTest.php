@@ -103,7 +103,7 @@ final class BillTest extends TestCase
         $this->postJson('/api/v1/bills', $this->bill(['contact_id' => $this->c['contact']]), $this->h)->assertUnprocessable()->assertJsonValidationErrors('contact_id');
         $this->postJson('/api/v1/bills', $this->bill([], ['account_id' => $this->c['sales']]), $this->h)->assertUnprocessable()->assertJsonValidationErrors('lines.0.account_id');
         $this->postJson('/api/v1/bills', $this->bill([], ['account_id' => $this->account('1200')]), $this->h)->assertUnprocessable();  // receivable
-        $this->postJson('/api/v1/bills', $this->bill([], ['item_id' => $this->c['item']]), $this->h)->assertUnprocessable();
+        $this->postJson('/api/v1/bills', $this->bill([], ['item_id' => $this->c['item']]), $this->h)->assertCreated();   // a service item on a bill line
         $this->postJson('/api/v1/bills', $this->bill(['number' => 'B-1']), $this->h)->assertUnprocessable()->assertJsonValidationErrors('number');
 
         // One table, but each route finds only its own kind.

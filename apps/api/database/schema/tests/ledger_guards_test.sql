@@ -1406,6 +1406,39 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T52: a document's warehouse, a line's item and a stock move's document all stay within the company (025).
+-- Company B's warehouse is created as company B first.
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', false) \gset ignore_
+INSERT INTO warehouses (id, company_id, name) VALUES ('00000000-0000-0000-0000-0000000000b9', '00000000-0000-0000-0000-00000000000b', 'B store');
+INSERT INTO items (id, company_id, name, type) VALUES ('00000000-0000-0000-0000-0000000000b8', '00000000-0000-0000-0000-00000000000b', 'B item', 'inventory');
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, warehouse_id) VALUES
+      (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', '00000000-0000-0000-0000-0000000000b9');
+    RAISE EXCEPTION 'FAIL T52a: an invoice named another company''s warehouse';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, warehouse_id) VALUES
+    ('00000000-0000-0000-0000-0000000000dd', app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', '00000000-0000-0000-0000-0000000000a1');
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000dd', 1, 'x', 1, 1, '00000000-0000-0000-0000-000000000a40', 1, '00000000-0000-0000-0000-0000000000b8');
+    RAISE EXCEPTION 'FAIL T52b: a line named another company''s item';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000a1', '2027-06-30', 'purchase', 1, 1, '00000000-0000-0000-0000-0000000000d9');
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000a1', '2027-06-30', 'purchase', 1, 1, '00000000-0000-0000-0000-00000000ffff');
+    RAISE EXCEPTION 'FAIL T52c: a stock move named a document that is not the company''s';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T52 warehouses, items and stock moves on documents stay within the company';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

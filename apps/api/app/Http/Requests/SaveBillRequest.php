@@ -13,8 +13,8 @@ use Illuminate\Validation\Rule;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * A supplier's bill. Each line is a cost: an expense account, or a fixed asset or prepayment. Stock bought for resale
- * comes with the inventory module (goods received), so inventory accounts are not offered here yet.
+ * A supplier's bill. Each line is a cost: an expense account, or a fixed asset or prepayment. A line with a stock item
+ * goes to the inventory account instead (SaveInvoiceDraft) and brings the goods into the bill's warehouse on posting.
  */
 final class SaveBillRequest extends FormRequest
 {
@@ -60,7 +60,8 @@ final class SaveBillRequest extends FormRequest
             'lines.*.account_id' => ['required', 'uuid', Rule::exists('accounts', 'id')->where(fn (Builder $q) => $q->where('is_active', true)
                 ->where(fn (Builder $w) => $w->where('type', 'expense')->orWhere(fn (Builder $a) => $a->where('type', 'asset')->whereIn('subtype', ['fixed_asset', 'prepayment']))))],
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')->whereIn('kind', ['vat', 'tot'])],
-            'lines.*.item_id' => ['prohibited'],
+            'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')->where('is_active', true)],
+            'warehouse_id' => ['nullable', 'uuid', Rule::exists('warehouses', 'id')->where('is_active', true)],   // where stock lines arrive
         ];
     }
 
