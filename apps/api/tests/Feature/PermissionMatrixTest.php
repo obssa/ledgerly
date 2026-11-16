@@ -112,6 +112,7 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/payments-received' => 'payments.receive',
         'GET api/v1/payments-received/{payment}' => 'payments.view',
         'POST api/v1/payments-received/{payment}/reverse' => 'payments.reverse',
+        'POST api/v1/payments-received/{payment}/bounce' => 'payments.reverse',
 
         'GET api/v1/items' => 'inventory.view',
         'POST api/v1/items' => 'inventory.items',
@@ -131,6 +132,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/bank-accounts/{bankAccount}' => 'banking.view',
         'PUT api/v1/bank-accounts/{bankAccount}' => 'banking.manage',
         'GET api/v1/bank-accounts/{bankAccount}/register' => 'banking.view',
+        'GET api/v1/bank-accounts/{bankAccount}/cheques' => 'banking.view',
         'GET api/v1/bank-accounts/{bankAccount}/statement-lines' => 'banking.view',
         'POST api/v1/bank-accounts/{bankAccount}/statements' => 'banking.review',
         'POST api/v1/statement-lines/{statementLine}/match' => 'banking.review',

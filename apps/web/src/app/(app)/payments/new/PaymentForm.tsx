@@ -55,7 +55,8 @@ export function PaymentForm({ options }: { options: ReceiveOptions & { customer:
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
             </select>
           </div>
-          <Field name="reference" label="Reference (cheque or transfer number)" />
+          <Field name="cheque_number" label="Cheque number (cheques only)" invalid={bad("cheque_number")} />
+          <Field name="reference" label="Reference (transfer number)" />
           {currency !== options.baseCurrency && <Field name="fx_rate" label={`Rate (${options.baseCurrency} for 1 ${currency})`} hint="Empty: the company's rate for the date" invalid={bad("fx_rate")} />}
         </div>
       </Card>

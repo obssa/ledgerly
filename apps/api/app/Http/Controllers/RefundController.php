@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Banking\ChequeNumbers;
 use App\Domain\Ledger\Currency;
 use App\Domain\Sales\Actions\RecordRefund;
 use App\Domain\Sales\Actions\ReversePayment;
@@ -49,7 +50,10 @@ final class RefundController extends Controller
     {
         $this->authorizeCompany('payments.pay');
 
-        return response()->json($refund->handle('customer', $this->validated($request), $request->user()->getKey()), 201);
+        $data = $this->validated($request);
+        ChequeNumbers::assertWritable($data);   // money leaves the company: a cheque written
+
+        return response()->json($refund->handle('customer', $data, $request->user()->getKey()), 201);
     }
 
     /** A supplier pays back: a supplier credit's credit left (credit_id) or the unused part of an advance (payment_id). */
@@ -80,6 +84,7 @@ final class RefundController extends Controller
             'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
             'method' => ['required', Rule::in(PaymentReceivedController::METHODS)],
             'reference' => ['nullable', 'string', 'max:100'],
+            'cheque_number' => ChequeNumbers::RULE,
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'amount' => ['required', 'decimal:0,2', 'gt:0', 'max:999999999999999999'],

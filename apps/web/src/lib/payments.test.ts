@@ -57,3 +57,11 @@ describe("paymentBody for a payment made", () => {
     expect(paymentBody(f, "bill")).toMatchObject({ amount: "22400.00", withholding: "600", withholding_certificate: "WHT-12", allocations: [{ bill_id: "b1", amount: "23000" }] });
   });
 });
+
+describe("cheque numbers", () => {
+  it("are sent for a cheque and left out for any other method", () => {
+    const base: [string, string][] = [["contact_id", "s1"], ["account_id", "bank"], ["payment_date", "2026-11-10"], ["currency", "ETB"], ["amount", "50"], ["cheque_number", "000101"]];
+    expect(paymentBody(form([...base, ["method", "cheque"]]), "bill")).toMatchObject({ method: "cheque", cheque_number: "000101" });
+    expect(paymentBody(form([...base, ["method", "bank_transfer"]]), "bill")).not.toHaveProperty("cheque_number");
+  });
+});

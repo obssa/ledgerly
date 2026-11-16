@@ -119,7 +119,8 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
             </select>
           </div>
-          <Field name="reference" label="Reference (cheque or transfer number)" />
+          {method === "cheque" && <Field name="cheque_number" label="Cheque number" hint="From the cheque book; each number once per account" invalid={bad("cheque_number")} />}
+          <Field name="reference" label={method === "cheque" ? "Reference" : "Reference (transfer number)"} />
           {currency !== options.baseCurrency && <Field name="fx_rate" label={`Rate (${options.baseCurrency} for 1 ${currency})`} hint="Empty: the company's rate for the date" invalid={bad("fx_rate")} />}
         </div>
         {advice?.applies && <p className="mt-3 text-[13px] text-muted">{advice.note} Goods above {formatAmount(advice.goods_above ?? "0")}, services above {formatAmount(advice.services_above ?? "0")}.</p>}

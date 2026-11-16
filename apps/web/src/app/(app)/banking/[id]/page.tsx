@@ -24,6 +24,7 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
         actions={a.kind !== "undeposited_funds" ? <>
           <Link href={`/banking/${encodeURIComponent(a.id)}/statement`} className="btn">Statement</Link>
           <Link href={`/banking/${encodeURIComponent(a.id)}/reconcile`} className="btn">Reconcile</Link>
+          {a.kind === "bank" && <Link href={`/banking/${encodeURIComponent(a.id)}/cheques`} className="btn">Cheques</Link>}
         </> : undefined} />
       <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
         <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={register.from} /></div>

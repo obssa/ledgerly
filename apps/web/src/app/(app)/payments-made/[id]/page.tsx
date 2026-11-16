@@ -36,6 +36,10 @@ export default async function PaymentMadePage({ params, searchParams }: PageProp
             <div><dt className="text-muted">Date</dt><dd className="num">{payment.payment_date}</dd></div>
             <div><dt className="text-muted">Method</dt><dd>{payment.method.replace("_", " ")}</dd></div>
             <div><dt className="text-muted">Reference</dt><dd className="num">{payment.reference ?? "—"}</dd></div>
+            {payment.cheque_number && (
+              <div><dt className="text-muted">Cheque</dt><dd className="num">{payment.cheque_number}{" "}
+                <Link href={`/payments-made/${encodeURIComponent(payment.id)}/cheque`} className="font-semibold text-brand hover:underline">Print</Link></dd></div>
+            )}
             <div><dt className="text-muted">Tax withheld</dt><dd className="num">{formatAmount(payment.withholding)}</dd></div>
             <div><dt className="text-muted">Withholding receipt</dt><dd className="num">{payment.withholding_certificate ?? "—"}</dd></div>
             <div><dt className="text-muted">Bank fee</dt><dd className="num">{formatAmount(payment.fee)}</dd></div>

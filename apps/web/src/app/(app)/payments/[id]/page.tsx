@@ -5,6 +5,7 @@ import { getMoneyAccounts, getOpenInvoices, getPaymentReceived } from "@/lib/dat
 import { formatAmount, formatMoney } from "@/lib/format";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { AllocateLeft } from "./AllocateLeft";
+import { BounceCheque } from "./BounceCheque";
 import { ReversePayment } from "./ReversePayment";
 
 export const metadata = { title: "Payment" };
@@ -22,7 +23,7 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
     <>
       <PageTitle
         eyebrow={<><Link href="/payments" className="hover:underline">Payments received</Link> / Payment</>}
-        title={<>{formatMoney(payment.amount, payment.currency)} from {payment.contact?.name} {payment.status === "reversed" ? <Pill tone="bad">Reversed</Pill> : <Pill tone="good">Recorded</Pill>}</>}
+        title={<>{formatMoney(payment.amount, payment.currency)} from {payment.contact?.name} {payment.bounced_on ? <Pill tone="bad">Bounced</Pill> : payment.status === "reversed" ? <Pill tone="bad">Reversed</Pill> : <Pill tone="good">Recorded</Pill>}</>}
       />
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_520px]" label="Payment">
@@ -30,6 +31,8 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
             <div><dt className="text-muted">Date</dt><dd className="num">{payment.payment_date}</dd></div>
             <div><dt className="text-muted">Method</dt><dd>{payment.method.replace("_", " ")}</dd></div>
             <div><dt className="text-muted">Reference</dt><dd className="num">{payment.reference ?? "—"}</dd></div>
+            {payment.cheque_number && <div><dt className="text-muted">Cheque</dt><dd className="num">{payment.cheque_number}</dd></div>}
+            {payment.bounced_on && <div><dt className="text-muted">Bounced on</dt><dd className="num">{payment.bounced_on}</dd></div>}
             <div><dt className="text-muted">Tax withheld</dt><dd className="num">{formatAmount(payment.withholding)}</dd></div>
             <div><dt className="text-muted">Bank fee</dt><dd className="num">{formatAmount(payment.fee)}</dd></div>
             {Number(payment.fx_rate) !== 1 && <div><dt className="text-muted">Rate</dt><dd className="num">{payment.fx_rate}</dd></div>}
@@ -52,6 +55,7 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
           <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
             {canAllocate && <AllocateLeft id={payment.id} left={payment.unallocated} documents={invoices} />}
             {canRefund && payment.contact && <RefundPanel side="customer" contactId={payment.contact.id} currency={payment.currency} left={payment.unallocated} paymentId={payment.id} accounts={moneyAccounts} />}
+            {payment.can.reverse && payment.method === "cheque" && <BounceCheque id={payment.id} received={payment.payment_date} />}
             {payment.can.reverse && <ReversePayment id={payment.id} />}
           </aside>
         )}

@@ -80,6 +80,7 @@ final class ReceivePayment
                 'reference' => $data['reference'] ?? null, 'currency' => $currency, 'fx_rate' => $rate,
                 'amount' => $amount->toDecimalString(), 'fee' => $fee->toDecimalString(), 'withholding' => $withholding->toDecimalString(),
                 'provider_txn_id' => $data['provider_txn_id'] ?? null,
+                'cheque_number' => ($data['method'] ?? null) === 'cheque' ? ($data['cheque_number'] ?? null) : null,
             ]);
 
             $entry = $this->posting->post($this->builder->received(
