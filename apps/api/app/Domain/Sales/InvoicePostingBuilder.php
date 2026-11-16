@@ -15,6 +15,7 @@ use DateTimeImmutable;
  *   Invoice:      Dr Accounts receivable (total)   Cr Income per account   Cr Tax payable per tax account
  *   Credit note:  the same lines with sides swapped
  *   Bill:         Cr Accounts payable (total)      Dr Expense or asset per account   Dr VAT receivable
+ *   Expense:      Cr the bank, cash or wallet it was paid from, with the same debits as a bill
  *
  * Foreign-currency documents: each credit group is converted to the base currency first and the receivable
  * is the sum of the converted credits, so rounding can never unbalance the entry.
@@ -40,14 +41,14 @@ final class InvoicePostingBuilder
     ): JournalDraft {
         $sourceType ??= $isCreditNote ? 'credit_note' : 'invoice';
         // The control account (receivable or payable) is debited for an invoice, credited for a credit note or a bill.
-        $controlOnCredit = in_array($sourceType, ['credit_note', 'bill'], true);
+        $controlOnCredit = in_array($sourceType, ['credit_note', 'bill', 'expense'], true);
         $draft = new JournalDraft(
             companyId: $companyId,
             date: $issueDate,
             baseCurrency: $baseCurrency,
             currency: $currency,
             fxRate: $fxRate,
-            memo: ['invoice' => 'Invoice ', 'credit_note' => 'Credit note ', 'bill' => 'Bill '][$sourceType] . $documentNumber,
+            memo: ['invoice' => 'Invoice ', 'credit_note' => 'Credit note ', 'bill' => 'Bill ', 'expense' => 'Expense '][$sourceType] . $documentNumber,
             sourceType: $sourceType,
             sourceId: $documentId,
         );

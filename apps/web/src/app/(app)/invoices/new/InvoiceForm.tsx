@@ -7,19 +7,28 @@ import type { InvoiceOptions } from "@/lib/data";
 import { documentAmounts, lineAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { createBill } from "../../bills/actions";
+import { createExpense } from "../../expenses/actions";
 import { createInvoice } from "../actions";
 
 /** The words and postings that differ between a sales invoice and a supplier's bill; the form is the same. */
 const KIND = {
   invoice: {
-    party: "Customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Number (from your invoice book)",
+    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Number (from your invoice book)",
     notes: "Notes for the customer (optional)", noun: "invoice", posting: [["Dr Accounts receivable", "total"], ["Cr Income", "subtotal"], ["Cr Tax payable", "tax"]],
   },
   bill: {
-    party: "Supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
+    party: "Supplier", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
     notes: "Notes (optional)", noun: "bill", posting: [["Dr Expense or asset", "subtotal"], ["Dr VAT receivable", "tax"], ["Cr Accounts payable", "total"]],
   },
+  expense: {
+    party: "Paid to", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
+    notes: "Notes (optional)", noun: "expense", posting: [["Dr Expense or asset", "subtotal"], ["Dr VAT receivable", "tax"], ["Cr Paid from", "total"]],
+  },
 } as const;
+
+const METHODS: Record<string, string> = {
+  cash: "Cash", card: "Card", bank_transfer: "Bank transfer", mobile_money: "Mobile money (telebirr, M-PESA …)", cheque: "Cheque", other: "Other",
+};
 
 /** Kept for callers and tests that pass tax rates on their own. */
 export interface TaxRateOption {
@@ -53,7 +62,7 @@ const addDays = (date: string, days: number) => {
  */
 export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOptions; kind?: keyof typeof KIND }) {
   const words = KIND[kind];
-  const [state, action, pending] = useActionState(kind === "bill" ? createBill : createInvoice, undefined);
+  const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : createInvoice, undefined);
   const today = new Date().toISOString().slice(0, 10);
   const firstRate = options.taxRates[0]?.id ?? "";
   const firstAccount = options.accounts[0]?.id ?? "";
@@ -83,7 +92,7 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
   if (options.customers.length === 0) {
     return (
       <Card label={`No ${words.parties} yet`}>
-        <p className="text-sm">Add a {words.party.toLowerCase()} first. <Link href={words.newParty} className="font-bold text-brand">New {words.party.toLowerCase()}</Link></p>
+        <p className="text-sm">Add a {words.who} first. <Link href={words.newParty} className="font-bold text-brand">New {words.who}</Link></p>
       </Card>
     );
   }
@@ -108,18 +117,37 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
                     setLines((ls) => ls.map((l) => (l.accountId === firstAccount ? { ...l, accountId: usual } : l)));
                   }
                 }}>
-                <option value="">Choose a {words.party.toLowerCase()}</option>
+                <option value="">Choose a {words.who}</option>
                 {options.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {customer && <p className="mt-1.5 text-[13px] text-muted">{customer.tax_id ? <>TIN <span className="num">{customer.tax_id}</span> · </> : "No TIN · "}Terms {customer.payment_terms_days} days</p>}
             </div>
             {kind === "bill" && <Field name="reference" label="Supplier's invoice number" hint="As printed on their invoice" invalid={bad("reference")} />}
+            {kind === "expense" && (
+              <>
+                <Field name="reference" label="Receipt number" hint="As printed on the receipt" invalid={bad("reference")} />
+                <div>
+                  <label className="field-label" htmlFor="paid_from_account_id">Paid from</label>
+                  <select className={`field ${bad("paid_from_account_id") ? "!border-bad" : ""}`} id="paid_from_account_id" name="paid_from_account_id">
+                    {(options.moneyAccounts ?? []).filter((a) => (a.currency ?? options.baseCurrency) === currency).map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="payment_method">Paid by</label>
+                  <select className="field" id="payment_method" name="payment_method" defaultValue="cash">
+                    {Object.entries(METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
             {options.manualNumbers && <Field name="number" label={words.numberLabel} invalid={bad("number")} />}
             <div>
               <label className="field-label" htmlFor="issue_date">Issue date</label>
               <input className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </div>
-            <Field key={`${customerId}-${issueDate}`} name="due_date" label="Due date" type="date" defaultValue={customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
+            {kind !== "expense" && (
+              <Field key={`${customerId}-${issueDate}`} name="due_date" label="Due date" type="date" defaultValue={customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
+            )}
             <div>
               <label className="field-label" htmlFor="currency">Currency</label>
               <select className="field" id="currency" name="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
@@ -197,17 +225,23 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
           </dl>
           <p className="mt-3 text-[13px] text-muted">
             {options.manualNumbers ? "The number is the one you type." : `The ${words.noun} gets its number when it is posted.`}{" "}
-            {kind === "bill"
-              ? "VAT is reclaimable only when the company is VAT-registered; otherwise it is part of the cost."
-              : "Where e-invoicing applies, posting also sends it to the tax authority."}
+            {kind === "invoice"
+              ? "Where e-invoicing applies, posting also sends it to the tax authority."
+              : "VAT is reclaimable only when the company is VAT-registered; otherwise it is part of the cost."}
           </p>
         </Card>
         {options.demo ? (
           <p className="text-sm text-muted">Saving is not available in the demo.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <button type="submit" name="intent" value="draft" className="btn" disabled={pending}>Save draft</button>
-            <button type="submit" name="intent" value="approve" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save and approve"}</button>
+            {kind === "expense" ? (
+              <button type="submit" className="btn btn-primary" disabled={pending || (options.moneyAccounts ?? []).length === 0}>{pending ? "Recording…" : "Record expense"}</button>
+            ) : (
+              <>
+                <button type="submit" name="intent" value="draft" className="btn" disabled={pending}>Save draft</button>
+                <button type="submit" name="intent" value="approve" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save and approve"}</button>
+              </>
+            )}
           </div>
         )}
       </aside>

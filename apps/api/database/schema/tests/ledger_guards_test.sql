@@ -1197,6 +1197,48 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T48: an expense is paid from the company's own bank, cash or wallet account, names a supplier and leaves nothing to
+-- pay; no other document names a paying account (021). Uses supplier c8 (T47).
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency) VALUES (app_company_id(), 'expense', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB');
+    RAISE EXCEPTION 'FAIL T48a: an expense was stored without the account it was paid from';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, paid_from_account_id, payment_method)
+      VALUES (app_company_id(), 'expense', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB', '00000000-0000-0000-0000-000000000a40', 'cash');
+    RAISE EXCEPTION 'FAIL T48b: an expense was paid from an income account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, paid_from_account_id, payment_method)
+      VALUES (app_company_id(), 'expense', '00000000-0000-0000-0000-0000000000c1', '2027-06-30', 'ETB', '00000000-0000-0000-0000-000000000a10', 'cash');
+    RAISE EXCEPTION 'FAIL T48c: an expense was stored for a customer who is not a supplier';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, paid_from_account_id, payment_method)
+      VALUES (app_company_id(), 'bill', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB', '00000000-0000-0000-0000-000000000a10', 'cash');
+    RAISE EXCEPTION 'FAIL T48d: a bill named a paying account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES ('00000000-0000-0000-0000-00000000e480', app_company_id(), 9480, '2027-06-30', 'ETB', 'expense');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e480', 1, '00000000-0000-0000-0000-000000000a40', 250, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e480', 2, '00000000-0000-0000-0000-000000000a10', 0, 250);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due, paid_from_account_id, payment_method) VALUES
+    ('00000000-0000-0000-0000-0000000000da', app_company_id(), 'expense', 'EXP-T48', '00000000-0000-0000-0000-0000000000c8', '2027-06-30', 'ETB', 250, 250,
+     '00000000-0000-0000-0000-000000000a10', 'cash');
+  BEGIN
+    UPDATE documents SET status = 'posted', journal_entry_id = '00000000-0000-0000-0000-00000000e480' WHERE id = '00000000-0000-0000-0000-0000000000da';
+    RAISE EXCEPTION 'FAIL T48e: a posted expense was left with something to pay';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET status = 'posted', amount_due = 0, journal_entry_id = '00000000-0000-0000-0000-00000000e480' WHERE id = '00000000-0000-0000-0000-0000000000da';
+  RAISE NOTICE 'PASS T48 expenses are paid from the company''s own money accounts, name a supplier and leave nothing to pay';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

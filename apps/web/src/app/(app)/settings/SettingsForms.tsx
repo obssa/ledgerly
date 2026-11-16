@@ -279,7 +279,7 @@ export function DimensionsPanel({ settings, dimensions }: { settings: Settings; 
   );
 }
 
-const DOC_TYPES: Record<string, string> = { invoice: "Invoices", credit_note: "Credit notes" };
+const DOC_TYPES: Record<string, string> = { invoice: "Invoices", credit_note: "Credit notes", bill: "Bills", expense: "Expenses" };
 
 /**
  * Numbering per document type. Automatic numbers are given in order when a document is posted, so they have no gaps;

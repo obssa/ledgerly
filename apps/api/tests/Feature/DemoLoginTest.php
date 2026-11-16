@@ -70,6 +70,7 @@ final class DemoLoginTest extends TestCase
         $bills = collect($this->withToken($token)->getJson('/api/v1/bills', $h)->assertOk()->json('data'));
         $this->assertSame(['awaiting_approval', 'paid', 'part_paid', 'posted'], $bills->pluck('status')->sort()->values()->all(), 'suppliers, bills and payments made too');
         $this->withToken($token)->getJson('/api/v1/payments-made', $h)->assertOk()->assertJsonCount(2, 'data');
+        $this->withToken($token)->getJson('/api/v1/expenses', $h)->assertOk()->assertJsonCount(2, 'data');
         $ageing = $this->withToken($token)->getJson('/api/v1/reports/ar-ageing', $h)->assertOk();
         $this->assertNotSame('0.00', $ageing->json('totals.total'));
 

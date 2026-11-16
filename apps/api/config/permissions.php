@@ -11,6 +11,8 @@
 | bills.create       enter a supplier's bill as a draft; bills.approve posts it (accountant, approver, owner, admin)
 | payments.receive   record a payment received; payments.reverse reverses one (accountant, owner, admin)
 | payments.pay       pay suppliers' bills (accountant via 'payments.*', owner, admin): money leaves the company
+| expenses.create    record an expense already paid (fuel, utilities, petty cash): bookkeeper, accountant, owner, admin
+| expenses.view      read expenses: also approvers and viewers
 | company.view       read the company profile and fiscal settings, the chart of accounts (no balances) and the tax
 |                    rates; every role, because every document form names accounts and taxes
 | company.manage     change the profile and settings; owner and admin only (via '*')
@@ -24,12 +26,12 @@ return [
     'roles' => [
         'owner' => ['*'],
         'admin' => ['*'],
-        'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*'],
-        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'banking.*', 'contacts.*', 'reports.view'],
+        'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*'],
+        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'banking.*', 'contacts.*', 'reports.view'],
         'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive'],
         'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create'],
-        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'payments.approve'],
-        'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'reports.view'],
+        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'payments.approve'],
+        'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'reports.view'],
         'custom' => [],
     ],
 ];
