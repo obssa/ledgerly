@@ -1,0 +1,90 @@
+"use client";
+
+import { useActionState } from "react";
+import type { Item } from "@/lib/api";
+import type { FormState } from "@/lib/forms";
+import { adjustStock, createItem, createWarehouse, saveItem } from "./actions";
+
+function Message({ state }: { state: FormState | undefined }) {
+  if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
+  if (state?.notice) return <p role="status" className="mb-3 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">{state.notice}</p>;
+  return null;
+}
+
+const TYPES: Record<string, string> = { inventory: "Stock item (kept in stock, with a bin card)", non_inventory: "Non-stock item", service: "Service" };
+
+/** New item, or the details of one. Type is fixed once the item has stock moves (the API says so). */
+export function ItemForm({ item, readOnly = false }: { item?: Item; readOnly?: boolean }) {
+  const [state, action, pending] = useActionState(item ? saveItem : createItem, undefined);
+  const bad = (n: string) => Boolean(state?.fields?.[n]);
+  return (
+    <form action={action} noValidate>
+      <Message state={state} />
+      {item && <input type="hidden" name="id" value={item.id} />}
+      <fieldset disabled={readOnly} className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-[18px]">
+        <legend className="sr-only">Item</legend>
+        <Field name="name" label="Name" defaultValue={item?.name} invalid={bad("name")} />
+        <Field name="sku" label="SKU or code" defaultValue={item?.sku ?? ""} invalid={bad("sku")} />
+        <div>
+          <label className="field-label" htmlFor="type">Type</label>
+          <select className={`field ${bad("type") ? "!border-bad" : ""}`} id="type" name="type" defaultValue={item?.type ?? "inventory"}>
+            {Object.entries(TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <Field name="unit" label="Unit" defaultValue={item?.unit ?? "each"} hint="each, kg, bag, carton" />
+        <Field name="sale_price" label="Sale price" defaultValue={item?.sale_price ?? ""} invalid={bad("sale_price")} />
+        <Field name="purchase_price" label="Purchase price" defaultValue={item?.purchase_price ?? ""} invalid={bad("purchase_price")} />
+        <Field name="reorder_point" label="Reorder when on hand falls to" defaultValue={item?.reorder_point ?? ""} invalid={bad("reorder_point")} />
+      </fieldset>
+      {!readOnly && <button type="submit" className="btn btn-primary mt-6" disabled={pending}>{pending ? "Saving…" : item ? "Save item" : "Add item"}</button>}
+    </form>
+  );
+}
+
+/** Opening stock, a count difference, damage: moves stock with a reason and posts its value. */
+export function AdjustStock({ item, warehouses }: { item: Item; warehouses: { id: string; name: string }[] }) {
+  const [state, action, pending] = useActionState(adjustStock, undefined);
+  const today = new Date().toISOString().slice(0, 10);
+  const bad = (n: string) => Boolean(state?.fields?.[n]);
+  return (
+    <form action={action} noValidate className="flex flex-col gap-3">
+      <Message state={state} />
+      <input type="hidden" name="item_id" value={item.id} />
+      <div>
+        <label className="field-label" htmlFor="warehouse_id">Warehouse</label>
+        <select className="field" id="warehouse_id" name="warehouse_id">{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select>
+      </div>
+      <Field name="quantity" label="Quantity (minus to take out)" invalid={bad("quantity")} />
+      <Field name="unit_cost" label="Unit cost (stock coming in)" invalid={bad("unit_cost")} hint="Stock going out is valued at the average cost" />
+      <Field name="date" label="Date" type="date" defaultValue={today} invalid={bad("date")} />
+      <Field name="reason" label="Reason" invalid={bad("reason")} hint="For example: count on 30 Nov, bags torn" />
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="opening" className="size-4" /> Opening stock (against opening balance equity)</label>
+      <button type="submit" className="btn self-start" disabled={pending}>{pending ? "Recording…" : "Record"}</button>
+    </form>
+  );
+}
+
+export function NewWarehouse() {
+  const [state, action, pending] = useActionState(createWarehouse, undefined);
+  return (
+    <form action={action} noValidate className="flex flex-wrap items-end gap-2.5">
+      <div className="min-w-[200px] flex-1">
+        <Message state={state} />
+        <label className="field-label" htmlFor="wh_name">New warehouse, shop or van</label>
+        <input className="field" id="wh_name" name="name" maxLength={120} />
+      </div>
+      <button type="submit" className="btn" disabled={pending}>Add</button>
+    </form>
+  );
+}
+
+function Field({ name, label, type = "text", defaultValue = "", invalid, hint }: { name: string; label: string; type?: string; defaultValue?: string; invalid?: boolean; hint?: string }) {
+  return (
+    <div>
+      <label className="field-label" htmlFor={name}>{label}</label>
+      <input className={`field ${invalid ? "!border-bad" : ""}`} id={name} name={name} type={type} defaultValue={defaultValue} aria-invalid={invalid || undefined}
+        aria-describedby={hint ? `${name}-hint` : undefined} />
+      {hint && <p id={`${name}-hint`} className="mt-1.5 text-[13px] text-muted">{hint}</p>}
+    </div>
+  );
+}

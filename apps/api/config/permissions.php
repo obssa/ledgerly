@@ -14,6 +14,9 @@
 |                    (a refund received from a supplier needs payments.receive)
 | expenses.create    record an expense already paid (fuel, utilities, petty cash): bookkeeper, accountant, owner, admin
 | expenses.view      read expenses: also approvers and viewers
+| inventory.view     items, warehouses, stock on hand: every role that works with goods
+| inventory.items    add and change items and warehouses (bookkeeper, purchasing, accountant)
+| inventory.adjust   stock adjustments and opening stock, which post to the ledger (accountant, owner, admin)
 | company.view       read the company profile and fiscal settings, the chart of accounts (no balances) and the tax
 |                    rates; every role, because every document form names accounts and taxes
 | company.manage     change the profile and settings; owner and admin only (via '*')
@@ -27,12 +30,12 @@ return [
     'roles' => [
         'owner' => ['*'],
         'admin' => ['*'],
-        'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*'],
-        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'banking.*', 'contacts.*', 'reports.view'],
-        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive'],
-        'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create'],
-        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'payments.approve'],
-        'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'reports.view'],
+        'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'inventory.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*'],
+        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'banking.*', 'contacts.*', 'reports.view'],
+        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view'],
+        'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items'],
+        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve'],
+        'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'reports.view'],
         'custom' => [],
     ],
 ];

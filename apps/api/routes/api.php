@@ -13,6 +13,7 @@ use App\Http\Controllers\DemoController;
 use App\Http\Controllers\DimensionController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\NumberingController;
@@ -20,9 +21,11 @@ use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\PaymentMadeController;
 use App\Http\Controllers\PaymentReceivedController;
 use App\Http\Controllers\RefundController;
+use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierCreditController;
 use App\Http\Controllers\TaxRateController;
+use App\Http\Controllers\WarehouseController;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Sales\Models\Payment;
 use Illuminate\Support\Str;
@@ -175,6 +178,16 @@ Route::prefix('v1')->group(function () {
             Route::get('payments-received/{payment}', [PaymentReceivedController::class, 'show']);
             Route::post('payments-received/{payment}/reverse', [PaymentReceivedController::class, 'reverse']);
             Route::post('payments-received/{payment}/allocate', [PaymentReceivedController::class, 'allocate']);
+
+            Route::get('items', [ItemController::class, 'index']);
+            Route::post('items', [ItemController::class, 'store']);
+            Route::get('items/{item}', [ItemController::class, 'show']);
+            Route::put('items/{item}', [ItemController::class, 'update']);
+            Route::get('warehouses', [WarehouseController::class, 'index']);
+            Route::post('warehouses', [WarehouseController::class, 'store']);
+            Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update']);
+            Route::get('stock', [StockController::class, 'index']);
+            Route::post('stock/adjustments', [StockController::class, 'adjust']);
 
             Route::post('banking/transfers', [BankingController::class, 'transfer']);
             Route::post('banking/deposits', [BankingController::class, 'deposit']);

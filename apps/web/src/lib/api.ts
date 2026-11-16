@@ -139,6 +139,39 @@ export interface Contact {
   tax_id: string | null;
 }
 
+/** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
+export interface Item {
+  id: string;
+  sku: string | null;
+  name: string;
+  type: "inventory" | "non_inventory" | "service" | "bundle";
+  unit: string;
+  sale_price: string | null;
+  purchase_price: string | null;
+  income_account_id: string | null;
+  expense_account_id: string | null;
+  reorder_point: string | null;
+  is_active: boolean;
+  on_hand?: string;
+  value?: string;
+  balances?: { warehouse: { id: string; name: string }; quantity: string; value: string }[];
+  can?: { edit: boolean; adjust: boolean };
+}
+
+export interface Warehouse { id: string; name: string; is_active: boolean }
+
+/** GET /stock: what is on hand per item and warehouse, valued at weighted average. */
+export interface StockOnHand {
+  data: { item: { id: string; sku: string | null; name: string; unit: string; reorder_point: string | null }; warehouse: { id: string; name: string }; quantity: string; value: string; average_cost: string }[];
+  total_value: string;
+}
+
+/** GET /reports/bin-card. */
+export interface BinCard {
+  opening: { quantity: string; value: string };
+  moves: { moved_on: string; kind: string; reference: string | null; qty_in: string; qty_out: string; unit_cost: string; value: string; balance_qty: string; balance_value: string }[];
+}
+
 /** Where a supplier is paid: a bank account, a mobile-money wallet, or both. */
 export interface Payout {
   bank_name?: string;
@@ -506,6 +539,17 @@ export const ledgerly = {
   createExpense: (body: Record<string, unknown>, ctx: RequestOptions) => api<Expense>("expenses", { ...ctx, method: "POST", body }),
   voidExpense: (id: string, reason: string, ctx: RequestOptions) =>
     api<Expense>(`expenses/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
+  items: (q: { search?: string; include_archived?: string; type?: string }, ctx: RequestOptions) =>
+    api<{ data: Item[]; can: { edit: boolean; adjust: boolean } }>("items", { ...ctx, query: q }),
+  item: (id: string, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, ctx),
+  createItem: (body: Record<string, unknown>, ctx: RequestOptions) => api<Item>("items", { ...ctx, method: "POST", body }),
+  updateItem: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  warehouses: (ctx: RequestOptions) => api<{ data: Warehouse[] }>("warehouses", ctx),
+  createWarehouse: (name: string, ctx: RequestOptions) => api<Warehouse>("warehouses", { ...ctx, method: "POST", body: { name } }),
+  stock: (ctx: RequestOptions) => api<StockOnHand>("stock", ctx),
+  adjustStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ move_id: string; amount: string; unit_cost: string }>("stock/adjustments", { ...ctx, method: "POST", body }),
+  binCard: (q: { item_id: string; warehouse_id: string; from: string; to: string }, ctx: RequestOptions) => api<BinCard>("reports/bin-card", { ...ctx, query: q }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),

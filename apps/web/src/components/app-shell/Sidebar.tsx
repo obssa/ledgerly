@@ -14,7 +14,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
       { href: "/invoices", label: "Sales and invoices" },
       { href: "/customers", label: "Customers" },
       { href: "/payments", label: "Payments received" },
-      { href: "/products", label: "Products and services", soon: true },
+      { href: "/products", label: "Products and services" },
     ],
   },
   {
@@ -30,7 +30,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
     label: "Operations",
     items: [
       { href: "/banking", label: "Banking and cash", soon: true },
-      { href: "/inventory", label: "Inventory and bin cards", soon: true },
+      { href: "/inventory", label: "Inventory and bin cards" },
       { href: "/payroll", label: "Payroll", soon: true },
     ],
   },
