@@ -72,6 +72,7 @@ final class DemoLoginTest extends TestCase
         $this->withToken($token)->getJson('/api/v1/payments-made', $h)->assertOk()->assertJsonCount(2, 'data');
         $this->withToken($token)->getJson('/api/v1/expenses', $h)->assertOk()->assertJsonCount(2, 'data');
         $this->withToken($token)->getJson('/api/v1/supplier-credits', $h)->assertOk()->assertJsonPath('data.0.status', 'paid');
+        $this->withToken($token)->getJson('/api/v1/stock', $h)->assertOk()->assertJsonPath('total_value', '557000.00');   // 215 x 640 + 900 x 450 + 1,200 x 12
         $ageing = $this->withToken($token)->getJson('/api/v1/reports/ar-ageing', $h)->assertOk();
         $this->assertNotSame('0.00', $ageing->json('totals.total'));
 

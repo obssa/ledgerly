@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -204,6 +204,46 @@ export async function getExpense(id: string): Promise<Expense | null> {
     return await withApi((ctx) => ledgerly.expense(id, ctx));
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export async function getItems(q: { search?: string; archived?: boolean }): Promise<{ data: Item[]; can: { edit: boolean; adjust: boolean }; demo: boolean }> {
+  await connection();
+  if (isDemoMode()) return { data: [], can: { edit: false, adjust: false }, demo: true };
+  return { ...(await withApi((ctx) => ledgerly.items({ search: q.search || undefined, include_archived: q.archived ? "1" : undefined }, ctx))), demo: false };
+}
+
+export async function getItem(id: string): Promise<Item | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.item(id, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export async function getWarehouses(): Promise<Warehouse[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.warehouses(ctx))).data;
+}
+
+export async function getStock(): Promise<StockOnHand | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi((ctx) => ledgerly.stock(ctx));
+}
+
+export async function getBinCard(q: { item_id: string; warehouse_id: string; from: string; to: string }): Promise<BinCard | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.binCard(q, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 422)) return null;
     throw error;
   }
 }

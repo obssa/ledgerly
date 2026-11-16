@@ -60,6 +60,7 @@ final class DemoSetup
         $this->addPaymentsMade($owner, $company, $say);
         $this->addExpenses($owner, $company, $say);
         $this->addSupplierCredit($owner, $company, $say);
+        $this->addInventory($owner, $company, $say);
 
         foreach ($roles as $role) {
             if ($owner->table('demo_accounts')->where('role', $role)->exists()) {
@@ -240,6 +241,41 @@ final class DemoSetup
             $user->tokens()->where('name', 'demo-setup')->delete();
         }
         $say('Added the demo supplier credit.');
+    }
+
+    /** Module 4 sample: two warehouses, three stock items with opening stock at the conversion date, and a service. Added once. */
+    private function addInventory(ConnectionInterface $owner, string $company, callable $say): void
+    {
+        if ($owner->table('items')->where(['company_id' => $company, 'type' => 'inventory'])->exists()) {
+            return;
+        }
+        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
+        $this->company = $company;
+
+        try {
+            $opening = (string) ($owner->table('companies')->where('id', $company)->value('conversion_date') ?? now()->format('Y-m-d'));
+            $accounts = collect($this->call('GET', 'accounts')['data']);
+            $roastery = $this->call('POST', 'warehouses', ['name' => 'Bole roastery'])['id'];
+            $shop = $this->call('POST', 'warehouses', ['name' => 'Hawassa shop'])['id'];
+            $item = fn (array $i) => $this->call('POST', 'items', $i)['id'];
+            $roasted = $item(['name' => 'Roasted coffee, Yirgacheffe 1 kg', 'sku' => 'RC-YRG-1K', 'type' => 'inventory', 'unit' => 'bag', 'sale_price' => '1150', 'reorder_point' => '40',
+                'income_account_id' => $accounts->firstWhere('code', '4000')['id']]);
+            $green = $item(['name' => 'Green coffee, Sidama grade 2', 'sku' => 'GC-SID-2', 'type' => 'inventory', 'unit' => 'kg', 'sale_price' => '780', 'purchase_price' => '450']);
+            $bags = $item(['name' => 'Coffee bags, 1 kg, printed', 'sku' => 'PK-BAG-1K', 'type' => 'inventory', 'unit' => 'bag', 'purchase_price' => '12', 'reorder_point' => '500']);
+            $item(['name' => 'Coffee ceremony catering (per event)', 'sku' => 'SV-CER', 'type' => 'service', 'sale_price' => '6500', 'income_account_id' => $accounts->firstWhere('code', '4100')['id']]);
+
+            $stock = fn (string $it, string $wh, string $qty, string $cost) => $this->call('POST', 'stock/adjustments', [
+                'item_id' => $it, 'warehouse_id' => $wh, 'date' => $opening, 'quantity' => $qty, 'unit_cost' => $cost, 'opening' => true, 'reason' => 'Opening count',
+            ]);
+            $stock($roasted, $roastery, '180', '640');
+            $stock($roasted, $shop, '35', '640');
+            $stock($green, $roastery, '900', '450');
+            $stock($bags, $roastery, '1200', '12');
+        } finally {
+            $user->tokens()->where('name', 'demo-setup')->delete();
+        }
+        $say('Added the demo items and opening stock.');
     }
 
     /** Module 3 sample: expenses paid on the spot, from cash and from the bank. Added once. */

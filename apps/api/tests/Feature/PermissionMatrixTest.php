@@ -113,6 +113,16 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/payments-received/{payment}' => 'payments.view',
         'POST api/v1/payments-received/{payment}/reverse' => 'payments.reverse',
 
+        'GET api/v1/items' => 'inventory.view',
+        'POST api/v1/items' => 'inventory.items',
+        'GET api/v1/items/{item}' => 'inventory.view',
+        'PUT api/v1/items/{item}' => 'inventory.items',
+        'GET api/v1/warehouses' => 'inventory.view',
+        'POST api/v1/warehouses' => 'inventory.items',
+        'PUT api/v1/warehouses/{warehouse}' => 'inventory.items',
+        'GET api/v1/stock' => 'inventory.view',
+        'POST api/v1/stock/adjustments' => 'inventory.adjust',
+
         'POST api/v1/banking/transfers' => 'banking.transfer',
         'POST api/v1/banking/deposits' => 'banking.deposit',
 

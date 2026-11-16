@@ -1353,6 +1353,59 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T51: stock is costed by the database at weighted average, never goes below zero, moves only stock items of the
+-- company, and the balances are written only by the trigger (024).
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ DECLARE m record; b record; BEGIN
+  INSERT INTO items (id, company_id, sku, name, type) VALUES
+    ('00000000-0000-0000-0000-0000000000b2', app_company_id(), 'GC-SID-1K', 'Green coffee, Sidama (kg)', 'inventory'),
+    ('00000000-0000-0000-0000-0000000000b3', app_company_id(), 'SRV-ROAST', 'Roasting service', 'service');
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000b3', '00000000-0000-0000-0000-0000000000a1', '2027-06-30', 'adjustment', 1, 10);
+    RAISE EXCEPTION 'FAIL T51a: a service had a stock move';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a1', '2027-06-30', 'sale', -1, 0);
+    RAISE EXCEPTION 'FAIL T51b: stock went below zero';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- 10 at 100.00 and 5 at 130.00: 15 on hand worth 1,650.00, an average of 110.00.
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a1', '2027-06-01', 'purchase', 10, 100),
+    (app_company_id(), '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a1', '2027-06-02', 'purchase', 5, 130);
+  -- 4 out at whatever unit cost the caller says: the database takes the average.
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a1', '2027-06-03', 'sale', -4, 1)
+    RETURNING amount, unit_cost INTO m;
+  IF (m.amount, m.unit_cost) <> (-440.00::numeric(20,2), 110.000000::numeric(20,6)) THEN
+    RAISE EXCEPTION 'FAIL T51c: 4 out were not costed at the average of 110.00 (got %, %)', m.amount, m.unit_cost;
+  END IF;
+  -- The last 11 take all that is left, so nothing is left behind by rounding.
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000a1', '2027-06-04', 'sale', -11, 0)
+    RETURNING amount INTO m;
+  SELECT quantity, value INTO b FROM stock_balances WHERE item_id = '00000000-0000-0000-0000-0000000000b2';
+  IF m.amount <> -1210 OR (b.quantity, b.value) <> (0::numeric(18,2), 0::numeric(20,2)) THEN
+    RAISE EXCEPTION 'FAIL T51d: emptying the warehouse did not take all its value (got %, balance %, %)', m.amount, b.quantity, b.value;
+  END IF;
+
+  BEGIN
+    UPDATE stock_balances SET quantity = 1000;
+    RAISE EXCEPTION 'FAIL T51e: the application role changed a stock balance';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000b9', '2027-06-30', 'purchase', 1, 10);
+    RAISE EXCEPTION 'FAIL T51f: stock moved into a warehouse that is not the company''s';
+  EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T51 stock is costed at weighted average by the database, never goes below zero, and moves only the company''s stock items';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

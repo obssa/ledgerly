@@ -62,6 +62,13 @@ trait CompanyFixtures
             'lines' => [['description' => 'Coffee returned', 'quantity' => '1', 'unit_price' => '100', 'account_id' => $ids['sales']]]], $h)->assertCreated()->json('id');
         $ids['draft'] = $this->postJson('/api/v1/invoices', $invoice(), $h)->assertCreated()->json('id');
 
+        // A stock item with 20 on hand at 50.00 (opening stock, 2 Nov) in the company's main store.
+        $ids['store'] = $this->postJson('/api/v1/warehouses', ['name' => 'Main store'], $h)->assertCreated()->json('id');
+        $ids['stock_item'] = $this->postJson('/api/v1/items', ['name' => 'Roasted coffee 1 kg', 'sku' => 'RC-1K', 'type' => 'inventory', 'unit' => 'bag', 'sale_price' => '1150'], $h)
+            ->assertCreated()->json('id');
+        $this->postJson('/api/v1/stock/adjustments', ['item_id' => $ids['stock_item'], 'warehouse_id' => $ids['store'], 'date' => '2026-11-02',
+            'quantity' => '20', 'unit_cost' => '50', 'opening' => true, 'reason' => 'Opening count'], $h)->assertCreated();
+
         // A supplier with a posted bill (400.00 of rent, 5 Nov) and a draft bill.
         $ids['supplier'] = $this->postJson('/api/v1/suppliers', ['name' => "{$name} supplier"], $h)->assertCreated()->json('id');
         $ids['rent'] = $this->owner()->table('accounts')->where(['company_id' => $company, 'code' => '6100'])->value('id');
@@ -98,7 +105,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(82, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(91, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -119,6 +126,8 @@ trait CompanyFixtures
             'expense' => $ids['expense'],
             'supplierCredit' => $ids['supplier_credit'],
             'refund' => $ids['refund'],
+            'item' => $ids['stock_item'],
+            'warehouse' => $ids['store'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

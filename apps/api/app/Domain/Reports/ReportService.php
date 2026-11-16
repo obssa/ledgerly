@@ -125,7 +125,7 @@ final class ReportService
     {
         $opening = DB::selectOne(<<<'SQL'
             SELECT coalesce(sum(quantity), 0)::numeric(18,2)::text AS quantity,
-                   coalesce(sum(quantity * unit_cost), 0)::numeric(20,2)::text AS value
+                   coalesce(sum(amount), 0)::numeric(20,2)::text AS value
               FROM stock_moves
              WHERE company_id = ? AND item_id = ? AND warehouse_id = ? AND moved_on < ?
             SQL, [$companyId, $itemId, $warehouseId, $from]);
@@ -134,9 +134,10 @@ final class ReportService
             SELECT moved_on, kind, reference,
                    greatest(quantity, 0)::numeric(18,2)::text            AS qty_in,
                    greatest(-quantity, 0)::numeric(18,2)::text           AS qty_out,
-                   unit_cost::text                                       AS unit_cost,
+                   round(unit_cost, 2)::text                             AS unit_cost,
                    (?::numeric + sum(quantity) OVER w)::numeric(18,2)::text            AS balance_qty,
-                   (?::numeric + sum(quantity * unit_cost) OVER w)::numeric(20,2)::text AS balance_value
+                   amount::text                                          AS value,
+                   (?::numeric + sum(amount) OVER w)::numeric(20,2)::text AS balance_value
               FROM stock_moves
              WHERE company_id = ? AND item_id = ? AND warehouse_id = ? AND moved_on BETWEEN ? AND ?
             WINDOW w AS (ORDER BY moved_on, seq ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
