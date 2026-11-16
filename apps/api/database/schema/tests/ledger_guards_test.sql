@@ -1439,6 +1439,32 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T53: an account with entries keeps its type, kind and currency; bank details are an object (026). Uses bank account
+-- a10 of company A, which has entries since T13.
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    UPDATE accounts SET currency = 'USD' WHERE id = '00000000-0000-0000-0000-000000000a10';
+    RAISE EXCEPTION 'FAIL T53a: an account with entries changed its currency';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE accounts SET type = 'expense', subtype = NULL WHERE id = '00000000-0000-0000-0000-000000000a10';
+    RAISE EXCEPTION 'FAIL T53b: an account with entries changed its type';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE accounts SET bank_details = '[]' WHERE id = '00000000-0000-0000-0000-000000000a10';
+    RAISE EXCEPTION 'FAIL T53c: bank details were not an object';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE accounts SET name = 'Bank (CBE Bole)', bank_details = '{"bank_name": "Commercial Bank of Ethiopia", "account_number": "1000123456789"}'
+   WHERE id = '00000000-0000-0000-0000-000000000a10';
+  INSERT INTO accounts (id, company_id, code, name, type, subtype) VALUES ('00000000-0000-0000-0000-000000000a53', app_company_id(), '1199', 'New wallet', 'asset', 'mobile_money');
+  UPDATE accounts SET currency = 'USD' WHERE id = '00000000-0000-0000-0000-000000000a53';   -- no entries yet: still free
+  RAISE NOTICE 'PASS T53 an account with entries keeps its type, kind and currency';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

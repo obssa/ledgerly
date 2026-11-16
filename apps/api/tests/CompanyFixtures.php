@@ -105,7 +105,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(94, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(99, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -128,6 +128,7 @@ trait CompanyFixtures
             'refund' => $ids['refund'],
             'item' => $ids['stock_item'],
             'warehouse' => $ids['store'],
+            'bankAccount' => $ids['bank'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

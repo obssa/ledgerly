@@ -126,6 +126,11 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/stock/reorder' => 'inventory.view',
         'GET api/v1/reports/inventory-valuation' => 'reports.view',
 
+        'GET api/v1/bank-accounts' => 'banking.view',
+        'POST api/v1/bank-accounts' => 'banking.manage',
+        'GET api/v1/bank-accounts/{bankAccount}' => 'banking.view',
+        'PUT api/v1/bank-accounts/{bankAccount}' => 'banking.manage',
+        'GET api/v1/bank-accounts/{bankAccount}/register' => 'banking.view',
         'POST api/v1/banking/transfers' => 'banking.transfer',
         'POST api/v1/banking/deposits' => 'banking.deposit',
 

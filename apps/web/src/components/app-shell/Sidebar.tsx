@@ -29,7 +29,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
   {
     label: "Operations",
     items: [
-      { href: "/banking", label: "Banking and cash", soon: true },
+      { href: "/banking", label: "Banking and cash" },
       { href: "/inventory", label: "Inventory and bin cards" },
       { href: "/payroll", label: "Payroll", soon: true },
     ],

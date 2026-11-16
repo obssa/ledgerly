@@ -139,6 +139,30 @@ export interface Contact {
   tax_id: string | null;
 }
 
+/** Module 5: a place the company keeps money, a ledger account of its own. */
+export interface BankAccount {
+  id: string;
+  code: string;
+  name: string;
+  kind: "bank" | "mobile_money" | "cash" | "undeposited_funds";
+  currency: string;
+  is_active: boolean;
+  bank_details: { bank_name?: string; account_number?: string; branch?: string; provider?: string; wallet_number?: string };
+  balance: string;
+  balance_base: string;
+  can?: { manage: boolean; transfer: boolean; deposit: boolean };
+}
+
+export interface BankRegister {
+  account: BankAccount;
+  currency: string;
+  from: string;
+  to: string;
+  opening: string;
+  closing: string;
+  lines: { date: string; entry: number; source_type: string; memo: string | null; description: string | null; contact: string | null; in: string; out: string; balance: string }[];
+}
+
 /** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
 export interface Item {
   id: string;
@@ -556,6 +580,13 @@ export const ledgerly = {
   inventoryValuation: (asOf: string | undefined, ctx: RequestOptions) =>
     api<{ as_of: string; rows: { item_id: string; name: string; sku: string | null; unit: string; warehouse: string; quantity: string; value: string }[]; stock_value: string; inventory_account: string; difference: string }>(
       "reports/inventory-valuation", { ...ctx, query: { as_of: asOf } }),
+  bankAccounts: (ctx: RequestOptions) => api<{ data: BankAccount[]; can: { manage: boolean; transfer: boolean; deposit: boolean } }>("bank-accounts", ctx),
+  bankAccount: (id: string, ctx: RequestOptions) => api<BankAccount>(`bank-accounts/${encodeURIComponent(id)}`, ctx),
+  createBankAccount: (body: Record<string, unknown>, ctx: RequestOptions) => api<BankAccount>("bank-accounts", { ...ctx, method: "POST", body }),
+  updateBankAccount: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<BankAccount>(`bank-accounts/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  bankRegister: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) => api<BankRegister>(`bank-accounts/${encodeURIComponent(id)}/register`, { ...ctx, query: q }),
+  transferMoney: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ number: number }>("banking/transfers", { ...ctx, method: "POST", body }),
+  depositReceipts: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ number: number }>("banking/deposits", { ...ctx, method: "POST", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),

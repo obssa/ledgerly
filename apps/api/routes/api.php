@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\CompanyController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierCreditController;
 use App\Http\Controllers\TaxRateController;
 use App\Http\Controllers\WarehouseController;
+use App\Domain\Ledger\Models\Account;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Sales\Models\Payment;
 use Illuminate\Support\Str;
@@ -56,6 +58,10 @@ $paymentOf = fn (array $where) => fn (string $id) => Str::isUuid($id)
 Route::bind('payment', $paymentOf(['direction' => 'in', 'kind' => 'payment']));
 Route::bind('paymentMade', $paymentOf(['direction' => 'out', 'kind' => 'payment']));
 Route::bind('refund', $paymentOf(['kind' => 'refund']));
+// A money account: bank, wallet, cash, or undeposited funds; any other account is not found on these routes.
+Route::bind('bankAccount', fn (string $id) => Str::isUuid($id)
+    ? Account::query()->where(fn ($q) => $q->whereIn('subtype', BankAccountController::KINDS)->orWhere('system_key', 'undeposited_funds'))->findOrFail($id)
+    : abort(404));
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
@@ -190,6 +196,12 @@ Route::prefix('v1')->group(function () {
             Route::post('stock/adjustments', [StockController::class, 'adjust']);
             Route::post('stock/transfers', [StockController::class, 'transfer']);
             Route::get('stock/reorder', [StockController::class, 'reorder']);
+
+            Route::get('bank-accounts', [BankAccountController::class, 'index']);
+            Route::post('bank-accounts', [BankAccountController::class, 'store']);
+            Route::get('bank-accounts/{bankAccount}', [BankAccountController::class, 'show']);
+            Route::put('bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
+            Route::get('bank-accounts/{bankAccount}/register', [BankAccountController::class, 'register']);
 
             Route::post('banking/transfers', [BankingController::class, 'transfer']);
             Route::post('banking/deposits', [BankingController::class, 'deposit']);

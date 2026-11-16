@@ -13,11 +13,11 @@ class Account extends Model
     use BelongsToCompany;
     use HasUuids;
 
-    protected $fillable = ['company_id', 'code', 'name', 'type', 'subtype', 'system_key', 'parent_id', 'currency', 'is_active'];
+    protected $fillable = ['company_id', 'code', 'name', 'type', 'subtype', 'system_key', 'parent_id', 'currency', 'is_active', 'bank_details'];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['is_active' => 'boolean', 'bank_details' => 'array'];
     }
 
     /** Look up a system account (e.g. 'accounts_receivable') in the current company. */
