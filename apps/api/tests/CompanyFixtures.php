@@ -115,6 +115,9 @@ trait CompanyFixtures
         // Monthly rent as a recurring journal, first due on 1 Dec (so nothing posts yet).
         $ids['recurring_journal'] = $this->postJson('/api/v1/recurring-journals', ['name' => 'Monthly rent', 'memo' => 'Rent for the month', 'frequency' => 'monthly',
             'next_on' => '2026-12-01', 'lines' => [['account_id' => $ids['rent'], 'debit' => '40'], ['account_id' => $ids['equity'], 'credit' => '40']]], $h)->assertCreated()->json('id');
+        // The VAT return for September, filed on 10 Oct (nothing was posted then, so it is all zero).
+        $ids['tax_return'] = $this->postJson('/api/v1/tax-returns', ['kind' => 'vat', 'period_start' => '2026-09-01', 'period_end' => '2026-09-30',
+            'filed_on' => '2026-10-10', 'reference' => "{$name} VAT Sep"], $h)->assertCreated()->json('id');
         // A reconciliation of the bank to 8 Nov in progress, its difference not yet zero.
         $ids['reconciliation'] = $this->postJson("/api/v1/bank-accounts/{$ids['bank']}/reconciliations", ['statement_date' => '2026-11-08', 'ending_balance' => '1'], $h)
             ->assertCreated()->json('id');
@@ -129,7 +132,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(147, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(152, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -159,6 +162,7 @@ trait CompanyFixtures
             'journalRequest' => $ids['journal_request'],
             'fiscalYear' => $ids['fiscal_year'],
             'recurringJournal' => $ids['recurring_journal'],
+            'taxReturn' => $ids['tax_return'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

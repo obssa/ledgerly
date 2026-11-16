@@ -342,6 +342,45 @@ export interface JournalRequest {
   can: { approve: boolean; withdraw: boolean };
 }
 
+/** Module 7: a tax worksheet, built from the ledger (VAT: output and input; withholding: what was withheld). */
+export type TaxKind = "vat" | "withholding";
+
+export interface TaxRateRow { code: string; name: string; rate: string | null; kind: string | null; taxable: string; tax: string }
+export interface TaxDocumentRow { id: string; type: string; number: string | null; date: string; contact: string; tax_id: string | null; taxable: string; tax: string }
+
+export interface TaxWorksheet {
+  kind: TaxKind;
+  from: string;
+  to: string;
+  currency: string;
+  output_tax: string;
+  input_tax: string;
+  net: string;
+  sales?: { rates: TaxRateRow[]; documents: TaxDocumentRow[]; taxable: string; tax: string };
+  purchases?: { rates: TaxRateRow[]; documents: TaxDocumentRow[]; taxable: string; tax: string };
+  withheld?: { payments: { id: string; date: string; contact: string | null; tax_id: string | null; reference: string | null; gross: string; withheld: string }[]; gross: string; tax: string };
+  other: { output: string; input: string; entries: { id: string; number: number; date: string; memo: string | null; source_type: string; output: string; input: string }[] };
+  filed?: { id: string; period_start: string; period_end: string; filed_on: string }[];
+  can?: { file: boolean };
+}
+
+export interface TaxReturn {
+  id: string;
+  kind: TaxKind;
+  period_start: string;
+  period_end: string;
+  filed_on: string;
+  reference: string | null;
+  output_tax: string;
+  input_tax: string;
+  net: string;
+  filed_by: string | null;
+  settled_on: string | null;
+  figures?: TaxWorksheet;
+  settlement?: { id: string; number: number; date: string } | null;
+  can?: { settle: boolean };
+}
+
 /** Module 6, accountant tools: an entry the review queue flags, and its review once marked. */
 export type ReviewFlag = "manual_cash" | "round_amount" | "large" | "backdated" | "out_of_hours" | "opening_equity";
 
@@ -804,6 +843,12 @@ export const ledgerly = {
     api<RecurringJournal>(`recurring-journals/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   postDueRecurring: (ctx: RequestOptions) =>
     api<{ data: { id: string; name: string; posted: number[]; error: string | null }[]; posted: number }>("recurring-journals/post-due", { ...ctx, method: "POST", body: {} }),
+  taxWorksheet: (q: { kind?: string; from?: string; to?: string }, ctx: RequestOptions) => api<TaxWorksheet>("tax/worksheet", { ...ctx, query: q }),
+  taxReturns: (ctx: RequestOptions) => api<{ data: TaxReturn[]; can: { file: boolean } }>("tax-returns", ctx),
+  taxReturn: (id: string, ctx: RequestOptions) => api<TaxReturn>(`tax-returns/${encodeURIComponent(id)}`, ctx),
+  fileTaxReturn: (body: Record<string, unknown>, ctx: RequestOptions) => api<TaxReturn>("tax-returns", { ...ctx, method: "POST", body }),
+  settleTaxReturn: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<TaxReturn>(`tax-returns/${encodeURIComponent(id)}/settle`, { ...ctx, method: "POST", body }),
   reviewQueue: (q: { from?: string; to?: string; reviewed?: string }, ctx: RequestOptions) => api<ReviewQueue>("journal-entries/review", { ...ctx, query: q }),
   reviewEntry: (id: string, note: string | null, ctx: RequestOptions) =>
     api<{ id: string; number: number; flags: string[] }>(`journal-entries/${encodeURIComponent(id)}/review`, { ...ctx, method: "POST", body: note ? { note } : {} }),

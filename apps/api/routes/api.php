@@ -37,6 +37,7 @@ use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierCreditController;
 use App\Http\Controllers\TaxRateController;
+use App\Http\Controllers\TaxReturnController;
 use App\Http\Controllers\WarehouseController;
 use App\Domain\Banking\Models\BankTransaction;
 use App\Domain\Banking\Models\Reconciliation;
@@ -165,6 +166,11 @@ Route::prefix('v1')->group(function () {
             Route::post('recurring-journals/{recurringJournal}/resume', [RecurringJournalController::class, 'resume'])->whereUuid('recurringJournal');
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
+            Route::get('tax/worksheet', [TaxReturnController::class, 'worksheet']);
+            Route::get('tax-returns', [TaxReturnController::class, 'index']);
+            Route::post('tax-returns', [TaxReturnController::class, 'store']);
+            Route::get('tax-returns/{taxReturn}', [TaxReturnController::class, 'show'])->whereUuid('taxReturn');
+            Route::post('tax-returns/{taxReturn}/settle', [TaxReturnController::class, 'settle'])->whereUuid('taxReturn');
             Route::post('tax-rates', [TaxRateController::class, 'store']);
 
             Route::get('customers', [CustomerController::class, 'index']);
