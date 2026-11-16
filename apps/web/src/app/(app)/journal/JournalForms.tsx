@@ -15,7 +15,7 @@ function Message({ state }: { state: FormState | undefined }) {
 const KINDS = [["location", "location_id", "Location"], ["class", "class_id", "Class"], ["project", "project_id", "Project"]] as const;
 
 /** The lines of a journal: accounts, descriptions, dimensions when the company uses them, and the running balance. */
-function JournalLines({ lines, setLines, accounts, dimensions, bad }: {
+export function JournalLines({ lines, setLines, accounts, dimensions, bad }: {
   lines: JournalLineInput[]; setLines: (lines: JournalLineInput[]) => void; accounts: Account[]; dimensions: Dimension[]; bad: (name: string) => boolean;
 }) {
   const totals = journalTotals(lines);

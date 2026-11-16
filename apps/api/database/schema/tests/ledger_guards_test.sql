@@ -2052,6 +2052,61 @@ DO $$ DECLARE lines jsonb := '[{"account_id": "x", "debit": "900"}, {"account_id
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T63 recurring journals repeat within their end and a journal reverses after its date, as asked';
 END $$;
+-- T64: the adjustments period for the auditor (037). An audit adjustment goes into a closed year that is not signed off,
+-- dated its last day, never on accounts kept by documents; signing off needs a closed year and then nothing about the
+-- year changes. Uses T62's closed year 2027-07-01 to 2028-06-30 of company A and an open year after it.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e641', app_company_id(), 9641, '2028-06-29', 'ETB', 'adjustment', '00000000-0000-0000-0000-0000000006f1');
+    RAISE EXCEPTION 'FAIL T64a: an audit adjustment was dated before the year''s last day';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO fiscal_years (id, company_id, starts_on, ends_on) VALUES
+    ('00000000-0000-0000-0000-0000000006f2', app_company_id(), '2028-07-01', '2029-06-30');
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e642', app_company_id(), 9642, '2029-06-30', 'ETB', 'adjustment', '00000000-0000-0000-0000-0000000006f2');
+    RAISE EXCEPTION 'FAIL T64b: an audit adjustment went into a year still open';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE fiscal_years SET adjustments_closed_at = now(), adjustments_closed_by = '00000000-0000-0000-0000-0000000000f1' WHERE id = '00000000-0000-0000-0000-0000000006f2';
+    RAISE EXCEPTION 'FAIL T64c: an open year''s audit was signed off';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    ('00000000-0000-0000-0000-00000000e643', app_company_id(), 9643, '2028-06-30', 'ETB', 'adjustment', '00000000-0000-0000-0000-0000000006f1');
+  BEGIN
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e643', 1, '00000000-0000-0000-0000-000000000a11', 50, 0, 50);
+    RAISE EXCEPTION 'FAIL T64d: an audit adjustment touched receivables';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e643', 1, '00000000-0000-0000-0000-000000000a40', 50, 0, 50),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e643', 2, '00000000-0000-0000-0000-000000000a10', 0, 50, -50);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+
+  -- Signed off: no more adjustments, and the year stays closed as it is.
+  BEGIN
+    UPDATE fiscal_years SET adjustments_closed_at = now() WHERE id = '00000000-0000-0000-0000-0000000006f1';
+    RAISE EXCEPTION 'FAIL T64e: an audit was signed off without saying by whom';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE fiscal_years SET adjustments_closed_at = now(), adjustments_closed_by = '00000000-0000-0000-0000-0000000000f1' WHERE id = '00000000-0000-0000-0000-0000000006f1';
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e644', app_company_id(), 9644, '2028-06-30', 'ETB', 'adjustment', '00000000-0000-0000-0000-0000000006f1');
+    RAISE EXCEPTION 'FAIL T64f: an audit adjustment went into a year signed off';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE fiscal_years SET status = 'reopened' WHERE id = '00000000-0000-0000-0000-0000000006f1';
+    RAISE EXCEPTION 'FAIL T64g: a year signed off was reopened';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE fiscal_years SET adjustments_closed_at = NULL, adjustments_closed_by = NULL WHERE id = '00000000-0000-0000-0000-0000000006f1';
+    RAISE EXCEPTION 'FAIL T64h: a sign-off was taken back';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T64 audit adjustments go into a closed year until it is signed off, then the year stays as it is';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
