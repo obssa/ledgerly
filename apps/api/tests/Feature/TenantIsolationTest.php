@@ -184,6 +184,7 @@ final class TenantIsolationTest extends TestCase
                 'lines' => [['account_id' => $this->b['rent'], 'debit' => '10'], ['account_id' => $this->b['equity'], 'credit' => '10']]]],
             'reclassifying B\'s ledger line' => ['POST', '/api/v1/journal-entries/reclassify', ['line_ids' => [$this->b['bank_line']], 'to_account_id' => $this->a['rent'], 'date' => '2026-11-10']],
             'reclassifying onto B\'s account' => ['POST', '/api/v1/journal-entries/reclassify', ['line_ids' => [$this->a['bank_line']], 'to_account_id' => $this->b['rent'], 'date' => '2026-11-10']],
+            'tax return settled from B\'s bank' => ['POST', "/api/v1/tax-returns/{$this->a['tax_return']}/settle", ['date' => '2026-11-10', 'bank_account_id' => $this->b['bank']]],
             'reconciliation ticking B\'s entry' => ['PUT', "/api/v1/reconciliations/{$this->a['reconciliation']}", ['cleared' => [$this->b['bank_line']]]],
         ];
 
@@ -283,7 +284,7 @@ final class TenantIsolationTest extends TestCase
     /** @return array<string, int> */
     private function ledgerCounts(): array
     {
-        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines', 'recurring_journals'])
+        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines', 'recurring_journals', 'tax_returns'])
             ->mapWithKeys(fn ($t) => [$t => $this->owner()->table($t)->count()])->all();
     }
 

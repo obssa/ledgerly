@@ -2142,6 +2142,73 @@ DO $$ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RAISE NOTICE 'PASS T65 an entry is reviewed once, by the person signed in, and the review is kept as it was';
 END $$;
+-- T66: tax returns (039). Filed by the person signed in, for an ended period that no other return of the kind covers,
+-- figures that add up and never change; the filed period is locked for that tax's accounts; a return is settled once,
+-- by its own settlement entry dated after the period. Company A, as user f1 (a22 is VAT payable, a10 the bank).
+DO $$ DECLARE figures jsonb := '{"boxes": []}'; BEGIN
+  BEGIN
+    INSERT INTO tax_returns (company_id, kind, period_start, period_end, filed_on, output_tax, input_tax, net, figures, filed_by) VALUES
+      (app_company_id(), 'vat', '2027-09-01', '2027-09-30', '2027-10-15', 1500, 600, 900, figures, '00000000-0000-0000-0000-0000000000f2');
+    RAISE EXCEPTION 'FAIL T66a: a return was filed by someone else';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO tax_returns (company_id, kind, period_start, period_end, filed_on, output_tax, input_tax, net, figures, filed_by) VALUES
+      (app_company_id(), 'vat', '2027-09-01', '2027-09-30', '2027-10-15', 1500, 600, 800, figures, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T66b: a return''s figures did not add up';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO tax_returns (company_id, kind, period_start, period_end, filed_on, output_tax, input_tax, net, figures, filed_by) VALUES
+      (app_company_id(), 'vat', '2027-09-01', '2027-09-30', '2027-09-30', 1500, 600, 900, figures, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T66c: a return was filed before its period ended';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO tax_returns (id, company_id, kind, period_start, period_end, filed_on, reference, output_tax, input_tax, net, figures, filed_by) VALUES
+    ('00000000-0000-0000-0000-0000000006d1', app_company_id(), 'vat', '2027-09-01', '2027-09-30', '2027-10-15', 'MOR-77120', 1500, 600, 900, figures, '00000000-0000-0000-0000-0000000000f1');
+  BEGIN
+    INSERT INTO tax_returns (company_id, kind, period_start, period_end, filed_on, output_tax, input_tax, net, figures, filed_by) VALUES
+      (app_company_id(), 'vat', '2027-09-15', '2027-10-15', '2027-10-20', 0, 0, 0, figures, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T66d: two VAT returns covered the same days';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE tax_returns SET output_tax = 1, net = -599 WHERE id = '00000000-0000-0000-0000-0000000006d1';
+    RAISE EXCEPTION 'FAIL T66e: a filed return was changed';
+  EXCEPTION WHEN insufficient_privilege OR check_violation THEN NULL; END;
+
+  -- The filed period is locked for VAT: an entry on VAT payable dated inside it is refused, after it is fine.
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES
+    ('00000000-0000-0000-0000-00000000e661', app_company_id(), 9661, '2027-09-15', 'ETB', 'test');
+  BEGIN
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e661', 1, '00000000-0000-0000-0000-000000000a22', 0, 50, -50);
+    RAISE EXCEPTION 'FAIL T66f: an entry posted VAT into a filed period';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e661', 1, '00000000-0000-0000-0000-000000000a10', 50, 0, 50),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e661', 2, '00000000-0000-0000-0000-000000000a40', 0, 50, -50);   -- other accounts are open
+
+  -- Settled once, by its own entry dated after the period.
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e662', app_company_id(), 9662, '2027-09-30', 'ETB', 'tax_settlement', '00000000-0000-0000-0000-0000000006d1');
+    RAISE EXCEPTION 'FAIL T66g: a settlement was dated inside its period';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    ('00000000-0000-0000-0000-00000000e663', app_company_id(), 9663, '2027-10-25', 'ETB', 'tax_settlement', '00000000-0000-0000-0000-0000000006d1');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e663', 1, '00000000-0000-0000-0000-000000000a22', 900, 0, 900),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e663', 2, '00000000-0000-0000-0000-000000000a10', 0, 900, -900);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  BEGIN
+    UPDATE tax_returns SET settlement_entry_id = '00000000-0000-0000-0000-00000000e661', settled_on = '2027-09-15' WHERE id = '00000000-0000-0000-0000-0000000006d1';
+    RAISE EXCEPTION 'FAIL T66h: a return was settled by an entry that is not its settlement';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE tax_returns SET settlement_entry_id = '00000000-0000-0000-0000-00000000e663', settled_on = '2027-10-25' WHERE id = '00000000-0000-0000-0000-0000000006d1';
+  BEGIN
+    UPDATE tax_returns SET settlement_entry_id = NULL, settled_on = NULL WHERE id = '00000000-0000-0000-0000-0000000006d1';
+    RAISE EXCEPTION 'FAIL T66i: a settlement was taken off its return';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T66 a tax return is filed once for its period, locks that tax there, and is settled once after it';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

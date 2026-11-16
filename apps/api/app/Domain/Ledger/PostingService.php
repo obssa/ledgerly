@@ -49,6 +49,16 @@ final class PostingService
             if ($reconciled !== null) {
                 throw new LedgerException("{$reconciled->code} {$reconciled->name} is reconciled through {$reconciled->statement_date}: date the entry after that, or undo the reconciliation.");
             }
+            // A filed tax return locks its period for that tax's accounts (039): the database refuses it too.
+            $kinds = DB::table('accounts')->whereIn('id', $accountIds)
+                ->whereIn('system_key', ['vat_payable', 'vat_receivable', 'withholding_payable', 'withholding_receivable'])->pluck('system_key')
+                ->map(fn (string $key) => str_starts_with($key, 'vat_') ? 'vat' : 'withholding')->unique()->values()->all();
+            $filed = $kinds === [] ? null : DB::table('tax_returns')->where('company_id', $draft->companyId)->whereIn('kind', $kinds)
+                ->where('period_start', '<=', $date)->where('period_end', '>=', $date)->first(['kind', 'period_start', 'period_end', 'filed_on']);
+            if ($filed !== null) {
+                $what = $filed->kind === 'vat' ? 'VAT' : 'withholding tax';
+                throw new LedgerException("The {$what} return for {$filed->period_start} to {$filed->period_end} was filed on {$filed->filed_on}: date this after the period, or correct it in a later return.");
+            }
 
             $entryId = (string) Str::uuid7(); // time-ordered: new rows land together in the index
             $number = $this->nextNumber($draft->companyId, 'journal');
