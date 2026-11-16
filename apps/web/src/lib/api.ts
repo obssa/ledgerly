@@ -569,6 +569,15 @@ export interface TrialBalanceRow {
   credit: string;
 }
 
+/** Module 6: what to check before closing the books through a date. */
+export interface CloseChecklist {
+  period_end: string;
+  warnings: number;
+  books_closed_until: string | null;
+  items: { key: string; label: string; status: "ok" | "warn"; detail: string; link?: string; items: { id: string | null; label: string; note: string; link: string }[] }[];
+  can: { reopen: boolean };
+}
+
 export interface ProfitAndLossRow {
   code: string;
   name: string;
@@ -840,6 +849,7 @@ export const ledgerly = {
   applyCredit: (creditNoteId: string, body: { invoice_id: string; amount: string }, ctx: RequestOptions) =>
     api<unknown>(`credit-notes/${encodeURIComponent(creditNoteId)}/apply`, { ...ctx, method: "POST", body }),
   taxRates: (ctx: RequestOptions) => api<{ data: TaxRate[] }>("tax-rates", ctx),
+  closeChecklist: (periodEnd: string | undefined, ctx: RequestOptions) => api<CloseChecklist>("close-checklist", { ...ctx, query: { period_end: periodEnd } }),
   generalLedger: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<GeneralLedger>("reports/general-ledger", { ...ctx, query: q }),
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>

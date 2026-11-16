@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Ledger\CloseChecklist;
 use App\Domain\Ledger\Currency;
 use App\Domain\Tenancy\Models\Company;
 use App\Domain\Tenancy\Support\CountryPack;
@@ -132,6 +133,18 @@ final class CompanySettingsController extends Controller
      * The period lock: nothing may post on or before books_closed_until. Moving it forward closes periods (an
      * accountant's everyday work); moving it back or clearing it reopens them, for an owner or admin with a reason.
      */
+    /** The close checklist for a period end (default: the end of last month), and where the books are closed now. */
+    public function closeChecklist(Request $request, CurrentCompany $current, CloseChecklist $checklist): JsonResponse
+    {
+        $this->authorizeCompany('periods.close');
+        $end = $request->validate(['period_end' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:' . $current->today()]])['period_end']
+            ?? (new \DateTimeImmutable($current->today()))->modify('first day of this month')->modify('-1 day')->format('Y-m-d');
+        $company = $current->get();
+
+        return response()->json([...$checklist->run($company, $end), 'books_closed_until' => $company->books_closed_until?->format('Y-m-d'),
+            'can' => ['reopen' => (bool) $current->membership()?->can('periods.reopen')]]);
+    }
+
     public function periodLock(Request $request, CurrentCompany $current): JsonResponse
     {
         $this->authorizeCompany('periods.close');
@@ -156,9 +169,13 @@ final class CompanySettingsController extends Controller
             }
         }
 
+        // Closing: what the checklist said at that moment goes into the record (it informs the close, it does not block it).
+        $checklist = $reopening ? null : app(CloseChecklist::class)->run($company, $new);
         DB::table('companies')->where('id', $company->getKey())->update(['books_closed_until' => $new, 'updated_at' => now()]);
         $this->audit->record($company->getKey(), $reopening ? 'period_reopened' : 'period_closed', 'company', $company->getKey(),
-            ['books_closed_until' => $old], ['books_closed_until' => $new], $data['reason'] ?? null, $request->user()->getKey());
+            ['books_closed_until' => $old], ['books_closed_until' => $new, ...($checklist ? ['checklist_warnings' => array_values(array_map(
+                fn (array $i) => $i['key'], array_filter($checklist['items'], fn (array $i) => $i['status'] !== 'ok')))] : [])],
+            $data['reason'] ?? null, $request->user()->getKey());
 
         return response()->json(['books_closed_until' => $new]);
     }
