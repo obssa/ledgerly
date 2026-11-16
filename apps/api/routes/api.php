@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankingController;
+use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanySettingsController;
@@ -189,6 +190,7 @@ Route::prefix('v1')->group(function () {
             Route::post('payments-received', [PaymentReceivedController::class, 'store']);
             Route::get('payments-received/{payment}', [PaymentReceivedController::class, 'show']);
             Route::post('payments-received/{payment}/reverse', [PaymentReceivedController::class, 'reverse']);
+            Route::post('payments-received/{payment}/bounce', [PaymentReceivedController::class, 'bounce']);
             Route::post('payments-received/{payment}/allocate', [PaymentReceivedController::class, 'allocate']);
 
             Route::get('items', [ItemController::class, 'index']);
@@ -208,6 +210,7 @@ Route::prefix('v1')->group(function () {
             Route::get('bank-accounts/{bankAccount}', [BankAccountController::class, 'show']);
             Route::put('bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
             Route::get('bank-accounts/{bankAccount}/register', [BankAccountController::class, 'register']);
+            Route::get('bank-accounts/{bankAccount}/cheques', [ChequeController::class, 'index']);
             Route::get('bank-accounts/{bankAccount}/statement-lines', [StatementController::class, 'index']);
             Route::post('bank-accounts/{bankAccount}/statements', [StatementController::class, 'import']);
             Route::post('statement-lines/{statementLine}/match', [StatementController::class, 'match']);

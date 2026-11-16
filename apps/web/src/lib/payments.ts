@@ -22,6 +22,7 @@ export function paymentBody(form: FormData, settles: "invoice" | "bill" = "invoi
     amount: clean(form.get("amount")),
   };
   for (const name of ["reference", "withholding_certificate"]) if (value(name) !== "") body[name] = value(name);
+  if (body.method === "cheque" && value("cheque_number") !== "") body.cheque_number = value("cheque_number");
   for (const name of ["fee", "withholding", "fx_rate"]) if (!blank(clean(form.get(name)))) body[name] = clean(form.get(name));
 
   const allocations: Record<string, string>[] = [];

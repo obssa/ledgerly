@@ -239,6 +239,17 @@ export interface Reconciliations {
   can: { reconcile: boolean };
 }
 
+/** Module 5: a bank account's cheque register (cheques written or received), read from payments and the statement. */
+export interface ChequeRegister {
+  account: { id: string; code: string; name: string; currency: string };
+  direction: "out" | "in";
+  data: { id: string; kind: string; number: string | null; date: string; contact: string | null; currency: string; amount: string; reference: string | null;
+    status: "issued" | "cleared" | "cancelled" | "received" | "bounced" | "reversed"; bounced_on: string | null }[];
+  counts: Record<string, number>;
+  next_number: string | null;
+  can: { bounce: boolean };
+}
+
 /** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
 export interface Item {
   id: string;
@@ -423,6 +434,9 @@ export interface PaymentReceived {
   fee: string;
   withholding: string;
   status: "posted" | "reversed";
+  /** A cheque's number (029); the day it bounced, for a cheque received that did. */
+  cheque_number?: string | null;
+  bounced_on?: string | null;
   allocations_count?: number;
   allocations?: { id: string; amount: string; document_id: string; document?: { id: string; number: string | null; issue_date?: string; total: string; amount_due: string; status: string } }[];
 }
@@ -610,6 +624,10 @@ export const ledgerly = {
   paymentReceived: (id: string, ctx: RequestOptions) =>
     api<PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean; refund: boolean } }>(`payments-received/${encodeURIComponent(id)}`, ctx),
   receivePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<PaymentReceived>("payments-received", { ...ctx, method: "POST", body }),
+  cheques: (accountId: string, direction: "out" | "in", ctx: RequestOptions) =>
+    api<ChequeRegister>(`bank-accounts/${encodeURIComponent(accountId)}/cheques`, { ...ctx, query: { direction } }),
+  bounceCheque: (id: string, body: { date: string; fee?: string; reason?: string }, ctx: RequestOptions) =>
+    api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/bounce`, { ...ctx, method: "POST", body }),
   reversePayment: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   arAgeing: (asOf: string | undefined, ctx: RequestOptions) => api<ArAgeing>("reports/ar-ageing", { ...ctx, query: { as_of: asOf } }),

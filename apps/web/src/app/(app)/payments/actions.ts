@@ -47,6 +47,19 @@ export async function reversePayment(_: FormState | undefined, form: FormData): 
   return { notice: "Payment reversed. Its invoices owe again." };
 }
 
+/** A cheque received that bounced: reversed on the bank's date, its invoices owe again, the bank's charge booked. */
+export async function bounceCheque(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const fee = (text(form, "fee") ?? "").replace(/[,\s]/g, "");
+  try {
+    await ledgerly.bounceCheque(text(form, "id") ?? "", { date: text(form, "date") ?? "", ...(fee ? { fee } : {}), ...(text(form, "reason") ? { reason: text(form, "reason") } : {}) }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Recorded as bounced. Its invoices owe again." };
+}
+
 /** Applies a customer's unused credit on this payment to one of their open invoices. */
 export async function allocatePayment(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

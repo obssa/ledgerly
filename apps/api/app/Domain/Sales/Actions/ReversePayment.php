@@ -23,9 +23,10 @@ final class ReversePayment
     {
     }
 
-    public function handle(Payment $payment, string $date, string $reason, string $userId): Payment
+    /** $bounced: a cheque received that bounced on $date; the bank had the deposit, so its statement match stands (029). */
+    public function handle(Payment $payment, string $date, string $reason, string $userId, bool $bounced = false): Payment
     {
-        return DB::transaction(function () use ($payment, $date, $reason, $userId) {
+        return DB::transaction(function () use ($payment, $date, $reason, $userId, $bounced) {
             $payment = Payment::query()->with('allocations.document:id,number')->lockForUpdate()->findOrFail($payment->getKey());
             if ($payment->status !== 'posted') {
                 throw new LedgerException('This payment is already reversed.');
@@ -34,16 +35,16 @@ final class ReversePayment
                 throw new LedgerException('Part of this payment was refunded: reverse the refund first.');
             }
 
-            $reversal = $this->posting->reverse($payment->journal_entry_id, new DateTimeImmutable($date), $userId);
+            $reversal = $this->posting->reverse($payment->journal_entry_id, new DateTimeImmutable($date), $userId, laterEvent: $bounced);
             // Exchange differences booked when the payment was applied later go with it.
             foreach (DB::table('journal_entries')->where(['source_type' => 'payment_allocation', 'source_id' => $payment->getKey(), 'status' => 'posted'])->pluck('id') as $fxEntry) {
-                $this->posting->reverse($fxEntry, new DateTimeImmutable($date), $userId);
+                $this->posting->reverse($fxEntry, new DateTimeImmutable($date), $userId, laterEvent: $bounced);
             }
             $released = $payment->allocations->map(fn ($a) => ['invoice' => $a->document?->number, 'amount' => (string) $a->amount])->all();
             DB::table('payment_allocations')->where('payment_id', $payment->getKey())->delete();
-            DB::table('payments')->where('id', $payment->getKey())->update(['status' => 'reversed']);
+            DB::table('payments')->where('id', $payment->getKey())->update(['status' => 'reversed', ...($bounced ? ['bounced_on' => $date] : [])]);
 
-            $this->audit->record($payment->company_id, 'payment_reversed', 'payment', $payment->getKey(),
+            $this->audit->record($payment->company_id, $bounced ? 'cheque_bounced' : 'payment_reversed', 'payment', $payment->getKey(),
                 ['status' => 'posted', 'allocations' => $released],
                 ['status' => 'reversed', 'reversal_entry' => $reversal->number, 'date' => $date],
                 $reason, $userId);

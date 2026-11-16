@@ -76,6 +76,7 @@ final class RecordRefund
                 'method' => $data['method'], 'reference' => $data['reference'] ?? null, 'currency' => $currency, 'fx_rate' => $rate,
                 'amount' => $amount->toDecimalString(), 'fee' => $fee->toDecimalString(), 'withholding' => '0',
                 'refunds_payment_id' => $original?->getKey(),
+                'cheque_number' => ($data['method'] ?? null) === 'cheque' ? ($data['cheque_number'] ?? null) : null,
             ]);
 
             $common = [

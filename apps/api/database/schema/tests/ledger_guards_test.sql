@@ -1648,6 +1648,48 @@ DO $$ DECLARE l_in uuid; l_out uuid; l_late uuid; l_sales uuid; n int; st text; 
   SET CONSTRAINTS ALL IMMEDIATE;
   RAISE NOTICE 'PASS T55 reconciliations finish at zero difference, lock the period, never change and are undone latest first with a reason';
 END $$;
+-- T56: cheques (029). Only cheques carry a number; a cheque written has one, used once per bank account; only a cheque
+-- received bounces, and not before it was received. Uses bank a10, customer c1 and supplier c8 of company A.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, amount) VALUES
+      (app_company_id(), 'out', '00000000-0000-0000-0000-0000000000c8', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cheque', 'ETB', 10);
+    RAISE EXCEPTION 'FAIL T56a: a cheque was written without a number';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO payments (id, company_id, direction, contact_id, account_id, payment_date, method, currency, amount, cheque_number) VALUES
+    ('00000000-0000-0000-0000-0000000005e1', app_company_id(), 'out', '00000000-0000-0000-0000-0000000000c8', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cheque', 'ETB', 10, '000101');
+  BEGIN
+    INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, amount, cheque_number) VALUES
+      (app_company_id(), 'out', '00000000-0000-0000-0000-0000000000c8', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cheque', 'ETB', 20, '000101');
+    RAISE EXCEPTION 'FAIL T56b: one cheque number was used twice on one account';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, amount, cheque_number) VALUES
+      (app_company_id(), 'out', '00000000-0000-0000-0000-0000000000c8', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'bank_transfer', 'ETB', 20, '000102');
+    RAISE EXCEPTION 'FAIL T56c: a bank transfer carried a cheque number';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE payments SET status = 'reversed', bounced_on = '2027-06-30' WHERE id = '00000000-0000-0000-0000-0000000005e1';
+    RAISE EXCEPTION 'FAIL T56d: a cheque the company wrote bounced';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO payments (id, company_id, direction, contact_id, account_id, payment_date, method, currency, amount, cheque_number) VALUES
+    ('00000000-0000-0000-0000-0000000005e2', app_company_id(), 'in', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cheque', 'ETB', 30, 'CQ-55');
+  BEGIN
+    UPDATE payments SET bounced_on = '2027-06-30' WHERE id = '00000000-0000-0000-0000-0000000005e2';
+    RAISE EXCEPTION 'FAIL T56e: a cheque bounced and its payment still stands';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE payments SET status = 'reversed', bounced_on = '2027-06-29' WHERE id = '00000000-0000-0000-0000-0000000005e2';
+    RAISE EXCEPTION 'FAIL T56f: a cheque bounced before it was received';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE payments SET status = 'reversed', bounced_on = '2027-06-30' WHERE id = '00000000-0000-0000-0000-0000000005e2';
+  BEGIN
+    UPDATE payments SET bounced_on = '2027-07-01' WHERE id = '00000000-0000-0000-0000-0000000005e2';
+    RAISE EXCEPTION 'FAIL T56g: the day a cheque bounced was changed afterwards';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T56 cheques carry their numbers once per account and only cheques received bounce';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

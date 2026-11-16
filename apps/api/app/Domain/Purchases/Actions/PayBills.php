@@ -80,6 +80,7 @@ final class PayBills
                 'reference' => $data['reference'] ?? null, 'currency' => $currency, 'fx_rate' => $rate,
                 'amount' => $amount->toDecimalString(), 'fee' => $fee->toDecimalString(), 'withholding' => $withholding->toDecimalString(),
                 'withholding_certificate' => $withholding->isZero() ? null : ($data['withholding_certificate'] ?? null),
+                'cheque_number' => ($data['method'] ?? null) === 'cheque' ? ($data['cheque_number'] ?? null) : null,
             ]);
 
             $entry = $this->posting->post($this->builder->paid(

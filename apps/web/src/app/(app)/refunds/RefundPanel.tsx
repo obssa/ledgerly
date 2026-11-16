@@ -55,6 +55,10 @@ export function RefundPanel({ side, contactId, currency, left, creditId, payment
             <input className="field" id="refund_date" name="payment_date" type="date" defaultValue={today} />
           </div>
           <div>
+            <label className="field-label" htmlFor="refund_cheque">Cheque number (cheques only)</label>
+            <input className="field" id="refund_cheque" name="cheque_number" maxLength={20} />
+          </div>
+          <div>
             <label className="field-label" htmlFor="refund_reference">Reference</label>
             <input className="field" id="refund_reference" name="reference" maxLength={100} />
           </div>

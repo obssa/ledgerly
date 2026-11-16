@@ -88,6 +88,7 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | Stock: the database costs every move and keeps the balances; the application can only read them; stock never goes below zero by default (T51) | Tested |
 | Bank statements: imported by `banking.review` roles only; the file is read and dropped, never stored; what the bank said cannot be changed or deleted; a line is explained by one entry of the same account for the same amount; an explained entry cannot be reversed until the match is undone (T54) | Tested |
 | Reconciliation (`banking.reconcile`): finishes only at a zero difference, saves its report, locks the account through the statement date; a completed reconciliation never changes; only the latest is undone, with a reason kept in the audit log (T55) | Tested |
+| Cheques: a cheque number is used once per bank account and kept by a cancelled cheque; only a cheque received bounces, reversed on or after the day it came in, the bounce date written once with the reversal (T56); bouncing needs `payments.reverse` | Tested |
 
 Product decision (CLAUDE.md, light controls): no second approver for payout changes and no three-way match. The audit
 record and the duplicate warning are the controls; `settings.approval.bill_above` is the one optional approval step

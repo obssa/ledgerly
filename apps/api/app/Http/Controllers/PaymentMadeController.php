@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Banking\ChequeNumbers;
 use App\Domain\Ledger\Currency;
 use App\Domain\Ledger\Money;
 use App\Domain\Purchases\Actions\PayBills;
@@ -80,6 +81,7 @@ final class PaymentMadeController extends Controller
             'fee' => ['nullable', 'decimal:0,2', 'min:0'],
             'withholding' => ['nullable', 'decimal:0,2', 'min:0'],
             'withholding_certificate' => ['nullable', 'string', 'max:60', 'required_unless:withholding,null,0,0.0,0.00'],
+            'cheque_number' => ChequeNumbers::RULE,
             'allocations' => ['nullable', 'array', 'max:200'],
             'allocations.*.bill_id' => ['required', 'uuid', 'distinct'],
             'allocations.*.amount' => ['required', 'decimal:0,2', 'gt:0'],
@@ -88,6 +90,7 @@ final class PaymentMadeController extends Controller
             'withholding_certificate.required_unless' => 'Give the number of the withholding receipt handed to the supplier.',
         ]);
 
+        ChequeNumbers::assertWritable($data);
         $payment = $pay->handle($data, $request->user()->getKey());
 
         return response()->json([...$payment->toArray(), 'warnings' => $this->warnings($payment)], 201);

@@ -32,6 +32,7 @@ export async function recordRefund(_: FormState | undefined, form: FormData): Pr
     method: text(form, "method") ?? "", currency: text(form, "currency") ?? "", amount: (text(form, "amount") ?? "").replace(/[,\s]/g, ""),
   };
   for (const name of ["reference", "credit_id", "payment_id"]) if (text(form, name)) body[name] = text(form, name);
+  if (text(form, "method") === "cheque" && text(form, "cheque_number")) body.cheque_number = text(form, "cheque_number");
   let id: string;
   try {
     id = (await ledgerly.recordRefund(side, body, ctx)).id;
