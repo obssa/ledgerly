@@ -131,6 +131,12 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/bank-accounts/{bankAccount}' => 'banking.view',
         'PUT api/v1/bank-accounts/{bankAccount}' => 'banking.manage',
         'GET api/v1/bank-accounts/{bankAccount}/register' => 'banking.view',
+        'GET api/v1/bank-accounts/{bankAccount}/statement-lines' => 'banking.view',
+        'POST api/v1/bank-accounts/{bankAccount}/statements' => 'banking.review',
+        'POST api/v1/statement-lines/{statementLine}/match' => 'banking.review',
+        'POST api/v1/statement-lines/{statementLine}/categorise' => 'banking.review',
+        'POST api/v1/statement-lines/{statementLine}/exclude' => 'banking.review',
+        'POST api/v1/statement-lines/{statementLine}/undo' => 'banking.review',
         'POST api/v1/banking/transfers' => 'banking.transfer',
         'POST api/v1/banking/deposits' => 'banking.deposit',
 

@@ -95,6 +95,14 @@ trait CompanyFixtures
             ['account_id' => $ids['bank'], 'debit' => '1000'], ['account_id' => $ids['equity'], 'credit' => '1000'],
         ]], $h)->assertCreated()->json('id');
 
+        // The bank's statement for 7 Nov: the fuel expense above, and a 2.50 SMS charge still to review.
+        $this->postJson("/api/v1/bank-accounts/{$ids['bank']}/statements", ['csv' => "Date,Description,Reference,Debit,Credit,Balance\n"
+            . "07/11/2026,Fuel station R-7781,FT26311,115.00,,\n07/11/2026,SMS alert charge,,2.50,,\n"], $h)->assertCreated()->assertJsonPath('imported', 2);
+        $statement = $this->owner()->table('bank_transactions')->where(['company_id' => $ids['company'], 'account_id' => $ids['bank']])->pluck('id', 'amount');
+        $ids['statement_line'] = $statement['-2.50'];
+        $ids['statement_fuel'] = $statement['-115.00'];
+        $ids['bank_line'] = $this->owner()->table('journal_lines')->where(['company_id' => $ids['company'], 'account_id' => $ids['bank'], 'credit' => '115'])->value('id');
+
         return $ids;
     }
 
@@ -105,7 +113,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(99, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(105, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -129,6 +137,7 @@ trait CompanyFixtures
             'item' => $ids['stock_item'],
             'warehouse' => $ids['store'],
             'bankAccount' => $ids['bank'],
+            'statementLine' => $ids['statement_line'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

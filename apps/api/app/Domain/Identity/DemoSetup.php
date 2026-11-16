@@ -61,6 +61,7 @@ final class DemoSetup
         $this->addExpenses($owner, $company, $say);
         $this->addSupplierCredit($owner, $company, $say);
         $this->addInventory($owner, $company, $say);
+        $this->addStatement($owner, $company, $say);
 
         foreach ($roles as $role) {
             if ($owner->table('demo_accounts')->where('role', $role)->exists()) {
@@ -308,6 +309,52 @@ final class DemoSetup
             $user->tokens()->where('name', 'demo-setup')->delete();
         }
         $say('Added the demo expenses.');
+    }
+
+    /**
+     * Module 5 sample: the bank's statement for the sample window. It carries the bank side of what is already in the
+     * books (to match), and the charges and interest only the bank knew about (to categorise). One charge is categorised
+     * already, so every tab has a line. Imported once.
+     */
+    private function addStatement(ConnectionInterface $owner, string $company, callable $say): void
+    {
+        if ($owner->table('bank_transactions')->where('company_id', $company)->exists()) {
+            return;
+        }
+        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
+        $this->company = $company;
+
+        try {
+            $today = new DateTimeImmutable('today');
+            $accounts = collect($this->call('GET', 'accounts')['data']);
+            $bank = $accounts->firstWhere('code', '1100')['id'] ?? null;
+            if ($bank === null) {
+                return;
+            }
+            $register = $this->call('GET', "bank-accounts/{$bank}/register?from={$today->modify('-85 days')->format('Y-m-d')}&to={$today->format('Y-m-d')}");
+            $rows = ['Txn Date,Particulars,Reference,Debit,Credit'];
+            $n = 0;
+            foreach ($register['lines'] as $line) {
+                $what = strtoupper(trim(($line['contact'] ? "TRF {$line['contact']} " : '') . ($line['memo'] ?? $line['description'] ?? '')));
+                $rows[] = implode(',', [(new DateTimeImmutable($line['date']))->format('d/m/Y'), '"' . str_replace('"', "'", Str::limit($what, 60, '')) . '"',
+                    'FT' . $today->format('y') . sprintf('%06d', 310000 + ++$n), $line['out'] === '0.00' ? '' : $line['out'], $line['in'] === '0.00' ? '' : $line['in']]);
+            }
+            $charge = $today->modify('-20 days')->format('d/m/Y');
+            $rows[] = "{$charge},SERVICE CHARGE MONTHLY,,25.00,";
+            $rows[] = "{$charge},SMS ALERT CHARGE,,2.50,";
+            $rows[] = "{$today->modify('-3 days')->format('d/m/Y')},INTEREST ON SAVINGS,,,48.12";
+            $this->call('POST', "bank-accounts/{$bank}/statements", ['csv' => implode("\n", $rows) . "\n", 'file_name' => 'cbe-statement.csv']);
+
+            $charges = $accounts->firstWhere('system_key', 'bank_charges')['id'] ?? null;
+            $service = collect($this->call('GET', "bank-accounts/{$bank}/statement-lines")['data'])->firstWhere('description', 'SERVICE CHARGE MONTHLY');
+            if ($charges !== null && $service !== null) {
+                $this->call('POST', "statement-lines/{$service['id']}/categorise", ['account_id' => $charges, 'memo' => 'Monthly account fee']);
+            }
+        } finally {
+            $user->tokens()->where('name', 'demo-setup')->delete();
+        }
+        $say('Added the demo bank statement.');
     }
 
     /** Sample books inside the current fiscal year: opening balances, customers, invoices in every state, payments. */
