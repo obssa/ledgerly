@@ -21,7 +21,10 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
     <>
       <PageTitle eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / Account</>}
         title={<><span className="num">{a.code}</span> {a.name} {!a.is_active && <Pill>Archived</Pill>}</>}
-        actions={a.kind !== "undeposited_funds" ? <Link href={`/banking/${encodeURIComponent(a.id)}/statement`} className="btn">Statement</Link> : undefined} />
+        actions={a.kind !== "undeposited_funds" ? <>
+          <Link href={`/banking/${encodeURIComponent(a.id)}/statement`} className="btn">Statement</Link>
+          <Link href={`/banking/${encodeURIComponent(a.id)}/reconcile`} className="btn">Reconcile</Link>
+        </> : undefined} />
       <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
         <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={register.from} /></div>
         <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={register.to} /></div>

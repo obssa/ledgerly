@@ -102,6 +102,9 @@ trait CompanyFixtures
         $ids['statement_line'] = $statement['-2.50'];
         $ids['statement_fuel'] = $statement['-115.00'];
         $ids['bank_line'] = $this->owner()->table('journal_lines')->where(['company_id' => $ids['company'], 'account_id' => $ids['bank'], 'credit' => '115'])->value('id');
+        // A reconciliation of the bank to 8 Nov in progress, its difference not yet zero.
+        $ids['reconciliation'] = $this->postJson("/api/v1/bank-accounts/{$ids['bank']}/reconciliations", ['statement_date' => '2026-11-08', 'ending_balance' => '1'], $h)
+            ->assertCreated()->json('id');
 
         return $ids;
     }
@@ -113,7 +116,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(105, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(112, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -138,6 +141,7 @@ trait CompanyFixtures
             'warehouse' => $ids['store'],
             'bankAccount' => $ids['bank'],
             'statementLine' => $ids['statement_line'],
+            'reconciliation' => $ids['reconciliation'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

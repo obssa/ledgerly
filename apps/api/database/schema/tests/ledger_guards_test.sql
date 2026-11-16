@@ -1524,6 +1524,130 @@ DO $$ DECLARE jl uuid; other uuid; BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RAISE NOTICE 'PASS T54 statement lines keep what the bank said and are explained by one entry on the same account for the same amount';
 END $$;
+-- T55: reconciliation (028). Starts where the last one ended, finishes only at a zero difference, locks the period,
+-- never changes once completed, is undone latest first and only with a reason, and moves its statement lines with it.
+-- Uses a new wallet a55 of company A with three entries: 1,000.00 in (1 Jun), 300.00 out (10 Jun), 50.00 in (25 Jun).
+DO $$ DECLARE l_in uuid; l_out uuid; l_late uuid; l_sales uuid; n int; st text; BEGIN
+  INSERT INTO accounts (id, company_id, code, name, type, subtype) VALUES ('00000000-0000-0000-0000-000000000a55', app_company_id(), '1155', 'Recon wallet', 'asset', 'mobile_money');
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES
+    ('00000000-0000-0000-0000-00000000e551', app_company_id(), 9551, '2027-06-01', 'ETB'),
+    ('00000000-0000-0000-0000-00000000e552', app_company_id(), 9552, '2027-06-10', 'ETB'),
+    ('00000000-0000-0000-0000-00000000e553', app_company_id(), 9553, '2027-06-25', 'ETB');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e551', 1, '00000000-0000-0000-0000-000000000a55', 1000, 0, 1000),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e551', 2, '00000000-0000-0000-0000-000000000a40', 0, 1000, -1000),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e552', 1, '00000000-0000-0000-0000-000000000a40', 300, 0, 300),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e552', 2, '00000000-0000-0000-0000-000000000a55', 0, 300, -300),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e553', 1, '00000000-0000-0000-0000-000000000a55', 50, 0, 50),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e553', 2, '00000000-0000-0000-0000-000000000a40', 0, 50, -50);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  SELECT id INTO l_in FROM journal_lines WHERE journal_entry_id = '00000000-0000-0000-0000-00000000e551' AND line_no = 1;
+  SELECT id INTO l_sales FROM journal_lines WHERE journal_entry_id = '00000000-0000-0000-0000-00000000e551' AND line_no = 2;
+  SELECT id INTO l_out FROM journal_lines WHERE journal_entry_id = '00000000-0000-0000-0000-00000000e552' AND line_no = 2;
+  SELECT id INTO l_late FROM journal_lines WHERE journal_entry_id = '00000000-0000-0000-0000-00000000e553' AND line_no = 1;
+  INSERT INTO bank_transactions (id, company_id, account_id, posted_on, description, amount, source) VALUES
+    ('00000000-0000-0000-0000-00000000b551', app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-01', 'Deposit', 1000, 'statement');
+  UPDATE bank_transactions SET status = 'matched', journal_line_id = l_in WHERE id = '00000000-0000-0000-0000-00000000b551';
+
+  BEGIN
+    INSERT INTO reconciliations (company_id, account_id, statement_date, opening_balance, ending_balance) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a40', '2027-06-20', 0, 700);
+    RAISE EXCEPTION 'FAIL T55a: an income account was reconciled';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO reconciliations (company_id, account_id, statement_date, opening_balance, ending_balance) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-20', 5, 700);
+    RAISE EXCEPTION 'FAIL T55b: the first reconciliation did not start from zero';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO reconciliations (id, company_id, account_id, statement_date, opening_balance, ending_balance) VALUES
+    ('00000000-0000-0000-0000-00000000c551', app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-20', 0, 700);
+  BEGIN
+    INSERT INTO reconciliations (company_id, account_id, statement_date, opening_balance, ending_balance) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-30', 0, 750);
+    RAISE EXCEPTION 'FAIL T55c: two reconciliations of one account were in progress';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO reconciliation_lines (company_id, reconciliation_id, journal_line_id) VALUES (app_company_id(), '00000000-0000-0000-0000-00000000c551', l_late);
+    RAISE EXCEPTION 'FAIL T55d: an entry dated after the statement was ticked';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO reconciliation_lines (company_id, reconciliation_id, journal_line_id) VALUES (app_company_id(), '00000000-0000-0000-0000-00000000c551', l_sales);
+    RAISE EXCEPTION 'FAIL T55e: an entry on another account was ticked';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO reconciliation_lines (company_id, reconciliation_id, journal_line_id) VALUES (app_company_id(), '00000000-0000-0000-0000-00000000c551', l_in);
+  BEGIN
+    UPDATE reconciliations SET status = 'completed', report = '{}', completed_at = now() WHERE id = '00000000-0000-0000-0000-00000000c551';
+    RAISE EXCEPTION 'FAIL T55f: a reconciliation finished with a difference';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO reconciliation_lines (company_id, reconciliation_id, journal_line_id) VALUES (app_company_id(), '00000000-0000-0000-0000-00000000c551', l_out);
+  UPDATE reconciliations SET status = 'completed', report = '{"cleared": 2}', completed_at = now() WHERE id = '00000000-0000-0000-0000-00000000c551';
+  SELECT status INTO st FROM bank_transactions WHERE id = '00000000-0000-0000-0000-00000000b551';
+  IF st <> 'reconciled' THEN RAISE EXCEPTION 'FAIL T55g: the statement line was left %', st; END IF;
+
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e554', app_company_id(), 9554, '2027-06-15', 'ETB');
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e554', 1, '00000000-0000-0000-0000-000000000a55', 5, 0, 5),
+      (app_company_id(), '00000000-0000-0000-0000-00000000e554', 2, '00000000-0000-0000-0000-000000000a40', 0, 5, -5);
+    RAISE EXCEPTION 'FAIL T55h: an entry was posted into the reconciled period';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM NOT LIKE '%reconciled through%' THEN RAISE EXCEPTION 'FAIL T55h: refused for another reason: %', SQLERRM; END IF;
+  END;
+  BEGIN
+    UPDATE reconciliations SET ending_balance = 701 WHERE id = '00000000-0000-0000-0000-00000000c551';
+    RAISE EXCEPTION 'FAIL T55i: a completed reconciliation changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM reconciliation_lines WHERE reconciliation_id = '00000000-0000-0000-0000-00000000c551';
+    RAISE EXCEPTION 'FAIL T55j: a completed reconciliation lost its entries';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM reconciliations WHERE id = '00000000-0000-0000-0000-00000000c551';
+    RAISE EXCEPTION 'FAIL T55k: a completed reconciliation was deleted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO reconciliations (company_id, account_id, statement_date, opening_balance, ending_balance) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-30', 0, 750);
+    RAISE EXCEPTION 'FAIL T55l: the next reconciliation did not start from the last ending balance';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO reconciliations (company_id, account_id, statement_date, opening_balance, ending_balance) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-20', 700, 700);
+    RAISE EXCEPTION 'FAIL T55m: a reconciliation ended on the date already reconciled';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE reconciliations SET status = 'undone', undone_at = now() WHERE id = '00000000-0000-0000-0000-00000000c551';
+    RAISE EXCEPTION 'FAIL T55n: a reconciliation was undone without a reason';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- The next month, then undo: the later one first.
+  INSERT INTO reconciliations (id, company_id, account_id, statement_date, opening_balance, ending_balance) VALUES
+    ('00000000-0000-0000-0000-00000000c552', app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-30', 700, 750);
+  INSERT INTO reconciliation_lines (company_id, reconciliation_id, journal_line_id) VALUES (app_company_id(), '00000000-0000-0000-0000-00000000c552', l_late);
+  UPDATE reconciliations SET status = 'completed', report = '{"cleared": 1}', completed_at = now() WHERE id = '00000000-0000-0000-0000-00000000c552';
+  BEGIN
+    UPDATE reconciliations SET status = 'undone', undone_at = now(), undo_reason = 'Wrong statement' WHERE id = '00000000-0000-0000-0000-00000000c551';
+    RAISE EXCEPTION 'FAIL T55o: an earlier reconciliation was undone before a later one';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE reconciliations SET status = 'undone', undone_at = now(), undo_reason = 'Bank sent a corrected statement' WHERE id = '00000000-0000-0000-0000-00000000c552';
+  UPDATE reconciliations SET status = 'undone', undone_at = now(), undo_reason = 'Wrong statement' WHERE id = '00000000-0000-0000-0000-00000000c551';
+  SELECT count(*) INTO n FROM reconciliation_lines WHERE reconciliation_id IN ('00000000-0000-0000-0000-00000000c551', '00000000-0000-0000-0000-00000000c552');
+  SELECT status INTO st FROM bank_transactions WHERE id = '00000000-0000-0000-0000-00000000b551';
+  IF n <> 0 OR st <> 'matched' THEN RAISE EXCEPTION 'FAIL T55p: undoing left % cleared entries and the statement line %', n, st; END IF;
+
+  -- A draft is discarded with its ticks; the period is open again.
+  INSERT INTO reconciliations (id, company_id, account_id, statement_date, opening_balance, ending_balance) VALUES
+    ('00000000-0000-0000-0000-00000000c553', app_company_id(), '00000000-0000-0000-0000-000000000a55', '2027-06-20', 0, 700);
+  INSERT INTO reconciliation_lines (company_id, reconciliation_id, journal_line_id) VALUES (app_company_id(), '00000000-0000-0000-0000-00000000c553', l_in);
+  DELETE FROM reconciliations WHERE id = '00000000-0000-0000-0000-00000000c553';
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES ('00000000-0000-0000-0000-00000000e555', app_company_id(), 9555, '2027-06-15', 'ETB');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e555', 1, '00000000-0000-0000-0000-000000000a55', 5, 0, 5),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e555', 2, '00000000-0000-0000-0000-000000000a40', 0, 5, -5);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  RAISE NOTICE 'PASS T55 reconciliations finish at zero difference, lock the period, never change and are undone latest first with a reason';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

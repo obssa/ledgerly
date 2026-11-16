@@ -41,6 +41,14 @@ final class PostingService
             }
 
             $this->assertAccountsUsable($draft);
+            // A reconciled period is locked per account (028): the database refuses it too; this says it plainly.
+            $accountIds = array_values(array_unique(array_map(fn (JournalLineDraft $l) => $l->accountId, $draft->lines())));
+            $reconciled = DB::table('reconciliations as r')->join('accounts as a', 'a.id', '=', 'r.account_id')
+                ->where(['r.company_id' => $draft->companyId, 'r.status' => 'completed'])->whereIn('r.account_id', $accountIds)
+                ->where('r.statement_date', '>=', $date)->orderByDesc('r.statement_date')->first(['a.code', 'a.name', 'r.statement_date']);
+            if ($reconciled !== null) {
+                throw new LedgerException("{$reconciled->code} {$reconciled->name} is reconciled through {$reconciled->statement_date}: date the entry after that, or undo the reconciliation.");
+            }
 
             $entryId = (string) Str::uuid7(); // time-ordered: new rows land together in the index
             $number = $this->nextNumber($draft->companyId, 'journal');
@@ -115,6 +123,12 @@ final class PostingService
 
             if ($entry->status !== 'posted') {
                 throw new LedgerException("Journal entry {$entry->number} is already reversed.");
+            }
+            // A reconciled entry is part of a statement the books agreed with (028): undo the reconciliation first.
+            if (DB::table('reconciliation_lines as rl')
+                ->join('reconciliations as r', fn ($j) => $j->on('r.company_id', '=', 'rl.company_id')->on('r.id', '=', 'rl.reconciliation_id'))
+                ->where(['rl.company_id' => $entry->company_id, 'r.status' => 'completed'])->whereIn('rl.journal_line_id', $entry->lines->pluck('id')->all())->exists()) {
+                throw new LedgerException("Journal entry {$entry->number} is in a completed bank reconciliation: undo the reconciliation first.");
             }
             // A bank statement line explained by this entry would be left pointing at money that never moved (027).
             if (DB::table('bank_transactions')->where('company_id', $entry->company_id)->whereIn('journal_line_id', $entry->lines->pluck('id')->all())->exists()) {

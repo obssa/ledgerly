@@ -171,6 +171,8 @@ final class TenantIsolationTest extends TestCase
             'statement line matched to B\'s entry' => ['POST', "/api/v1/statement-lines/{$this->a['statement_fuel']}/match", ['journal_line_id' => $this->b['bank_line']]],
             'statement line categorised to B\'s account' => ['POST', "/api/v1/statement-lines/{$this->a['statement_line']}/categorise", ['account_id' => $this->b['rent']]],
             'statement line categorised for B\'s supplier' => ['POST', "/api/v1/statement-lines/{$this->a['statement_line']}/categorise", ['account_id' => $this->a['rent'], 'contact_id' => $this->b['supplier']]],
+            'reconciliation of B\'s bank' => ['POST', "/api/v1/bank-accounts/{$this->b['bank']}/reconciliations", ['statement_date' => '2026-11-09', 'ending_balance' => '1']],
+            'reconciliation ticking B\'s entry' => ['PUT', "/api/v1/reconciliations/{$this->a['reconciliation']}", ['cleared' => [$this->b['bank_line']]]],
         ];
 
         foreach ($attempts as $what => [$method, $uri, $body]) {
@@ -269,7 +271,7 @@ final class TenantIsolationTest extends TestCase
     /** @return array<string, int> */
     private function ledgerCounts(): array
     {
-        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions'])
+        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines'])
             ->mapWithKeys(fn ($t) => [$t => $this->owner()->table($t)->count()])->all();
     }
 
