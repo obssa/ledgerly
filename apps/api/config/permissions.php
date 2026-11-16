@@ -31,6 +31,8 @@
 | accounting.opening enter or replace the opening balances (accountant via 'accounting.*')
 | accounting.dimensions  add, rename and turn off locations, classes and projects (accountant via 'accounting.*')
 | accounting.chart   add, rename, re-code, group and archive accounts of the chart (accountant via 'accounting.*')
+| journals.approve   approve or reject a manual journal above settings.approval.journal_above, not one you asked for
+|                    (accountant via 'journals.*', approver)
 */
 
 return [
@@ -41,7 +43,7 @@ return [
         'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'banking.*', 'contacts.*', 'reports.view'],
         'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view'],
         'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer'],
-        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve'],
+        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve'],
         'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'banking.view', 'reports.view'],
         'custom' => [],
     ],

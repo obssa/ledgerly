@@ -33,6 +33,9 @@ final class CompanySettingsController extends Controller
     /** Fields fixed once one journal entry exists. The country never changes here: a new country is a new company. */
     public const FOUNDATION = ['base_currency', 'calendar', 'fiscal_year_start_month', 'conversion_date'];
 
+    /** Approval limits a company can set: invoices, bills and manual journals above them need someone else to approve. */
+    public const APPROVAL_LIMITS = ['invoice_above', 'bill_above', 'journal_above'];
+
     private const PROFILE = ['legal_name', 'trading_name', 'legal_form', 'industry', 'tin', 'vat_registered', 'vat_number',
         'phone', 'email', 'website', 'address_line1', 'address_line2', 'city', 'region', 'postal_code', 'timezone',
         'accounting_basis'];
@@ -79,6 +82,9 @@ final class CompanySettingsController extends Controller
             'calendar' => ['sometimes', 'required', Rule::in(array_values(array_unique(['gregorian', ...$pack->calendars])))],
             'fiscal_year_start_month' => ['sometimes', 'required', 'integer', 'between:1,12'],
             'conversion_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
+            // The one optional approval step: above these amounts (base currency), someone other than the creator approves.
+            'approval' => ['sometimes', 'array:' . implode(',', self::APPROVAL_LIMITS)],
+            'approval.*' => ['nullable', 'decimal:0,2', 'gt:0'],
         ]);
 
         if ($data['version'] !== $this->version($company)) {
@@ -90,6 +96,11 @@ final class CompanySettingsController extends Controller
         }
 
         $before = $this->editable($company);
+        if (array_key_exists('approval', $data)) {
+            $limits = [...($company->settings['approval'] ?? []), ...$data['approval']];
+            $company->settings = [...($company->settings ?? []), 'approval' => array_filter($limits, fn ($v) => $v !== null && $v !== '')];
+            unset($data['approval']);
+        }
         $company->fill($data);
         $changes = AuditLogger::diff($before, $this->editable($company));
         if ($changes === []) {
@@ -200,6 +211,8 @@ final class CompanySettingsController extends Controller
                 default => $value,
             };
         }
+
+        $fields['approval'] = array_intersect_key($company->settings['approval'] ?? [], array_flip(self::APPROVAL_LIMITS));
 
         return $fields;
     }

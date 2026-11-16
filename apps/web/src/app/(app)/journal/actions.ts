@@ -24,13 +24,15 @@ function refusal(error: unknown): FormState {
 
 export async function postJournal(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
-  let id: string;
+  let to: string;
   try {
-    id = (await ledgerly.postJournal(journalBody(form), ctx)).id;
+    const result = await ledgerly.postJournal(journalBody(form), ctx);
+    // Above the company's approval limit the journal waits for someone else instead of posting.
+    to = "request" in result ? `/journal/requests/${encodeURIComponent(result.request.id)}` : `/journal/${encodeURIComponent(result.id)}`;
   } catch (error) {
     return refusal(error);
   }
-  redirect(`/journal/${encodeURIComponent(id)}`);
+  redirect(to);
 }
 
 export async function reverseJournal(_: FormState | undefined, form: FormData): Promise<FormState> {
@@ -43,4 +45,22 @@ export async function reverseJournal(_: FormState | undefined, form: FormData): 
   }
   refresh();
   redirect(`/journal/${encodeURIComponent(id)}`);
+}
+
+/** Approve, reject (with a note) or withdraw a manual journal waiting for approval. */
+export async function decideJournalRequest(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const step = text(form, "step");
+  if (step !== "approve" && step !== "reject" && step !== "withdraw") return { error: "Choose what to do with the request." };
+  const id = text(form, "id") ?? "";
+  let posted: string | null = null;
+  try {
+    const result = await ledgerly.decideJournalRequest(id, step, step === "reject" ? { note: text(form, "note") ?? "" } : {}, ctx);
+    if (step === "approve" && "number" in result) posted = result.id;
+  } catch (error) {
+    return refusal(error);
+  }
+  if (posted) redirect(`/journal/${encodeURIComponent(posted)}`);
+  refresh();
+  return { notice: step === "reject" ? "Rejected. The person who asked sees your note." : "Withdrawn." };
 }

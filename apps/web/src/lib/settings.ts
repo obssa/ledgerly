@@ -10,6 +10,9 @@ const OPTIONAL = [
   "address_line1", "address_line2", "city", "region", "postal_code", "conversion_date",
 ] as const;
 
+/** Approval limits a company can set (base currency). */
+export const APPROVAL_LIMITS = ["invoice_above", "bill_above", "journal_above"] as const;
+
 /** A checkbox sends nothing when unticked, so the form carries this marker to say the checkbox was shown. */
 export const VAT_SHOWN = "vat_registered_shown";
 
@@ -24,6 +27,14 @@ export function settingsBody(form: FormData): Record<string, unknown> {
   for (const name of OPTIONAL) if (form.has(name)) body[name] = value(name) === "" ? null : value(name);
   if (form.has("fiscal_year_start_month")) body.fiscal_year_start_month = Number(value("fiscal_year_start_month"));
   if (form.has(VAT_SHOWN)) body.vat_registered = form.get("vat_registered") === "on";
+  // Approval limits: above them someone other than the creator approves. Empty means no limit.
+  const limits = APPROVAL_LIMITS.filter((k) => form.has(`approval.${k}`));
+  if (limits.length > 0) {
+    body.approval = Object.fromEntries(limits.map((k) => {
+      const v = value(`approval.${k}`).replace(/[,\s]/g, "");
+      return [k, v === "" ? null : v];
+    }));
+  }
 
   return body;
 }

@@ -96,6 +96,18 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
         {field("conversion_date", "Conversion date", { type: "date", hint: "Last bank statement date before Ledgerly" })}
       </fieldset>
 
+      <h3 className="mb-1 mt-7 text-[15px] font-bold">Approval</h3>
+      <p className="mb-3 text-[13px] text-muted">Above these amounts ({settings.base_currency}), someone other than the person who made it approves an invoice, a bill or a manual journal. Leave empty for no limit.</p>
+      <fieldset disabled={!editable} className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[18px]">
+        <legend className="sr-only">Approval limits</legend>
+        {([["invoice_above", "Invoices above"], ["bill_above", "Bills above"], ["journal_above", "Manual journals above"]] as const).map(([key, label]) => (
+          <div key={key}>
+            <label className="field-label" htmlFor={`approval-${key}`}>{label}</label>
+            <input className="field num" id={`approval-${key}`} name={`approval.${key}`} inputMode="decimal" defaultValue={settings.approval?.[key] ?? ""} placeholder="No limit" />
+          </div>
+        ))}
+      </fieldset>
+
       {editable && (
         <button type="submit" className="btn btn-primary mt-7 min-w-[180px] justify-center" disabled={pending}>
           {pending ? "Saving…" : "Save settings"}

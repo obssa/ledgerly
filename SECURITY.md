@@ -92,10 +92,11 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | Petty cash: only cash accounts keep a float; a cash count (`banking.count`) names who counted, is never changed or removed, and leaves the books holding what was counted, its difference posted to cash over and short (T57) | Tested |
 | Chart of accounts (`accounting.chart`, accountants): accounts are never deleted; system accounts keep their key and stay active; only an empty account with nothing active under it is archived; sub-accounts stay within their company and type (T58) | Tested |
 | Manual journals (`journals.create`): never on accounts kept by documents, checked by the database (T59); only manual journals are reversed by hand, with a reason in the audit log; entries made by documents are corrected through the document | Tested |
+| Manual journals above `settings.approval.journal_above` wait as requests: asked and decided by the person signed in (the database checks it), approved or rejected by someone other than the asker (`journals.approve`), decided once, never changed or deleted (T60); an approval checks the journal again before posting | Tested |
 
 Product decision (CLAUDE.md, light controls): no second approver for payout changes and no three-way match. The audit
 record and the duplicate warning are the controls; `settings.approval.bill_above` is the one optional approval step
-(like `invoice_above`, read by the API but not yet settable from the settings screen).
+(like `invoice_above` and `journal_above`), set by owners and admins in Company settings.
 
 ### Demo sign-in (off unless `DEMO_LOGINS=true`)
 One shared account per role in a demo company, one click from the sign-in page (`config/demo.php`).

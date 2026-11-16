@@ -1847,6 +1847,72 @@ DO $$ BEGIN
   SET CONSTRAINTS ALL DEFERRED;
   RAISE NOTICE 'PASS T59 manual journals leave the accounts kept by documents alone';
 END $$;
+-- T60: journals waiting for approval (033). Asked by the person signed in, decided once by someone else (or withdrawn
+-- by the asker), an approval names the manual journal it posted, and what was asked never changes. Hana (f1) asks;
+-- Other (f2) decides.
+DO $$ DECLARE lines jsonb := '[{"account_id": "x", "debit": "900"}, {"account_id": "y", "credit": "900"}]'; BEGIN
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false);
+  BEGIN
+    INSERT INTO journal_requests (company_id, entry_date, memo, lines, total, requested_by) VALUES
+      (app_company_id(), '2027-06-30', 'Asked for someone else', lines, 900, '00000000-0000-0000-0000-0000000000f2');
+    RAISE EXCEPTION 'FAIL T60a: a request was made in someone else''s name';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO journal_requests (company_id, entry_date, memo, lines, total, requested_by, status) VALUES
+      (app_company_id(), '2027-06-30', 'Already approved', lines, 900, '00000000-0000-0000-0000-0000000000f1', 'approved');
+    RAISE EXCEPTION 'FAIL T60b: a request started approved';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_requests (id, company_id, entry_date, memo, lines, total, requested_by) VALUES
+    ('00000000-0000-0000-0000-0000000006a1', app_company_id(), '2027-06-30', 'Year-end accrual', lines, 900, '00000000-0000-0000-0000-0000000000f1'),
+    ('00000000-0000-0000-0000-0000000006a2', app_company_id(), '2027-06-30', 'Changed my mind', lines, 900, '00000000-0000-0000-0000-0000000000f1'),
+    ('00000000-0000-0000-0000-0000000006a3', app_company_id(), '2027-06-30', 'Bonus provision', lines, 900, '00000000-0000-0000-0000-0000000000f1');
+  BEGIN
+    UPDATE journal_requests SET status = 'rejected', decided_by = app_user_id(), decided_at = now(), decision_note = 'No'
+     WHERE id = '00000000-0000-0000-0000-0000000006a1';
+    RAISE EXCEPTION 'FAIL T60c: the person who asked decided their own request';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE journal_requests SET status = 'withdrawn', decided_by = app_user_id(), decided_at = now() WHERE id = '00000000-0000-0000-0000-0000000006a2';
+
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', false);
+  BEGIN
+    UPDATE journal_requests SET status = 'withdrawn', decided_by = app_user_id(), decided_at = now() WHERE id = '00000000-0000-0000-0000-0000000006a1';
+    RAISE EXCEPTION 'FAIL T60d: someone other than the asker withdrew a request';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE journal_requests SET status = 'rejected', decided_by = app_user_id(), decided_at = now() WHERE id = '00000000-0000-0000-0000-0000000006a1';
+    RAISE EXCEPTION 'FAIL T60e: a request was rejected without saying why';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE journal_requests SET status = 'rejected', decided_by = app_user_id(), decided_at = now(), decision_note = 'Accrue it in July instead'
+   WHERE id = '00000000-0000-0000-0000-0000000006a1';
+  BEGIN
+    UPDATE journal_requests SET status = 'approved' WHERE id = '00000000-0000-0000-0000-0000000006a1';
+    RAISE EXCEPTION 'FAIL T60f: a decided request was decided again';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE journal_requests SET status = 'approved', decided_by = app_user_id(), decided_at = now(), journal_entry_id = '00000000-0000-0000-0000-00000000e480'
+     WHERE id = '00000000-0000-0000-0000-0000000006a3';
+    RAISE EXCEPTION 'FAIL T60g: an approval named an entry it did not post';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    ('00000000-0000-0000-0000-00000000e601', app_company_id(), 9601, '2027-06-30', 'ETB', 'manual', '00000000-0000-0000-0000-0000000006a3');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e601', 1, '00000000-0000-0000-0000-000000000a40', 900, 0, 900),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e601', 2, '00000000-0000-0000-0000-000000000a10', 0, 900, -900);
+  UPDATE journal_requests SET status = 'approved', decided_by = app_user_id(), decided_at = now(), journal_entry_id = '00000000-0000-0000-0000-00000000e601'
+   WHERE id = '00000000-0000-0000-0000-0000000006a3';
+  BEGIN
+    UPDATE journal_requests SET memo = 'Something else' WHERE id = '00000000-0000-0000-0000-0000000006a3';
+    RAISE EXCEPTION 'FAIL T60h: an approved request changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM journal_requests WHERE id = '00000000-0000-0000-0000-0000000006a1';
+    RAISE EXCEPTION 'FAIL T60i: a request was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false);
+  RAISE NOTICE 'PASS T60 a journal above the limit is asked by one person, decided once by another, and never changes';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

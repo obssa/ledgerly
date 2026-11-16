@@ -5,12 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
-use App\Domain\Ledger\JournalDraft;
-use App\Domain\Ledger\JournalLineDraft;
-use App\Domain\Ledger\Models\Account;
-use App\Domain\Ledger\Models\Dimension;
+use App\Domain\Ledger\ManualJournal;
 use App\Domain\Ledger\Models\JournalEntry;
-use App\Domain\Ledger\Money;
 use App\Domain\Ledger\PostingService;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use DateTimeImmutable;
@@ -18,7 +14,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -28,11 +24,6 @@ use Illuminate\Validation\ValidationException;
  */
 final class JournalController extends Controller
 {
-    /** Kinds and system accounts a manual journal leaves alone (032 checks the same in the database). */
-    public const KEPT_KINDS = ['receivable', 'payable', 'inventory'];
-
-    public const KEPT_KEYS = ['accounts_receivable', 'accounts_payable', 'inventory', 'grni', 'undeposited_funds', 'retained_earnings'];
-
     public function __construct(private readonly CurrentCompany $current, private readonly PostingService $posting, private readonly AuditLogger $audit)
     {
     }
@@ -81,56 +72,31 @@ final class JournalController extends Controller
         return response()->json($this->present($entry));
     }
 
-    /** A manual journal: balanced lines on the company's own active accounts, not on accounts kept by documents. */
+    /**
+     * A manual journal: balanced lines on the company's own active accounts, not on accounts kept by documents. Above the
+     * company's approval limit (settings.approval.journal_above) it is not posted but waits for someone else to approve
+     * it (202, the request); otherwise it posts at once (201, the entry).
+     */
     public function store(Request $request): JsonResponse
     {
         $this->authorizeCompany('journals.create');
-        $data = $request->validate([
-            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
-            'memo' => ['required', 'string', 'min:3', 'max:500'],
-            'lines' => ['required', 'array', 'min:2', 'max:500'],
-            'lines.*.account_id' => ['required', 'uuid'],
-            'lines.*.debit' => ['nullable', 'decimal:0,2', 'min:0'],
-            'lines.*.credit' => ['nullable', 'decimal:0,2', 'min:0'],
-            'lines.*.description' => ['nullable', 'string', 'max:255'],
-            'lines.*.location_id' => ['nullable', 'uuid'],
-            'lines.*.class_id' => ['nullable', 'uuid'],
-            'lines.*.project_id' => ['nullable', 'uuid'],
-        ], ['memo.required' => 'Say what the entry is for: the memo is how it is found again.']);
+        $data = $request->validate(ManualJournal::rules($this->current->today()),
+            ['memo.required' => 'Say what the entry is for: the memo is how it is found again.']);
         $company = $this->current->get();
-        $base = $company->base_currency;
+        $draft = ManualJournal::draft($company, $data['date'], $data['memo'], $data['lines']);
 
-        $accounts = Account::query()->whereIn('id', array_unique(array_column($data['lines'], 'account_id')))->get()->keyBy('id');
-        $errors = [];
-        foreach (array_values($data['lines']) as $i => $line) {
-            $account = $accounts[$line['account_id']] ?? null;
-            $debit = Money::of($line['debit'] ?? '0', $base);
-            $credit = Money::of($line['credit'] ?? '0', $base);
-            if ($account === null || ! $account->is_active) {
-                $errors["lines.{$i}.account_id"] = ['Choose an active account of this company.'];
-            } elseif (in_array($account->subtype, self::KEPT_KINDS, true) || in_array($account->system_key, self::KEPT_KEYS, true)) {
-                $errors["lines.{$i}.account_id"] = ["{$account->code} {$account->name} is kept by its documents: use a credit note, a stock adjustment or a deposit instead."];
-            } elseif ($account->currency !== null && $account->currency !== $base) {
-                $errors["lines.{$i}.account_id"] = ["{$account->code} {$account->name} is kept in {$account->currency}: move money in it with a transfer."];
-            }
-            if ($debit->isZero() === $credit->isZero()) {
-                $errors["lines.{$i}.debit"] = ['A line is a debit or a credit, above zero.'];
-            }
-        }
-        if ($errors !== []) {
-            throw ValidationException::withMessages($errors);
-        }
-        $dimensions = $this->activeDimensions($data['lines']);
+        $limit = ManualJournal::approvalLimit($company);
+        if ($limit !== null && $limit->minus($draft->totalDebit())->isNegative()) {
+            $id = (string) Str::uuid7();
+            DB::table('journal_requests')->insert([
+                'id' => $id, 'company_id' => $company->getKey(), 'entry_date' => $data['date'], 'memo' => $data['memo'],
+                'lines' => json_encode(array_values($data['lines']), JSON_THROW_ON_ERROR), 'total' => $draft->totalDebit()->toDecimalString(),
+                'requested_by' => $request->user()->getKey(),
+            ]);
+            $this->audit->record($company->getKey(), 'journal_requested', 'journal_request', $id, null,
+                ['memo' => $data['memo'], 'total' => $draft->totalDebit()->toDecimalString(), 'limit' => $limit->toDecimalString()], userId: $request->user()->getKey());
 
-        $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($data['date']), $base, $base, '1', $data['memo'], 'manual');
-        foreach (array_values($data['lines']) as $i => $line) {
-            $debit = Money::of($line['debit'] ?? '0', $base);
-            $draft->add($debit->isZero()
-                ? JournalLineDraft::credit($line['account_id'], Money::of($line['credit'], $base), null, $line['description'] ?? null, null, $dimensions[$i])
-                : JournalLineDraft::debit($line['account_id'], $debit, null, $line['description'] ?? null, null, $dimensions[$i]));
-        }
-        if (! $draft->totalDebit()->equals($draft->totalCredit())) {
-            throw ValidationException::withMessages(['lines' => ["Debits ({$draft->totalDebit()->toDecimalString()}) and credits ({$draft->totalCredit()->toDecimalString()}) must be equal."]]);
+            return response()->json(['request' => app(JournalRequestController::class)->present($id)], 202);
         }
         $entry = $this->guarded(fn () => $this->posting->post($draft, $request->user()->getKey()));
 
@@ -159,7 +125,7 @@ final class JournalController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function present(JournalEntry $entry): array
+    public function present(JournalEntry $entry): array
     {
         $companyId = $this->current->id();
         $lines = DB::table('journal_lines as l')->join('accounts as a', 'a.id', '=', 'l.account_id')
@@ -204,7 +170,7 @@ final class JournalController extends Controller
     }
 
     /** A rule the database checks (a closed period, a reconciled account, an account kept by documents) as a 422. */
-    private function guarded(callable $post): JournalEntry
+    public function guarded(callable $post): JournalEntry
     {
         try {
             return $post();
@@ -215,39 +181,5 @@ final class JournalController extends Controller
             }
             throw $e;
         }
-    }
-
-    /** The location, class and project of each line, each an active dimension of its kind in this company. @return list<array<string, string>> */
-    private function activeDimensions(array $lines): array
-    {
-        $ids = [];
-        foreach ($lines as $line) {
-            foreach (Dimension::COLUMNS as $column) {
-                if (! empty($line[$column])) {
-                    $ids[] = $line[$column];
-                }
-            }
-        }
-        $found = Dimension::query()->whereIn('id', array_unique($ids))->where('is_active', true)->get(['id', 'kind'])->keyBy('id');
-        $out = [];
-        $errors = [];
-        foreach (array_values($lines) as $i => $line) {
-            $out[$i] = [];
-            foreach (Dimension::COLUMNS as $kind => $column) {
-                if (empty($line[$column])) {
-                    continue;
-                }
-                if (($found[$line[$column]]->kind ?? null) !== $kind) {
-                    $errors["lines.{$i}.{$column}"] = ["Not an active {$kind} of this company."];
-                } else {
-                    $out[$i][$column] = $line[$column];
-                }
-            }
-        }
-        if ($errors !== []) {
-            throw ValidationException::withMessages($errors);
-        }
-
-        return $out;
     }
 }
