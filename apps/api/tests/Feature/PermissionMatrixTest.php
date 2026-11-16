@@ -32,6 +32,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/company' => 'company.view',
         'PUT api/v1/company' => 'company.manage',
         'PUT api/v1/company/period-lock' => 'periods.close',
+        'GET api/v1/close-checklist' => 'periods.close',
         'GET api/v1/currencies' => 'company.view',
         'PUT api/v1/currencies' => 'company.manage',
         'GET api/v1/exchange-rates' => 'company.view',

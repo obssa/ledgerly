@@ -40,6 +40,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
     items: [
       { href: "/accounts", label: "Chart of accounts" },
       { href: "/journal", label: "Journal entries" },
+      { href: "/close", label: "Close the books" },
       { href: "/opening-balances", label: "Opening balances" },
       { href: "/reports", label: "Reports" },
     ],
