@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
+import { todayIn } from "@/lib/dates";
 
 /**
  * Server-side data access. In demo mode returns sample data; otherwise calls the API with the session's
@@ -205,8 +206,8 @@ export async function getInvoiceOptions(): Promise<InvoiceOptions> {
       demo: true,
     };
   }
+  const today = await getCompanyToday();
   return withApi(async (ctx) => {
-    const today = new Date().toISOString().slice(0, 10);
     const [customers, accounts, rates, currencies, numbering, items, warehouses] = await Promise.all([
       ledgerly.customers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
       ledgerly.items({}, ctx), ledgerly.warehouses(ctx),
@@ -233,8 +234,8 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
   if (isDemoMode()) {
     return { customers: [], accounts: [], taxRates: demoTaxRates, currencies: ["ETB"], baseCurrency: "ETB", manualNumbers: false, demo: true };
   }
+  const today = await getCompanyToday();
   return withApi(async (ctx) => {
-    const today = new Date().toISOString().slice(0, 10);
     const [suppliers, accounts, rates, currencies, numbering, items, warehouses] = await Promise.all([
       ledgerly.suppliers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
       ledgerly.items({}, ctx), ledgerly.warehouses(ctx),
@@ -787,6 +788,18 @@ export interface ShellContext {
 }
 
 /** The company being worked on, and who is signed in, for the app shell. */
+/** Today in the company's time zone: the same date the API takes as today (CurrentCompany::today()). */
+export async function getCompanyToday(): Promise<string> {
+  await connection();
+  if (isDemoMode()) return todayIn(demoCompanySettings.timezone);
+  try {
+    return todayIn((await withApi((ctx) => ledgerly.companySettings(ctx))).timezone);
+  } catch (error) {
+    if (error instanceof ApiError) return todayIn();   // a role without company.view still gets a date; redirects pass through
+    throw error;
+  }
+}
+
 export async function getShellContext(): Promise<ShellContext> {
   await connection();
   if (isDemoMode()) {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getReconciliations } from "@/lib/data";
+import { getReconciliations, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { StartReconciliation } from "../../ReconcileForms";
 
@@ -16,7 +16,7 @@ export default async function ReconcilePage({ params }: PageProps<"/banking/[id]
   if (!list) notFound();
   const account = list.account;
   const href = (rid: string) => `/banking/${encodeURIComponent(id)}/reconcile/${encodeURIComponent(rid)}`;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = await getCompanyToday();
 
   return (
     <>

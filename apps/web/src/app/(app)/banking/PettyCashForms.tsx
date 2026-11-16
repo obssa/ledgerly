@@ -5,6 +5,7 @@ import type { BankAccount } from "@/lib/api";
 import { countTotal, DENOMINATIONS } from "@/lib/cash";
 import type { FormState } from "@/lib/forms";
 import { countCash, saveBankAccount, transferMoney } from "./actions";
+import { todayIn } from "@/lib/dates";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -31,7 +32,7 @@ export function FloatForm({ account }: { account: BankAccount }) {
 /** Top the box back up to its float from a bank or wallet: an ordinary transfer, filled in. */
 export function TopUpForm({ account, sources }: { account: BankAccount; sources: BankAccount[] }) {
   const [state, action, pending] = useActionState(transferMoney, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   return (
     <form action={action} noValidate className="flex flex-wrap items-end gap-2">
       <div className="w-full"><Message state={state} /></div>
@@ -57,7 +58,7 @@ export function TopUpForm({ account, sources }: { account: BankAccount; sources:
 /** Count the box: who counted, the notes and coins (or just the total), and a note. */
 export function CashCountForm({ account }: { account: BankAccount }) {
   const [state, action, pending] = useActionState(countCash, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const values = DENOMINATIONS[account.currency] ?? [];
   const [pieces, setPieces] = useState<Record<string, string>>({});
   const total = countTotal(pieces);

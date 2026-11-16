@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import type { Item } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
 import { adjustStock, createItem, createWarehouse, saveItem, transferStock } from "./actions";
+import { todayIn } from "@/lib/dates";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -44,7 +45,7 @@ export function ItemForm({ item, readOnly = false }: { item?: Item; readOnly?: b
 /** Opening stock, a count difference, damage: moves stock with a reason and posts its value. */
 export function AdjustStock({ item, warehouses }: { item: Item; warehouses: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(adjustStock, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const bad = (n: string) => Boolean(state?.fields?.[n]);
   return (
     <form action={action} noValidate className="flex flex-col gap-3">
@@ -81,7 +82,7 @@ export function NewWarehouse() {
 /** Moves stock between warehouses at its average cost; nothing posts to the ledger. */
 export function TransferStock({ items, warehouses }: { items: { id: string; name: string }[]; warehouses: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(transferStock, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const bad = (n: string) => Boolean(state?.fields?.[n]);
   return (
     <form action={action} noValidate className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] items-end gap-3">

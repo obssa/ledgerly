@@ -3,11 +3,12 @@
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
 import { bounceCheque } from "../actions";
+import { todayIn } from "@/lib/dates";
 
 /** A cheque received that the bank returned: reversed on that day, its invoices owe again, and the bank's charge booked. */
 export function BounceCheque({ id, received }: { id: string; received: string }) {
   const [state, action, pending] = useActionState(bounceCheque, undefined);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
 
   return (
     <Card label="Cheque bounced">

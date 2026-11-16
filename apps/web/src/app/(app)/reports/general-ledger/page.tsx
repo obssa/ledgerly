@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
-import { getChart, getDimensions, getGeneralLedger } from "@/lib/data";
+import { getChart, getDimensions, getGeneralLedger, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { defaultPeriod, drCr } from "@/lib/ledger";
 
@@ -17,7 +17,7 @@ function Balance({ value }: { value: string }) {
 /** Module 6: every posted line of a period, account by account, with the balance carried forward and a running balance. */
 export default async function GeneralLedgerPage({ searchParams }: PageProps<"/reports/general-ledger">) {
   const q = await searchParams;
-  const period = defaultPeriod(new Date().toISOString().slice(0, 10));
+  const period = defaultPeriod(await getCompanyToday());
   const filters = {
     from: date(q.from) ?? period.from, to: date(q.to) ?? period.to,
     account_id: uuid(q.account_id), location_id: uuid(q.location_id), class_id: uuid(q.class_id), project_id: uuid(q.project_id),

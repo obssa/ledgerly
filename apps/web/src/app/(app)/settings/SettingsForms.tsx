@@ -7,6 +7,7 @@ import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
 import { VAT_SHOWN } from "@/lib/settings";
 import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock, toggleDimension } from "./actions";
+import { todayIn } from "@/lib/dates";
 
 type Settings = CompanySettings & { demo: boolean };
 
@@ -154,7 +155,7 @@ export function CurrenciesPanel({ settings, currencies }: { settings: Settings; 
   const enabled = currencies.data.filter((c) => c.is_enabled);
   const manage = settings.can.manage && !settings.demo;
   const enterRates = settings.can.enter_rates && !settings.demo && enabled.length > 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
 
   return (
     <div>
