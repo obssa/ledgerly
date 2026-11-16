@@ -7,6 +7,7 @@ namespace App\Domain\Sales\Actions;
 use App\Domain\Compliance\ConnectorRegistry;
 use App\Domain\Compliance\Jobs\SubmitEInvoice;
 use App\Domain\Compliance\Models\EInvoiceSubmission;
+use App\Domain\Inventory\DocumentStock;
 use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Ledger\JournalDraft;
 use App\Domain\Ledger\Models\Account;
@@ -82,7 +83,10 @@ final class ApproveInvoice
                 }
                 $invoice->number = $this->numbers->take($company, $invoice->type, DateTimeImmutable::createFromInterface($invoice->issue_date));
             }
-            $entry = $this->posting->post($this->journalDraftFor($invoice->load('lines')), $userId);
+            $draft = $this->journalDraftFor($invoice->load('lines'));
+            // Stock lines: goods in on a bill, goods out (and their cost) on an invoice, in this transaction (025).
+            app(DocumentStock::class)->onPosting($invoice, $draft, $company, $userId);
+            $entry = $this->posting->post($draft, $userId);
 
             $invoice->status = 'posted';
             $invoice->journal_entry_id = $entry->getKey();

@@ -115,6 +115,9 @@ export interface InvoiceOptions {
   manualNumbers: boolean;
   /** For an expense: the bank, cash and wallet accounts it can be paid from. */
   moneyAccounts?: { id: string; code: string; name: string; currency: string | null }[];
+  /** Items to pick on a line, and the warehouses stock lines use. */
+  items?: { id: string; name: string; type: string; unit: string; price: string | null; account_id: string | null }[];
+  warehouses?: { id: string; name: string }[];
   demo: boolean;
 }
 
@@ -134,8 +137,9 @@ export async function getInvoiceOptions(): Promise<InvoiceOptions> {
   }
   return withApi(async (ctx) => {
     const today = new Date().toISOString().slice(0, 10);
-    const [customers, accounts, rates, currencies, numbering] = await Promise.all([
+    const [customers, accounts, rates, currencies, numbering, items, warehouses] = await Promise.all([
       ledgerly.customers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
+      ledgerly.items({}, ctx), ledgerly.warehouses(ctx),
     ]);
     return {
       customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days })),
@@ -146,6 +150,8 @@ export async function getInvoiceOptions(): Promise<InvoiceOptions> {
       currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === "invoice")?.mode === "manual",
+      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id })),
+      warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       demo: false,
     };
   });
@@ -159,8 +165,9 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
   }
   return withApi(async (ctx) => {
     const today = new Date().toISOString().slice(0, 10);
-    const [suppliers, accounts, rates, currencies, numbering] = await Promise.all([
+    const [suppliers, accounts, rates, currencies, numbering, items, warehouses] = await Promise.all([
       ledgerly.suppliers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
+      ledgerly.items({}, ctx), ledgerly.warehouses(ctx),
     ]);
     return {
       customers: suppliers.data.map((s) => ({ id: s.id, name: s.name, tax_id: s.tax_id, currency: s.currency, payment_terms_days: s.payment_terms_days, default_account_id: s.default_expense_account_id })),
@@ -173,6 +180,8 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === "bill")?.mode === "manual",
+      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id })),
+      warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       demo: false,
     };
   });

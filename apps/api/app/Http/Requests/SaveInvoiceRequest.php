@@ -59,7 +59,8 @@ final class SaveInvoiceRequest extends FormRequest
             'lines.*.discount_rate' => ['nullable', 'decimal:0,6', 'between:0,1'],
             'lines.*.account_id' => ['required', 'uuid', Rule::exists('accounts', 'id')->where('type', 'income')],
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')],
-            'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')],
+            'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')->where('is_active', true)],
+            'warehouse_id' => ['nullable', 'uuid', Rule::exists('warehouses', 'id')->where('is_active', true)],   // for stock lines
         ];
     }
 }

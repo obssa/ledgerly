@@ -40,6 +40,7 @@ export interface TaxRateOption {
 
 interface Line {
   key: number;
+  itemId: string;
   description: string;
   quantity: string;
   unitPrice: string;
@@ -71,7 +72,17 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
   const [issueDate, setIssueDate] = useState(today);
   const [currency, setCurrency] = useState(options.baseCurrency);
   const [inclusive, setInclusive] = useState(false);
-  const [lines, setLines] = useState<Line[]>([{ key: 1, description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
+  const [lines, setLines] = useState<Line[]>([{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
+  const items = options.items ?? [];
+  const stockLine = lines.some((l) => items.find((i) => i.id === l.itemId)?.type === "inventory");
+  /** Picking an item fills the line from it; the person can still change what was filled. */
+  const pickItem = (key: number, itemId: string) => {
+    const item = items.find((i) => i.id === itemId);
+    setLines((ls) => ls.map((l) => (l.key !== key ? l : {
+      ...l, itemId,
+      ...(item ? { description: item.name, unitPrice: item.price ?? l.unitPrice, accountId: item.account_id && options.accounts.some((a) => a.id === item.account_id) ? item.account_id : l.accountId } : {}),
+    })));
+  };
 
   const customer = options.customers.find((c) => c.id === customerId);
   const rateOf = (id: string) => options.taxRates.find((t) => t.id === id)?.rate ?? "0";
@@ -83,9 +94,9 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
   );
 
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
+  const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
-  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null })));
+  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null })));
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
   const bad = (name: string) => Boolean(state?.fields?.[name]);
 
@@ -154,6 +165,14 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
                 {options.currencies.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+            {stockLine && (
+              <div>
+                <label className="field-label" htmlFor="warehouse_id">{kind === "bill" ? "Goods arrive in" : "Goods leave from"}</label>
+                <select className={`field ${bad("warehouse_id") ? "!border-bad" : ""}`} id="warehouse_id" name="warehouse_id">
+                  {(options.warehouses ?? []).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+            )}
             {currency !== options.baseCurrency && (
               <Field name="fx_rate" label={`Rate (${options.baseCurrency} for 1 ${currency})`} hint="Empty: the company's rate for the issue date" invalid={bad("fx_rate")} />
             )}
@@ -170,7 +189,7 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">{words.account}</th><th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+                <tr>{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}<th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">{words.account}</th><th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
               </thead>
               <tbody>
                 {lines.map((l, i) => {
@@ -178,6 +197,14 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
                   const amt = ok ? lineAmounts({ quantity: plain(l.quantity), unitPrice: plain(l.unitPrice), taxRate: rateOf(l.taxRateId) }, currency, inclusive) : null;
                   return (
                     <tr key={l.key} className={lineError(i) ? "bg-bad-tint" : ""}>
+                      {items.length > 0 && kind !== "expense" && (
+                        <td>
+                          <select aria-label="Item" className="field w-[150px]" value={l.itemId} onChange={(e) => pickItem(l.key, e.target.value)}>
+                            <option value="">—</option>
+                            {items.map((it) => <option key={it.id} value={it.id}>{it.name}{it.type === "inventory" ? " (stock)" : ""}</option>)}
+                          </select>
+                        </td>
+                      )}
                       <td><input aria-label="Description" className="field min-w-[180px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} /></td>
                       <td><input aria-label="Quantity" inputMode="decimal" className="field num w-[72px] text-right" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} /></td>
                       <td><input aria-label="Unit price" inputMode="decimal" className="field num w-[110px] text-right" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} /></td>

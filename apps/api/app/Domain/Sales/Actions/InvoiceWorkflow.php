@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Sales\Actions;
 
+use App\Domain\Inventory\DocumentStock;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Ledger\Exceptions\PeriodLocked;
@@ -69,6 +70,7 @@ final class InvoiceWorkflow
                     ? (new DateTimeImmutable($closedUntil))->modify('+1 day')
                     : DateTimeImmutable::createFromInterface($invoice->issue_date);
                 $reversalId = $this->posting->reverse($invoice->journal_entry_id, $date, $userId)->getKey();
+                app(DocumentStock::class)->onVoid($invoice, $company, $date, $userId);   // goods back, or out again (025)
             }
 
             $from = $invoice->status;

@@ -10,6 +10,7 @@ export interface InvoiceLineInput {
   unit_price: string;
   account_id: string;
   tax_rate_id: string | null;
+  item_id?: string | null;
 }
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.replace(/[,\s]/g, "") : "");
@@ -30,6 +31,7 @@ export function parseLines(json: FormDataEntryValue | null): InvoiceLineInput[] 
     unit_price: clean(l?.unit_price),
     account_id: str(l?.account_id),
     tax_rate_id: str(l?.tax_rate_id) || null,
+    ...(str(l?.item_id) ? { item_id: str(l?.item_id) } : {}),
   }));
 }
 
@@ -45,7 +47,7 @@ export function invoiceBody(form: FormData): Record<string, unknown> {
     prices_include_tax: form.get("prices_include_tax") === "on",
     lines: parseLines(form.get("lines")),
   };
-  for (const name of ["due_date", "notes", "number", "reference", "paid_from_account_id", "payment_method"]) if (value(name) !== "") body[name] = value(name);
+  for (const name of ["due_date", "notes", "number", "reference", "paid_from_account_id", "payment_method", "warehouse_id"]) if (value(name) !== "") body[name] = value(name);
   if (clean(form.get("fx_rate")) !== "") body.fx_rate = clean(form.get("fx_rate"));
   return body;
 }
