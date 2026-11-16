@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -678,6 +678,28 @@ export async function getGeneralLedger(q: Record<string, string | undefined>): P
     return await withApi((ctx) => ledgerly.generalLedger(q, ctx));
   } catch (error) {
     if (error instanceof ApiError && error.status === 422) return null;
+    throw error;
+  }
+}
+
+/** Revaluation runs, newest first. */
+export async function getRevaluations(): Promise<{ data: RevaluationRun[]; can: { revalue: boolean } } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi((ctx) => ledgerly.revaluations(ctx));
+}
+
+/** What a revaluation at a date would restate, or the API's message (a missing rate, a date not before today). */
+export async function getRevaluationPreview(asOf: string, rates: Record<string, string>): Promise<{ preview?: RevaluationPreview; error?: string; missing?: string[] }> {
+  await connection();
+  if (isDemoMode()) return {};
+  try {
+    return { preview: await withApi((ctx) => ledgerly.revaluationPreview(asOf, rates, ctx)) };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 422) {
+      const errors = ((error.body ?? {}) as { errors?: Record<string, string[]> }).errors ?? {};
+      return { error: Object.values(errors)[0]?.[0] ?? error.message, missing: Object.keys(errors).filter((k) => k.startsWith("rates.")).map((k) => k.slice(6)) };
+    }
     throw error;
   }
 }

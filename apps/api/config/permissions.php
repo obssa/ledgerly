@@ -31,6 +31,7 @@
 | accounting.opening enter or replace the opening balances (accountant via 'accounting.*')
 | accounting.dimensions  add, rename and turn off locations, classes and projects (accountant via 'accounting.*')
 | accounting.chart   add, rename, re-code, group and archive accounts of the chart (accountant via 'accounting.*')
+| accounting.revalue revalue foreign-currency balances at a month end (accountant via 'accounting.*')
 | journals.approve   approve or reject a manual journal above settings.approval.journal_above, not one you asked for
 |                    (accountant via 'journals.*', approver)
 */

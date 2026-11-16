@@ -125,7 +125,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(127, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(130, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -163,6 +163,7 @@ trait CompanyFixtures
         $query = match ($route->uri()) {
             'api/v1/reports/trial-balance', 'api/v1/reports/balance-sheet' => ['as_of' => '2026-12-31'],
             'api/v1/reports/general-ledger' => ['from' => '2026-07-08', 'to' => '2027-07-07'],
+            'api/v1/revaluations/preview' => ['as_of' => '2026-11-08'],
             'api/v1/reports/profit-and-loss' => ['from' => '2026-07-08', 'to' => '2027-07-07'],
             'api/v1/exchange-rates' => ['currency' => 'USD', 'from' => '2026-07-08', 'to' => '2027-07-07'],
             'api/v1/payments-received/{payment}/reverse', 'api/v1/payments-made/{paymentMade}/reverse', 'api/v1/refunds/{refund}/reverse' => [],

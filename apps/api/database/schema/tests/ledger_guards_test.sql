@@ -1913,6 +1913,59 @@ DO $$ DECLARE lines jsonb := '[{"account_id": "x", "debit": "900"}, {"account_id
   PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false);
   RAISE NOTICE 'PASS T60 a journal above the limit is asked by one person, decided once by another, and never changes';
 END $$;
+-- T61: revaluations (034). One per date, made by the person signed in, naming its own revaluation entry of that date
+-- and the reversal of it dated after; never changed or deleted. Uses sales a40 and bank a10 of company A (as user f1).
+DO $$ BEGIN
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false);
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    ('00000000-0000-0000-0000-00000000e611', app_company_id(), 9611, '2027-06-30', 'ETB', 'revaluation', '00000000-0000-0000-0000-0000000006b1'),
+    ('00000000-0000-0000-0000-00000000e612', app_company_id(), 9612, '2027-07-01', 'ETB', 'reversal', '00000000-0000-0000-0000-00000000e611'),
+    ('00000000-0000-0000-0000-00000000e613', app_company_id(), 9613, '2027-06-30', 'ETB', 'manual', NULL);
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e611', 1, '00000000-0000-0000-0000-000000000a10', 40, 0, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e611', 2, '00000000-0000-0000-0000-000000000a40', 0, 40, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e612', 1, '00000000-0000-0000-0000-000000000a40', 40, 0, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e612', 2, '00000000-0000-0000-0000-000000000a10', 0, 40, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e613', 1, '00000000-0000-0000-0000-000000000a10', 1, 0, 1),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e613', 2, '00000000-0000-0000-0000-000000000a40', 0, 1, -1);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  BEGIN
+    INSERT INTO fx_revaluations (id, company_id, as_of, rates, lines, net, journal_entry_id, reversal_entry_id, created_by) VALUES
+      ('00000000-0000-0000-0000-0000000006b1', app_company_id(), '2027-06-30', '{"USD": "155"}', '[]', 40,
+       '00000000-0000-0000-0000-00000000e613', '00000000-0000-0000-0000-00000000e612', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T61a: a revaluation named a manual journal as its entry';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO fx_revaluations (id, company_id, as_of, rates, lines, net, journal_entry_id, reversal_entry_id, created_by) VALUES
+      ('00000000-0000-0000-0000-0000000006b1', app_company_id(), '2027-06-30', '{"USD": "155"}', '[]', 40,
+       '00000000-0000-0000-0000-00000000e611', '00000000-0000-0000-0000-00000000e613', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T61b: a revaluation named something other than its reversal';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO fx_revaluations (id, company_id, as_of, rates, lines, net, journal_entry_id, reversal_entry_id, created_by) VALUES
+      ('00000000-0000-0000-0000-0000000006b1', app_company_id(), '2027-06-30', '{"USD": "155"}', '[]', 40,
+       '00000000-0000-0000-0000-00000000e611', '00000000-0000-0000-0000-00000000e612', '00000000-0000-0000-0000-0000000000f2');
+    RAISE EXCEPTION 'FAIL T61c: a revaluation was made in someone else''s name';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO fx_revaluations (id, company_id, as_of, rates, lines, net, journal_entry_id, reversal_entry_id, created_by) VALUES
+    ('00000000-0000-0000-0000-0000000006b1', app_company_id(), '2027-06-30', '{"USD": "155"}', '[]', 40,
+     '00000000-0000-0000-0000-00000000e611', '00000000-0000-0000-0000-00000000e612', '00000000-0000-0000-0000-0000000000f1');
+  BEGIN
+    INSERT INTO fx_revaluations (company_id, as_of, rates, lines, net, journal_entry_id, reversal_entry_id, created_by) VALUES
+      (app_company_id(), '2027-06-30', '{}', '[]', 0, '00000000-0000-0000-0000-00000000e611', '00000000-0000-0000-0000-00000000e612', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T61d: a date was revalued twice';
+  EXCEPTION WHEN unique_violation OR check_violation THEN NULL; END;
+  BEGIN
+    UPDATE fx_revaluations SET net = 41 WHERE id = '00000000-0000-0000-0000-0000000006b1';
+    RAISE EXCEPTION 'FAIL T61e: a revaluation was changed';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM fx_revaluations WHERE id = '00000000-0000-0000-0000-0000000006b1';
+    RAISE EXCEPTION 'FAIL T61f: a revaluation was deleted';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T61 a revaluation is made once a date, names its entry and its reversal, and never changes';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
