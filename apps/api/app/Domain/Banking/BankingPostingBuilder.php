@@ -50,6 +50,69 @@ final class BankingPostingBuilder
         return $draft;
     }
 
+    /**
+     * A transfer where at least one side is held in a foreign currency: birr to dollars, dollars to birr, or dollars to
+     * dollars. Each side is valued in the base currency at the day's rate of the foreign currency (IAS 21: spot rate at
+     * the date of the transaction); birr is what was actually sent or received. What the bank kept in its rate is the
+     * difference, booked to exchange gain or loss. The fee is charged in the source account's currency.
+     *
+     *   Dr destination (received x rate)   Cr source (sent x rate)   Dr/Cr exchange gain or loss (the difference)
+     *
+     * The entry is in the foreign currency at the day's rate; every line's transaction amount is in that currency.
+     */
+    public function currencyTransfer(
+        string $companyId,
+        DateTimeImmutable $date,
+        string $baseCurrency,
+        string $fromAccountId,
+        string $toAccountId,
+        Money $sent,
+        Money $received,
+        string $rate,
+        string $fxAccountId,
+        ?Money $fee = null,
+        ?string $feeAccountId = null,
+        ?string $memo = null,
+    ): JournalDraft {
+        if ($fromAccountId === $toAccountId) {
+            throw new InvalidArgumentException('A transfer needs two different accounts.');
+        }
+        $this->assertPositive($sent);
+        $this->assertPositive($received);
+        $foreign = array_values(array_unique(array_filter([$sent->currency, $received->currency], fn ($c) => $c !== $baseCurrency)));
+        if (count($foreign) !== 1) {
+            throw new InvalidArgumentException('A currency transfer is between the base currency and one foreign currency, or within one foreign currency.');
+        }
+        $currency = $foreign[0];
+        if ($sent->currency === $received->currency && ! $sent->equals($received)) {
+            throw new InvalidArgumentException('Within one currency the amount received is the amount sent.');
+        }
+
+        $toBase = fn (Money $m): Money => $m->currency === $baseCurrency ? $m : $m->convertTo($baseCurrency, $rate);
+        $toTxn = fn (Money $m): Money => $m->currency === $currency ? $m
+            : $m->convertTo($currency, \Brick\Math\BigDecimal::one()->dividedBy($rate, 12, \App\Domain\Ledger\Rounding::halfUp()));
+        $sentBase = $toBase($sent);
+        $receivedBase = $toBase($received);
+
+        $draft = new JournalDraft($companyId, $date, $baseCurrency, $currency, $rate, $memo ?? 'Transfer', 'transfer');
+        $draft->add(JournalLineDraft::debit($toAccountId, $receivedBase, $toTxn($received), 'Transfer in'));
+        $draft->add(JournalLineDraft::credit($fromAccountId, $sentBase, $toTxn($sent), 'Transfer out'));
+        $difference = $sentBase->minus($receivedBase);
+        if (! $difference->isZero()) {
+            $draft->add($difference->isNegative()
+                ? JournalLineDraft::credit($fxAccountId, $difference->negated(), Money::zero($currency), 'Exchange gain on transfer')
+                : JournalLineDraft::debit($fxAccountId, $difference, Money::zero($currency), 'Exchange loss on transfer'));
+        }
+        if ($fee !== null && ! $fee->isZero()) {
+            $draft->add(JournalLineDraft::debit($feeAccountId ?? throw new InvalidArgumentException('Fee needs a fee account'), $toBase($fee), $toTxn($fee), 'Transfer fee'));
+            $draft->add(JournalLineDraft::credit($fromAccountId, $toBase($fee), $toTxn($fee), 'Transfer fee'));
+        }
+
+        $draft->assertBalanced();
+
+        return $draft;
+    }
+
     /** @param list<Money> $receipts amounts of the receipts grouped on this deposit slip */
     public function deposit(
         string $companyId,
