@@ -578,7 +578,7 @@ export interface GeneralLedger {
   currency: string;
   truncated: boolean;
   accounts: { account_id: string; code: string; name: string; type: string; opening: string; debits: string; credits: string; closing: string;
-    lines: { date: string; entry_id: string; entry: number; source_type: string; memo: string | null; description: string | null; contact: string | null; debit: string; credit: string; balance: string }[] }[];
+    lines: { line_id: string; date: string; entry_id: string; entry: number; source_type: string; status: string; memo: string | null; description: string | null; contact: string | null; debit: string; credit: string; balance: string }[] }[];
 }
 
 export interface TrialBalanceRow {
@@ -775,6 +775,8 @@ export const ledgerly = {
     api<{ data: JournalRow[]; page: number; more: boolean; can: { create: boolean } }>("journal-entries", { ...ctx, query: q }),
   journalEntry: (id: string, ctx: RequestOptions) => api<JournalDetail>(`journal-entries/${encodeURIComponent(id)}`, ctx),
   postJournal: (body: Record<string, unknown>, ctx: RequestOptions) => api<JournalDetail | { request: JournalRequest }>("journal-entries", { ...ctx, method: "POST", body }),
+  reclassify: (body: { line_ids: string[]; to_account_id: string; date: string; memo?: string }, ctx: RequestOptions) =>
+    api<JournalDetail | { request: JournalRequest }>("journal-entries/reclassify", { ...ctx, method: "POST", body }),
   journalRequests: (status: string, ctx: RequestOptions) =>
     api<{ status: string; data: JournalRequest[]; pending: number }>("journal-requests", { ...ctx, query: { status } }),
   journalRequest: (id: string, ctx: RequestOptions) => api<JournalRequest>(`journal-requests/${encodeURIComponent(id)}`, ctx),

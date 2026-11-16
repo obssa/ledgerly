@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { journalAccounts, journalBody, journalTotals, recurringBody } from "./journal";
+import { journalAccounts, journalBody, journalTotals, reclassifyBody, recurringBody } from "./journal";
 
 describe("journalTotals", () => {
   it("adds debits and credits exactly and says when the entry balances", () => {
@@ -58,5 +58,17 @@ describe("reverse_on and recurringBody", () => {
     for (const [k, v] of [["name", " Office rent "], ["memo", "Rent for the month"], ["frequency", "monthly"], ["next_on", "2026-12-31"], ["ends_on", ""], ["lines", lines]]) f.append(k, v);
     expect(recurringBody(f)).toEqual({ name: "Office rent", memo: "Rent for the month", frequency: "monthly", next_on: "2026-12-31", ends_on: null,
       lines: [{ account_id: "rent", debit: "300" }, { account_id: "equity", credit: "300" }] });
+  });
+});
+
+describe("reclassifyBody", () => {
+  it("sends each ticked line once, and the memo only when given", () => {
+    const a = "01a1e5d0-ded7-7169-ab35-a3df7a7508e8";
+    const b = "01a1e5d0-ded7-7169-ab35-a3df6a863dfa";
+    const f = new FormData();
+    for (const [k, v] of [["line_ids", a], ["line_ids", b], ["line_ids", a], ["line_ids", "not-an-id"], ["to_account_id", "acc"], ["date", "2026-11-12"], ["memo", " "]]) f.append(k, v);
+    expect(reclassifyBody(f)).toEqual({ line_ids: [a, b], to_account_id: "acc", date: "2026-11-12" });
+    f.set("memo", "Repairs, not rent");
+    expect(reclassifyBody(f).memo).toBe("Repairs, not rent");
   });
 });

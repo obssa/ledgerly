@@ -214,7 +214,7 @@ final class ReportService
             ->leftJoin('contacts as c', 'c.id', '=', 'l.contact_id')
             ->whereBetween('l.entry_date', [$from, $to])
             ->orderBy('l.entry_date')->orderBy('e.number')->orderBy('l.line_no')->limit(self::GL_MAX_LINES + 1)
-            ->get(['l.account_id', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.memo', 'l.description', 'c.name as contact', 'l.debit', 'l.credit']);
+            ->get(['l.id as line_id', 'l.account_id', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.status', 'e.memo', 'l.description', 'c.name as contact', 'l.debit', 'l.credit']);
         $truncated = $lines->count() > self::GL_MAX_LINES;
         $lines = $lines->take(self::GL_MAX_LINES)->groupBy('account_id');
 
@@ -234,7 +234,7 @@ final class ReportService
                     $debits = $debits->plus($d);
                     $credits = $credits->plus($c);
 
-                    return ['date' => $l->date, 'entry_id' => $l->entry_id, 'entry' => (int) $l->entry, 'source_type' => $l->source_type, 'memo' => $l->memo,
+                    return ['line_id' => $l->line_id, 'date' => $l->date, 'entry_id' => $l->entry_id, 'entry' => (int) $l->entry, 'source_type' => $l->source_type, 'status' => $l->status, 'memo' => $l->memo,
                         'description' => $l->description, 'contact' => $l->contact, 'debit' => $d->toDecimalString(), 'credit' => $c->toDecimalString(),
                         'balance' => $balance->toDecimalString()];
                 })->values()->all();

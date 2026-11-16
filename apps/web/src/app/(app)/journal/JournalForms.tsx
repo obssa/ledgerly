@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { Account, Dimension, RecurringJournal } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
 import { emptyLine, FREQUENCIES, journalTotals, type JournalLineInput } from "@/lib/journal";
-import { decideJournalRequest, postDueRecurring, postJournal, recurringStep, reverseJournal, saveRecurring } from "./actions";
+import { decideJournalRequest, postDueRecurring, postJournal, reclassify, recurringStep, reverseJournal, saveRecurring } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -162,6 +162,64 @@ export function RecurringForm({ accounts, dimensions, template }: { accounts: Ac
         <span className="text-[13px] text-muted">
           Each entry posts on its date without approval, so the total stays within the company&apos;s approval limit. {template ? "Saving makes it post as you." : ""}
         </span>
+      </div>
+    </form>
+  );
+}
+
+type ReclassLine = { line_id: string; date: string; entry: number; entry_id: string; description: string | null; memo: string | null; debit: string; credit: string; movable: boolean };
+
+/** Reclassify in bulk: tick lines of one account, choose where they go; one manual journal moves them. */
+export function ReclassifyForm({ lines, accounts, fromAccountId }: { lines: ReclassLine[]; accounts: Account[]; fromAccountId: string }) {
+  const [state, action, pending] = useActionState(reclassify, undefined);
+  const today = new Date().toISOString().slice(0, 10);
+  const bad = (n: string) => Boolean(state?.fields?.[n]);
+  return (
+    <form action={action} noValidate className="grid gap-4">
+      <Message state={state} />
+      <div className="overflow-x-auto">
+        <table className="tbl">
+          <thead><tr><th scope="col"><span className="sr-only">Move</span></th><th scope="col">Date</th><th scope="col">Entry</th><th scope="col">What</th><th scope="col" className="!text-right">Debit</th><th scope="col" className="!text-right">Credit</th></tr></thead>
+          <tbody>
+            {lines.length === 0 && <tr><td colSpan={6} className="text-muted">No lines in this period.</td></tr>}
+            {lines.map((l) => (
+              <tr key={l.line_id}>
+                <td>
+                  {l.movable ? (
+                    <><label className="sr-only" htmlFor={`line-${l.line_id}`}>Move the line of entry #{l.entry}</label>
+                    <input type="checkbox" id={`line-${l.line_id}`} name="line_ids" value={l.line_id} /></>
+                  ) : <span className="text-[12px] text-muted">reversed</span>}
+                </td>
+                <td className="num">{l.date}</td>
+                <td className="num">#{l.entry}</td>
+                <td>{l.description ?? l.memo ?? ""}</td>
+                <td className="num text-right">{l.debit === "0.00" ? "" : l.debit}</td>
+                <td className="num text-right">{l.credit === "0.00" ? "" : l.credit}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+        <div className="min-w-0">
+          <label className="field-label" htmlFor="to_account_id">Move them to</label>
+          <select className={`field ${bad("to_account_id") || bad("lines.1.account_id") ? "!border-bad" : ""}`} id="to_account_id" name="to_account_id" defaultValue="">
+            <option value="">Choose…</option>
+            {accounts.filter((a) => a.id !== fromAccountId).map((a) => <option key={a.id} value={a.id}>{`${a.code} ${a.name}`}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="field-label" htmlFor="reclass_date">Date of the journal</label>
+          <input className={`field ${bad("date") ? "!border-bad" : ""}`} id="reclass_date" name="date" type="date" max={today} defaultValue={today} />
+        </div>
+        <div className="col-span-2 min-w-0">
+          <label className="field-label" htmlFor="reclass_memo">Memo (optional)</label>
+          <input className="field" id="reclass_memo" name="memo" maxLength={500} placeholder="Reclassification from one account to the other" />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Moving…" : "Move the ticked lines"}</button>
+        <span className="text-[13px] text-muted">The lines stay where they were posted; one journal takes each off this account and puts it on the new one.</span>
       </div>
     </form>
   );

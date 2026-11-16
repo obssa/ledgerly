@@ -51,6 +51,14 @@ export function journalBody(form: FormData): { date: string; memo: string; lines
   return { date: value("date"), memo: value("memo"), lines, ...(reverseOn ? { reverse_on: reverseOn } : {}) };
 }
 
+/** The body of a bulk reclassification: the ticked lines (each once), the account they move to, the date and memo. */
+export function reclassifyBody(form: FormData): { line_ids: string[]; to_account_id: string; date: string; memo?: string } {
+  const value = (n: string) => (typeof form.get(n) === "string" ? String(form.get(n)).trim() : "");
+  const ids = [...new Set(form.getAll("line_ids").filter((v): v is string => typeof v === "string" && /^[0-9a-f-]{36}$/.test(v)))];
+  const memo = value("memo");
+  return { line_ids: ids, to_account_id: value("to_account_id"), date: value("date"), ...(memo ? { memo } : {}) };
+}
+
 export const FREQUENCIES = [["monthly", "Every month"], ["quarterly", "Every quarter"], ["yearly", "Every year"]] as const;
 
 /** A recurring journal's body: its name and schedule, with the memo and lines a journal has. */

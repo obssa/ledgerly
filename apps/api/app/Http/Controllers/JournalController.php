@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Ledger\ManualJournal;
 use App\Domain\Ledger\Models\JournalEntry;
+use App\Domain\Ledger\Money;
 use App\Domain\Ledger\PostingService;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use DateTimeImmutable;
@@ -89,8 +90,80 @@ final class JournalController extends Controller
         if ($reverseOn !== null && $reverseOn > (new DateTimeImmutable($data['date']))->modify('+1 year')->format('Y-m-d')) {
             throw ValidationException::withMessages(['reverse_on' => ['A journal reverses within a year of its date.']]);
         }
+
+        return $this->submit($request, $data['date'], $data['memo'], $data['lines'], $reverseOn);
+    }
+
+    /**
+     * Reclassify in bulk: lines posted to one account move to another, by one manual journal that takes each line off
+     * the account it is on and puts it on the new one, keeping its description and dimensions. The lines are loaded
+     * through the company; every one is on the same account, on a standing entry, and dated on or before the journal.
+     * The journal is checked and approved like any other (an account kept by documents is refused on either side).
+     */
+    public function reclassify(Request $request): JsonResponse
+    {
+        $this->authorizeCompany('journals.create');
+        $data = $request->validate([
+            'line_ids' => ['required', 'array', 'min:1', 'max:200'],
+            'line_ids.*' => ['required', 'uuid', 'distinct'],
+            'to_account_id' => ['required', 'uuid'],
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
+            'memo' => ['nullable', 'string', 'min:3', 'max:500'],
+        ], ['line_ids.required' => 'Choose the lines to move.']);
+        $companyId = $this->current->id();
+        $lines = DB::table('journal_lines as l')
+            ->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'l.company_id')->on('e.id', '=', 'l.journal_entry_id'))
+            ->join('accounts as a', 'a.id', '=', 'l.account_id')
+            ->where('l.company_id', $companyId)->whereIn('l.id', $data['line_ids'])
+            ->orderBy('l.entry_date')->orderBy('e.number')->orderBy('l.line_no')
+            ->get(['l.id', 'l.account_id', 'a.code', 'a.name', 'l.entry_date', 'l.debit', 'l.credit', 'l.description', 'l.location_id', 'l.class_id', 'l.project_id',
+                'e.number', 'e.status', 'e.source_type']);
+        if ($lines->count() !== count($data['line_ids'])) {
+            throw ValidationException::withMessages(['line_ids' => ['Choose lines of this company\'s books.']]);
+        }
+        $from = $lines->first();
+        if ($lines->pluck('account_id')->unique()->count() > 1) {
+            throw ValidationException::withMessages(['line_ids' => ['Choose lines of one account: they move from it to the new account.']]);
+        }
+        if ($from->account_id === $data['to_account_id']) {
+            throw ValidationException::withMessages(['to_account_id' => ["The lines are already on {$from->code} {$from->name}."]]);
+        }
+        if ($lines->contains(fn ($l) => $l->status !== 'posted' || $l->source_type === 'reversal')) {
+            throw ValidationException::withMessages(['line_ids' => ['A reversed entry and its reversal cancel out: leave their lines where they are.']]);
+        }
+        if ($lines->max('entry_date') > $data['date']) {
+            throw ValidationException::withMessages(['date' => ["The latest line is dated {$lines->max('entry_date')}: the reclassification is dated on or after it."]]);
+        }
+        $journal = [];
+        foreach ($lines as $l) {
+            $debit = Money::of((string) $l->debit, $this->current->get()->base_currency);
+            $amount = $debit->isZero() ? (string) $l->credit : (string) $l->debit;
+            $dims = array_filter(['location_id' => $l->location_id, 'class_id' => $l->class_id, 'project_id' => $l->project_id]);
+            $description = mb_substr("#{$l->number}" . ($l->description ? ": {$l->description}" : ''), 0, 255);
+            $journal[] = [...$dims, 'account_id' => $l->account_id, ($debit->isZero() ? 'debit' : 'credit') => $amount, 'description' => $description];
+            $journal[] = [...$dims, 'account_id' => $data['to_account_id'], ($debit->isZero() ? 'credit' : 'debit') => $amount, 'description' => $description];
+        }
+        $to = DB::table('accounts')->where(['company_id' => $companyId, 'id' => $data['to_account_id']])->first(['code', 'name']);
+        $memo = $data['memo'] ?? ("Reclassification from {$from->code} {$from->name}" . ($to ? " to {$to->code} {$to->name}" : ''));
+        $response = $this->submit($request, $data['date'], $memo, $journal, null);
+        $this->audit->record($companyId, 'journal_reclassified', 'account', $from->account_id, ['account_id' => $from->account_id],
+            ['account_id' => $data['to_account_id'], 'lines' => $lines->count(), 'line_ids' => $lines->pluck('id')->all(), 'status' => $response->status() === 201 ? 'posted' : 'waiting for approval'],
+            userId: $request->user()->getKey());
+
+        return $response;
+    }
+
+    /**
+     * Post a manual journal, or (above the approval limit) ask for it to be approved: 201 with the entry, 202 with the
+     * request. With $reverseOn, its reversal posts with it, or on approval.
+     *
+     * @param list<array<string, mixed>> $lines
+     */
+    private function submit(Request $request, string $date, string $memo, array $lines, ?string $reverseOn): JsonResponse
+    {
         $company = $this->current->get();
-        $draft = ManualJournal::draft($company, $data['date'], $data['memo'], $data['lines']);
+        $draft = ManualJournal::draft($company, $date, $memo, $lines);
+        $data = ['date' => $date, 'memo' => $memo, 'lines' => $lines];
 
         $limit = ManualJournal::approvalLimit($company);
         if ($limit !== null && $limit->minus($draft->totalDebit())->isNegative()) {
