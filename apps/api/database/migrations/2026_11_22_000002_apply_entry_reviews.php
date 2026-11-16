@@ -1,0 +1,22 @@
+<?php
+
+use App\Support\SchemaSql;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Applies database/schema/038_entry_reviews.sql (Module 6): reviews of the review queue of unusual entries, made once by
+ * the person signed in and kept as they were.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        DB::unprepared(SchemaSql::load('038_entry_reviews.sql'));
+    }
+
+    public function down(): void
+    {
+        throw new RuntimeException('Ledger rules are never rolled back. Restore from backup instead.');
+    }
+};

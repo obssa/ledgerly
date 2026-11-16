@@ -5,7 +5,7 @@ import type { Account, Dimension, RecurringJournal } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
 import { emptyLine, FREQUENCIES, journalTotals, type JournalLineInput } from "@/lib/journal";
-import { decideJournalRequest, postDueRecurring, postJournal, reclassify, recurringStep, reverseJournal, saveRecurring } from "./actions";
+import { decideJournalRequest, postDueRecurring, postJournal, reclassify, recurringStep, reverseJournal, reviewEntry, saveRecurring } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -222,6 +222,21 @@ export function ReclassifyForm({ lines, accounts, fromAccountId }: { lines: Recl
         <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Moving…" : "Move the ticked lines"}</button>
         <span className="text-[13px] text-muted">The lines stay where they were posted; one journal takes each off this account and puts it on the new one.</span>
       </div>
+    </form>
+  );
+}
+
+/** Mark one entry of the review queue reviewed, with an optional note. */
+export function ReviewEntry({ id, number }: { id: string; number: number }) {
+  const [state, action, pending] = useActionState(reviewEntry, undefined);
+  if (state?.notice) return <p role="status" className="text-[13px] font-semibold text-good">{state.notice}</p>;
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-1.5">
+      <input type="hidden" name="id" value={id} />
+      <label className="sr-only" htmlFor={`note-${id}`}>Note on entry #{number}</label>
+      <input className="field !w-44 !py-1 text-[13px]" id={`note-${id}`} name="note" maxLength={500} placeholder="Note (optional)" />
+      <button type="submit" className="btn !py-1 text-[13px]" disabled={pending}>Reviewed</button>
+      {state?.error && <span role="alert" className="text-[12px] font-semibold text-bad">{state.error}</span>}
     </form>
   );
 }

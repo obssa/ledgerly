@@ -10,6 +10,7 @@ use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
 use App\Http\Controllers\RecurringJournalController;
+use App\Http\Controllers\ReviewQueueController;
 use App\Http\Controllers\RevaluationController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\BillController;
@@ -143,7 +144,9 @@ Route::prefix('v1')->group(function () {
             Route::get('journal-entries', [JournalController::class, 'index']);
             Route::post('journal-entries', [JournalController::class, 'store']);
             Route::post('journal-entries/reclassify', [JournalController::class, 'reclassify']);
+            Route::get('journal-entries/review', [ReviewQueueController::class, 'index']);
             Route::get('journal-entries/{entry}', [JournalController::class, 'show']);
+            Route::post('journal-entries/{entry}/review', [ReviewQueueController::class, 'review']);
             Route::post('journal-entries/{entry}/reverse', [JournalController::class, 'reverse']);
             Route::get('journal-requests', [JournalRequestController::class, 'index']);
             Route::get('revaluations', [RevaluationController::class, 'index']);

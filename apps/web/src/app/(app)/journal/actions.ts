@@ -62,6 +62,19 @@ export async function reclassify(_: FormState | undefined, form: FormData): Prom
   redirect(to);
 }
 
+/** Mark an entry of the review queue reviewed, with an optional note; it then leaves the queue. */
+export async function reviewEntry(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const done = await ledgerly.reviewEntry(text(form, "id") ?? "", text(form, "note") ?? null, ctx);
+    refresh();
+    return { notice: `Entry #${done.number} marked reviewed.` };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return { error: "Your role does not review entries." };
+    return refusal(error);
+  }
+}
+
 /** Set up a recurring journal, or save changes to one (it then posts as you). */
 export async function saveRecurring(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

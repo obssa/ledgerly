@@ -342,6 +342,20 @@ export interface JournalRequest {
   can: { approve: boolean; withdraw: boolean };
 }
 
+/** Module 6, accountant tools: an entry the review queue flags, and its review once marked. */
+export type ReviewFlag = "manual_cash" | "round_amount" | "large" | "backdated" | "out_of_hours" | "opening_equity";
+
+export interface ReviewQueue {
+  from: string;
+  to: string;
+  data: { id: string; number: number; date: string; memo: string | null; source_type: string; status: string; total: string; posted_by: string | null;
+    posted_at: string; flags: ReviewFlag[]; review: { by: string | null; at: string; note: string | null } | null }[];
+  counts: Record<ReviewFlag, number>;
+  flags: Record<ReviewFlag, string>;
+  truncated: boolean;
+  can: { review: boolean };
+}
+
 /** Module 6: a manual journal posted on a schedule. Paused, it says why in last_error. */
 export interface RecurringJournal {
   id: string;
@@ -790,6 +804,9 @@ export const ledgerly = {
     api<RecurringJournal>(`recurring-journals/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   postDueRecurring: (ctx: RequestOptions) =>
     api<{ data: { id: string; name: string; posted: number[]; error: string | null }[]; posted: number }>("recurring-journals/post-due", { ...ctx, method: "POST", body: {} }),
+  reviewQueue: (q: { from?: string; to?: string; reviewed?: string }, ctx: RequestOptions) => api<ReviewQueue>("journal-entries/review", { ...ctx, query: q }),
+  reviewEntry: (id: string, note: string | null, ctx: RequestOptions) =>
+    api<{ id: string; number: number; flags: string[] }>(`journal-entries/${encodeURIComponent(id)}/review`, { ...ctx, method: "POST", body: note ? { note } : {} }),
   reverseJournal: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<JournalDetail>(`journal-entries/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   chart: (archived: boolean, ctx: RequestOptions) =>
