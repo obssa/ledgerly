@@ -452,7 +452,7 @@ export const ledgerly = {
     api<{ data: Bill[] }>("bills", { ...ctx, query: { contact_id: contactId, open: "1" } }),
   paymentsMade: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-made", ctx),
   paymentMade: (id: string, ctx: RequestOptions) =>
-    api<PaymentReceived & { withholding_certificate: string | null; contact?: { id: string; name: string; tax_id?: string | null; payout?: Payout }; can: { reverse: boolean } }>(
+    api<PaymentReceived & { withholding_certificate: string | null; unallocated: string; contact?: { id: string; name: string; tax_id?: string | null; payout?: Payout }; can: { reverse: boolean; allocate: boolean } }>(
       `payments-made/${encodeURIComponent(id)}`, ctx),
   payBills: (body: Record<string, unknown>, ctx: RequestOptions) =>
     api<PaymentReceived & { warnings: { type: string; message: string }[] }>("payments-made", { ...ctx, method: "POST", body }),
@@ -462,8 +462,13 @@ export const ledgerly = {
   apAgeing: (asOf: string | undefined, ctx: RequestOptions) => api<ArAgeing>("reports/ap-ageing", { ...ctx, query: { as_of: asOf } }),
   supplierStatement: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) =>
     api<Omit<CustomerStatement, "customer"> & { supplier: CustomerStatement["customer"] }>(`suppliers/${encodeURIComponent(id)}/statement`, { ...ctx, query: q }),
+  allocatePayment: (id: string, body: { allocations: { invoice_id: string; amount: string }[] }, ctx: RequestOptions) =>
+    api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/allocate`, { ...ctx, method: "POST", body }),
+  allocatePaymentMade: (id: string, body: { allocations: { bill_id: string; amount: string }[] }, ctx: RequestOptions) =>
+    api<PaymentReceived>(`payments-made/${encodeURIComponent(id)}/allocate`, { ...ctx, method: "POST", body }),
   paymentsReceived: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-received", ctx),
-  paymentReceived: (id: string, ctx: RequestOptions) => api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}`, ctx),
+  paymentReceived: (id: string, ctx: RequestOptions) =>
+    api<PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean } }>(`payments-received/${encodeURIComponent(id)}`, ctx),
   receivePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<PaymentReceived>("payments-received", { ...ctx, method: "POST", body }),
   reversePayment: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),

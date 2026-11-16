@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getPaymentReceived } from "@/lib/data";
+import { getOpenInvoices, getPaymentReceived } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { AllocateLeft } from "./AllocateLeft";
 import { ReversePayment } from "./ReversePayment";
 
 export const metadata = { title: "Payment" };
@@ -11,6 +12,8 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
   const { id } = await params;
   const payment = await getPaymentReceived(id);
   if (!payment) notFound();
+  const canAllocate = payment.status === "posted" && payment.can.allocate && payment.unallocated !== "0.00";
+  const invoices = canAllocate && payment.contact ? await getOpenInvoices(payment.contact.id, payment.currency) : [];
 
   return (
     <>
@@ -43,7 +46,10 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
           )}
         </Card>
         {payment.status === "posted" && (
-          <aside className="min-w-0 flex-[1_1_300px]"><ReversePayment id={payment.id} /></aside>
+          <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+            {canAllocate && <AllocateLeft id={payment.id} left={payment.unallocated} documents={invoices} />}
+            {payment.can.reverse && <ReversePayment id={payment.id} />}
+          </aside>
         )}
       </div>
     </>

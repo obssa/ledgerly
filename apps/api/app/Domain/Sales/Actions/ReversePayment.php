@@ -12,7 +12,8 @@ use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Reverses a payment (a bounced cheque, a transfer that came back): its journal entry is reversed on the given date,
+ * Reverses a payment (a bounced cheque, a transfer that came back): its journal entry (and any exchange difference booked
+ * when it was applied later) is reversed on the given date,
  * its allocations are removed so the invoices owe again (006 gives the amounts back), and it is marked reversed. The
  * allocations it had are kept in the audit record.
  */
@@ -31,6 +32,10 @@ final class ReversePayment
             }
 
             $reversal = $this->posting->reverse($payment->journal_entry_id, new DateTimeImmutable($date), $userId);
+            // Exchange differences booked when the payment was applied later go with it.
+            foreach (DB::table('journal_entries')->where(['source_type' => 'payment_allocation', 'source_id' => $payment->getKey(), 'status' => 'posted'])->pluck('id') as $fxEntry) {
+                $this->posting->reverse($fxEntry, new DateTimeImmutable($date), $userId);
+            }
             $released = $payment->allocations->map(fn ($a) => ['invoice' => $a->document?->number, 'amount' => (string) $a->amount])->all();
             DB::table('payment_allocations')->where('payment_id', $payment->getKey())->delete();
             DB::table('payments')->where('id', $payment->getKey())->update(['status' => 'reversed']);

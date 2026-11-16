@@ -46,3 +46,15 @@ export async function reversePayment(_: FormState | undefined, form: FormData): 
   refresh();
   return { notice: "Payment reversed. Its invoices owe again." };
 }
+
+/** Applies a customer's unused credit on this payment to one of their open invoices. */
+export async function allocatePayment(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.allocatePayment(text(form, "id") ?? "", { allocations: [{ invoice_id: text(form, "document_id") ?? "", amount: (text(form, "amount") ?? "").replace(/,/g, "") }] }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Applied." };
+}

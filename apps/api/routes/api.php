@@ -160,11 +160,13 @@ Route::prefix('v1')->group(function () {
             Route::get('payments-made/withholding/{supplier}', [PaymentMadeController::class, 'withholding']);
             Route::get('payments-made/{paymentMade}', [PaymentMadeController::class, 'show']);
             Route::post('payments-made/{paymentMade}/reverse', [PaymentMadeController::class, 'reverse']);
+            Route::post('payments-made/{paymentMade}/allocate', [PaymentMadeController::class, 'allocate']);
 
             Route::get('payments-received', [PaymentReceivedController::class, 'index']);
             Route::post('payments-received', [PaymentReceivedController::class, 'store']);
             Route::get('payments-received/{payment}', [PaymentReceivedController::class, 'show']);
             Route::post('payments-received/{payment}/reverse', [PaymentReceivedController::class, 'reverse']);
+            Route::post('payments-received/{payment}/allocate', [PaymentReceivedController::class, 'allocate']);
 
             Route::post('banking/transfers', [BankingController::class, 'transfer']);
             Route::post('banking/deposits', [BankingController::class, 'deposit']);

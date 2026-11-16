@@ -36,4 +36,16 @@ class Payment extends Model
     {
         return $this->belongsTo(Contact::class);
     }
+
+    /** What the payment brought (amount + tax withheld) and has not settled yet: a customer's credit or an advance. */
+    public function unallocated(): string
+    {
+        if ($this->status !== 'posted') {
+            return '0.00';
+        }
+        $allocated = (string) $this->allocations()->sum('amount');
+
+        return \App\Domain\Ledger\Money::of((string) $this->amount, $this->currency)->plus(\App\Domain\Ledger\Money::of((string) $this->withholding, $this->currency))
+            ->minus(\App\Domain\Ledger\Money::of($allocated, $this->currency))->toDecimalString();
+    }
 }

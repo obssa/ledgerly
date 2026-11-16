@@ -8,6 +8,7 @@ use App\Domain\Ledger\Currency;
 use App\Domain\Ledger\Money;
 use App\Domain\Purchases\Actions\PayBills;
 use App\Domain\Purchases\WithholdingAdvice;
+use App\Domain\Sales\Actions\AllocatePayment;
 use App\Domain\Sales\Actions\ReversePayment;
 use App\Domain\Sales\Models\Contact;
 use App\Domain\Sales\Models\Payment;
@@ -46,7 +47,8 @@ final class PaymentMadeController extends Controller
 
         return response()->json([
             ...$paymentMade->load(['contact:id,name,tax_id,payout', 'allocations.document:id,number,reference,issue_date,total,amount_due,status'])->toArray(),
-            'can' => ['reverse' => (bool) $this->current->membership()?->can('payments.reverse')],
+            'unallocated' => $paymentMade->unallocated(),
+            'can' => ['reverse' => (bool) $this->current->membership()?->can('payments.reverse'), 'allocate' => (bool) $this->current->membership()?->can('payments.pay')],
         ]);
     }
 
@@ -88,6 +90,20 @@ final class PaymentMadeController extends Controller
         $payment = $pay->handle($data, $request->user()->getKey());
 
         return response()->json([...$payment->toArray(), 'warnings' => $this->warnings($payment)], 201);
+    }
+
+    /** Applies what the payment did not allocate (an advance) to the supplier's open bills. */
+    public function allocate(Request $request, Payment $paymentMade, AllocatePayment $allocate): JsonResponse
+    {
+        $this->authorizeCompany('payments.pay');
+        $data = $request->validate([
+            'allocations' => ['required', 'array', 'min:1', 'max:200'],
+            'allocations.*.bill_id' => ['required', 'uuid', 'distinct'],
+            'allocations.*.amount' => ['required', 'decimal:0,2', 'gt:0'],
+        ], ['allocations.*.bill_id.distinct' => 'Each bill appears once.']);
+
+        return response()->json($allocate->handle($paymentMade,
+            array_map(fn (array $a) => ['document_id' => $a['bill_id'], 'amount' => $a['amount']], $data['allocations']), $request->user()->getKey()));
     }
 
     public function reverse(Request $request, Payment $paymentMade, ReversePayment $reverse): JsonResponse

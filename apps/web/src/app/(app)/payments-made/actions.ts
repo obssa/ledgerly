@@ -50,3 +50,15 @@ export async function reversePaymentMade(_: FormState | undefined, form: FormDat
   refresh();
   return { notice: "Payment reversed. Its bills are open again." };
 }
+
+/** Applies an advance on this payment to one of the supplier's open bills. */
+export async function allocatePaymentMade(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.allocatePaymentMade(text(form, "id") ?? "", { allocations: [{ bill_id: text(form, "document_id") ?? "", amount: (text(form, "amount") ?? "").replace(/,/g, "") }] }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Applied." };
+}

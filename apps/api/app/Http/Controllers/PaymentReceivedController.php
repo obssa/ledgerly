@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Ledger\Currency;
+use App\Domain\Sales\Actions\AllocatePayment;
 use App\Domain\Sales\Actions\ReceivePayment;
 use App\Domain\Sales\Actions\ReversePayment;
 use App\Domain\Sales\Models\Payment;
@@ -40,7 +41,11 @@ final class PaymentReceivedController extends Controller
         $this->authorizeCompany('payments.view');
         $this->assertReceived($payment);
 
-        return response()->json($payment->load(['contact:id,name', 'allocations.document:id,number,issue_date,total,amount_due,status']));
+        $payment->load(['contact:id,name', 'allocations.document:id,number,issue_date,total,amount_due,status']);
+
+        return response()->json([...$payment->toArray(), 'unallocated' => $payment->unallocated(),
+            'can' => ['allocate' => (bool) app(\App\Domain\Tenancy\Support\CurrentCompany::class)->membership()?->can('payments.receive'),
+                'reverse' => (bool) app(\App\Domain\Tenancy\Support\CurrentCompany::class)->membership()?->can('payments.reverse')]]);
     }
 
     public function store(Request $request, ReceivePayment $receive): JsonResponse
@@ -65,6 +70,21 @@ final class PaymentReceivedController extends Controller
         ], ['allocations.*.invoice_id.distinct' => 'Each invoice appears once.']);
 
         return response()->json($receive->handle($data, $request->user()->getKey()), 201);
+    }
+
+    /** Applies what the payment did not allocate (the customer's credit) to their open invoices. */
+    public function allocate(Request $request, Payment $payment, AllocatePayment $allocate): JsonResponse
+    {
+        $this->authorizeCompany('payments.receive');
+        $this->assertReceived($payment);
+        $data = $request->validate([
+            'allocations' => ['required', 'array', 'min:1', 'max:200'],
+            'allocations.*.invoice_id' => ['required', 'uuid', 'distinct'],
+            'allocations.*.amount' => ['required', 'decimal:0,2', 'gt:0'],
+        ], ['allocations.*.invoice_id.distinct' => 'Each invoice appears once.']);
+
+        return response()->json($allocate->handle($payment,
+            array_map(fn (array $a) => ['document_id' => $a['invoice_id'], 'amount' => $a['amount']], $data['allocations']), $request->user()->getKey()));
     }
 
     public function reverse(Request $request, Payment $payment, ReversePayment $reverse): JsonResponse
