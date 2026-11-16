@@ -112,7 +112,7 @@ export function TransferMoney({ accounts, base }: { accounts: BankAccount[]; bas
       <Field name="fee" label={`Fee${from ? ` (${from.currency})` : ""}`} />
       <Field name="date" label="Date" type="date" defaultValue={today} invalid={bad("date")} />
       <Field name="memo" label="Memo" />
-      {across && <p className="col-span-full text-[13px] text-muted">Both sides are valued at the day's rate; what the bank kept in its rate is booked as an exchange gain or loss.</p>}
+      {across && <p className="col-span-full text-[13px] text-muted">Both sides are valued at the rate of the day; what the bank kept in its rate is booked as an exchange gain or loss.</p>}
       <button type="submit" className="btn" disabled={pending}>{pending ? "Posting…" : "Transfer"}</button>
     </form>
   );
