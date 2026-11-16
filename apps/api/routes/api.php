@@ -7,6 +7,7 @@ use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CashCountController;
 use App\Http\Controllers\ChartController;
 use App\Http\Controllers\JournalController;
+use App\Http\Controllers\JournalRequestController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\CompanyController;
@@ -132,6 +133,11 @@ Route::prefix('v1')->group(function () {
             Route::post('journal-entries', [JournalController::class, 'store']);
             Route::get('journal-entries/{entry}', [JournalController::class, 'show']);
             Route::post('journal-entries/{entry}/reverse', [JournalController::class, 'reverse']);
+            Route::get('journal-requests', [JournalRequestController::class, 'index']);
+            Route::get('journal-requests/{journalRequest}', [JournalRequestController::class, 'show'])->whereUuid('journalRequest');
+            Route::post('journal-requests/{journalRequest}/approve', [JournalRequestController::class, 'approve'])->whereUuid('journalRequest');
+            Route::post('journal-requests/{journalRequest}/reject', [JournalRequestController::class, 'reject'])->whereUuid('journalRequest');
+            Route::post('journal-requests/{journalRequest}/withdraw', [JournalRequestController::class, 'withdraw'])->whereUuid('journalRequest');
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
             Route::post('tax-rates', [TaxRateController::class, 'store']);

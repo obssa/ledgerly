@@ -26,3 +26,17 @@ describe("settingsBody", () => {
     expect(settingsBody(form([["version", "v1"]]))).not.toHaveProperty("vat_registered");
   });
 });
+
+describe("approval limits", () => {
+  it("are sent without separators, and an emptied one as null (no limit)", () => {
+    const f = new FormData();
+    f.append("version", "v1");
+    f.append("approval.invoice_above", "50,000");
+    f.append("approval.bill_above", "");
+    f.append("approval.journal_above", " 10000.50 ");
+    expect(settingsBody(f)).toEqual({ version: "v1", approval: { invoice_above: "50000", bill_above: null, journal_above: "10000.50" } });
+    const none = new FormData();
+    none.append("version", "v1");
+    expect(settingsBody(none)).not.toHaveProperty("approval");
+  });
+});

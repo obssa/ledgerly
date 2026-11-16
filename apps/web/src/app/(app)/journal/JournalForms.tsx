@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { Account, Dimension } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
 import { emptyLine, journalTotals, type JournalLineInput } from "@/lib/journal";
-import { postJournal, reverseJournal } from "./actions";
+import { decideJournalRequest, postJournal, reverseJournal } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -118,5 +118,41 @@ export function ReverseJournal({ id, date }: { id: string; date: string }) {
       </div>
       <button type="submit" className="btn" disabled={pending}>{pending ? "Reversing…" : "Reverse entry"}</button>
     </form>
+  );
+}
+
+/** Approve or reject (with a note) a journal someone else asked for; or withdraw your own. */
+export function DecideRequest({ id, canApprove, canWithdraw }: { id: string; canApprove: boolean; canWithdraw: boolean }) {
+  const [state, action, pending] = useActionState(decideJournalRequest, undefined);
+  return (
+    <div className="grid gap-4">
+      <Message state={state} />
+      {canApprove && (
+        <>
+          <form action={action}>
+            <input type="hidden" name="id" value={id} />
+            <input type="hidden" name="step" value="approve" />
+            <button type="submit" className="btn btn-primary" disabled={pending}>Approve and post</button>
+            <span className="ml-3 text-[13px] text-muted">It is checked again and posted as asked, with you as the person who posted it.</span>
+          </form>
+          <form action={action} className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="id" value={id} />
+            <input type="hidden" name="step" value="reject" />
+            <div className="min-w-[260px] flex-1">
+              <label className="field-label" htmlFor="reject_note">Why reject it</label>
+              <input className="field" id="reject_note" name="note" maxLength={500} />
+            </div>
+            <button type="submit" className="btn" disabled={pending}>Reject</button>
+          </form>
+        </>
+      )}
+      {canWithdraw && (
+        <form action={action}>
+          <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="step" value="withdraw" />
+          <button type="submit" className="btn" disabled={pending}>Withdraw my request</button>
+        </form>
+      )}
+    </div>
   );
 }

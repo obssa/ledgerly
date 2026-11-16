@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getJournal } from "@/lib/data";
+import { getJournal, getJournalRequests } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Journal entries" };
@@ -18,12 +18,32 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
     search: typeof q.search === "string" && q.search.trim() ? q.search.trim().slice(0, 100) : undefined,
     page: typeof q.page === "string" && /^\d{1,4}$/.test(q.page) ? q.page : undefined,
   };
-  const journal = await getJournal(filters);
+  const [journal, requests] = await Promise.all([getJournal(filters), getJournalRequests()]);
   const pageHref = (page: number) => `/journal?${new URLSearchParams(Object.entries({ ...filters, page: String(page) }).filter(([, v]) => v) as [string, string][]).toString()}`;
 
   return (
     <>
       <PageTitle eyebrow="Books" title="Journal entries" actions={journal.can.create ? <Link href="/journal/new" className="btn btn-primary">New journal entry</Link> : undefined} />
+      {requests.data.length > 0 && (
+        <Card className="mb-4 !p-2" label="Waiting for approval">
+          <h2 className="px-3 pt-2 text-[15px] font-bold">Waiting for approval ({requests.pending})</h2>
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead><tr><th scope="col">Date</th><th scope="col">Memo</th><th scope="col">Asked by</th><th scope="col" className="!text-right">Amount</th></tr></thead>
+              <tbody>
+                {requests.data.map((r) => (
+                  <tr key={r.id}>
+                    <td className="num">{r.date}</td>
+                    <td><Link href={`/journal/requests/${encodeURIComponent(r.id)}`} className="font-semibold hover:underline">{r.memo}</Link></td>
+                    <td>{r.requested_by ?? "—"}</td>
+                    <td className="num text-right">{formatAmount(r.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       <form className="mb-4 flex flex-wrap items-end gap-2.5">
         <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={filters.from} /></div>
         <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={filters.to} /></div>

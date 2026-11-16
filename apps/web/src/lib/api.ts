@@ -48,6 +48,8 @@ export interface CompanySettings {
   books_started: boolean;
   locked_fields: string[];
   fiscal_years: { starts_on: string; ends_on: string; status: string }[];
+  /** Above these amounts someone other than the creator approves (invoices, bills, manual journals). */
+  approval?: Partial<Record<"invoice_above" | "bill_above" | "journal_above", string>>;
   can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean; manage_dimensions: boolean };
   options: { tax_id_label: string; calendars: string[]; legal_forms: string[] };
 }
@@ -320,6 +322,23 @@ export interface JournalDetail {
   reversed_by: { id: string; number: number; date: string } | null;
   reverses: { id: string; number: number; date: string } | null;
   can: { reverse: boolean };
+}
+
+/** Module 6: a manual journal above the approval limit, waiting for (or decided by) someone other than the asker. */
+export interface JournalRequest {
+  id: string;
+  date: string;
+  memo: string;
+  total: string;
+  status: "pending" | "approved" | "rejected" | "withdrawn";
+  requested_by: string | null;
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  note: string | null;
+  journal_entry: { id: string; number: number } | null;
+  lines: { account_id: string; code: string | null; account: string | null; debit: string | null; credit: string | null; description: string | null }[] | null;
+  can: { approve: boolean; withdraw: boolean };
 }
 
 /** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
@@ -652,7 +671,12 @@ export const ledgerly = {
   journal: (q: { from?: string; to?: string; source?: string; search?: string; page?: string }, ctx: RequestOptions) =>
     api<{ data: JournalRow[]; page: number; more: boolean; can: { create: boolean } }>("journal-entries", { ...ctx, query: q }),
   journalEntry: (id: string, ctx: RequestOptions) => api<JournalDetail>(`journal-entries/${encodeURIComponent(id)}`, ctx),
-  postJournal: (body: Record<string, unknown>, ctx: RequestOptions) => api<JournalDetail>("journal-entries", { ...ctx, method: "POST", body }),
+  postJournal: (body: Record<string, unknown>, ctx: RequestOptions) => api<JournalDetail | { request: JournalRequest }>("journal-entries", { ...ctx, method: "POST", body }),
+  journalRequests: (status: string, ctx: RequestOptions) =>
+    api<{ status: string; data: JournalRequest[]; pending: number }>("journal-requests", { ...ctx, query: { status } }),
+  journalRequest: (id: string, ctx: RequestOptions) => api<JournalRequest>(`journal-requests/${encodeURIComponent(id)}`, ctx),
+  decideJournalRequest: (id: string, step: "approve" | "reject" | "withdraw", body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<JournalRequest | JournalDetail>(`journal-requests/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   reverseJournal: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<JournalDetail>(`journal-entries/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   chart: (archived: boolean, ctx: RequestOptions) =>

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -49,6 +51,11 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/journal-entries' => 'accounting.view',
         'POST api/v1/journal-entries' => 'journals.create',
         'GET api/v1/journal-entries/{entry}' => 'accounting.view',
+        'GET api/v1/journal-requests' => 'accounting.view',
+        'GET api/v1/journal-requests/{journalRequest}' => 'accounting.view',
+        'POST api/v1/journal-requests/{journalRequest}/approve' => 'journals.approve',
+        'POST api/v1/journal-requests/{journalRequest}/reject' => 'journals.approve',
+        'POST api/v1/journal-requests/{journalRequest}/withdraw' => 'journals.create',
         'POST api/v1/journal-entries/{entry}/reverse' => 'journals.create',
 
         'GET api/v1/tax-rates' => 'company.view',
@@ -168,6 +175,8 @@ final class PermissionMatrixTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Every company route as one user per role: more than the API's 120 a minute. Not what this test is about.
+        $this->withoutMiddleware([ThrottleRequests::class, ThrottleRequestsWithRedis::class]);
         config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
         $this->company = $this->companyWithRecords('owner@example.test', 'Matrix Trading');
     }
