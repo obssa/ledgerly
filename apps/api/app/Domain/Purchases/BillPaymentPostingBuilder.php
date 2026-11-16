@@ -44,6 +44,7 @@ final class BillPaymentPostingBuilder
         Money $withholding,
         array $allocations,
         ?string $memo = null,
+        string $settledLabel = 'Bill paid',
     ): JournalDraft {
         $currency = $amount->currency;
         if ($amount->isZero() || $amount->isNegative()) {
@@ -63,7 +64,7 @@ final class BillPaymentPostingBuilder
         $draft = new JournalDraft($companyId, $date, $baseCurrency, $currency, $paymentRate, $memo ?? 'Payment made', 'payment', $paymentId);
 
         foreach ($allocations as $a) {
-            $draft->add(JournalLineDraft::debit($payableAccountId, $base($a['amount'], $a['bill_rate']), $a['amount'], 'Bill paid', $supplierId));
+            $draft->add(JournalLineDraft::debit($payableAccountId, $base($a['amount'], $a['bill_rate']), $a['amount'], $settledLabel, $supplierId));
         }
         $unallocated = $settles->minus($allocated);
         if (! $unallocated->isZero()) {

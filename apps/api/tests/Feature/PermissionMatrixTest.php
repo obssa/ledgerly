@@ -102,6 +102,12 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/payments-received/{payment}/allocate' => 'payments.receive',
         'GET api/v1/reports/ap-ageing' => 'reports.view',
 
+        'GET api/v1/refunds' => 'payments.view',
+        'POST api/v1/refunds/customer' => 'payments.pay',
+        'POST api/v1/refunds/supplier' => 'payments.receive',
+        'GET api/v1/refunds/{refund}' => 'payments.view',
+        'POST api/v1/refunds/{refund}/reverse' => 'payments.reverse',
+
         'GET api/v1/payments-received' => 'payments.view',
         'POST api/v1/payments-received' => 'payments.receive',
         'GET api/v1/payments-received/{payment}' => 'payments.view',

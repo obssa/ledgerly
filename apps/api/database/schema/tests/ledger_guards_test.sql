@@ -1294,6 +1294,65 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T50: refunds go back to customers and come back from suppliers, settle only credits, withhold nothing, and never give
+-- back more than a credit or a payment still holds (023). Uses credit note CN-T44 (100.00 left), payment e4 (50.00 from
+-- customer c4, unused) and supplier c8.
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO payments (company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount) VALUES
+      (app_company_id(), 'out', 'refund', '00000000-0000-0000-0000-0000000000c8', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 10);
+    RAISE EXCEPTION 'FAIL T50a: a refund was paid out to a supplier';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO payments (company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount) VALUES
+      (app_company_id(), 'in', 'refund', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 10);
+    RAISE EXCEPTION 'FAIL T50b: a refund was received from a customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO payments (company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount, withholding) VALUES
+      (app_company_id(), 'out', 'refund', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 10, 1);
+    RAISE EXCEPTION 'FAIL T50c: tax was withheld on a refund';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- 50.00 of CN-T44's credit paid back.
+  INSERT INTO payments (id, company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount) VALUES
+    ('00000000-0000-0000-0000-0000000000e8', app_company_id(), 'out', 'refund', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 50);
+  BEGIN
+    INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e8', '00000000-0000-0000-0000-0000000000d6', 10);
+    RAISE EXCEPTION 'FAIL T50d: a refund settled an invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO payment_allocations (company_id, payment_id, document_id, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000e8', '00000000-0000-0000-0000-0000000000d7', 50);
+  IF (SELECT amount_due FROM documents WHERE id = '00000000-0000-0000-0000-0000000000d7') <> 50 THEN
+    RAISE EXCEPTION 'FAIL T50e: the credit note did not show 50.00 left after a refund of 50.00';
+  END IF;
+
+  -- The unused 50.00 of payment e4: 60.00 is too much, 30.00 is fine, and 20.00 is then left.
+  BEGIN
+    INSERT INTO payments (company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount, refunds_payment_id) VALUES
+      (app_company_id(), 'out', 'refund', '00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 60, '00000000-0000-0000-0000-0000000000e4');
+    RAISE EXCEPTION 'FAIL T50f: a refund gave back more than the payment still held';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO payments (company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount, refunds_payment_id) VALUES
+    (app_company_id(), 'out', 'refund', '00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 30, '00000000-0000-0000-0000-0000000000e4');
+  BEGIN
+    INSERT INTO payments (company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount, refunds_payment_id) VALUES
+      (app_company_id(), 'out', 'refund', '00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 20.01, '00000000-0000-0000-0000-0000000000e4');
+    RAISE EXCEPTION 'FAIL T50g: after a refund of 30.00, more than the 20.00 still unused was refunded';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO payments (company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount, refunds_payment_id) VALUES
+    (app_company_id(), 'out', 'refund', '00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 20, '00000000-0000-0000-0000-0000000000e4');
+  BEGIN
+    INSERT INTO payments (company_id, direction, kind, contact_id, account_id, payment_date, method, currency, amount, refunds_payment_id) VALUES
+      (app_company_id(), 'in', 'payment', '00000000-0000-0000-0000-0000000000c4', '00000000-0000-0000-0000-000000000a10', '2027-06-30', 'cash', 'ETB', 5, '00000000-0000-0000-0000-0000000000e4');
+    RAISE EXCEPTION 'FAIL T50h: a payment that is not a refund named a payment it refunds';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T50 refunds go to the right side, settle only credits, withhold nothing and never give back more than is held';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

@@ -130,9 +130,9 @@ final class PaymentMadeTest extends TestCase
         $row = collect($ageing->json('rows'))->firstWhere('contact_id', $this->supplier);
         $this->assertSame('13000.00', $row['days_1_30'], '15 days past the due date');
         $this->assertSame('13000.00', $row['total']);
-        // The fixture supplier: a bill of 400.00 less an advance of 100.00.
+        // The fixture supplier: a bill of 400.00 less an advance of 100.00, of which 10.00 came back.
         $fixture = collect($ageing->json('rows'))->firstWhere('contact_id', $this->c['supplier']);
-        $this->assertSame(['400.00', '-100.00', '300.00'], [$fixture['days_31_60'], $fixture['credits'], $fixture['total']]);
+        $this->assertSame(['400.00', '-90.00', '310.00'], [$fixture['days_31_60'], $fixture['credits'], $fixture['total']]);
 
         $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-12-10', $this->h)->json('data'));
         $this->assertSame($ageing->json('totals.total'), $tb->firstWhere('account_id', $this->account('2000'))['credit'], 'the ageing total is accounts payable');

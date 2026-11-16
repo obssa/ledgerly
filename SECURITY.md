@@ -84,6 +84,7 @@ exists but has not been executed anywhere (Laravel could not be installed in the
 | The chart of accounts (no balances) and the tax rates are readable by every role: every document form names them | Tested |
 | Paying suppliers (`payments.pay`) is for accountants, owners and admins; bookkeepers and purchasing staff record bills only | Tested |
 | A payment made settles only its supplier's bills; no tax is withheld from a supplier with an exemption certificate (T47) | Tested |
+| Refunds: paying a customer back needs `payments.pay`; a refund settles only credits of its contact and never gives back more than is left (T50) | Tested |
 
 Product decision (CLAUDE.md, light controls): no second approver for payout changes and no three-way match. The audit
 record and the duplicate warning are the controls; `settings.approval.bill_above` is the one optional approval step

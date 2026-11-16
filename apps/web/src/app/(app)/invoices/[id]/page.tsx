@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getInvoice, getOpenInvoices } from "@/lib/data";
+import { getInvoice, getMoneyAccounts, getOpenInvoices } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { RefundPanel } from "../../refunds/RefundPanel";
 import { ApplyCredit } from "./ApplyCredit";
 import { InvoiceActions } from "./InvoiceActions";
 
@@ -31,6 +32,8 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const kind = creditNote ? "Credit note" : "Invoice";
   const canApply = creditNote && invoice.can.apply && ["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0 && !invoice.demo;
   const openInvoices = canApply ? await getOpenInvoices(invoice.contact.id, invoice.currency) : [];
+  const canRefund = creditNote && Boolean(invoice.can.refund) && ["posted", "part_paid"].includes(invoice.status) && invoice.amount_due !== "0.00" && !invoice.demo;
+  const moneyAccounts = canRefund ? await getMoneyAccounts(invoice.currency) : [];
 
   return (
     <>
@@ -97,6 +100,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <Link href={`/invoices/${encodeURIComponent(invoice.id)}/credit-note`} className="btn justify-center">Issue a credit note</Link>
           )}
           {canApply && <ApplyCredit creditNoteId={invoice.id} left={invoice.amount_due} invoices={openInvoices} />}
+          {canRefund && <RefundPanel side="customer" contactId={invoice.contact.id} currency={invoice.currency} left={invoice.amount_due} creditId={invoice.id} accounts={moneyAccounts} />}
           <Card label="E-invoice">
             <h2 className="text-[17px] font-bold">E-invoice</h2>
             <p className="mt-1.5 text-sm">

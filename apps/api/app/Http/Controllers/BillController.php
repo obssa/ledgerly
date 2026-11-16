@@ -43,6 +43,7 @@ final class BillController extends Controller
                 'void' => (bool) $membership?->can('transactions.edit'),
                 'credit' => (bool) $membership?->can('bills.create'),
                 'apply' => (bool) $membership?->can('payments.pay'),
+                'refund' => (bool) $membership?->can('payments.receive'),   // a supplier paying credit back
             ],
         ], $status);
     }

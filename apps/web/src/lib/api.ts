@@ -237,7 +237,7 @@ export interface BillDetail extends Bill {
   lines: InvoiceLine[];
   original?: { id: string; number: string | null; reference: string | null } | null;
   warnings: { type: string; message: string; bill_id?: string }[];
-  can: { edit: boolean; approve: boolean; void: boolean; credit?: boolean; apply?: boolean };
+  can: { edit: boolean; approve: boolean; void: boolean; credit?: boolean; apply?: boolean; refund?: boolean };
 }
 
 /** An expense paid on the spot (Module 3): posted at once against the account it was paid from. */
@@ -261,7 +261,7 @@ export interface InvoiceDetail extends Invoice {
   contact: Contact & { email?: string | null };
   lines: InvoiceLine[];
   warnings: { type: string; message: string }[];
-  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean };
+  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean; refund?: boolean };
 }
 
 /** GET /payments-made/withholding/{supplier}: what the country pack says about withholding on a payment to them. */
@@ -452,7 +452,7 @@ export const ledgerly = {
     api<{ data: Bill[] }>("bills", { ...ctx, query: { contact_id: contactId, open: "1" } }),
   paymentsMade: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-made", ctx),
   paymentMade: (id: string, ctx: RequestOptions) =>
-    api<PaymentReceived & { withholding_certificate: string | null; unallocated: string; contact?: { id: string; name: string; tax_id?: string | null; payout?: Payout }; can: { reverse: boolean; allocate: boolean } }>(
+    api<PaymentReceived & { withholding_certificate: string | null; unallocated: string; contact?: { id: string; name: string; tax_id?: string | null; payout?: Payout }; can: { reverse: boolean; allocate: boolean; refund: boolean } }>(
       `payments-made/${encodeURIComponent(id)}`, ctx),
   payBills: (body: Record<string, unknown>, ctx: RequestOptions) =>
     api<PaymentReceived & { warnings: { type: string; message: string }[] }>("payments-made", { ...ctx, method: "POST", body }),
@@ -466,9 +466,16 @@ export const ledgerly = {
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/allocate`, { ...ctx, method: "POST", body }),
   allocatePaymentMade: (id: string, body: { allocations: { bill_id: string; amount: string }[] }, ctx: RequestOptions) =>
     api<PaymentReceived>(`payments-made/${encodeURIComponent(id)}/allocate`, { ...ctx, method: "POST", body }),
+  refunds: (ctx: RequestOptions) => api<{ data: (PaymentReceived & { direction: "in" | "out" })[] }>("refunds", ctx),
+  refund: (id: string, ctx: RequestOptions) =>
+    api<PaymentReceived & { direction: "in" | "out"; refunds_payment_id: string | null; can: { reverse: boolean } }>(`refunds/${encodeURIComponent(id)}`, ctx),
+  recordRefund: (side: "customer" | "supplier", body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<PaymentReceived>(`refunds/${side}`, { ...ctx, method: "POST", body }),
+  reverseRefund: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
+    api<PaymentReceived>(`refunds/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   paymentsReceived: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-received", ctx),
   paymentReceived: (id: string, ctx: RequestOptions) =>
-    api<PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean } }>(`payments-received/${encodeURIComponent(id)}`, ctx),
+    api<PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean; refund: boolean } }>(`payments-received/${encodeURIComponent(id)}`, ctx),
   receivePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<PaymentReceived>("payments-received", { ...ctx, method: "POST", body }),
   reversePayment: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),

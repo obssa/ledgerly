@@ -10,7 +10,7 @@ export default async function PaymentsPage() {
 
   return (
     <>
-      <PageTitle eyebrow="Money in" title="Payments received" actions={<Link href="/payments/new" className="btn btn-primary">+ Receive a payment</Link>} />
+      <PageTitle eyebrow="Money in" title="Payments received" actions={<><Link href="/refunds" className="btn">Refunds</Link><Link href="/payments/new" className="btn btn-primary">+ Receive a payment</Link></>} />
       <Card className="!p-2" label="Payments received">
         <div className="overflow-x-auto">
           <table className="tbl">

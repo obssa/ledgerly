@@ -44,6 +44,7 @@ final class PaymentPostingBuilder
         Money $withholding,
         array $allocations,
         ?string $memo = null,
+        string $settledLabel = 'Invoice settled',
     ): JournalDraft {
         $currency = $amount->currency;
         if ($amount->isZero() || $amount->isNegative()) {
@@ -77,7 +78,7 @@ final class PaymentPostingBuilder
         }
 
         foreach ($allocations as $a) {
-            $draft->add(JournalLineDraft::credit($receivableAccountId, $base($a['amount'], $a['invoice_rate']), $a['amount'], 'Invoice settled', $customerId));
+            $draft->add(JournalLineDraft::credit($receivableAccountId, $base($a['amount'], $a['invoice_rate']), $a['amount'], $settledLabel, $customerId));
         }
         $unallocated = $settles->minus($allocated);
         if (! $unallocated->isZero()) {
