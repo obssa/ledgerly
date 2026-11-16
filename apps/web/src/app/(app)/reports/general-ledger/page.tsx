@@ -54,7 +54,14 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
       {gl && gl.accounts.length === 0 && <p className="text-[14px] text-muted">Nothing posted in this period.</p>}
       {gl?.accounts.map((a) => (
         <Card key={a.account_id} className="mb-4 !p-2" label={`${a.code} ${a.name}`}>
-          <h2 className="px-3 pt-2 text-[15px] font-bold"><Link href={`/accounts/${encodeURIComponent(a.account_id)}`} className="hover:underline"><span className="num">{a.code}</span> {a.name}</Link></h2>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-2">
+            <h2 className="text-[15px] font-bold"><Link href={`/accounts/${encodeURIComponent(a.account_id)}`} className="hover:underline"><span className="num">{a.code}</span> {a.name}</Link></h2>
+            {a.lines.length > 0 && (
+              <Link href={`/journal/reclassify?${new URLSearchParams({ account_id: a.account_id, from: gl.from, to: gl.to }).toString()}`} className="text-[13px] font-semibold text-brand hover:underline print:hidden">
+                Reclassify lines
+              </Link>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead><tr><th scope="col">Date</th><th scope="col">Entry</th><th scope="col">What</th><th scope="col">Who</th><th scope="col" className="!text-right">Debit</th><th scope="col" className="!text-right">Credit</th><th scope="col" className="!text-right">Balance</th></tr></thead>

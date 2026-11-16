@@ -142,6 +142,7 @@ Route::prefix('v1')->group(function () {
             Route::put('accounts/{account}', [ChartController::class, 'update']);
             Route::get('journal-entries', [JournalController::class, 'index']);
             Route::post('journal-entries', [JournalController::class, 'store']);
+            Route::post('journal-entries/reclassify', [JournalController::class, 'reclassify']);
             Route::get('journal-entries/{entry}', [JournalController::class, 'show']);
             Route::post('journal-entries/{entry}/reverse', [JournalController::class, 'reverse']);
             Route::get('journal-requests', [JournalRequestController::class, 'index']);

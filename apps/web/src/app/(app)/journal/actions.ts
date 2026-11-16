@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
-import { journalBody, recurringBody } from "@/lib/journal";
+import { journalBody, reclassifyBody, recurringBody } from "@/lib/journal";
 import { getSession } from "@/lib/session";
 
 /* Server Functions behind manual journals. The API checks who may post (journals.create) and every rule. */
@@ -45,6 +45,21 @@ export async function reverseJournal(_: FormState | undefined, form: FormData): 
   }
   refresh();
   redirect(`/journal/${encodeURIComponent(id)}`);
+}
+
+/** Move the ticked lines to another account by one manual journal (it may wait for approval). */
+export async function reclassify(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const body = reclassifyBody(form);
+  if (body.line_ids.length === 0) return { error: "Tick the lines to move." };
+  let to: string;
+  try {
+    const result = await ledgerly.reclassify(body, ctx);
+    to = "request" in result ? `/journal/requests/${encodeURIComponent(result.request.id)}` : `/journal/${encodeURIComponent(result.id)}`;
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(to);
 }
 
 /** Set up a recurring journal, or save changes to one (it then posts as you). */

@@ -182,6 +182,8 @@ final class TenantIsolationTest extends TestCase
                 'frequency' => 'monthly', 'next_on' => '2026-12-01', 'lines' => [['account_id' => $this->a['rent'], 'debit' => '10'], ['account_id' => $this->b['equity'], 'credit' => '10']]]],
             'audit adjustment on B\'s accounts' => ['POST', "/api/v1/fiscal-years/{$this->a['fiscal_year']}/adjustments", ['memo' => 'Planted',
                 'lines' => [['account_id' => $this->b['rent'], 'debit' => '10'], ['account_id' => $this->b['equity'], 'credit' => '10']]]],
+            'reclassifying B\'s ledger line' => ['POST', '/api/v1/journal-entries/reclassify', ['line_ids' => [$this->b['bank_line']], 'to_account_id' => $this->a['rent'], 'date' => '2026-11-10']],
+            'reclassifying onto B\'s account' => ['POST', '/api/v1/journal-entries/reclassify', ['line_ids' => [$this->a['bank_line']], 'to_account_id' => $this->b['rent'], 'date' => '2026-11-10']],
             'reconciliation ticking B\'s entry' => ['PUT', "/api/v1/reconciliations/{$this->a['reconciliation']}", ['cleared' => [$this->b['bank_line']]]],
         ];
 
