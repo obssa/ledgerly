@@ -22,7 +22,7 @@ final readonly class CountryPack
     public const REQUIRED_SYSTEM_KEYS = [
         'accounts_receivable', 'accounts_payable', 'vat_payable', 'vat_receivable', 'inventory', 'cogs',
         'sales', 'retained_earnings', 'opening_balance_equity', 'fx_gain_loss', 'bank_charges', 'undeposited_funds',
-        'grni', 'inventory_adjustment', 'bad_debt', 'rounding', 'withholding_payable', 'withholding_receivable',
+        'grni', 'inventory_adjustment', 'bad_debt', 'rounding', 'withholding_payable', 'withholding_receivable', 'cash_over_short',
     ];
 
     /** Accounting frameworks and the chart template each one uses by default. */

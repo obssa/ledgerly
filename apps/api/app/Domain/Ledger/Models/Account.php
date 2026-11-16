@@ -13,7 +13,7 @@ class Account extends Model
     use BelongsToCompany;
     use HasUuids;
 
-    protected $fillable = ['company_id', 'code', 'name', 'type', 'subtype', 'system_key', 'parent_id', 'currency', 'is_active', 'bank_details'];
+    protected $fillable = ['company_id', 'code', 'name', 'type', 'subtype', 'system_key', 'parent_id', 'currency', 'is_active', 'bank_details', 'float_amount'];
 
     protected function casts(): array
     {

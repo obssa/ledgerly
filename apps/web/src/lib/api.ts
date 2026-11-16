@@ -150,7 +150,24 @@ export interface BankAccount {
   bank_details: { bank_name?: string; account_number?: string; branch?: string; provider?: string; wallet_number?: string };
   balance: string;
   balance_base: string;
+  /** A petty cash float, and what it takes to bring the box back up to it. */
+  float_amount?: string | null;
+  top_up?: string | null;
   can?: { manage: boolean; transfer: boolean; deposit: boolean };
+}
+
+/** Module 5: one count of a cash box, by a named person; a difference was posted to cash over and short. */
+export interface CashCount {
+  id: string;
+  counted_on: string;
+  counted_by: string;
+  denominations: Record<string, number>;
+  counted: string;
+  book_balance: string;
+  difference: string;
+  entry: number | null;
+  note: string | null;
+  recorded_at: string;
 }
 
 export interface BankRegister {
@@ -624,6 +641,9 @@ export const ledgerly = {
   paymentReceived: (id: string, ctx: RequestOptions) =>
     api<PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean; refund: boolean } }>(`payments-received/${encodeURIComponent(id)}`, ctx),
   receivePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<PaymentReceived>("payments-received", { ...ctx, method: "POST", body }),
+  cashCounts: (accountId: string, ctx: RequestOptions) => api<{ data: CashCount[]; can: { count: boolean } }>(`bank-accounts/${encodeURIComponent(accountId)}/cash-counts`, ctx),
+  countCash: (accountId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ counted: string; book_balance: string; difference: string; entry: number | null }>(`bank-accounts/${encodeURIComponent(accountId)}/cash-counts`, { ...ctx, method: "POST", body }),
   cheques: (accountId: string, direction: "out" | "in", ctx: RequestOptions) =>
     api<ChequeRegister>(`bank-accounts/${encodeURIComponent(accountId)}/cheques`, { ...ctx, query: { direction } }),
   bounceCheque: (id: string, body: { date: string; fee?: string; reason?: string }, ctx: RequestOptions) =>

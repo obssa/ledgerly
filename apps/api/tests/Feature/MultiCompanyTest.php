@@ -33,7 +33,7 @@ final class MultiCompanyTest extends TestCase
 
         // Each company has its own books.
         $this->assertNotSame($first->json('id'), $second->json('id'));
-        $this->assertSame(50, $this->owner()->table('accounts')->where('company_id', $second->json('id'))->count());
+        $this->assertSame(51, $this->owner()->table('accounts')->where('company_id', $second->json('id'))->count());
     }
 
     public function test_someone_else_cannot_add_a_company_to_an_organisation(): void

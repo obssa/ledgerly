@@ -1690,6 +1690,80 @@ DO $$ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T56 cheques carry their numbers once per account and only cheques received bounce';
 END $$;
+-- T57: petty cash (030). Only cash accounts keep a float; a count says who counted, leaves the books holding what was
+-- counted (a difference posted first), and never changes. Uses a new petty cash account a57 of company A: 500.00 put in
+-- on 1 Jun 2027, and a 20.00 shortage posted on 3 Jun.
+DO $$ BEGIN
+  INSERT INTO accounts (id, company_id, code, name, type, subtype) VALUES ('00000000-0000-0000-0000-000000000a57', app_company_id(), '1057', 'Petty cash T57', 'asset', 'cash');
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES
+    ('00000000-0000-0000-0000-00000000e571', app_company_id(), 9571, '2027-06-01', 'ETB'),
+    ('00000000-0000-0000-0000-00000000e572', app_company_id(), 9572, '2027-06-03', 'ETB');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e571', 1, '00000000-0000-0000-0000-000000000a57', 500, 0, 500),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e571', 2, '00000000-0000-0000-0000-000000000a40', 0, 500, -500),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e572', 1, '00000000-0000-0000-0000-000000000a40', 20, 0, 20),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e572', 2, '00000000-0000-0000-0000-000000000a57', 0, 20, -20);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+
+  BEGIN
+    UPDATE accounts SET float_amount = 1000 WHERE id = '00000000-0000-0000-0000-000000000a10';
+    RAISE EXCEPTION 'FAIL T57a: a bank account kept a float';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE accounts SET float_amount = 0 WHERE id = '00000000-0000-0000-0000-000000000a57';
+    RAISE EXCEPTION 'FAIL T57b: a float of nothing was kept';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE accounts SET float_amount = 500 WHERE id = '00000000-0000-0000-0000-000000000a57';
+
+  -- 2 Jun: 500.00 counted, as the books say.
+  INSERT INTO cash_counts (company_id, account_id, counted_on, counted_by_name, counted, book_balance, difference) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-000000000a57', '2027-06-02', 'Meron Alemu', 500, 500, 0);
+  BEGIN
+    INSERT INTO cash_counts (company_id, account_id, counted_on, counted_by_name, counted, book_balance, difference) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a57', '2027-06-02', 'Meron Alemu', 480, 500, -20);
+    RAISE EXCEPTION 'FAIL T57c: a shortage was counted and nothing posted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO cash_counts (company_id, account_id, counted_on, counted_by_name, counted, book_balance, difference) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a57', '2027-06-02', 'Meron Alemu', 490, 500, 0);
+    RAISE EXCEPTION 'FAIL T57d: a count disagreed with its own difference';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO cash_counts (company_id, account_id, counted_on, counted_by_name, counted, book_balance, difference) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a57', '2027-06-02', ' ', 500, 500, 0);
+    RAISE EXCEPTION 'FAIL T57e: a count did not say who counted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO cash_counts (company_id, account_id, counted_on, counted_by_name, counted, book_balance, difference) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a10', '2027-06-02', 'Meron Alemu', 1, 1, 0);
+    RAISE EXCEPTION 'FAIL T57f: cash was counted in a bank account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- 3 Jun: 480.00 counted; the 20.00 shortage posted that day; the books hold 480.00.
+  BEGIN
+    INSERT INTO cash_counts (company_id, account_id, counted_on, counted_by_name, counted, book_balance, difference, journal_entry_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a57', '2027-06-03', 'Meron Alemu', 470, 490, -20, '00000000-0000-0000-0000-00000000e572');
+    RAISE EXCEPTION 'FAIL T57g: after a count the books did not hold what was counted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO cash_counts (company_id, account_id, counted_on, counted_by_name, counted, book_balance, difference, journal_entry_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000a57', '2027-06-03', 'Meron Alemu', 480, 500, -20, '00000000-0000-0000-0000-00000000e571');
+    RAISE EXCEPTION 'FAIL T57h: a count named an entry that is not its difference';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO cash_counts (id, company_id, account_id, counted_on, counted_by_name, denominations, counted, book_balance, difference, journal_entry_id) VALUES
+    ('00000000-0000-0000-0000-0000000005c7', app_company_id(), '00000000-0000-0000-0000-000000000a57', '2027-06-03', 'Meron Alemu', '{"200": 2, "50": 1, "10": 3}',
+     480, 500, -20, '00000000-0000-0000-0000-00000000e572');
+  BEGIN
+    UPDATE cash_counts SET counted_by_name = 'Someone else' WHERE id = '00000000-0000-0000-0000-0000000005c7';
+    RAISE EXCEPTION 'FAIL T57i: a cash count was changed';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM cash_counts WHERE id = '00000000-0000-0000-0000-0000000005c7';
+    RAISE EXCEPTION 'FAIL T57j: a cash count was removed';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T57 floats are for cash, and a cash count says who counted and leaves the books holding what was counted';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

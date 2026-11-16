@@ -102,6 +102,10 @@ trait CompanyFixtures
         $ids['statement_line'] = $statement['-2.50'];
         $ids['statement_fuel'] = $statement['-115.00'];
         $ids['bank_line'] = $this->owner()->table('journal_lines')->where(['company_id' => $ids['company'], 'account_id' => $ids['bank'], 'credit' => '115'])->value('id');
+        // The petty cash box, counted empty on 8 Nov by its keeper.
+        $ids['petty_cash'] = $this->owner()->table('accounts')->where(['company_id' => $company, 'code' => '1010'])->value('id');
+        $this->postJson("/api/v1/bank-accounts/{$ids['petty_cash']}/cash-counts", ['counted_on' => '2026-11-08', 'counted_by_name' => "{$name} cashier", 'counted' => '0'], $h)
+            ->assertCreated()->assertJsonPath('difference', '0.00');
         // A reconciliation of the bank to 8 Nov in progress, its difference not yet zero.
         $ids['reconciliation'] = $this->postJson("/api/v1/bank-accounts/{$ids['bank']}/reconciliations", ['statement_date' => '2026-11-08', 'ending_balance' => '1'], $h)
             ->assertCreated()->json('id');
@@ -116,7 +120,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(114, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(116, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
