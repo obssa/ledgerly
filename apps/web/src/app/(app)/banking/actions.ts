@@ -65,6 +65,8 @@ export async function transferMoney(_: FormState | undefined, form: FormData): P
   try {
     await ledgerly.transferMoney({ from_account_id: text(form, "from_account_id") ?? "", to_account_id: text(form, "to_account_id") ?? "",
       date: text(form, "date") ?? "", amount: amount(text(form, "amount")), ...(amount(text(form, "fee")) ? { fee: amount(text(form, "fee")) } : {}),
+      ...(amount(text(form, "amount_received")) ? { amount_received: amount(text(form, "amount_received")) } : {}),
+      ...(amount(text(form, "fx_rate")) ? { fx_rate: amount(text(form, "fx_rate")) } : {}),
       ...(text(form, "memo") ? { memo: text(form, "memo") } : {}) }, ctx);
   } catch (error) {
     return refusal(error);

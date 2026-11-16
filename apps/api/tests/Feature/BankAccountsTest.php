@@ -67,7 +67,7 @@ final class BankAccountsTest extends TestCase
         $this->assertSame(['2500.00', '15.00'], collect($bank->json('lines'))->pluck('out')->all());
         $this->assertSame(1, $this->owner()->table('audit_log')->where(['subject_id' => $this->c['bank'], 'action' => 'money_transferred'])->count());
 
-        // Not to an expense account, not in the future, not between dollars and birr yet.
+        // Not to an expense account, not in the future, not to dollars without saying how many arrived.
         $this->postJson('/api/v1/banking/transfers', ['date' => '2026-11-10', 'from_account_id' => $this->c['bank'], 'to_account_id' => $this->c['rent'], 'amount' => '1'], $this->h)
             ->assertUnprocessable()->assertJsonValidationErrors('to_account_id');
         $this->postJson('/api/v1/banking/transfers', ['date' => '2099-01-01', 'from_account_id' => $this->c['bank'], 'to_account_id' => $cash, 'amount' => '1'], $this->h)
@@ -75,7 +75,45 @@ final class BankAccountsTest extends TestCase
         $usd = $this->postJson('/api/v1/bank-accounts', ['name' => 'USD', 'kind' => 'bank', 'currency' => 'USD'], $this->h)->assertCreated()
             ->assertJsonPath('bank_details', [])->json('id');   // no details: an empty object
         $this->postJson('/api/v1/banking/transfers', ['date' => '2026-11-10', 'from_account_id' => $this->c['bank'], 'to_account_id' => $usd, 'amount' => '1'], $this->h)
-            ->assertUnprocessable()->assertJsonValidationErrors('to_account_id');
+            ->assertUnprocessable()->assertJsonValidationErrors('amount_received');
+    }
+
+    public function test_money_moves_between_birr_and_dollars_at_the_days_rate_and_the_banks_margin_is_an_exchange_difference(): void
+    {
+        $usd = $this->postJson('/api/v1/bank-accounts', ['name' => 'CBE USD account', 'kind' => 'bank', 'currency' => 'USD'], $this->h)->assertCreated()->json('id');
+        $usd2 = $this->postJson('/api/v1/bank-accounts', ['name' => 'Dashen USD account', 'kind' => 'bank', 'currency' => 'USD'], $this->h)->assertCreated()->json('id');
+        $this->postJson('/api/v1/exchange-rates', ['currency' => 'USD', 'rate_date' => '2026-11-10', 'rate' => '154.50'], $this->h)->assertCreated();
+        $fx = $this->owner()->table('accounts')->where(['company_id' => $this->c['company'], 'system_key' => 'fx_gain_loss'])->value('id');
+        $fxOf = fn (int $number) => $this->owner()->table('journal_lines as l')->join('journal_entries as e', 'e.id', '=', 'l.journal_entry_id')
+            ->where(['e.company_id' => $this->c['company'], 'e.number' => $number, 'l.account_id' => $fx])->selectRaw('sum(l.debit - l.credit)::numeric(20,2)::text AS n')->value('n');
+
+        // Buy 1,000.00 dollars for 155,000.00 birr: worth 154,500.00 at the day's rate, so 500.00 went to the bank's margin.
+        $buy = $this->postJson('/api/v1/banking/transfers', ['date' => '2026-11-10', 'from_account_id' => $this->c['bank'], 'to_account_id' => $usd,
+            'amount' => '155000', 'amount_received' => '1000'], $this->h)->assertCreated();
+        $this->assertSame('500.00', $fxOf($buy->json('number')));
+        $this->getJson("/api/v1/bank-accounts/{$usd}/register?from=2026-11-01&to=2026-11-30", $this->h)->assertOk()
+            ->assertJsonPath('currency', 'USD')->assertJsonPath('lines.0.in', '1000.00')->assertJsonPath('closing', '1000.00');
+        $this->getJson("/api/v1/bank-accounts/{$usd}", $this->h)->assertOk()->assertJsonPath('balance', '1000.00')->assertJsonPath('balance_base', '154500.00');
+
+        // Sell 200.00 of them for 31,200.00 birr, more than the day's 30,900.00: a gain. Then move 100.00 to the other
+        // dollar account, paying a 2.00 dollar fee: no exchange difference within one currency.
+        $sell = $this->postJson('/api/v1/banking/transfers', ['date' => '2026-11-10', 'from_account_id' => $usd, 'to_account_id' => $this->c['bank'],
+            'amount' => '200', 'amount_received' => '31200'], $this->h)->assertCreated();
+        $this->assertSame('-300.00', $fxOf($sell->json('number')));
+        $move = $this->postJson('/api/v1/banking/transfers', ['date' => '2026-11-10', 'from_account_id' => $usd, 'to_account_id' => $usd2,
+            'amount' => '100', 'fee' => '2'], $this->h)->assertCreated();
+        $this->assertNull($fxOf($move->json('number')));
+        $this->getJson("/api/v1/bank-accounts/{$usd}", $this->h)->assertOk()->assertJsonPath('balance', '698.00');
+        $this->getJson("/api/v1/bank-accounts/{$usd2}", $this->h)->assertOk()->assertJsonPath('balance', '100.00')->assertJsonPath('balance_base', '15450.00');
+
+        // A rate given on the transfer wins; with no rate for the date and none given, the person is asked for one.
+        $given = $this->postJson('/api/v1/banking/transfers', ['date' => '2026-11-10', 'from_account_id' => $this->c['bank'], 'to_account_id' => $usd,
+            'amount' => '1550', 'amount_received' => '10', 'fx_rate' => '155'], $this->h)->assertCreated();
+        $this->assertNull($fxOf($given->json('number')));
+        $this->postJson('/api/v1/banking/transfers', ['date' => '2026-10-01', 'from_account_id' => $this->c['bank'], 'to_account_id' => $usd,
+            'amount' => '1550', 'amount_received' => '10'], $this->h)->assertUnprocessable()->assertJsonValidationErrors('fx_rate');
+        $this->assertSame(1, $this->owner()->table('audit_log')->where(['subject_id' => $usd, 'action' => 'money_transferred'])
+            ->whereRaw("after->>'received_currency' = 'USD'")->count());
     }
 
     public function test_a_deposit_banks_undeposited_receipts(): void

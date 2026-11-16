@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { BankAccount } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
 import { createBankAccount, depositReceipts, saveBankAccount, transferMoney } from "./actions";
@@ -79,25 +79,40 @@ export function ArchiveBankAccount({ account }: { account: BankAccount }) {
   );
 }
 
-export function TransferMoney({ accounts }: { accounts: BankAccount[] }) {
+/** A transfer between two of the company's money accounts. Across currencies: what arrived, at the day's rate unless given. */
+export function TransferMoney({ accounts, base }: { accounts: BankAccount[]; base: string }) {
   const [state, action, pending] = useActionState(transferMoney, undefined);
   const today = new Date().toISOString().slice(0, 10);
   const bad = (n: string) => Boolean(state?.fields?.[n]);
+  const [fromId, setFromId] = useState(accounts[0]?.id ?? "");
+  const [toId, setToId] = useState(accounts[1]?.id ?? "");
+  const from = accounts.find((a) => a.id === fromId);
+  const to = accounts.find((a) => a.id === toId);
+  const across = Boolean(from && to && from.currency !== to.currency);
+  const foreign = [from?.currency, to?.currency].find((c) => c && c !== base);
+  const label = (a: BankAccount) => `${a.code} ${a.name}${a.currency !== base ? ` (${a.currency})` : ""}`;
   return (
     <form action={action} noValidate className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] items-end gap-3">
       <div className="col-span-full"><Message state={state} /></div>
       <div>
         <label className="field-label" htmlFor="from_account_id">From</label>
-        <select className={`field ${bad("from_account_id") ? "!border-bad" : ""}`} id="from_account_id" name="from_account_id">{accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}</select>
+        <select className={`field ${bad("from_account_id") ? "!border-bad" : ""}`} id="from_account_id" name="from_account_id" value={fromId} onChange={(e) => setFromId(e.target.value)}>
+          {accounts.map((a) => <option key={a.id} value={a.id}>{label(a)}</option>)}
+        </select>
       </div>
       <div>
         <label className="field-label" htmlFor="to_account_id">To</label>
-        <select className={`field ${bad("to_account_id") ? "!border-bad" : ""}`} id="to_account_id" name="to_account_id" defaultValue={accounts[1]?.id}>{accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}</select>
+        <select className={`field ${bad("to_account_id") ? "!border-bad" : ""}`} id="to_account_id" name="to_account_id" value={toId} onChange={(e) => setToId(e.target.value)}>
+          {accounts.map((a) => <option key={a.id} value={a.id}>{label(a)}</option>)}
+        </select>
       </div>
-      <Field name="amount" label="Amount" invalid={bad("amount")} />
-      <Field name="fee" label="Fee" />
+      <Field name="amount" label={`Amount sent${from ? ` (${from.currency})` : ""}`} invalid={bad("amount")} />
+      {across && <Field name="amount_received" label={`Amount received${to ? ` (${to.currency})` : ""}`} invalid={bad("amount_received")} />}
+      {(across || foreign) && <Field name="fx_rate" label={`Rate (${base} per ${foreign ?? ""})`} invalid={bad("fx_rate")} hint="Leave empty for the day's rate" />}
+      <Field name="fee" label={`Fee${from ? ` (${from.currency})` : ""}`} />
       <Field name="date" label="Date" type="date" defaultValue={today} invalid={bad("date")} />
       <Field name="memo" label="Memo" />
+      {across && <p className="col-span-full text-[13px] text-muted">Both sides are valued at the day's rate; what the bank kept in its rate is booked as an exchange gain or loss.</p>}
       <button type="submit" className="btn" disabled={pending}>{pending ? "Posting…" : "Transfer"}</button>
     </form>
   );

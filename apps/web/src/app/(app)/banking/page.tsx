@@ -36,8 +36,8 @@ export default async function BankingPage() {
           </table>
         </div>
       </Card>
-      {!demo && can.transfer && sameCurrency.length > 1 && (
-        <Card className="mt-4" label="Transfer"><h2 className="mb-2 text-[15px] font-bold">Move money between accounts</h2><TransferMoney accounts={sameCurrency} /></Card>
+      {!demo && can.transfer && money.filter((a) => a.is_active).length > 1 && (
+        <Card className="mt-4" label="Transfer"><h2 className="mb-2 text-[15px] font-bold">Move money between accounts</h2><TransferMoney accounts={money.filter((a) => a.is_active)} base={currencies.base_currency} /></Card>
       )}
       {!demo && can.deposit && sameCurrency.some((a) => a.kind !== "cash") && (
         <Card className="mt-4" label="Deposit">
