@@ -188,6 +188,8 @@ Route::prefix('v1')->group(function () {
             Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update']);
             Route::get('stock', [StockController::class, 'index']);
             Route::post('stock/adjustments', [StockController::class, 'adjust']);
+            Route::post('stock/transfers', [StockController::class, 'transfer']);
+            Route::get('stock/reorder', [StockController::class, 'reorder']);
 
             Route::post('banking/transfers', [BankingController::class, 'transfer']);
             Route::post('banking/deposits', [BankingController::class, 'deposit']);
@@ -195,6 +197,7 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/trial-balance', [LedgerController::class, 'trialBalance']);
             Route::get('reports/balance-sheet', [LedgerController::class, 'balanceSheet']);
             Route::get('reports/bin-card', [LedgerController::class, 'binCard']);
+            Route::get('reports/inventory-valuation', [LedgerController::class, 'inventoryValuation']);
             Route::get('reports/ar-ageing', [LedgerController::class, 'arAgeing']);
             Route::get('reports/ap-ageing', [LedgerController::class, 'apAgeing']);
             Route::get('reports/profit-and-loss', [LedgerController::class, 'profitAndLoss']);

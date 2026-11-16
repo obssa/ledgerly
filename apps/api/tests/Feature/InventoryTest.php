@@ -107,6 +107,32 @@ final class InventoryTest extends TestCase
         $this->postJson('/api/v1/items', ['name' => 'x', 'type' => 'service'], $this->h)->assertForbidden();
     }
 
+    public function test_a_transfer_moves_stock_at_its_cost_and_the_valuation_agrees_with_the_ledger(): void
+    {
+        $van = $this->postJson('/api/v1/warehouses', ['name' => 'Delivery van'], $this->h)->assertCreated()->json('id');
+        $this->adjust('5', '62')->assertCreated();   // 25 on hand worth 1,310.00: an average of 52.40
+        $entries = $this->owner()->table('journal_entries')->where('company_id', $this->c['company'])->count();
+
+        $this->postJson('/api/v1/stock/transfers', ['item_id' => $this->c['stock_item'], 'from_warehouse_id' => $this->c['store'], 'to_warehouse_id' => $van,
+            'date' => '2026-11-11', 'quantity' => '10'], $this->h)->assertCreated()->assertJsonPath('value', '524.00');
+        $this->assertSame($entries, $this->owner()->table('journal_entries')->where('company_id', $this->c['company'])->count(), 'a transfer posts nothing');
+        $this->postJson('/api/v1/stock/transfers', ['item_id' => $this->c['stock_item'], 'from_warehouse_id' => $van, 'to_warehouse_id' => $van,
+            'date' => '2026-11-11', 'quantity' => '1'], $this->h)->assertUnprocessable()->assertJsonValidationErrors('to_warehouse_id');
+        $this->postJson('/api/v1/stock/transfers', ['item_id' => $this->c['stock_item'], 'from_warehouse_id' => $van, 'to_warehouse_id' => $this->c['store'],
+            'date' => '2026-11-11', 'quantity' => '10.01'], $this->h)->assertUnprocessable()->assertJsonValidationErrors('quantity');
+
+        $valuation = $this->getJson('/api/v1/reports/inventory-valuation', $this->h)->assertOk()
+            ->assertJsonPath('stock_value', '1310.00')->assertJsonPath('inventory_account', '1310.00')->assertJsonPath('difference', '0.00');
+        $this->assertSame(['524.00', '786.00'], collect($valuation->json('rows'))->sortBy('warehouse')->pluck('value')->values()->all());   // Delivery van, Main store
+        $this->getJson('/api/v1/reports/inventory-valuation?as_of=2026-11-01', $this->h)->assertJsonPath('stock_value', '0.00');   // before the opening stock
+
+        // Running low: 25 on hand in all against a reorder point of 30.
+        $this->putJson("/api/v1/items/{$this->c['stock_item']}", ['reorder_point' => '30'], $this->h)->assertOk();
+        $this->getJson('/api/v1/stock/reorder', $this->h)->assertOk()->assertJsonPath('data.0.on_hand', '25.00');
+        $this->putJson("/api/v1/items/{$this->c['stock_item']}", ['reorder_point' => '24.99'], $this->h)->assertOk();
+        $this->getJson('/api/v1/stock/reorder', $this->h)->assertJsonCount(0, 'data');
+    }
+
     private function balance(string $code): string
     {
         return (string) $this->owner()->table('journal_lines')->where(['company_id' => $this->c['company'], 'account_id' => $this->account($code)])

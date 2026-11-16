@@ -246,6 +246,18 @@ export async function getStock(): Promise<StockOnHand | null> {
   return withApi((ctx) => ledgerly.stock(ctx));
 }
 
+export async function getReorder() {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.reorder(ctx))).data;
+}
+
+export async function getInventoryValuation(asOf?: string) {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi((ctx) => ledgerly.inventoryValuation(asOf, ctx));
+}
+
 export async function getBinCard(q: { item_id: string; warehouse_id: string; from: string; to: string }): Promise<BinCard | null> {
   await connection();
   if (isDemoMode()) return null;
