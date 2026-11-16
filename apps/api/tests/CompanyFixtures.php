@@ -19,7 +19,7 @@ trait CompanyFixtures
 
     /**
      * A company set up through the API by its own owner, with a posted invoice, a draft, a manual entry, a tax
-     * rate, a foreign currency with a rate, a location, a payment of 50.00 on the posted invoice, a draft credit note on it, a customer, a supplier with a posted and a draft bill and an advance of 100.00, an item and a warehouse. @return array<string, string>
+     * rate, a foreign currency with a rate, a location, a payment of 50.00 on the posted invoice, a draft credit note on it, a customer, a supplier with a posted and a draft bill an advance of 100.00 and an expense of 115.00, an item and a warehouse. @return array<string, string>
      */
     protected function companyWithRecords(string $email, string $name): array
     {
@@ -70,6 +70,10 @@ trait CompanyFixtures
         $ids['posted_bill'] = $this->postJson('/api/v1/bills', $bill('R-100'), $h)->assertCreated()->json('id');
         $this->postJson("/api/v1/bills/{$ids['posted_bill']}/approve", [], $h)->assertOk();
         $ids['bill'] = $this->postJson('/api/v1/bills', $bill('R-101'), $h)->assertCreated()->json('id');
+        // An expense paid from the bank: 115.00 of fuel (7 Nov).
+        $ids['expense'] = $this->postJson('/api/v1/expenses', ['contact_id' => $ids['supplier'], 'paid_from_account_id' => $ids['bank'],
+            'payment_method' => 'cash', 'reference' => 'R-7781', 'issue_date' => '2026-11-07', 'currency' => 'ETB',
+            'lines' => [['description' => 'Fuel', 'quantity' => '1', 'unit_price' => '115', 'account_id' => $ids['rent']]]], $h)->assertCreated()->json('id');
         // An advance of 100.00 to the supplier (6 Nov), not allocated to a bill.
         $ids['payment_made'] = $this->postJson('/api/v1/payments-made', ['contact_id' => $ids['supplier'], 'account_id' => $ids['bank'],
             'payment_date' => '2026-11-06', 'method' => 'bank_transfer', 'currency' => 'ETB', 'amount' => '100'], $h)->assertCreated()->json('id');
@@ -88,7 +92,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(68, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(72, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -106,6 +110,7 @@ trait CompanyFixtures
             'supplier' => $ids['supplier'],
             'bill' => $ids['bill'],         // a draft, like the invoice
             'paymentMade' => $ids['payment_made'],
+            'expense' => $ids['expense'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

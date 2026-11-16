@@ -58,6 +58,7 @@ final class DemoSetup
 
         $this->addPurchases($owner, $company, $say);
         $this->addPaymentsMade($owner, $company, $say);
+        $this->addExpenses($owner, $company, $say);
 
         foreach ($roles as $role) {
             if ($owner->table('demo_accounts')->where('role', $role)->exists()) {
@@ -208,6 +209,38 @@ final class DemoSetup
             $user->tokens()->where('name', 'demo-setup')->delete();
         }
         $say('Added the demo payments made.');
+    }
+
+    /** Module 3 sample: expenses paid on the spot, from cash and from the bank. Added once. */
+    private function addExpenses(ConnectionInterface $owner, string $company, callable $say): void
+    {
+        if ($owner->table('documents')->where(['company_id' => $company, 'type' => 'expense'])->exists()) {
+            return;
+        }
+        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
+        $this->company = $company;
+
+        try {
+            $today = new DateTimeImmutable('today');
+            $day = $this->dayIn($today, (new FiscalCalendar('gregorian', 7))->yearContaining($today)['start']);
+            $accounts = collect($this->call('GET', 'accounts')['data']);
+            $account = fn (string $code): string => $accounts->firstWhere('code', $code)['id'];
+            $vat = collect($this->call('GET', 'tax-rates')['data'])->firstWhere('code', 'VAT15')['id'];
+            $fuel = $this->call('POST', 'suppliers', ['name' => 'TotalEnergies Bole', 'default_expense_account_id' => $account('6400')])['id'];
+            $power = $this->call('POST', 'suppliers', ['name' => 'Ethiopian Electric Utility', 'tax_id' => '0000011223', 'default_expense_account_id' => $account('6200')])['id'];
+
+            $expense = fn (string $contact, float $f, string $from, string $method, string $ref, string $what, string $price, string $acc) => $this->call('POST', 'expenses', [
+                'contact_id' => $contact, 'paid_from_account_id' => $account($from), 'payment_method' => $method, 'reference' => $ref,
+                'issue_date' => $day($f), 'currency' => 'ETB',
+                'lines' => [['description' => $what, 'quantity' => '1', 'unit_price' => $price, 'account_id' => $account($acc), 'tax_rate_id' => $vat]],
+            ]);
+            $expense($fuel, 0.5, '1000', 'cash', 'TE-44871', 'Diesel for the delivery van', '4200', '6400');
+            $expense($power, 0.85, '1100', 'mobile_money', 'EEU-2027-118834', 'Electricity, roastery', '6800', '6200');
+        } finally {
+            $user->tokens()->where('name', 'demo-setup')->delete();
+        }
+        $say('Added the demo expenses.');
     }
 
     /** Sample books inside the current fiscal year: opening balances, customers, invoices in every state, payments. */

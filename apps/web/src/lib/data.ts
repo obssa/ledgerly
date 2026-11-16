@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Bill, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 
@@ -71,10 +71,10 @@ export async function getDimensions(): Promise<Dimension[]> {
   return (await withApi((ctx) => ledgerly.dimensions(ctx))).data;
 }
 
-/** Numbering of the document types in use so far (invoices and credit notes). */
+/** Numbering of the document types in use so far (invoices, credit notes, bills, expenses). */
 export async function getNumbering(): Promise<Numbering[]> {
   await connection();
-  const types = ["invoice", "credit_note"];
+  const types = ["invoice", "credit_note", "bill", "expense"];
   if (isDemoMode()) return demoNumbering;
   return (await withApi((ctx) => ledgerly.numbering(ctx))).data.filter((n) => types.includes(n.doc_type));
 }
@@ -113,6 +113,8 @@ export interface InvoiceOptions {
   baseCurrency: string;
   /** Manual numbering: the number is typed from the invoice book. */
   manualNumbers: boolean;
+  /** For an expense: the bank, cash and wallet accounts it can be paid from. */
+  moneyAccounts?: { id: string; code: string; name: string; currency: string | null }[];
   demo: boolean;
 }
 
@@ -174,6 +176,36 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       demo: false,
     };
   });
+}
+
+/** The new-expense screen: what a bill offers, plus the accounts the money can come from. */
+export async function getExpenseOptions(): Promise<InvoiceOptions> {
+  const options = await getBillOptions();
+  if (options.demo) return options;
+  const { data } = await withApi((ctx) => ledgerly.accounts(ctx));
+  return {
+    ...options,
+    manualNumbers: false,
+    moneyAccounts: data.filter((a) => a.is_active && ["bank", "cash", "mobile_money"].includes(a.subtype ?? ""))
+      .map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })),
+  };
+}
+
+export async function getExpenses(): Promise<Expense[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.expenses(ctx))).data;
+}
+
+export async function getExpense(id: string): Promise<Expense | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.expense(id, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 export async function getSuppliers(q: { search?: string; archived?: boolean }): Promise<{ data: Supplier[]; can: { create: boolean; edit: boolean; bill: boolean }; demo: boolean }> {

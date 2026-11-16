@@ -238,6 +238,17 @@ export interface BillDetail extends Bill {
   can: { edit: boolean; approve: boolean; void: boolean };
 }
 
+/** An expense paid on the spot (Module 3): posted at once against the account it was paid from. */
+export interface Expense extends Bill {
+  type: "expense";
+  payment_method: string;
+  paid_from?: { id: string; code: string; name: string };
+  fx_rate: string;
+  notes: string | null;
+  lines?: InvoiceLine[];
+  can?: { void: boolean };
+}
+
 export interface InvoiceDetail extends Invoice {
   type: "invoice" | "credit_note";
   /** A credit note names the invoice it corrects. */
@@ -470,6 +481,11 @@ export const ledgerly = {
   submitBill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
   voidBill: (id: string, reason: string, ctx: RequestOptions) =>
     api<BillDetail>(`bills/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
+  expenses: (ctx: RequestOptions) => api<{ data: Expense[] }>("expenses", ctx),
+  expense: (id: string, ctx: RequestOptions) => api<Expense>(`expenses/${encodeURIComponent(id)}`, ctx),
+  createExpense: (body: Record<string, unknown>, ctx: RequestOptions) => api<Expense>("expenses", { ...ctx, method: "POST", body }),
+  voidExpense: (id: string, reason: string, ctx: RequestOptions) =>
+    api<Expense>(`expenses/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),

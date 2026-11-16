@@ -22,7 +22,7 @@ final class DocumentNumbers
     /** Defaults when a company has not changed a type's numbering. */
     public const DEFAULTS = [
         'invoice' => 'INV-', 'credit_note' => 'CN-', 'sales_receipt' => 'SR-', 'quote' => 'QT-', 'sales_order' => 'SO-',
-        'bill' => 'BILL-', 'vendor_credit' => 'VC-', 'purchase_order' => 'PO-',
+        'bill' => 'BILL-', 'vendor_credit' => 'VC-', 'purchase_order' => 'PO-', 'expense' => 'EXP-',
     ];
 
     /** @return array{doc_type: string, mode: string, prefix: string, include_year: bool, padding: int} */

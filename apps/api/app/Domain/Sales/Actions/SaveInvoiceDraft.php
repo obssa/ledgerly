@@ -89,7 +89,7 @@ final class SaveInvoiceDraft
         $number = isset($data['number']) && trim((string) $data['number']) !== '' ? trim((string) $data['number']) : null;
         $automatic = $this->numbers->isAutomatic($this->company->id(), $type);
 
-        $noun = $type === 'bill' ? 'bill' : 'invoice';
+        $noun = in_array($type, ['bill', 'expense'], true) ? $type : 'invoice';
         if ($automatic && $number !== null) {
             throw ValidationException::withMessages(['number' => [ucfirst($noun) . 's are numbered when they are posted. Leave the number empty.']]);
         }
@@ -173,6 +173,9 @@ final class SaveInvoiceDraft
                 'language' => $data['language'] ?? 'en',
                 'notes' => $data['notes'] ?? null,
                 'reference' => isset($data['reference']) && trim((string) $data['reference']) !== '' ? trim((string) $data['reference']) : null,
+                // An expense says where it was paid from and how (021); other documents leave these empty.
+                'paid_from_account_id' => $data['paid_from_account_id'] ?? null,
+                'payment_method' => $data['payment_method'] ?? null,
             ],
             'lines' => $lineRows,
             'totals' => [

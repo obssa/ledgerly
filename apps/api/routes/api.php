@@ -11,6 +11,7 @@ use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\DimensionController;
+use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
@@ -41,6 +42,7 @@ $documentOf = fn (array $types) => fn (string $id) => Str::isUuid($id)
     : abort(404);
 Route::bind('invoice', $documentOf(['invoice', 'credit_note']));
 Route::bind('bill', $documentOf(['bill']));
+Route::bind('expense', $documentOf(['expense']));
 // Payments received and payments made share one table too.
 $paymentOf = fn (string $direction) => fn (string $id) => Str::isUuid($id)
     ? Payment::query()->where('direction', $direction)->findOrFail($id)
@@ -141,6 +143,11 @@ Route::prefix('v1')->group(function () {
             Route::post('bills/{bill}/approve', [BillController::class, 'approve']);
             Route::post('bills/{bill}/void', [BillController::class, 'void']);
             Route::get('bills/{bill}/history', [BillController::class, 'history']);
+
+            Route::get('expenses', [ExpenseController::class, 'index']);
+            Route::post('expenses', [ExpenseController::class, 'store']);
+            Route::get('expenses/{expense}', [ExpenseController::class, 'show']);
+            Route::post('expenses/{expense}/void', [ExpenseController::class, 'void']);
 
             Route::get('payments-made', [PaymentMadeController::class, 'index']);
             Route::post('payments-made', [PaymentMadeController::class, 'store']);

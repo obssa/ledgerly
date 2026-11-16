@@ -47,8 +47,8 @@ final class ApproveInvoice
 
     public function handle(Document $invoice, ?string $userId = null, ?int $lockVersion = null): Document
     {
-        if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill'], true)) {
-            throw new LedgerException("Document {$invoice->label()} is not an invoice, credit note or bill.");
+        if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill', 'expense'], true)) {
+            throw new LedgerException("Document {$invoice->label()} is not an invoice, credit note, bill or expense.");
         }
 
         $company = $this->current->get();
@@ -86,6 +86,9 @@ final class ApproveInvoice
 
             $invoice->status = 'posted';
             $invoice->journal_entry_id = $entry->getKey();
+            if ($invoice->type === 'expense') {
+                $invoice->amount_due = '0.00'; // paid on the spot (021)
+            }
             $invoice->save();
 
             // A credit note settles what its invoice still owes; the rest stays as the customer's credit.
@@ -101,7 +104,7 @@ final class ApproveInvoice
                 }
             }
 
-            if ($invoice->type !== 'bill' && ($connector = $this->connectors->forCountry($company->country_code))) {
+            if (in_array($invoice->type, ['invoice', 'credit_note'], true) && ($connector = $this->connectors->forCountry($company->country_code))) {
                 $submission = EInvoiceSubmission::query()->create([
                     'document_id' => $invoice->getKey(),
                     'authority' => $connector->authority(),
@@ -118,7 +121,7 @@ final class ApproveInvoice
     public function journalDraftFor(Document $invoice): JournalDraft
     {
         $company = $this->current->get();
-        if ($invoice->type === 'bill') {
+        if (in_array($invoice->type, ['bill', 'expense'], true)) {
             return $this->billDraft($invoice);
         }
 
@@ -154,7 +157,7 @@ final class ApproveInvoice
 
     /**
      * A bill: each line's cost to its expense or asset account, input VAT to VAT receivable, the total to accounts
-     * payable. Input VAT is reclaimable only for a VAT-registered company; otherwise, and for any other kind of tax,
+     * payable (an expense: to the account it was paid from). Input VAT is reclaimable only for a VAT-registered company; otherwise, and for any other kind of tax,
      * the tax is part of the cost.
      */
     private function billDraft(Document $bill): JournalDraft
@@ -188,9 +191,11 @@ final class ApproveInvoice
             currency: $bill->currency,
             fxRate: (string) $bill->fx_rate,
             customerId: $bill->contact_id,
-            receivableAccountId: Account::system('accounts_payable')->getKey(),
+            receivableAccountId: $bill->type === 'expense'
+                ? Account::query()->findOrFail($bill->paid_from_account_id)->getKey()   // company-scoped: one of its own accounts
+                : Account::system('accounts_payable')->getKey(),
             lines: $lines,
-            sourceType: 'bill',
+            sourceType: $bill->type,
         );
     }
 }
