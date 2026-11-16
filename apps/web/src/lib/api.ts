@@ -285,6 +285,43 @@ export interface ChartAccount {
   depth?: number;
 }
 
+/** Module 6: an entry of the books, as listed. */
+export interface JournalRow {
+  id: string;
+  number: number;
+  date: string;
+  memo: string | null;
+  source_type: string;
+  source_id: string | null;
+  status: "posted" | "reversed";
+  currency: string;
+  total: string;
+  posted_by: string | null;
+}
+
+/** Module 6: one entry with its lines, where it came from and what reversed it. */
+export interface JournalDetail {
+  id: string;
+  number: number;
+  date: string;
+  memo: string | null;
+  source_type: string;
+  source_label: string;
+  status: "posted" | "reversed";
+  currency: string;
+  fx_rate: string;
+  posted_by: string | null;
+  posted_at: string;
+  lines: { line_no: number; account_id: string; code: string; account: string; type: string; description: string | null; debit: string; credit: string;
+    amount_txn: string; contact: string | null; location: string | null; class: string | null; project: string | null }[];
+  total: string;
+  document: { id: string; type: string; number: string | null } | null;
+  payment: { id: string; direction: "in" | "out"; kind: string } | null;
+  reversed_by: { id: string; number: number; date: string } | null;
+  reverses: { id: string; number: number; date: string } | null;
+  can: { reverse: boolean };
+}
+
 /** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
 export interface Item {
   id: string;
@@ -612,6 +649,12 @@ export const ledgerly = {
   addExchangeRate: (body: { currency: string; rate_date: string; rate: string }, ctx: RequestOptions) =>
     api<{ id: string }>("exchange-rates", { ...ctx, method: "POST", body }),
   accounts: (ctx: RequestOptions) => api<{ data: Account[] }>("accounts", ctx),
+  journal: (q: { from?: string; to?: string; source?: string; search?: string; page?: string }, ctx: RequestOptions) =>
+    api<{ data: JournalRow[]; page: number; more: boolean; can: { create: boolean } }>("journal-entries", { ...ctx, query: q }),
+  journalEntry: (id: string, ctx: RequestOptions) => api<JournalDetail>(`journal-entries/${encodeURIComponent(id)}`, ctx),
+  postJournal: (body: Record<string, unknown>, ctx: RequestOptions) => api<JournalDetail>("journal-entries", { ...ctx, method: "POST", body }),
+  reverseJournal: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
+    api<JournalDetail>(`journal-entries/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   chart: (archived: boolean, ctx: RequestOptions) =>
     api<{ data: ChartAccount[]; kinds: Record<string, string[]>; can: { manage: boolean } }>("chart", { ...ctx, query: { include_archived: archived ? "1" : undefined } }),
   addAccount: (body: Record<string, unknown>, ctx: RequestOptions) => api<ChartAccount>("accounts", { ...ctx, method: "POST", body }),

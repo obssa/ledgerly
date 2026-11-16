@@ -39,7 +39,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
     label: "Books",
     items: [
       { href: "/accounts", label: "Chart of accounts" },
-      { href: "/journal", label: "Journal entries", soon: true },
+      { href: "/journal", label: "Journal entries" },
       { href: "/opening-balances", label: "Opening balances" },
       { href: "/reports", label: "Reports" },
     ],
