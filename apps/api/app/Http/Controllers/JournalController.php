@@ -187,6 +187,7 @@ final class JournalController extends Controller
             'vendor_credit' => 'supplier credit', 'payment' => 'payment', 'payment_allocation' => 'payment applied later', 'transfer' => 'transfer',
             'deposit' => 'deposit', 'reversal' => 'reversal', 'opening' => 'opening balances', 'stock_adjustment' => 'stock adjustment',
             'bank_transaction' => 'bank statement line', 'cash_count' => 'cash count', 'bounced_cheque' => 'bounced cheque',
+            'closing' => 'year-end close', 'adjustment' => 'audit adjustment',
         ][$type] ?? str_replace('_', ' ', $type);
     }
 

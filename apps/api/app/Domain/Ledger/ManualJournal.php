@@ -45,7 +45,7 @@ final class ManualJournal
      *
      * @throws ValidationException naming the lines that are wrong
      */
-    public static function draft(Company $company, string $date, string $memo, array $lines, ?string $sourceId = null): JournalDraft
+    public static function draft(Company $company, string $date, string $memo, array $lines, ?string $sourceId = null, string $sourceType = 'manual'): JournalDraft
     {
         $base = $company->base_currency;
         $lines = array_values($lines);
@@ -71,7 +71,7 @@ final class ManualJournal
         }
         $dimensions = self::activeDimensions($lines);
 
-        $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($date), $base, $base, '1', $memo, 'manual', $sourceId);
+        $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($date), $base, $base, '1', $memo, $sourceType, $sourceId);
         foreach ($lines as $i => $line) {
             $debit = Money::of($line['debit'] ?? '0', $base);
             $draft->add($debit->isZero()

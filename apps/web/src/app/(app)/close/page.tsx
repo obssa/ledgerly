@@ -57,6 +57,12 @@ export default async function ClosePage({ searchParams }: PageProps<"/close">) {
                     <span className="num">{y.starts_on} to {y.ends_on}</span>
                     <Pill tone={y.status === "closed" ? "good" : y.status === "reopened" ? "warn" : "neutral"}>{y.status === "closed" ? "Closed" : y.status === "reopened" ? "Reopened" : "Open"}</Pill>
                     {y.closed_by && y.status === "closed" && <span className="text-[13px] text-muted">by {y.closed_by}</span>}
+                    {y.adjustments_closed_at && <Pill tone="good">Audit signed off</Pill>}
+                    {y.status === "closed" && (
+                      <Link href={`/close/years/${encodeURIComponent(y.id)}`} className="text-[13px] font-semibold text-brand hover:underline">
+                        {y.adjustments_closed_at ? "Adjusted trial balance" : `Audit adjustments (${y.adjustments})`}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

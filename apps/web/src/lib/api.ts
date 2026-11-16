@@ -637,6 +637,20 @@ export interface FiscalYear {
   closed_at: string | null;
   can_close: boolean;
   can_reopen: boolean;
+  /** The adjustments period for the auditor: adjustments posted into the closed year, and when its audit was signed off. */
+  adjustments: number;
+  adjustments_closed_at: string | null;
+  signed_off_by: string | null;
+  can_adjust: boolean;
+}
+
+/** The auditor's worksheet for a fiscal year: balances before the close, the audit adjustments, and after (debit positive). */
+export interface AdjustedTrialBalance {
+  year: { id: string; starts_on: string; ends_on: string; status: FiscalYear["status"]; adjustments_closed_at: string | null };
+  lines: { account_id: string; code: string; name: string; type: string; unadjusted: string; adjustments: string; adjusted: string }[];
+  totals: { unadjusted: string; adjustments: string; adjusted: string };
+  adjustments: { id: string; number: number; memo: string | null; posted_by: string | null; posted_at: string }[];
+  can: { adjust: boolean };
 }
 
 export interface ProfitAndLossRow {
@@ -926,6 +940,10 @@ export const ledgerly = {
   yearClosing: (id: string, ctx: RequestOptions) =>
     api<{ lines: { account_id: string; code: string; name: string; type: string; balance: string }[]; net_profit: string }>(`fiscal-years/${encodeURIComponent(id)}/closing`, ctx),
   closeYear: (id: string, ctx: RequestOptions) => api<{ net_profit: string; entry: { id: string; number: number } }>(`fiscal-years/${encodeURIComponent(id)}/close`, { ...ctx, method: "POST" }),
+  adjustedTrialBalance: (id: string, ctx: RequestOptions) => api<AdjustedTrialBalance>(`fiscal-years/${encodeURIComponent(id)}/adjusted-trial-balance`, ctx),
+  postAdjustment: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ adjustment: { id: string; number: number }; closing: { number: number }; net_profit: string }>(`fiscal-years/${encodeURIComponent(id)}/adjustments`, { ...ctx, method: "POST", body }),
+  finaliseAudit: (id: string, ctx: RequestOptions) => api<AdjustedTrialBalance>(`fiscal-years/${encodeURIComponent(id)}/finalise`, { ...ctx, method: "POST" }),
   reopenYear: (id: string, reason: string, ctx: RequestOptions) => api<{ reversal: { number: number } }>(`fiscal-years/${encodeURIComponent(id)}/reopen`, { ...ctx, method: "POST", body: { reason } }),
   closeChecklist: (periodEnd: string | undefined, ctx: RequestOptions) => api<CloseChecklist>("close-checklist", { ...ctx, query: { period_end: periodEnd } }),
   generalLedger: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<GeneralLedger>("reports/general-ledger", { ...ctx, query: q }),

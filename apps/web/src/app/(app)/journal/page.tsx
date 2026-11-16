@@ -7,7 +7,7 @@ export const metadata = { title: "Journal entries" };
 
 const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const SOURCES = [["", "Everything"], ["manual", "Manual journals"], ["invoice", "Invoices"], ["bill", "Bills"], ["expense", "Expenses"], ["payment", "Payments"],
-  ["transfer", "Transfers"], ["deposit", "Deposits"], ["stock_adjustment", "Stock adjustments"], ["reversal", "Reversals"], ["opening", "Opening balances"]] as const;
+  ["transfer", "Transfers"], ["deposit", "Deposits"], ["stock_adjustment", "Stock adjustments"], ["reversal", "Reversals"], ["opening", "Opening balances"], ["closing", "Year-end close"], ["adjustment", "Audit adjustments"]] as const;
 
 /** Module 6: every entry of the books, newest first, by date, source or memo; manual journals posted from here. */
 export default async function JournalPage({ searchParams }: PageProps<"/journal">) {

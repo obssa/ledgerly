@@ -117,6 +117,9 @@ Route::prefix('v1')->group(function () {
             Route::get('fiscal-years/{fiscalYear}/closing', [FiscalYearController::class, 'preview'])->whereUuid('fiscalYear');
             Route::post('fiscal-years/{fiscalYear}/close', [FiscalYearController::class, 'close'])->whereUuid('fiscalYear');
             Route::post('fiscal-years/{fiscalYear}/reopen', [FiscalYearController::class, 'reopen'])->whereUuid('fiscalYear');
+            Route::get('fiscal-years/{fiscalYear}/adjusted-trial-balance', [FiscalYearController::class, 'adjustedTrialBalance'])->whereUuid('fiscalYear');
+            Route::post('fiscal-years/{fiscalYear}/adjustments', [FiscalYearController::class, 'adjust'])->whereUuid('fiscalYear');
+            Route::post('fiscal-years/{fiscalYear}/finalise', [FiscalYearController::class, 'finalise'])->whereUuid('fiscalYear');
 
             Route::get('currencies', [CurrencyController::class, 'index']);
             Route::put('currencies', [CurrencyController::class, 'update']);
