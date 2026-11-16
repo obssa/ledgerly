@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { getSession } from "@/lib/session";
+import { reconciliationBody } from "@/lib/reconcile";
 import { statementFrom } from "@/lib/statements";
 
 /* Server Functions behind banking. The API checks who may open accounts (banking.manage), transfer and deposit. */
@@ -119,4 +120,57 @@ export async function reviewStatementLine(_: FormState | undefined, form: FormDa
   }
   refresh();
   return { notice: STEPS[step] };
+}
+
+export async function startReconciliation(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const accountId = text(form, "account_id") ?? "";
+  let id: string;
+  try {
+    id = (await ledgerly.startReconciliation(accountId, { statement_date: text(form, "statement_date") ?? "", ending_balance: amount(text(form, "ending_balance")) }, ctx)).id;
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(`/banking/${encodeURIComponent(accountId)}/reconcile/${encodeURIComponent(id)}`);
+}
+
+/** Save the ticks (and the statement's date and balance); with intent=finish, then finish at a zero difference. */
+export async function saveReconciliation(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const id = text(form, "id") ?? "";
+  try {
+    await ledgerly.saveReconciliation(id, reconciliationBody(form), ctx);
+    if (text(form, "intent") === "finish") {
+      const done = await ledgerly.completeReconciliation(id, ctx);
+      refresh();
+      return { notice: `Reconciled to ${done.statement_date}. The account is locked through that date.` };
+    }
+  } catch (error) {
+    refresh();
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Saved." };
+}
+
+export async function undoReconciliation(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.undoReconciliation(text(form, "id") ?? "", text(form, "reason") ?? "", ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Undone. Its entries can be ticked again and the period is open." };
+}
+
+export async function discardReconciliation(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const accountId = text(form, "account_id") ?? "";
+  try {
+    await ledgerly.discardReconciliation(text(form, "id") ?? "", text(form, "reason") ?? "", ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(`/banking/${encodeURIComponent(accountId)}/reconcile`);
 }

@@ -22,6 +22,7 @@ use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\PaymentMadeController;
 use App\Http\Controllers\PaymentReceivedController;
 use App\Http\Controllers\RefundController;
+use App\Http\Controllers\ReconciliationController;
 use App\Http\Controllers\StatementController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\SupplierCreditController;
 use App\Http\Controllers\TaxRateController;
 use App\Http\Controllers\WarehouseController;
 use App\Domain\Banking\Models\BankTransaction;
+use App\Domain\Banking\Models\Reconciliation;
 use App\Domain\Ledger\Models\Account;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Sales\Models\Payment;
@@ -65,6 +67,7 @@ Route::bind('bankAccount', fn (string $id) => Str::isUuid($id)
     ? Account::query()->where(fn ($q) => $q->whereIn('subtype', BankAccountController::KINDS)->orWhere('system_key', 'undeposited_funds'))->findOrFail($id)
     : abort(404));
 Route::bind('statementLine', fn (string $id) => Str::isUuid($id) ? BankTransaction::query()->findOrFail($id) : abort(404));
+Route::bind('reconciliation', fn (string $id) => Str::isUuid($id) ? Reconciliation::query()->findOrFail($id) : abort(404));
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
@@ -211,6 +214,13 @@ Route::prefix('v1')->group(function () {
             Route::post('statement-lines/{statementLine}/categorise', [StatementController::class, 'categorise']);
             Route::post('statement-lines/{statementLine}/exclude', [StatementController::class, 'exclude']);
             Route::post('statement-lines/{statementLine}/undo', [StatementController::class, 'undo']);
+            Route::get('bank-accounts/{bankAccount}/reconciliations', [ReconciliationController::class, 'index']);
+            Route::post('bank-accounts/{bankAccount}/reconciliations', [ReconciliationController::class, 'store']);
+            Route::get('reconciliations/{reconciliation}', [ReconciliationController::class, 'show']);
+            Route::put('reconciliations/{reconciliation}', [ReconciliationController::class, 'update']);
+            Route::post('reconciliations/{reconciliation}/complete', [ReconciliationController::class, 'complete']);
+            Route::post('reconciliations/{reconciliation}/undo', [ReconciliationController::class, 'undo']);
+            Route::delete('reconciliations/{reconciliation}', [ReconciliationController::class, 'destroy']);
 
             Route::post('banking/transfers', [BankingController::class, 'transfer']);
             Route::post('banking/deposits', [BankingController::class, 'deposit']);

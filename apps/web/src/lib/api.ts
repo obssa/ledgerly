@@ -187,6 +187,58 @@ export interface StatementLines {
   can: { review: boolean };
 }
 
+/** Module 5: a bank statement agreed with the books. A draft carries its entries; a finished one its saved report. */
+export interface ReconciliationSummary {
+  id: string;
+  account_id: string;
+  status: "draft" | "completed" | "undone";
+  statement_date: string;
+  opening_balance: string;
+  ending_balance: string;
+  completed_at: string | null;
+  undone_at: string | null;
+  undo_reason: string | null;
+}
+
+export interface ReconciliationLine {
+  journal_line_id?: string;
+  date: string;
+  entry: number;
+  source_type: string;
+  memo: string | null;
+  contact: string | null;
+  amount: string;
+  on_statement: boolean;
+  cleared?: boolean;
+}
+
+export interface Reconciliation extends ReconciliationSummary {
+  account: { id: string; code: string; name: string; currency: string };
+  can: { reconcile: boolean };
+  /** A draft's entries up to the statement date; null once finished (see cleared and outstanding). */
+  lines: ReconciliationLine[] | null;
+  cleared_in?: string;
+  cleared_out?: string;
+  cleared_balance?: string;
+  difference?: string;
+  outstanding_total?: string;
+  book_balance?: string;
+  /** The saved report of a finished reconciliation. */
+  opening?: string;
+  ending?: string;
+  cleared?: ReconciliationLine[];
+  outstanding?: ReconciliationLine[];
+}
+
+export interface Reconciliations {
+  account: { id: string; code: string; name: string; currency: string };
+  data: ReconciliationSummary[];
+  draft_id: string | null;
+  reconciled_through: string | null;
+  next_opening: string;
+  can: { reconcile: boolean };
+}
+
 /** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
 export interface Item {
   id: string;
@@ -612,6 +664,17 @@ export const ledgerly = {
   transferMoney: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ number: number }>("banking/transfers", { ...ctx, method: "POST", body }),
   statementLines: (id: string, status: string, ctx: RequestOptions) =>
     api<StatementLines>(`bank-accounts/${encodeURIComponent(id)}/statement-lines`, { ...ctx, query: { status } }),
+  reconciliations: (accountId: string, ctx: RequestOptions) => api<Reconciliations>(`bank-accounts/${encodeURIComponent(accountId)}/reconciliations`, ctx),
+  startReconciliation: (accountId: string, body: { statement_date: string; ending_balance: string }, ctx: RequestOptions) =>
+    api<Reconciliation>(`bank-accounts/${encodeURIComponent(accountId)}/reconciliations`, { ...ctx, method: "POST", body }),
+  reconciliation: (id: string, ctx: RequestOptions) => api<Reconciliation>(`reconciliations/${encodeURIComponent(id)}`, ctx),
+  saveReconciliation: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<Reconciliation>(`reconciliations/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  completeReconciliation: (id: string, ctx: RequestOptions) => api<Reconciliation>(`reconciliations/${encodeURIComponent(id)}/complete`, { ...ctx, method: "POST" }),
+  undoReconciliation: (id: string, reason: string, ctx: RequestOptions) =>
+    api<Reconciliation>(`reconciliations/${encodeURIComponent(id)}/undo`, { ...ctx, method: "POST", body: { reason } }),
+  discardReconciliation: (id: string, reason: string, ctx: RequestOptions) =>
+    api<{ discarded: boolean }>(`reconciliations/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE", body: { reason } }),
   importStatement: (id: string, body: { csv: string; file_name?: string }, ctx: RequestOptions) =>
     api<{ imported: number; skipped: number; from: string; to: string }>(`bank-accounts/${encodeURIComponent(id)}/statements`, { ...ctx, method: "POST", body }),
   reviewStatementLine: (id: string, step: "match" | "categorise" | "exclude" | "undo", body: Record<string, unknown>, ctx: RequestOptions) =>

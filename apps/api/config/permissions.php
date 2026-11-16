@@ -21,6 +21,7 @@
 | banking.view       bank, wallet and cash accounts with balances and registers (also viewers)
 | banking.manage     open, rename, give bank details to and archive money accounts (bookkeeper, accountant via 'banking.*')
 | banking.review     import statements and match, categorise (posts an entry) or exclude their lines (bookkeeper, accountant)
+| banking.reconcile  reconcile an account with its statement, and undo the latest reconciliation with a reason (bookkeeper, accountant)
 | company.view       read the company profile and fiscal settings, the chart of accounts (no balances) and the tax
 |                    rates; every role, because every document form names accounts and taxes
 | company.manage     change the profile and settings; owner and admin only (via '*')
