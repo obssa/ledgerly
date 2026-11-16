@@ -150,14 +150,23 @@ final class ReportService
     /** @return array<string, object{name: string, type: string, subtype: ?string, amount: string}> keyed by account code */
     private function incomeStatementRows(string $companyId, string $from, string $to): array
     {
-        // Movement in a period = trial balance at its end minus trial balance the day before it starts.
+        // Movement in a period = trial balance at its end minus trial balance the day before it starts, leaving out the
+        // year-end closing entries (and their reversals): a closed year still shows the profit it made (035).
         // Income shown as credit - debit; expenses as debit - credit: both positive in normal use.
         $rows = DB::select(<<<'SQL'
             WITH movement AS (
                 SELECT account_id, sum(debit) AS debit, sum(credit) AS credit
                   FROM (SELECT account_id, debit, credit FROM trial_balance(?::uuid, ?::date)
                         UNION ALL
-                        SELECT account_id, -debit, -credit FROM trial_balance(?::uuid, (?::date - 1))) both_ends
+                        SELECT account_id, -debit, -credit FROM trial_balance(?::uuid, (?::date - 1))
+                        UNION ALL
+                        SELECT l.account_id, -l.debit, -l.credit
+                          FROM journal_lines l
+                          JOIN journal_entries e ON e.company_id = l.company_id AND e.id = l.journal_entry_id
+                         WHERE l.company_id = ?::uuid AND l.entry_date BETWEEN ?::date AND ?::date
+                           AND (e.source_type = 'closing'
+                                OR (e.source_type = 'reversal' AND e.source_id IN (
+                                    SELECT c.id FROM journal_entries c WHERE c.company_id = ?::uuid AND c.source_type = 'closing')))) both_ends
                  GROUP BY account_id
             )
             SELECT a.code, a.name, a.type, a.subtype,
@@ -166,7 +175,7 @@ final class ReportService
               JOIN accounts a ON a.id = m.account_id
              WHERE a.type IN ('income', 'expense') AND (m.debit <> 0 OR m.credit <> 0)
              ORDER BY a.code
-            SQL, [$companyId, $to, $companyId, $from]);
+            SQL, [$companyId, $to, $companyId, $from, $companyId, $from, $to, $companyId]);
 
         $keyed = [];
         foreach ($rows as $row) {

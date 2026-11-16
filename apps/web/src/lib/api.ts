@@ -606,6 +606,18 @@ export interface RevaluationRun extends RevaluationPreview {
   reversal: { id: string; number: number; date: string };
 }
 
+/** Module 6: a fiscal year and what can be done with it now. */
+export interface FiscalYear {
+  id: string;
+  starts_on: string;
+  ends_on: string;
+  status: "open" | "closing" | "closed" | "reopened";
+  closed_by: string | null;
+  closed_at: string | null;
+  can_close: boolean;
+  can_reopen: boolean;
+}
+
 export interface ProfitAndLossRow {
   code: string;
   name: string;
@@ -881,6 +893,11 @@ export const ledgerly = {
   revaluationPreview: (asOf: string, rates: Record<string, string>, ctx: RequestOptions) =>
     api<RevaluationPreview>("revaluations/preview", { ...ctx, query: { as_of: asOf, ...Object.fromEntries(Object.entries(rates).map(([k, v]) => [`rates[${k}]`, v])) } }),
   postRevaluation: (body: { as_of: string; rates: Record<string, string> }, ctx: RequestOptions) => api<RevaluationRun>("revaluations", { ...ctx, method: "POST", body }),
+  fiscalYears: (ctx: RequestOptions) => api<{ data: FiscalYear[] }>("fiscal-years", ctx),
+  yearClosing: (id: string, ctx: RequestOptions) =>
+    api<{ lines: { account_id: string; code: string; name: string; type: string; balance: string }[]; net_profit: string }>(`fiscal-years/${encodeURIComponent(id)}/closing`, ctx),
+  closeYear: (id: string, ctx: RequestOptions) => api<{ net_profit: string; entry: { id: string; number: number } }>(`fiscal-years/${encodeURIComponent(id)}/close`, { ...ctx, method: "POST" }),
+  reopenYear: (id: string, reason: string, ctx: RequestOptions) => api<{ reversal: { number: number } }>(`fiscal-years/${encodeURIComponent(id)}/reopen`, { ...ctx, method: "POST", body: { reason } }),
   closeChecklist: (periodEnd: string | undefined, ctx: RequestOptions) => api<CloseChecklist>("close-checklist", { ...ctx, query: { period_end: periodEnd } }),
   generalLedger: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<GeneralLedger>("reports/general-ledger", { ...ctx, query: q }),
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),

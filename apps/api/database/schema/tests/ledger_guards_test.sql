@@ -1966,6 +1966,44 @@ DO $$ BEGIN
   EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
   RAISE NOTICE 'PASS T61 a revaluation is made once a date, names its entry and its reversal, and never changes';
 END $$;
+-- T62: the year-end close (035). A closing entry belongs to a fiscal year and is dated its last day, one standing per
+-- year; a year is closed only with it and with the books locked through its end. Uses a fiscal year 2027-07-01 to
+-- 2028-06-30 of company A; the lock date is put back afterwards.
+DO $$ DECLARE was date; BEGIN
+  SELECT books_closed_until INTO was FROM companies WHERE id = app_company_id();
+  INSERT INTO fiscal_years (id, company_id, starts_on, ends_on) VALUES
+    ('00000000-0000-0000-0000-0000000006f1', app_company_id(), '2027-07-01', '2028-06-30');
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e621', app_company_id(), 9621, '2028-06-29', 'ETB', 'closing', '00000000-0000-0000-0000-0000000006f1');
+    RAISE EXCEPTION 'FAIL T62a: a closing entry was dated before the year''s last day';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE fiscal_years SET status = 'closing' WHERE id = '00000000-0000-0000-0000-0000000006f1';
+  BEGIN
+    UPDATE fiscal_years SET status = 'closed' WHERE id = '00000000-0000-0000-0000-0000000006f1';
+    RAISE EXCEPTION 'FAIL T62b: a year closed without its closing entry';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    ('00000000-0000-0000-0000-00000000e622', app_company_id(), 9622, '2028-06-30', 'ETB', 'closing', '00000000-0000-0000-0000-0000000006f1');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e622', 1, '00000000-0000-0000-0000-000000000a40', 100, 0, 100),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e622', 2, '00000000-0000-0000-0000-000000000a10', 0, 100, -100);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e623', app_company_id(), 9623, '2028-06-30', 'ETB', 'closing', '00000000-0000-0000-0000-0000000006f1');
+    RAISE EXCEPTION 'FAIL T62c: a year got two standing closing entries';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    UPDATE fiscal_years SET status = 'closed' WHERE id = '00000000-0000-0000-0000-0000000006f1';
+    RAISE EXCEPTION 'FAIL T62d: a year closed with its books still open';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE companies SET books_closed_until = '2028-06-30' WHERE id = app_company_id();
+  UPDATE fiscal_years SET status = 'closed' WHERE id = '00000000-0000-0000-0000-0000000006f1';
+  UPDATE companies SET books_closed_until = was WHERE id = app_company_id();
+  RAISE NOTICE 'PASS T62 a year closes with one closing entry dated its last day and its books locked';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

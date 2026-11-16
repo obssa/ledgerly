@@ -6,6 +6,7 @@ use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CashCountController;
 use App\Http\Controllers\ChartController;
+use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
 use App\Http\Controllers\RevaluationController;
@@ -111,6 +112,10 @@ Route::prefix('v1')->group(function () {
             Route::put('company', [CompanySettingsController::class, 'update']);
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);
             Route::get('close-checklist', [CompanySettingsController::class, 'closeChecklist']);
+            Route::get('fiscal-years', [FiscalYearController::class, 'index']);
+            Route::get('fiscal-years/{fiscalYear}/closing', [FiscalYearController::class, 'preview'])->whereUuid('fiscalYear');
+            Route::post('fiscal-years/{fiscalYear}/close', [FiscalYearController::class, 'close'])->whereUuid('fiscalYear');
+            Route::post('fiscal-years/{fiscalYear}/reopen', [FiscalYearController::class, 'reopen'])->whereUuid('fiscalYear');
 
             Route::get('currencies', [CurrencyController::class, 'index']);
             Route::put('currencies', [CurrencyController::class, 'update']);
