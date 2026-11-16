@@ -267,6 +267,24 @@ export interface ChequeRegister {
   can: { bounce: boolean };
 }
 
+/** Module 6: an account of the chart with its balance (debit minus credit) and where it sits. */
+export interface ChartAccount {
+  id: string;
+  code: string;
+  name: string;
+  type: "asset" | "liability" | "equity" | "income" | "expense";
+  kind: string | null;
+  system_key: string | null;
+  parent_id: string | null;
+  currency: string | null;
+  is_active: boolean;
+  balance: string;
+  has_entries: boolean;
+  is_system: boolean;
+  is_money: boolean;
+  depth?: number;
+}
+
 /** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
 export interface Item {
   id: string;
@@ -594,6 +612,10 @@ export const ledgerly = {
   addExchangeRate: (body: { currency: string; rate_date: string; rate: string }, ctx: RequestOptions) =>
     api<{ id: string }>("exchange-rates", { ...ctx, method: "POST", body }),
   accounts: (ctx: RequestOptions) => api<{ data: Account[] }>("accounts", ctx),
+  chart: (archived: boolean, ctx: RequestOptions) =>
+    api<{ data: ChartAccount[]; kinds: Record<string, string[]>; can: { manage: boolean } }>("chart", { ...ctx, query: { include_archived: archived ? "1" : undefined } }),
+  addAccount: (body: Record<string, unknown>, ctx: RequestOptions) => api<ChartAccount>("accounts", { ...ctx, method: "POST", body }),
+  changeAccount: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<ChartAccount>(`accounts/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   openingBalances: (ctx: RequestOptions) => api<OpeningBalances>("opening-balances", ctx),
   saveOpeningBalances: (lines: { account_id: string; debit?: string; credit?: string }[], ctx: RequestOptions) =>
     api<OpeningBalances>("opening-balances", { ...ctx, method: "PUT", body: { lines } }),

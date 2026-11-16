@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CashCountController;
+use App\Http\Controllers\ChartController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\CompanyController;
@@ -70,6 +71,7 @@ Route::bind('bankAccount', fn (string $id) => Str::isUuid($id)
     : abort(404));
 Route::bind('statementLine', fn (string $id) => Str::isUuid($id) ? BankTransaction::query()->findOrFail($id) : abort(404));
 Route::bind('reconciliation', fn (string $id) => Str::isUuid($id) ? Reconciliation::query()->findOrFail($id) : abort(404));
+Route::bind('account', fn (string $id) => Str::isUuid($id) ? Account::query()->findOrFail($id) : abort(404));
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:auth');
@@ -122,6 +124,9 @@ Route::prefix('v1')->group(function () {
             Route::put('opening-balances', [OpeningBalanceController::class, 'update']);
 
             Route::get('accounts', [LedgerController::class, 'accounts']);
+            Route::get('chart', [ChartController::class, 'index']);
+            Route::post('accounts', [ChartController::class, 'store']);
+            Route::put('accounts/{account}', [ChartController::class, 'update']);
             Route::get('journal-entries', [LedgerController::class, 'entries']);
             Route::post('journal-entries', [LedgerController::class, 'storeEntry']);
             Route::post('journal-entries/{entry}/reverse', [LedgerController::class, 'reverse']);

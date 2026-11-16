@@ -164,6 +164,8 @@ final class TenantIsolationTest extends TestCase
             'bill bringing in B\'s stock item' => ['POST', '/api/v1/bills', ['contact_id' => $this->a['supplier'], 'issue_date' => '2026-11-05', 'currency' => 'ETB',
                 'warehouse_id' => $this->a['store'], 'lines' => [['description' => 'x', 'quantity' => '1', 'unit_price' => '10', 'account_id' => $this->a['rent'], 'item_id' => $this->b['stock_item']]]]],
             'supplier defaulting to B\'s account' => ['POST', '/api/v1/suppliers', ['name' => 'Planted', 'default_expense_account_id' => $this->b['rent']]],
+            'account under B\'s account' => ['POST', '/api/v1/accounts', ['code' => '6101', 'name' => 'Planted', 'type' => 'expense', 'parent_id' => $this->b['rent']]],
+            'account moved under B\'s account' => ['PUT', "/api/v1/accounts/{$this->a['rent']}", ['parent_id' => $this->b['rent']]],
             'transfer out of B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->b['bank'], 'to_account_id' => $this->a['bank'], 'amount' => '10']],
             'transfer into B\'s bank' => ['POST', '/api/v1/banking/transfers', ['date' => '2026-11-05', 'from_account_id' => $this->a['bank'], 'to_account_id' => $this->b['bank'], 'amount' => '10']],
             'deposit into B\'s bank' => ['POST', '/api/v1/banking/deposits', ['date' => '2026-11-05', 'bank_account_id' => $this->b['bank'], 'receipts' => ['10']]],
