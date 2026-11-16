@@ -79,8 +79,7 @@ final class ExpenseTest extends TestCase
         $this->postJson('/api/v1/expenses', $this->expense(['issue_date' => '2099-01-01']), $this->h)->assertUnprocessable()->assertJsonValidationErrors('issue_date');
         $this->postJson('/api/v1/expenses', $this->expense(['payment_method' => 'barter']), $this->h)->assertUnprocessable()->assertJsonValidationErrors('payment_method');
         // A bank account kept in dollars pays only dollar expenses.
-        $usd = $this->account('1100');
-        $this->owner()->table('accounts')->where('id', $usd)->update(['currency' => 'USD']);
+        $usd = $this->postJson('/api/v1/bank-accounts', ['name' => 'USD account', 'kind' => 'bank', 'currency' => 'USD'], $this->h)->assertCreated()->json('id');
         $this->postJson('/api/v1/expenses', $this->expense(['paid_from_account_id' => $usd]), $this->h)->assertUnprocessable()->assertJsonValidationErrors('paid_from_account_id');
     }
 

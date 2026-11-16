@@ -18,6 +18,8 @@
 | inventory.items    add and change items and warehouses (bookkeeper, purchasing, accountant)
 | inventory.adjust   stock adjustments and opening stock, which post to the ledger (accountant, owner, admin)
 | inventory.transfer move stock between warehouses; no ledger effect (bookkeeper, purchasing, accountant)
+| banking.view       bank, wallet and cash accounts with balances and registers (also viewers)
+| banking.manage     open, rename, give bank details to and archive money accounts (bookkeeper, accountant via 'banking.*')
 | company.view       read the company profile and fiscal settings, the chart of accounts (no balances) and the tax
 |                    rates; every role, because every document form names accounts and taxes
 | company.manage     change the profile and settings; owner and admin only (via '*')
@@ -36,7 +38,7 @@ return [
         'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view'],
         'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer'],
         'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve'],
-        'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'reports.view'],
+        'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'banking.view', 'reports.view'],
         'custom' => [],
     ],
 ];
