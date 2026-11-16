@@ -176,6 +176,10 @@ final class TenantIsolationTest extends TestCase
             'general ledger of B\'s location' => ['GET', "/api/v1/reports/general-ledger?from=2026-07-08&to=2027-07-07&location_id={$this->b['dimension']}", []],
             'statement line categorised for B\'s supplier' => ['POST', "/api/v1/statement-lines/{$this->a['statement_line']}/categorise", ['account_id' => $this->a['rent'], 'contact_id' => $this->b['supplier']]],
             'reconciliation of B\'s bank' => ['POST', "/api/v1/bank-accounts/{$this->b['bank']}/reconciliations", ['statement_date' => '2026-11-09', 'ending_balance' => '1']],
+            'recurring journal on B\'s accounts' => ['POST', '/api/v1/recurring-journals', ['name' => 'Planted', 'memo' => 'Planted', 'frequency' => 'monthly', 'next_on' => '2026-12-01',
+                'lines' => [['account_id' => $this->b['rent'], 'debit' => '10'], ['account_id' => $this->b['equity'], 'credit' => '10']]]],
+            'A\'s recurring journal edited onto B\'s account' => ['PUT', "/api/v1/recurring-journals/{$this->a['recurring_journal']}", ['name' => 'Planted', 'memo' => 'Planted',
+                'frequency' => 'monthly', 'next_on' => '2026-12-01', 'lines' => [['account_id' => $this->a['rent'], 'debit' => '10'], ['account_id' => $this->b['equity'], 'credit' => '10']]]],
             'reconciliation ticking B\'s entry' => ['PUT', "/api/v1/reconciliations/{$this->a['reconciliation']}", ['cleared' => [$this->b['bank_line']]]],
         ];
 
@@ -275,7 +279,7 @@ final class TenantIsolationTest extends TestCase
     /** @return array<string, int> */
     private function ledgerCounts(): array
     {
-        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines'])
+        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines', 'recurring_journals'])
             ->mapWithKeys(fn ($t) => [$t => $this->owner()->table($t)->count()])->all();
     }
 

@@ -28,8 +28,8 @@ export function journalTotals(lines: JournalLineInput[]): { debit: string; credi
   return { debit: toString(d), credit: toString(c), difference: toString(d - c), balanced: d === c && d > 0n };
 }
 
-/** The request body from the form: the date and memo, and the lines that have an account and an amount. */
-export function journalBody(form: FormData): { date: string; memo: string; lines: Record<string, string>[] } {
+/** The request body from the form: the date and memo, the lines that have an account and an amount, and when it reverses. */
+export function journalBody(form: FormData): { date: string; memo: string; lines: Record<string, string>[]; reverse_on?: string } {
   const value = (n: string) => (typeof form.get(n) === "string" ? String(form.get(n)).trim() : "");
   let raw: unknown = [];
   try {
@@ -47,7 +47,17 @@ export function journalBody(form: FormData): { date: string; memo: string; lines
     for (const k of ["description", "location_id", "class_id", "project_id"] as const) if (l[k]) out[k] = String(l[k]).trim();
     return [out];
   });
-  return { date: value("date"), memo: value("memo"), lines };
+  const reverseOn = value("reverse_on");
+  return { date: value("date"), memo: value("memo"), lines, ...(reverseOn ? { reverse_on: reverseOn } : {}) };
+}
+
+export const FREQUENCIES = [["monthly", "Every month"], ["quarterly", "Every quarter"], ["yearly", "Every year"]] as const;
+
+/** A recurring journal's body: its name and schedule, with the memo and lines a journal has. */
+export function recurringBody(form: FormData): { name: string; memo: string; frequency: string; next_on: string; ends_on: string | null; lines: Record<string, string>[] } {
+  const value = (n: string) => (typeof form.get(n) === "string" ? String(form.get(n)).trim() : "");
+  const { memo, lines } = journalBody(form);
+  return { name: value("name"), memo, frequency: value("frequency"), next_on: value("next_on"), ends_on: value("ends_on") || null, lines };
 }
 
 /** Accounts a manual journal can use: active, in the company's currency, not kept by documents (the API's KEPT lists). */

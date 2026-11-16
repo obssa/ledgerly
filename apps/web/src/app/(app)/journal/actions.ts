@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
-import { journalBody } from "@/lib/journal";
+import { journalBody, recurringBody } from "@/lib/journal";
 import { getSession } from "@/lib/session";
 
 /* Server Functions behind manual journals. The API checks who may post (journals.create) and every rule. */
@@ -45,6 +45,47 @@ export async function reverseJournal(_: FormState | undefined, form: FormData): 
   }
   refresh();
   redirect(`/journal/${encodeURIComponent(id)}`);
+}
+
+/** Set up a recurring journal, or save changes to one (it then posts as you). */
+export async function saveRecurring(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let id: string;
+  try {
+    id = (await ledgerly.saveRecurringJournal(text(form, "id") ?? null, recurringBody(form), ctx)).id;
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  redirect(`/journal/recurring/${encodeURIComponent(id)}`);
+}
+
+export async function recurringStep(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const step = text(form, "step");
+  if (step !== "pause" && step !== "resume") return { error: "Choose pause or resume." };
+  try {
+    const nextOn = text(form, "next_on");
+    await ledgerly.recurringJournalStep(text(form, "id") ?? "", step, step === "resume" && nextOn ? { next_on: nextOn } : {}, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: step === "pause" ? "Paused: nothing posts until it is resumed." : "Resumed: it posts as you from now on." };
+}
+
+export async function postDueRecurring(): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const done = await ledgerly.postDueRecurring(ctx);
+    refresh();
+    const paused = done.data.filter((r) => r.error);
+    return paused.length > 0
+      ? { error: `Posted ${done.posted} entries. Paused: ${paused.map((r) => `${r.name} (${r.error})`).join("; ")}` }
+      : { notice: `Posted ${done.posted} ${done.posted === 1 ? "entry" : "entries"}.` };
+  } catch (error) {
+    return refusal(error);
+  }
 }
 
 /** Approve, reject (with a note) or withdraw a manual journal waiting for approval. */

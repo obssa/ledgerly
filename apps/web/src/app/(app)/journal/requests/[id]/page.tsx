@@ -24,6 +24,7 @@ export default async function JournalRequestPage({ params }: PageProps<"/journal
           <div><dt className="text-muted">Date of the entry</dt><dd className="num">{r.date}</dd></div>
           <div><dt className="text-muted">Amount</dt><dd className="num font-semibold">{formatAmount(r.total)}</dd></div>
           <div><dt className="text-muted">Asked by</dt><dd>{r.requested_by ?? "—"}</dd></div>
+          {r.reverse_on && <div><dt className="text-muted">Reverses on</dt><dd className="num">{r.reverse_on}</dd></div>}
           {r.decided_by && <div><dt className="text-muted">{r.status === "withdrawn" ? "Withdrawn by" : "Decided by"}</dt><dd>{r.decided_by}</dd></div>}
           {r.journal_entry && <div><dt className="text-muted">Posted as</dt><dd><Link href={`/journal/${encodeURIComponent(r.journal_entry.id)}`} className="num hover:underline">#{r.journal_entry.number}</Link></dd></div>}
         </dl>

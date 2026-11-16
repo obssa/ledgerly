@@ -337,8 +337,29 @@ export interface JournalRequest {
   decided_at: string | null;
   note: string | null;
   journal_entry: { id: string; number: number } | null;
+  reverse_on: string | null;
   lines: { account_id: string; code: string | null; account: string | null; debit: string | null; credit: string | null; description: string | null }[] | null;
   can: { approve: boolean; withdraw: boolean };
+}
+
+/** Module 6: a manual journal posted on a schedule. Paused, it says why in last_error. */
+export interface RecurringJournal {
+  id: string;
+  name: string;
+  memo: string;
+  total: string;
+  frequency: "monthly" | "quarterly" | "yearly";
+  next_on: string;
+  ends_on: string | null;
+  is_active: boolean;
+  posted_count: number;
+  last_posted_on: string | null;
+  last_error: string | null;
+  posts_as: string | null;
+  lines: { account_id: string; code: string | null; account: string | null; debit: string | null; credit: string | null; description: string | null;
+    location_id: string | null; class_id: string | null; project_id: string | null }[] | null;
+  entries: { id: string; number: number; date: string; status: string }[] | null;
+  can: { edit: boolean };
 }
 
 /** Module 4: something the company sells or buys. Stock items have a bin card per warehouse. */
@@ -745,6 +766,14 @@ export const ledgerly = {
   journalRequest: (id: string, ctx: RequestOptions) => api<JournalRequest>(`journal-requests/${encodeURIComponent(id)}`, ctx),
   decideJournalRequest: (id: string, step: "approve" | "reject" | "withdraw", body: Record<string, unknown>, ctx: RequestOptions) =>
     api<JournalRequest | JournalDetail>(`journal-requests/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
+  recurringJournals: (ctx: RequestOptions) => api<{ data: RecurringJournal[]; due: number; can: { create: boolean } }>("recurring-journals", ctx),
+  recurringJournal: (id: string, ctx: RequestOptions) => api<RecurringJournal>(`recurring-journals/${encodeURIComponent(id)}`, ctx),
+  saveRecurringJournal: (id: string | null, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<RecurringJournal>(id ? `recurring-journals/${encodeURIComponent(id)}` : "recurring-journals", { ...ctx, method: id ? "PUT" : "POST", body }),
+  recurringJournalStep: (id: string, step: "pause" | "resume", body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<RecurringJournal>(`recurring-journals/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
+  postDueRecurring: (ctx: RequestOptions) =>
+    api<{ data: { id: string; name: string; posted: number[]; error: string | null }[]; posted: number }>("recurring-journals/post-due", { ...ctx, method: "POST", body: {} }),
   reverseJournal: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<JournalDetail>(`journal-entries/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   chart: (archived: boolean, ctx: RequestOptions) =>

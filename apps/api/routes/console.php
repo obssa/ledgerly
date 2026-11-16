@@ -10,6 +10,40 @@ use Illuminate\Support\Facades\Schedule;
 if (config('queue.default') === 'redis') {
     Schedule::command('horizon:snapshot')->everyFiveMinutes();
 }
+Schedule::command('ledgerly:post-recurring')->hourly();
+
+/*
+| Posts recurring journals that have come due (App\Domain\Ledger\RecurringJournals), each in its own company's
+| context and as the person it posts as. Which templates are due comes from recurring_journals_due() (036): ids only.
+| A template that fails is paused with the reason by RecurringJournals; an unexpected error is reported and the
+| others still post.
+*/
+Artisan::command('ledgerly:post-recurring', function (\App\Domain\Ledger\RecurringJournals $recurring, \App\Domain\Tenancy\Support\CurrentCompany $current) {
+    // Each company's own today decides; tomorrow in UTC is the latest any company's today can be.
+    $due = DB::select('SELECT company_id, template_id, posts_as FROM recurring_journals_due(?)', [now('UTC')->addDay()->format('Y-m-d')]);
+    $posted = 0;
+    foreach ($due as $row) {
+        try {
+            $result = \App\Domain\Tenancy\Support\DatabaseTenantContext::run($row->posts_as, $row->company_id, function () use ($recurring, $current, $row) {
+                $current->set(\App\Domain\Tenancy\Models\Company::query()->findOrFail($row->company_id));
+
+                return $recurring->postDue($current->get(), $row->template_id, $row->posts_as, $current->today());
+            });
+            $posted += count($result['posted']);
+            if ($result['error'] !== null) {
+                $this->warn("Recurring journal {$row->template_id} paused: {$result['error']}");
+            }
+        } catch (\Throwable $e) {
+            report($e);
+            $this->error("Recurring journal {$row->template_id} failed: " . $e::class);
+        } finally {
+            $current->forget();
+        }
+    }
+    $this->info("Posted {$posted} recurring journal entries.");
+
+    return 0;
+})->purpose('Post recurring journals that have come due');
 
 /*
 | Run before `migrate` when the tables live outside `public` (DB_SCHEMA, shared hosting): Laravel creates its

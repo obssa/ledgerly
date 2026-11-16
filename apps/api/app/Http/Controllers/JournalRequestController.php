@@ -16,7 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Module 6: manual journals above the company's approval limit, waiting for someone other than the person who asked.
- * Approved, the journal is checked again and posted as it was asked, by the approver; rejected, with a note; or
+ * Approved, the journal is checked again and posted as it was asked, by the approver (and reversed on the day it was
+ * set to reverse, if it was); rejected, with a note; or
  * withdrawn by the person who asked. The database keeps these rules too (033).
  */
 final class JournalRequestController extends Controller
@@ -61,13 +62,16 @@ final class JournalRequestController extends Controller
             }
             $draft = ManualJournal::draft($company, $r->entry_date, $r->memo, json_decode((string) $r->lines, true, 512, JSON_THROW_ON_ERROR), $r->id);
             $entry = $journals->guarded(fn () => $this->posting->post($draft, $userId));
+            if ($r->reverse_on !== null) {
+                $journals->autoReverse($entry, (string) $r->reverse_on, $userId);
+            }
             DB::table('journal_requests')->where('id', $r->id)->update([
                 'status' => 'approved', 'decided_by' => $userId, 'decided_at' => now(), 'journal_entry_id' => $entry->getKey(),
             ]);
             $this->audit->record($company->getKey(), 'journal_approved', 'journal_request', $r->id, ['status' => 'pending'],
                 ['status' => 'approved', 'journal_entry' => $entry->number, 'total' => (string) $r->total], userId: $userId);
 
-            return $entry;
+            return $entry->refresh();
         });
 
         return response()->json($journals->present($entry), 201);
@@ -139,7 +143,7 @@ final class JournalRequestController extends Controller
         $userId = auth()->id();
 
         return [
-            'id' => $r->id, 'date' => $r->entry_date, 'memo' => $r->memo, 'total' => (string) $r->total, 'status' => $r->status,
+            'id' => $r->id, 'date' => $r->entry_date, 'memo' => $r->memo, 'total' => (string) $r->total, 'status' => $r->status, 'reverse_on' => $r->reverse_on,
             'requested_by' => $names[$r->requested_by] ?? null, 'requested_at' => $r->created_at,
             'decided_by' => $r->decided_by ? ($names[$r->decided_by] ?? null) : null, 'decided_at' => $r->decided_at, 'note' => $r->decision_note,
             'journal_entry' => $r->journal_entry_id ? ['id' => $r->journal_entry_id, 'number' => (int) $entry] : null,

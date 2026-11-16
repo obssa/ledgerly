@@ -9,6 +9,7 @@ use App\Http\Controllers\ChartController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
+use App\Http\Controllers\RecurringJournalController;
 use App\Http\Controllers\RevaluationController;
 use App\Http\Controllers\ChequeController;
 use App\Http\Controllers\BillController;
@@ -148,6 +149,13 @@ Route::prefix('v1')->group(function () {
             Route::post('journal-requests/{journalRequest}/approve', [JournalRequestController::class, 'approve'])->whereUuid('journalRequest');
             Route::post('journal-requests/{journalRequest}/reject', [JournalRequestController::class, 'reject'])->whereUuid('journalRequest');
             Route::post('journal-requests/{journalRequest}/withdraw', [JournalRequestController::class, 'withdraw'])->whereUuid('journalRequest');
+            Route::get('recurring-journals', [RecurringJournalController::class, 'index']);
+            Route::post('recurring-journals', [RecurringJournalController::class, 'store']);
+            Route::post('recurring-journals/post-due', [RecurringJournalController::class, 'postDue']);
+            Route::get('recurring-journals/{recurringJournal}', [RecurringJournalController::class, 'show'])->whereUuid('recurringJournal');
+            Route::put('recurring-journals/{recurringJournal}', [RecurringJournalController::class, 'update'])->whereUuid('recurringJournal');
+            Route::post('recurring-journals/{recurringJournal}/pause', [RecurringJournalController::class, 'pause'])->whereUuid('recurringJournal');
+            Route::post('recurring-journals/{recurringJournal}/resume', [RecurringJournalController::class, 'resume'])->whereUuid('recurringJournal');
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
             Route::post('tax-rates', [TaxRateController::class, 'store']);
