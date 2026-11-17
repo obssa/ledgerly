@@ -620,6 +620,8 @@ export interface InvoiceLine {
   discount_rate: string;
   tax_rate_id: string | null;
   account_id: string;
+  /** The project the line is tagged with (job costing), if any. */
+  project_id?: string | null;
   line_subtotal: string;
   line_tax: string;
 }

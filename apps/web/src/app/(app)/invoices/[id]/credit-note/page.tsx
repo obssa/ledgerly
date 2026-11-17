@@ -18,7 +18,7 @@ export default async function NewCreditNotePage({ params }: PageProps<"/invoices
         title={<>Credit note for <span className="num">{invoice.number}</span></>}
       />
       {["posted", "part_paid", "paid"].includes(invoice.status) ? (
-        <CreditNoteForm invoice={invoice} taxRates={options.taxRates} />
+        <CreditNoteForm invoice={invoice} taxRates={options.taxRates} projects={options.projects ?? []} />
       ) : (
         <p className="text-sm text-muted">Only a posted invoice is credited. Change the draft instead.</p>
       )}
