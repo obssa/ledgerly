@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDate, periodLabel, previousPeriod, showRatio } from "./reports";
+import { STOCK_BANDS, isDate, periodLabel, previousPeriod, showRatio } from "./reports";
 
 describe("previousPeriod", () => {
   it("is the same length, ending the day before", () => {
@@ -23,5 +23,12 @@ describe("isDate and showRatio", () => {
     expect(isDate("yesterday")).toBe(false);
     expect(showRatio(null, "%")).toBe("—");
     expect(showRatio("40.0", "%")).toBe("40.0%");
+  });
+});
+
+describe("STOCK_BANDS", () => {
+  it("names every band the API gives, slow-moving and dead stock marked", () => {
+    expect(Object.keys(STOCK_BANDS)).toEqual(["0-30", "31-90", "91-180", "over-180", "never"]);
+    expect([STOCK_BANDS["91-180"].note, STOCK_BANDS["over-180"].note, STOCK_BANDS.never.note, STOCK_BANDS["0-30"].note]).toEqual(["slow-moving", "dead stock", "dead stock", undefined]);
   });
 });

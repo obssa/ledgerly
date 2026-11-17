@@ -8,11 +8,11 @@ import type { Cell } from "./csv";
  */
 
 type Ctx = { token: string; companyId: string };
-type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string };
+type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
-  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log"] as const;
+  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 const ageing = (title: string, r: Awaited<ReturnType<typeof ledgerly.arAgeing>>): Export => ({
@@ -95,6 +95,20 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
         before = String(log.next_before_id);
       }
       return { title: "audit-log", rows };
+    }
+    case "stock-movement": {
+      const r = await ledgerly.stockMovement({ from: p.from, to: p.to, warehouse_id: p.warehouse_id }, ctx);
+      return { title: "stock-movement", rows: [["SKU", "Item", "Unit", "Opening quantity", "Opening value", "In quantity", "In value", "Out quantity", "Out value",
+        "Sold quantity", "Closing quantity", "Closing value"],
+        ...r.rows.map((x) => [x.item.sku, x.item.name, x.item.unit, x.opening_qty, x.opening_value, x.in_qty, x.in_value, x.out_qty, x.out_value, x.sold_qty,
+          x.closing_qty, x.closing_value]),
+        ["Total", null, null, null, r.totals.opening_value, null, r.totals.in_value, null, r.totals.out_value, null, null, r.totals.closing_value]] };
+    }
+    case "stock-ageing": {
+      const r = await ledgerly.stockAgeing({ as_of: p.as_of, warehouse_id: p.warehouse_id }, ctx);
+      return { title: "stock-ageing", rows: [["SKU", "Item", "Unit", "Quantity", "Value", "Last sold", "Last received", "Days since sale", "Band"],
+        ...r.rows.map((x) => [x.item.sku, x.item.name, x.item.unit, x.quantity, x.value, x.last_sold_on, x.last_received_on, x.days_since_sale, x.band]),
+        ["Total", null, null, null, r.total_value, null, null, null, null]] };
     }
     case "ar-ageing":
       return ageing("ar-ageing", await ledgerly.arAgeing(p.as_of, ctx));

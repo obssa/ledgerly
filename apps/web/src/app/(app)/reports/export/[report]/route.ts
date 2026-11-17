@@ -25,8 +25,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
   try {
     const period = await getReportPeriod({ from: q.get("from") ?? undefined, to: q.get("to") ?? undefined });
     const asOf = isDate(q.get("as_of")) ? (q.get("as_of") as string) : period.to;
-    const options = { kind: word("kind"), group: word("group"), account_id: id, action: word("action"), user_id: uuid("user_id") };
-    const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing"].includes(report);
+    const options = { kind: word("kind"), group: word("group"), account_id: id, action: word("action"), user_id: uuid("user_id"), warehouse_id: uuid("warehouse_id") };
+    const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing"].includes(report);
     const { title, rows } = await exportRows(report as ExportableReport, { ...period, as_of: asOf, ...options }, ctx);
     await ledgerly.recordExport({
       report, format: "csv", ...(pointInTime ? { as_of: asOf } : { from: period.from, to: period.to }),

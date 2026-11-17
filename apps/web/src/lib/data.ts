@@ -942,6 +942,8 @@ export const getDocumentAnalysis = (side: "sales" | "purchases", q: { group: str
   statement((ctx) => ledgerly.documentAnalysis(side, q, ctx));
 export const getAuditLog = (q: Record<string, string | undefined>): Promise<AuditLog | null> => statement((ctx) => ledgerly.auditLog(q, ctx));
 export const verifyAuditLog = () => statement((ctx) => ledgerly.verifyAuditLog(ctx));
+export const getStockMovement = (q: { from: string; to: string; warehouse_id?: string }) => statement((ctx) => ledgerly.stockMovement(q, ctx));
+export const getStockAgeing = (q: { as_of?: string; warehouse_id?: string }) => statement((ctx) => ledgerly.stockAgeing(q, ctx));
 export const getFinancialHealth = (q: { from: string; to: string }): Promise<FinancialHealth | null> => statement((ctx) => ledgerly.financialHealth(q, ctx));
 
 export async function getProfitAndLoss(q: { from: string; to: string; compare_from?: string; compare_to?: string }): Promise<ProfitAndLoss> {
