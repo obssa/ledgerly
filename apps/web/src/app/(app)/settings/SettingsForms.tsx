@@ -5,7 +5,7 @@ import type { CompanySettings, Currencies, Dimension, Numbering } from "@/lib/ap
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
-import { VAT_SHOWN } from "@/lib/settings";
+import { VAT_SHOWN, REMINDERS_SHOWN } from "@/lib/settings";
 import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock, toggleDimension } from "./actions";
 import { todayIn } from "@/lib/dates";
 
@@ -107,6 +107,21 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
             <input className="field num" id={`approval-${key}`} name={`approval.${key}`} inputMode="decimal" defaultValue={settings.approval?.[key] ?? ""} placeholder="No limit" />
           </div>
         ))}
+      </fieldset>
+
+      <h3 className="mb-1 mt-7 text-[15px] font-bold">Payment reminders</h3>
+      <p className="mb-3 text-[13px] text-muted">An email to the customer so many days after an invoice falls due, while something is still owed. Up to three steps; each goes once.</p>
+      <fieldset disabled={!editable} className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] items-end gap-[18px]">
+        <legend className="sr-only">Payment reminders</legend>
+        <input type="hidden" name={REMINDERS_SHOWN} value="1" />
+        <label className="flex items-center gap-2 text-sm" htmlFor="reminders-enabled">
+          <input type="checkbox" id="reminders-enabled" name="reminders.enabled" defaultChecked={settings.reminders?.enabled ?? false} />
+          Send reminders automatically
+        </label>
+        <div>
+          <label className="field-label" htmlFor="reminders-days">Days after the due date</label>
+          <input className="field num" id="reminders-days" name="reminders.days" inputMode="numeric" defaultValue={(settings.reminders?.days ?? [7, 30]).join(", ")} placeholder="7, 30" />
+        </div>
       </fieldset>
 
       {editable && (

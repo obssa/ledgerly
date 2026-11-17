@@ -50,6 +50,8 @@ export interface CompanySettings {
   fiscal_years: { starts_on: string; ends_on: string; status: string }[];
   /** Above these amounts someone other than the creator approves (invoices, bills, manual journals). */
   approval?: Partial<Record<"invoice_above" | "bill_above" | "journal_above", string>>;
+  /** Payment reminders: emailed to the customer so many days after an invoice falls due (048). */
+  reminders?: { enabled: boolean; days: number[] };
   can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean; manage_dimensions: boolean };
   options: { tax_id_label: string; calendars: string[]; legal_forms: string[] };
 }
@@ -703,7 +705,9 @@ export interface InvoiceDetail extends Invoice {
   contact: Contact & { email?: string | null };
   lines: InvoiceLine[];
   warnings: { type: string; message: string }[];
-  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean; refund?: boolean };
+  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean; refund?: boolean; remind?: boolean };
+  /** Payment reminders sent to the customer, newest first (048). */
+  reminders?: InvoiceReminderSent[];
 }
 
 /** GET /payments-made/withholding/{supplier}: what the country pack says about withholding on a payment to them. */
@@ -966,6 +970,8 @@ export interface Member {
   joined_at: string;
   me?: boolean;
 }
+
+export interface InvoiceReminderSent { kind: "manual" | "scheduled"; step: number | null; sent_to: string; sent_at: string }
 
 export interface Invitation { company_name: string; role: string; email: string; name: string; new_account: boolean; expires_at: string }
 
@@ -1303,6 +1309,7 @@ export const ledgerly = {
     api<{ id: string }>(`invoices/${encodeURIComponent(invoiceId)}/credit-notes`, { ...ctx, method: "POST", body }),
   creditNotes: (ctx: RequestOptions) =>
     api<{ data: (Invoice & { original?: { id: string; number: string | null } | null })[] }>("credit-notes", ctx),
+  remindInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/remind`, { ...ctx, method: "POST", body: {} }),
   applyCredit: (creditNoteId: string, body: { invoice_id: string; amount: string }, ctx: RequestOptions) =>
     api<unknown>(`credit-notes/${encodeURIComponent(creditNoteId)}/apply`, { ...ctx, method: "POST", body }),
   taxRates: (ctx: RequestOptions) => api<{ data: TaxRate[] }>("tax-rates", ctx),

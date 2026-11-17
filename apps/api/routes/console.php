@@ -12,6 +12,7 @@ if (config('queue.default') === 'redis') {
 }
 Schedule::command('ledgerly:post-recurring')->hourly();
 Schedule::command('ledgerly:send-saved-reports')->hourly();
+Schedule::command('ledgerly:send-invoice-reminders')->hourly();
 
 /*
 | Posts recurring journals that have come due (App\Domain\Ledger\RecurringJournals), each in its own company's
@@ -87,6 +88,42 @@ Artisan::command('ledgerly:send-saved-reports', function (\App\Domain\Reports\Sa
 
     return 0;
 })->purpose('Email the scheduled reports that have come due');
+
+/*
+| Sends the payment reminders that have come due (048): for each company with reminders on, an email to the customer
+| so many days after an invoice fell due, while something is still owed. Which are due comes from
+| invoice_reminders_due(): ids only. Each runs in its own company's context and is due on the company's own today;
+| a step goes once per invoice. A customer without an email, or an invoice paid meanwhile, is skipped.
+*/
+Artisan::command('ledgerly:send-invoice-reminders', function (\App\Domain\Sales\InvoiceReminders $reminders, \App\Domain\Tenancy\Support\CurrentCompany $current) {
+    $due = DB::select('SELECT company_id, document_id, step FROM invoice_reminders_due(?)', [now('UTC')->addDay()->format('Y-m-d')]);
+    $sent = 0;
+    foreach ($due as $row) {
+        try {
+            $sent += \App\Domain\Tenancy\Support\DatabaseTenantContext::run(null, $row->company_id, function () use ($reminders, $current, $row) {
+                $company = \App\Domain\Tenancy\Models\Company::query()->findOrFail($row->company_id);
+                $current->set($company);
+                $invoice = \App\Domain\Sales\Models\Document::query()->where('company_id', $row->company_id)->find($row->document_id);
+                if ($invoice === null || $invoice->due_date === null || $invoice->due_date->copy()->addDays((int) $row->step)->format('Y-m-d') > $current->today()) {
+                    return 0;   // not yet due in the company's own time zone
+                }
+                $reminders->send($company, $invoice, 'scheduled', (int) $row->step, null);
+
+                return 1;
+            });
+        } catch (\Illuminate\Validation\ValidationException) {
+            // paid or changed since the list was read: nothing to remind
+        } catch (\Throwable $e) {
+            report($e);
+            $this->error("Reminder for invoice {$row->document_id} failed: " . $e::class);
+        } finally {
+            $current->forget();
+        }
+    }
+    $this->info("Sent {$sent} payment reminders.");
+
+    return 0;
+})->purpose('Email the payment reminders that have come due');
 
 /*
 | Run before `migrate` when the tables live outside `public` (DB_SCHEMA, shared hosting): Laravel creates its

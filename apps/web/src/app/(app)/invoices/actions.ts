@@ -21,7 +21,9 @@ async function context(): Promise<{ token: string; companyId: string }> {
 
 function refusal(error: unknown): FormState {
   if (error instanceof ApiError && error.status === 401) redirect("/sign-in");
-  if (error instanceof ApiError && error.status === 403) return { error: "Your role cannot do this." };
+  if (error instanceof ApiError && error.status === 403) {
+    return { error: (error.body as { type?: string } | null)?.type === "DemoAccount" ? "Not available in the demo: reminders are not emailed from the shared demo accounts." : "Your role cannot do this." };
+  }
   // A rule of the books (closed period, approval limit, state) arrives as 422 with a message for the person.
   if (error instanceof ApiError && error.status === 422 && (error.body as { type?: string } | null)?.type) {
     return { error: (error.body as { message?: string }).message ?? "Not possible right now." };
@@ -73,6 +75,18 @@ export async function applyCredit(_: FormState | undefined, form: FormData): Pro
   }
   refresh();
   return { notice: "Credit applied." };
+}
+
+/** Module 2: emails the customer a payment reminder for this invoice now (at most once a day). */
+export async function remindInvoice(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const invoice = await ledgerly.remindInvoice(text(form, "id") ?? "", ctx);
+    refresh();
+    return { notice: `Reminder sent to ${invoice.reminders?.[0]?.sent_to ?? "the customer"}.` };
+  } catch (error) {
+    return refusal(error);
+  }
 }
 
 export async function invoiceAction(_: FormState | undefined, form: FormData): Promise<FormState> {

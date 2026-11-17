@@ -5,6 +5,7 @@ import { getInvoice, getMoneyAccounts, getOpenInvoices } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { ApplyCredit } from "./ApplyCredit";
+import { Reminders } from "./Reminders";
 import { InvoiceActions } from "./InvoiceActions";
 
 export const metadata = { title: "Invoice" };
@@ -99,6 +100,9 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
           {!invoice.demo && <InvoiceActions invoice={invoice} />}
           {!creditNote && invoice.can.credit && ["posted", "part_paid", "paid"].includes(invoice.status) && !invoice.demo && (
             <Link href={`/invoices/${encodeURIComponent(invoice.id)}/credit-note`} className="btn justify-center">Issue a credit note</Link>
+          )}
+          {!creditNote && !invoice.demo && ["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0 && (
+            <Reminders invoiceId={invoice.id} sent={invoice.reminders ?? []} canSend={Boolean(invoice.can.remind)} />
           )}
           {canApply && <ApplyCredit creditNoteId={invoice.id} left={invoice.amount_due} invoices={openInvoices} />}
           {canRefund && <RefundPanel side="customer" contactId={invoice.contact.id} currency={invoice.currency} left={invoice.amount_due} creditId={invoice.id} accounts={moneyAccounts} />}
