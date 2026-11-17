@@ -63,3 +63,13 @@ body {
     @apply whitespace-nowrap border-b border-line-soft px-3 py-3;
   }
 }
+
+/* Printing a report, or saving it as PDF from the print dialog: the page as shown, without the app around it. */
+@media print {
+  @page { margin: 14mm 12mm; }
+  body { background: #fff; }
+  .tbl { font-size: 11px; }
+  .tbl th, .tbl td { padding: 4px 6px; }
+  .tbl tr { break-inside: avoid; }
+  .tbl thead { display: table-header-group; }
+}

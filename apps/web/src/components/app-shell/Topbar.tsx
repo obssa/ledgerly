@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export function Topbar({ user }: { user: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3">
+    <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
       <div className="max-w-[520px] flex-[1_1_320px]">
         <label htmlFor="q" className="sr-only">Search</label>
         <input

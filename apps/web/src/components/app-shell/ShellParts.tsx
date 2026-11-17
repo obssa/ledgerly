@@ -5,6 +5,12 @@ import { getShellContext } from "@/lib/data";
 /** Server parts of the app shell; the layout renders each inside <Suspense>. */
 
 /** The company being worked in, and the switcher: other companies, and adding one to the same organisation. */
+/** On paper only: whose books a printed report is from. */
+export async function PrintedCompany() {
+  const { companyName } = await getShellContext();
+  return <p className="hidden text-[13px] font-bold print:block">{companyName}</p>;
+}
+
 export async function CompanyBadge() {
   const { companyName, companyNote, companies, companyId, organisationId, demo } = await getShellContext();
   const others = companies.filter((c) => c.id !== companyId);
