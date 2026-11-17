@@ -9,6 +9,7 @@ use App\Http\Controllers\ChartController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
+use App\Http\Controllers\AnalysisReportController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
@@ -308,6 +309,9 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/cash-flow', [FinancialStatementController::class, 'cashFlow']);
             Route::get('reports/changes-in-equity', [FinancialStatementController::class, 'changesInEquity']);
             Route::get('reports/financial-health', [FinancialStatementController::class, 'health']);
+            Route::get('reports/profit-by-dimension', [AnalysisReportController::class, 'profitByDimension']);
+            Route::get('reports/sales', [AnalysisReportController::class, 'sales']);
+            Route::get('reports/purchases', [AnalysisReportController::class, 'purchases']);
         });
     });
 });

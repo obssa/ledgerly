@@ -860,6 +860,27 @@ export interface FinancialHealth {
   ratios: Record<"current_ratio" | "quick_ratio" | "cash_runway_months" | "dso_days" | "dpo_days" | "gross_margin" | "net_margin", string | null>;
 }
 
+/** Module 10: profit by location, class or project. */
+export interface ProfitByDimension {
+  kind: "location" | "class" | "project";
+  from: string;
+  to: string;
+  currency: string;
+  rows: { id: string | null; code: string | null; name: string; income: string; cost_of_sales: string; expenses: string; profit: string; margin: string | null }[];
+  totals: Record<"income" | "cost_of_sales" | "expenses" | "profit", string>;
+}
+
+/** Module 10: sales or purchases by customer or supplier, item, or month. */
+export interface DocumentAnalysis {
+  side: "sales" | "purchases";
+  group: "contact" | "item" | "month";
+  from: string;
+  to: string;
+  currency: string;
+  rows: { key: string | null; label: string; amount: string; tax: string; documents: number; quantity: string | null; share: string | null }[];
+  totals: Record<"amount" | "tax", string>;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) {
     super(message);
@@ -1181,6 +1202,9 @@ export const ledgerly = {
   cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),
   changesInEquity: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<ChangesInEquity>("reports/changes-in-equity", { ...ctx, query: q }),
   financialHealth: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<FinancialHealth>("reports/financial-health", { ...ctx, query: q }),
+  profitByDimension: (q: { kind: string; from?: string; to?: string }, ctx: RequestOptions) => api<ProfitByDimension>("reports/profit-by-dimension", { ...ctx, query: q }),
+  documentAnalysis: (side: "sales" | "purchases", q: { group: string; from?: string; to?: string }, ctx: RequestOptions) =>
+    api<DocumentAnalysis>(`reports/${side}`, { ...ctx, query: q }),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>
     api<ProfitAndLoss>("reports/profit-and-loss", { ...ctx, query: q }),
 };
