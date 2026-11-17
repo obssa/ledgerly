@@ -11,6 +11,7 @@ if (config('queue.default') === 'redis') {
     Schedule::command('horizon:snapshot')->everyFiveMinutes();
 }
 Schedule::command('ledgerly:post-recurring')->hourly();
+Schedule::command('ledgerly:send-saved-reports')->hourly();
 
 /*
 | Posts recurring journals that have come due (App\Domain\Ledger\RecurringJournals), each in its own company's
@@ -44,6 +45,48 @@ Artisan::command('ledgerly:post-recurring', function (\App\Domain\Ledger\Recurri
 
     return 0;
 })->purpose('Post recurring journals that have come due');
+
+/*
+| Sends the scheduled reports that have come due (045): an email to the person who saved each one, with a link to it and
+| no figures. Each runs in its own company's context as that person; due on the company's own today. Someone who no
+| longer reads reports gets nothing, and the schedule moves on. Which are due comes from saved_reports_due(): ids only.
+*/
+Artisan::command('ledgerly:send-saved-reports', function (\App\Domain\Reports\SavedReports $saved, \App\Domain\Tenancy\Support\CurrentCompany $current, \App\Domain\Audit\AuditLogger $audit) {
+    $due = DB::select('SELECT company_id, saved_report_id, user_id FROM saved_reports_due(?)', [now('UTC')->addDay()->format('Y-m-d')]);
+    $sent = 0;
+    foreach ($due as $row) {
+        try {
+            $sent += \App\Domain\Tenancy\Support\DatabaseTenantContext::run($row->user_id, $row->company_id, function () use ($saved, $current, $audit, $row) {
+                $company = \App\Domain\Tenancy\Models\Company::query()->findOrFail($row->company_id);
+                $current->set($company);
+                $today = $current->today();
+                $report = DB::table('saved_reports')->where(['id' => $row->saved_report_id, 'company_id' => $row->company_id, 'user_id' => $row->user_id])->first();
+                if ($report === null || $report->next_send_on > $today) {
+                    return 0;   // not yet due in the company's own time zone
+                }
+                $member = \App\Domain\Tenancy\Models\Membership::query()->where(['company_id' => $row->company_id, 'user_id' => $row->user_id, 'status' => 'active'])->first();
+                $send = $member !== null && $member->can('reports.view');
+                if ($send) {
+                    $dates = $saved->period($row->company_id, $report->period, $report->from_date, $report->to_date, $today);
+                    $covers = in_array($report->report, \App\Domain\Reports\SavedReports::AT_A_DATE, true) ? "at {$dates['to']}" : "{$dates['from']} to {$dates['to']}";
+                    \App\Models\User::query()->findOrFail($row->user_id)->notify(new \App\Notifications\SavedReportReady($report->id, $report->name, (string) $company->legal_name, $covers));
+                    $audit->record($row->company_id, 'saved_report_sent', 'saved_report', $report->id, null, ['name' => $report->name, 'covers' => $covers], userId: $row->user_id);
+                }
+                DB::table('saved_reports')->where('id', $report->id)->update(['next_send_on' => $saved->nextSend($report->schedule, $today), 'last_sent_at' => $send ? now() : $report->last_sent_at]);
+
+                return $send ? 1 : 0;
+            });
+        } catch (\Throwable $e) {
+            report($e);
+            $this->error("Saved report {$row->saved_report_id} failed: " . $e::class);
+        } finally {
+            $current->forget();
+        }
+    }
+    $this->info("Sent {$sent} scheduled reports.");
+
+    return 0;
+})->purpose('Email the scheduled reports that have come due');
 
 /*
 | Run before `migrate` when the tables live outside `public` (DB_SCHEMA, shared hosting): Laravel creates its

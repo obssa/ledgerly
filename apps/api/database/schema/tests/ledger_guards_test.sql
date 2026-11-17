@@ -2412,6 +2412,52 @@ DO $$ BEGIN
   END IF;
   RAISE NOTICE 'PASS T71 only sales documents name a salesperson, and only an active member of the company';
 END $$;
+-- T72: saved and scheduled reports (045). Saved by the person signed in, an active member; seen only by them; a custom
+-- period has its dates, a schedule its next date; the scheduler sees what is due only outside any company. Company A,
+-- as user f1; f2 is not a member of company A.
+DO $$ BEGIN
+  INSERT INTO saved_reports (id, company_id, user_id, name, report, period, schedule, next_send_on) VALUES
+    ('00000000-0000-0000-0000-0000000072a1', app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'Monthly P&L', 'profit-and-loss', 'last_month', 'monthly', '2027-09-01');
+  BEGIN
+    INSERT INTO saved_reports (company_id, user_id, name, report, period) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000f2', 'Not mine', 'balance-sheet', 'this_month');
+    RAISE EXCEPTION 'FAIL T72a: a report was saved for someone else';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+  BEGIN
+    INSERT INTO saved_reports (company_id, user_id, name, report, period) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'No dates', 'balance-sheet', 'custom');
+    RAISE EXCEPTION 'FAIL T72b: a custom period was saved without its dates';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO saved_reports (company_id, user_id, name, report, period, schedule) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'Never sent', 'balance-sheet', 'this_month', 'weekly');
+    RAISE EXCEPTION 'FAIL T72c: a schedule was saved without its next date';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO saved_reports (company_id, user_id, name, report, period) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'Payroll', 'payroll', 'this_month');
+    RAISE EXCEPTION 'FAIL T72d: a report that does not exist was saved';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE saved_reports SET user_id = '00000000-0000-0000-0000-0000000000f2' WHERE id = '00000000-0000-0000-0000-0000000072a1';
+    RAISE EXCEPTION 'FAIL T72e: a saved report was handed to someone else';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+  -- Someone else in the same company does not see it.
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM saved_reports) THEN
+    RAISE EXCEPTION 'FAIL T72f: another person saw a saved report';
+  END IF;
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  IF EXISTS (SELECT 1 FROM saved_reports_due('2027-09-01')) THEN
+    RAISE EXCEPTION 'FAIL T72g: due reports were listed inside a company''s context';
+  END IF;
+  PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+  IF (SELECT array_agg(saved_report_id) FROM saved_reports_due('2027-09-01')) IS DISTINCT FROM ARRAY['00000000-0000-0000-0000-0000000072a1'::uuid] THEN
+    RAISE EXCEPTION 'FAIL T72h: the scheduler did not see exactly the report that is due';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T72 a saved report is its owner''s alone, saved by them, and the scheduler sees only what is due';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

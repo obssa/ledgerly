@@ -126,6 +126,9 @@ trait CompanyFixtures
         $ids['fixed_asset'] = $this->postJson('/api/v1/fixed-assets', ['code' => 'IT-001', 'name' => "{$name} laptop", 'asset_account_id' => $byCode('1500'),
             'depreciation_account_id' => $byCode('1590'), 'expense_account_id' => $byCode('6700'), 'acquired_on' => '2026-11-03', 'cost' => '36000',
             'method' => 'straight_line', 'useful_life_months' => 36], $h)->assertCreated()->json('id');
+        // The owner's saved report: last month's profit and loss, sent monthly.
+        $ids['saved_report'] = $this->postJson('/api/v1/saved-reports', ['name' => 'Monthly P&L', 'report' => 'profit-and-loss', 'period' => 'last_month',
+            'schedule' => 'monthly'], $h)->assertCreated()->json('id');
         // The VAT return for September, filed on 10 Oct (nothing was posted then, so it is all zero).
         $ids['tax_return'] = $this->postJson('/api/v1/tax-returns', ['kind' => 'vat', 'period_start' => '2026-09-01', 'period_end' => '2026-09-30',
             'filed_on' => '2026-10-10', 'reference' => "{$name} VAT Sep"], $h)->assertCreated()->json('id');
@@ -143,7 +146,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(182, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(187, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -177,6 +180,7 @@ trait CompanyFixtures
             'project' => $ids['project'],
             'timeEntry' => $ids['time_entry'],
             'fixedAsset' => $ids['fixed_asset'],
+            'savedReport' => $ids['saved_report'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");
