@@ -958,6 +958,7 @@ export async function getSavedReport(id: string) {
     throw error;
   }
 }
+export const getMembers = () => statement((ctx) => ledgerly.members(ctx));
 export const getFinancialHealth = (q: { from: string; to: string }): Promise<FinancialHealth | null> => statement((ctx) => ledgerly.financialHealth(q, ctx));
 
 export async function getProfitAndLoss(q: { from: string; to: string; compare_from?: string; compare_to?: string }): Promise<ProfitAndLoss> {

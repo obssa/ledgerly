@@ -2458,6 +2458,66 @@ DO $$ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T72 a saved report is its owner''s alone, saved by them, and the scheduler sees only what is due';
 END $$;
+-- T73: invitation links (046). Made only by an owner or admin of the company, for an open invitation, lasting at most
+-- 14 days; the app reads only its own company's links and writes none; looked up and used once only outside any company's context;
+-- accepting is the invited person's own change. Company A, as its owner f1; f9 is invited; f2 owns company B.
+DO $$
+DECLARE
+  hash text := repeat('ab', 32);
+  m uuid := '00000000-0000-0000-0000-0000000073e1';
+  n int;
+BEGIN
+  INSERT INTO users (id, name, email, password) VALUES ('00000000-0000-0000-0000-0000000000f9', 'Selam', 'selam@example.test', 'not-usable');
+  INSERT INTO memberships (id, company_id, user_id, role, status, invited_at) VALUES
+    (m, app_company_id(), '00000000-0000-0000-0000-0000000000f9', 'accountant', 'invited', now());
+  BEGIN
+    PERFORM invitation_issue(m, hash, true, now() + interval '30 days');
+    RAISE EXCEPTION 'FAIL T73a: an invitation link lasted more than 14 days';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    PERFORM invitation_issue((SELECT id FROM memberships WHERE company_id = '00000000-0000-0000-0000-00000000000b' LIMIT 1), hash, true, now() + interval '7 days');
+    RAISE EXCEPTION 'FAIL T73b: a link was made for another company''s membership';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  PERFORM invitation_issue(m, hash, true, now() + interval '7 days');
+  BEGIN
+    UPDATE invitation_tokens SET expires_at = now() + interval '1 year';
+    RAISE EXCEPTION 'FAIL T73c: the app wrote an invitation link';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  IF (SELECT count(*) FROM invitation_tokens WHERE membership_id = m) <> 1 THEN
+    RAISE EXCEPTION 'FAIL T73c: the company does not see its own link';
+  END IF;
+  IF EXISTS (SELECT 1 FROM invitation_lookup(hash)) OR EXISTS (SELECT 1 FROM invitation_take(hash)) THEN
+    RAISE EXCEPTION 'FAIL T73d: a link was read or used inside a company''s context';
+  END IF;
+
+  -- Opened by someone not signed in: seen, then used once.
+  PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+  -- Company A goes by its trading name, set by an earlier check.
+  IF (SELECT role || '/' || company_name || '/' || email || '/' || new_account FROM invitation_lookup(hash)) IS DISTINCT FROM 'accountant/A Trading/selam@example.test/true' THEN
+    RAISE EXCEPTION 'FAIL T73e: the link did not show its invitation';
+  END IF;
+  SELECT count(*) INTO n FROM invitation_take(hash);
+  IF n <> 1 OR EXISTS (SELECT 1 FROM invitation_take(hash)) OR EXISTS (SELECT 1 FROM invitation_lookup(hash)) THEN
+    RAISE EXCEPTION 'FAIL T73f: a link was not used exactly once';
+  END IF;
+
+  -- Accepted by the invited person themselves; as an accountant they cannot make links.
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f9', true);
+  UPDATE memberships SET status = 'active' WHERE id = m;
+  IF (SELECT status FROM memberships WHERE id = m) <> 'active' THEN
+    RAISE EXCEPTION 'FAIL T73g: the invited person could not accept';
+  END IF;
+  BEGIN
+    PERFORM invitation_issue(m, repeat('cd', 32), false, now() + interval '7 days');
+    RAISE EXCEPTION 'FAIL T73h: an accountant made an invitation link';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM invitation_tokens) THEN
+    RAISE EXCEPTION 'FAIL T73i: company B saw company A''s invitation links';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T73 an invitation link is made by an owner or admin, seen only by its company, used once, and accepted by the invited person';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -35,6 +35,7 @@
 | journals.approve   approve or reject a manual journal above settings.approval.journal_above, not one you asked for
 |                    (accountant via 'journals.*', approver)
 | audit.view         the audit log, its export and the check of its hash chain (accountant; owner and admin)
+| users.manage       the people of the company: invite, change roles, deactivate and reactivate (owner and admin only)
 | assets.view        the fixed asset register, each asset's depreciation schedule (accountant via 'assets.*',
 |                    bookkeeper, approver, viewer)
 | assets.manage      register fixed assets and edit them (accountant via 'assets.*')

@@ -24,5 +24,5 @@ function publicOrigin(request: NextRequest): string {
 
 export const config = {
   // Everything except the signed-out pages, Next.js assets and static files.
-  matcher: ["/((?!sign-in|sign-up|forgot-password|reset-password|verify-email|_next/|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|txt|xml|css|js)$).*)"],
+  matcher: ["/((?!sign-in|sign-up|forgot-password|reset-password|verify-email|invitation|_next/|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|txt|xml|css|js)$).*)"],
 };
