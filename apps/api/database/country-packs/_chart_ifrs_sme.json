@@ -215,6 +215,13 @@
       "system_key": "fx_gain_loss"
     },
     {
+      "code": "4960",
+      "name": "Gain or loss on disposal of assets",
+      "type": "income",
+      "subtype": "other_income",
+      "system_key": "asset_disposal"
+    },
+    {
       "code": "5000",
       "name": "Cost of goods sold",
       "type": "expense",

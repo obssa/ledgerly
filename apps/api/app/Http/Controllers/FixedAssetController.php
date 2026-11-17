@@ -85,6 +85,24 @@ final class FixedAssetController extends Controller
         return $this->show($before->id);
     }
 
+    /** Sell or scrap an asset: its gain or loss against its book value is posted, and it leaves the register. */
+    public function dispose(Request $request, string $fixedAsset): JsonResponse
+    {
+        $this->authorizeCompany('assets.manage');
+        $a = $this->load($fixedAsset);
+        $data = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
+            'proceeds' => ['nullable', 'decimal:0,2', 'min:0'],
+            'bank_account_id' => ['nullable', 'uuid'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+        $result = $this->assets->dispose($this->current->get(), $a->id, $data['date'], $data['proceeds'] ?? '0', $data['bank_account_id'] ?? null, $request->user()->getKey());
+        $this->audit->record($this->current->id(), 'asset_disposed', 'fixed_asset', $a->id, ['status' => 'active'],
+            ['status' => 'disposed', 'date' => $data['date'], ...$result, 'entry' => $result['entry']['number']], $data['reason'] ?? null, userId: $request->user()->getKey());
+
+        return $this->show($a->id);
+    }
+
     /** What the run for a month end would post, asset by asset. */
     public function preview(Request $request): JsonResponse
     {
@@ -223,6 +241,7 @@ final class FixedAssetController extends Controller
             'acquired_on' => $a->acquired_on, 'cost' => (string) $a->cost, 'residual_value' => (string) $a->residual_value, 'method' => $a->method,
             'useful_life_months' => $a->useful_life_months === null ? null : (int) $a->useful_life_months,
             'annual_rate' => $a->annual_rate === null ? null : (string) $a->annual_rate, 'depreciation_starts_on' => $a->depreciation_starts_on,
-            'opening_depreciation' => (string) $a->opening_depreciation, 'source_document_id' => $a->source_document_id];
+            'opening_depreciation' => (string) $a->opening_depreciation, 'source_document_id' => $a->source_document_id,
+            'disposal' => $a->status === 'disposed' ? ['date' => $a->disposed_on, 'proceeds' => (string) $a->proceeds, 'entry_id' => $a->disposal_entry_id] : null];
     }
 }

@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getAssetOptions, getFixedAsset } from "@/lib/data";
+import { getAssetOptions, getBankAccounts, getFixedAsset } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { AssetForm } from "../AssetForms";
+import { AssetForm, DisposeAsset } from "../AssetForms";
 
 export const metadata = { title: "Fixed asset" };
 
 /** Module 9c: one asset, its depreciation so far and the months ahead, and editing it. */
 export default async function FixedAssetPage({ params }: PageProps<"/fixed-assets/[id]">) {
   const { id } = await params;
-  const [a, options] = await Promise.all([getFixedAsset(id), getAssetOptions()]);
+  const [a, options, banks] = await Promise.all([getFixedAsset(id), getAssetOptions(), getBankAccounts()]);
   if (!a) notFound();
   const how = a.method === "straight_line" ? `Straight line over ${a.useful_life_months} months` : `Reducing balance at ${Number(a.annual_rate) * 100}% a year`;
 
@@ -27,6 +27,8 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
           <div><dt className="text-muted">Depreciation</dt><dd>{how}, from <span className="num">{a.depreciation_starts_on}</span></dd></div>
           <div><dt className="text-muted">Kept on</dt><dd><span className="num">{a.asset_account.code}</span> {a.asset_account.name}</dd></div>
           <div><dt className="text-muted">Where, and who keeps it</dt><dd>{a.location?.name ?? "—"}{a.custodian ? `, ${a.custodian}` : ""}</dd></div>
+          {a.disposal && <div><dt className="text-muted">Disposed of</dt><dd><Link href={`/journal/${encodeURIComponent(a.disposal.entry_id)}`} className="num hover:underline">{a.disposal.date}</Link>
+            {a.disposal.proceeds !== "0.00" ? <>, sold for <span className="num">{formatAmount(a.disposal.proceeds)}</span></> : ", scrapped"}</dd></div>}
         </dl>
       </Card>
       <Card className="mb-4 !p-2" label="Schedule">
@@ -50,7 +52,13 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
           </table>
         </div>
       </Card>
-      {a.can.manage && options && (
+      {a.can.manage && a.status === "active" && (
+        <Card className="mb-4" label="Dispose">
+          <h2 className="mb-3 text-[15px] font-bold">Sell or scrap it</h2>
+          <DisposeAsset id={a.id} bookValue={formatAmount(a.book_value)} banks={banks.data.filter((b) => b.is_active && b.kind !== "undeposited_funds")} />
+        </Card>
+      )}
+      {a.can.manage && options && a.status === "active" && (
         <Card label="Edit">
           <h2 className="mb-3 text-[15px] font-bold">Edit</h2>
           <AssetForm asset={a} options={options} locked={a.depreciated_by_runs} />

@@ -32,6 +32,11 @@ final class FixedAssets
     {
     }
 
+    private static function positive(Money $m): bool
+    {
+        return ! $m->isZero() && ! $m->isNegative();
+    }
+
     /** The month end on or after a date. */
     public static function monthEnd(string $date): string
     {
@@ -113,6 +118,74 @@ final class FixedAssets
             DB::table('asset_depreciation')->insert(array_map(fn (array $c) => ['company_id' => $id, 'run_id' => $runId, 'asset_id' => $c['asset']->id, 'amount' => $c['amount']], $charges));
 
             return ['run' => $runId, 'entry' => ['id' => $entry->getKey(), 'number' => (int) $entry->number], 'total' => $total->toDecimalString(), 'assets' => count($charges)];
+        });
+    }
+
+    /**
+     * Dispose of an asset (sold or scrapped) on a day: one entry takes off its accumulated depreciation and its cost,
+     * brings in what it was sold for (to a bank, wallet or cash account), and posts the difference from its book value
+     * as a gain or loss on disposal (043). Depreciation for the months before should be posted first.
+     *
+     * @return array{entry: array{id: string, number: int}, book_value: string, proceeds: string, gain: string}
+     */
+    public function dispose(Company $company, string $assetId, string $date, string $proceeds, ?string $bankAccountId, string $userId): array
+    {
+        return DB::transaction(function () use ($company, $assetId, $date, $proceeds, $bankAccountId, $userId) {
+            $id = $company->getKey();
+            $base = $company->base_currency;
+            $a = DB::table('fixed_assets')->where(['company_id' => $id, 'id' => $assetId])->lockForUpdate()->first();
+            if ($a === null) {
+                abort(404);
+            }
+            if ($a->status !== 'active') {
+                throw ValidationException::withMessages(['date' => ["{$a->code} was disposed of on {$a->disposed_on}."]]);
+            }
+            if ($date < (string) $a->acquired_on) {
+                throw ValidationException::withMessages(['date' => ["{$a->code} was acquired on {$a->acquired_on}: it goes on or after that day."]]);
+            }
+            $lastCharged = DB::table('asset_depreciation as d')->join('depreciation_runs as r', 'r.id', '=', 'd.run_id')
+                ->where(['d.company_id' => $id, 'd.asset_id' => $a->id])->max('r.period_end');
+            if ($lastCharged !== null && $date <= $lastCharged) {
+                throw ValidationException::withMessages(['date' => ["Depreciation of {$a->code} is posted to {$lastCharged}: date the disposal after that."]]);
+            }
+            $charged = (string) DB::table('asset_depreciation')->where(['company_id' => $id, 'asset_id' => $a->id])->sum('amount');
+            $accumulated = Money::of(BigDecimal::of((string) $a->opening_depreciation)->plus($charged ?: '0'), $base);
+            $cost = Money::of((string) $a->cost, $base);
+            $received = Money::of($proceeds, $base);
+            $book = $cost->minus($accumulated);
+            $gain = $received->minus($book);
+            $bank = null;
+            if (self::positive($received)) {
+                $bank = $bankAccountId === null ? null : \App\Domain\Ledger\Models\Account::query()->whereKey($bankAccountId)
+                    ->whereIn('subtype', ['bank', 'cash', 'mobile_money'])->where('is_active', true)->first();
+                if ($bank === null || ($bank->currency !== null && $bank->currency !== $base)) {
+                    throw ValidationException::withMessages(['bank_account_id' => ["Choose the bank, wallet or cash account the {$received->toDecimalString()} came into, in {$base}."]]);
+                }
+            }
+            $dims = $a->location_id ? ['location_id' => $a->location_id] : [];
+            $label = "{$a->code} {$a->name}";
+            $draft = new JournalDraft($id, new DateTimeImmutable($date), $base, $base, '1',
+                (self::positive($received) ? 'Sale' : 'Disposal') . " of {$label}", 'asset_disposal', $a->id);
+            if (self::positive($accumulated)) {
+                $draft->add(JournalLineDraft::debit($a->depreciation_account_id, $accumulated, null, "Depreciation of {$label}", null, $dims));
+            }
+            if ($bank !== null) {
+                $draft->add(JournalLineDraft::debit($bank->getKey(), $received, null, "Proceeds of {$label}", null, $dims));
+            }
+            $draft->add(JournalLineDraft::credit($a->asset_account_id, $cost, null, "Cost of {$label}", null, $dims));
+            if (! $gain->isZero()) {
+                $account = \App\Domain\Ledger\Models\Account::system('asset_disposal')->getKey();
+                $draft->add(self::positive($gain)
+                    ? JournalLineDraft::credit($account, $gain, null, "Gain on {$label}", null, $dims)
+                    : JournalLineDraft::debit($account, $gain->negated(), null, "Loss on {$label}", null, $dims));
+            }
+            $entry = $this->posting->post($draft, $userId);
+            DB::table('fixed_assets')->where(['company_id' => $id, 'id' => $a->id])->update([
+                'status' => 'disposed', 'disposed_on' => $date, 'disposal_entry_id' => $entry->getKey(), 'proceeds' => $received->toDecimalString(), 'updated_at' => now(),
+            ]);
+
+            return ['entry' => ['id' => $entry->getKey(), 'number' => (int) $entry->number], 'book_value' => $book->toDecimalString(),
+                'proceeds' => $received->toDecimalString(), 'gain' => $gain->toDecimalString()];
         });
     }
 

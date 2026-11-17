@@ -39,6 +39,21 @@ export async function saveAsset(_: FormState | undefined, form: FormData): Promi
   redirect(`/fixed-assets/${encodeURIComponent(saved)}`);
 }
 
+/** Sell or scrap an asset: its gain or loss is posted and it leaves the register. */
+export async function disposeAsset(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.disposeFixedAsset(text(form, "id") ?? "", {
+      date: text(form, "date") ?? "", proceeds: (text(form, "proceeds") ?? "").replace(/[,\s]/g, "") || null,
+      bank_account_id: text(form, "bank_account_id") ?? null, reason: text(form, "reason") ?? null,
+    }, ctx);
+    refresh();
+    return { notice: "Disposed of: the entry is posted and the asset is off the register." };
+  } catch (error) {
+    return refusal(error, "dispose of assets");
+  }
+}
+
 export async function runDepreciation(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   try {
