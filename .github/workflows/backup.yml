@@ -1,0 +1,75 @@
+# Nightly backup (SECURITY.md S11): the live database, encrypted before it touches a disk, to a private Cloudflare R2
+# bucket, with each company's audit chain head beside it. Setup: docs/runbook/backups.md.
+#
+# Variables: BACKUP_ENABLED (true), BACKUP_AGE_RECIPIENT (the age public key), R2_ACCOUNT_ID, R2_BUCKET
+# Secrets:   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (a token for that bucket only), and the deploy secrets
+#            (DEPLOY_HOST, DEPLOY_PORT, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS, DEPLOY_DB_OWNER_PASSWORD)
+name: backup
+
+on:
+  schedule:
+    - cron: '30 22 * * *'   # 01:30 in Addis Ababa
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: vars.BACKUP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: live
+    env:
+      R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      BUCKET: ${{ vars.R2_BUCKET }}
+      RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the settings
+        run: |
+          for v in BUCKET RECIPIENT AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            [ -n "${!v}" ] || { echo "$v is not set (docs/runbook/backups.md)"; exit 1; }
+          done
+          case "$RECIPIENT" in age1*) ;; *) echo "BACKUP_AGE_RECIPIENT must be an age public key (age1...)"; exit 1 ;; esac
+          sudo apt-get update -qq && sudo apt-get install -y -qq age >/dev/null
+      - name: SSH with a pinned host key
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$HOST" && test -n "$USER" && test -n "$KEY" && test -n "$KNOWN_HOSTS" || { echo "Deploy secrets are incomplete"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host target\n  HostName %s\n  Port %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  ServerAliveInterval 15\n' \
+            "$HOST" "$PORT" "$USER" > ~/.ssh/config
+          scp scripts/deploy/cpanel/backup.sh target:ledgerly/deploy/backup.sh
+      - name: Dump, encrypt and upload
+        env:
+          OWNER_PASSWORD: ${{ secrets.DEPLOY_DB_OWNER_PASSWORD }}
+        run: |
+          set -o pipefail
+          test -n "$OWNER_PASSWORD" || { echo "DEPLOY_DB_OWNER_PASSWORD is not set"; exit 1; }
+          STAMP="$(date -u +%Y%m%dT%H%M%SZ)"; DAY="$(date -u +%Y/%m/%d)"
+          # The plain dump exists only inside this pipe: encrypted before it is written anywhere.
+          printf '%s\n' "$OWNER_PASSWORD" | ssh target 'bash ~/ledgerly/deploy/backup.sh dump' | age -r "$RECIPIENT" > backup.dump.age
+          printf '%s\n' "$OWNER_PASSWORD" | ssh target 'bash ~/ledgerly/deploy/backup.sh heads' > heads.json
+          SIZE=$(stat -c %s backup.dump.age)
+          [ "$SIZE" -gt 1000 ] || { echo "The encrypted dump is only $SIZE bytes: something failed"; exit 1; }
+          python3 -c 'import json,sys; d=json.load(open("heads.json")); assert isinstance(d, list); print(len(d), "audit chain heads")'
+          SUM=$(sha256sum backup.dump.age | cut -d' ' -f1)
+          aws s3 cp --endpoint-url "$R2_ENDPOINT" --only-show-errors backup.dump.age "s3://$BUCKET/ledgerly/db/$DAY/ledgerly-$STAMP.dump.age" --metadata "sha256=$SUM"
+          aws s3 cp --endpoint-url "$R2_ENDPOINT" --only-show-errors heads.json "s3://$BUCKET/ledgerly/audit-heads/$DAY/heads-$STAMP.json"
+          { echo "### Backup $STAMP"; echo "- Encrypted dump: $((SIZE / 1024)) KB, sha256 \`$SUM\`"; echo "- Audit chain heads: $(python3 -c 'import json; print(len(json.load(open("heads.json"))))') companies"; } >> "$GITHUB_STEP_SUMMARY"
+          rm -f backup.dump.age heads.json
