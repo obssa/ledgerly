@@ -81,6 +81,7 @@ final class ReceivePayment
                 'amount' => $amount->toDecimalString(), 'fee' => $fee->toDecimalString(), 'withholding' => $withholding->toDecimalString(),
                 'provider_txn_id' => $data['provider_txn_id'] ?? null,
                 'cheque_number' => ($data['method'] ?? null) === 'cheque' ? ($data['cheque_number'] ?? null) : null,
+                'withholding_certificate' => $withholding->isZero() ? null : ($data['withholding_certificate'] ?? null),
             ]);
 
             $entry = $this->posting->post($this->builder->received(
