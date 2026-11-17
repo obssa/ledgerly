@@ -173,6 +173,7 @@ final class DemoLoginTest extends TestCase
         $viewer = collect($members)->firstWhere('role', 'viewer')['id'];
         $this->withToken($owner['token'])->postJson("/api/v1/members/{$viewer}/deactivate", [], $h)->assertForbidden();
         $this->withToken($owner['token'])->putJson("/api/v1/members/{$viewer}", ['role' => 'owner'], $h)->assertForbidden();
+        $this->withToken($owner['token'])->getJson('/api/v1/company/export', $h)->assertForbidden()->assertJsonPath('type', 'DemoAccount');
         \Illuminate\Support\Facades\Notification::assertNothingSent();
         $this->assertSame('active', $this->owner()->table('memberships')->where('id', $viewer)->value('status'));
     }

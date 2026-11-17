@@ -1019,6 +1019,22 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 export type { SignedInSession } from "./sessions";
 import type { SignedInSession } from "./sessions";
 
+/** A file from the API (not JSON), passed on as it came; an error answer becomes an ApiError as in api(). */
+export async function apiFile(path: string, opts: { token: string; companyId: string }): Promise<Response> {
+  const base = apiBaseUrl();
+  if (!base) throw new ApiError(0, "LEDGERLY_API_URL is not set (demo mode)");
+  const visitor = await import("./visitor").then((m) => m.visitorHeaders()).catch(() => ({}));
+  const res = await fetch(new URL(`/api/v1/${path.replace(/^\//, "")}`, base), {
+    headers: { Accept: "application/json, application/zip", ...visitor, Authorization: `Bearer ${opts.token}`, "X-Company-Id": opts.companyId },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ApiError(res.status, (body as { message?: string } | null)?.message ?? res.statusText, body);
+  }
+  return res;
+}
+
 export interface User {
   id: string;
   name: string;

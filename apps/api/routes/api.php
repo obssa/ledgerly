@@ -13,6 +13,7 @@ use App\Http\Controllers\AnalysisReportController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\SessionController;
+use App\Http\Controllers\CompanyExportController;
 use App\Http\Controllers\SavedReportController;
 use App\Http\Controllers\PeopleController;
 use App\Http\Controllers\StockReportController;
@@ -138,6 +139,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('members/{membership}/resend', [TeamController::class, 'resend']);
                 Route::post('members/{membership}/deactivate', [TeamController::class, 'deactivate']);
                 Route::post('members/{membership}/reactivate', [TeamController::class, 'reactivate']);
+                Route::get('company/export', [CompanyExportController::class, 'download']);
             });
             Route::put('company', [CompanySettingsController::class, 'update']);
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);

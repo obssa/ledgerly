@@ -61,7 +61,7 @@ final class TenantIsolationTest extends TestCase
         foreach ($this->companyRoutes() as $route) {
             foreach ([$this->b, $this->a] as $ids) {   // B's records and A's: the header alone decides
                 $response = $this->callRoute($route, $ids, ['X-Company-Id' => $this->b['company']]);
-                $this->assertSame(403, $response->status(), $this->describe($route, 'header of company B', $response));
+                $this->assertSame(403, $response->getStatusCode(), $this->describe($route, 'header of company B', $response));
                 $this->assertNoDataOf($this->b, $response, $route);
             }
         }
@@ -74,13 +74,13 @@ final class TenantIsolationTest extends TestCase
 
         foreach ($routes as $route) {
             $response = $this->callRoute($route, $this->b, ['X-Company-Id' => $this->a['company']]);
-            $this->assertSame(404, $response->status(), $this->describe($route, "company B's id in the URL", $response));
+            $this->assertSame(404, $response->getStatusCode(), $this->describe($route, "company B's id in the URL", $response));
             $this->assertNoDataOf($this->b, $response, $route);
 
             // Control: the same route with A's own record is found, so the 404 above is isolation, not a broken route.
             $own = $this->callRoute($route, $this->a, ['X-Company-Id' => $this->a['company']]);
-            $this->assertNotSame(404, $own->status(), $this->describe($route, "company A's own id", $own));
-            $this->assertLessThan(500, $own->status(), $this->describe($route, "company A's own id", $own));
+            $this->assertNotSame(404, $own->getStatusCode(), $this->describe($route, "company A's own id", $own));
+            $this->assertLessThan(500, $own->getStatusCode(), $this->describe($route, "company A's own id", $own));
         }
     }
 
@@ -91,7 +91,7 @@ final class TenantIsolationTest extends TestCase
 
         foreach ($routes as $route) {
             $response = $this->callRoute($route, $this->b, ['X-Company-Id' => $this->a['company']]);
-            $this->assertSame(200, $response->status(), $this->describe($route, 'company A', $response));
+            $this->assertSame(200, $response->getStatusCode(), $this->describe($route, 'company A', $response));
             $this->assertNoDataOf($this->b, $response, $route);
         }
 
@@ -198,7 +198,7 @@ final class TenantIsolationTest extends TestCase
 
         foreach ($attempts as $what => [$method, $uri, $body]) {
             $response = $this->json($method, $uri, $body, $headers);
-            $this->assertContains($response->status(), [403, 404, 422], "{$what}: expected a refusal, got {$response->status()}: {$response->getContent()}");
+            $this->assertContains($response->getStatusCode(), [403, 404, 422], "{$what}: expected a refusal, got {$response->getStatusCode()}: {$response->getContent()}");
             $this->assertNoDataOf($this->b, $response, null, $what);
         }
 
@@ -277,16 +277,37 @@ final class TenantIsolationTest extends TestCase
     /** @param array<string, string> $ids */
     private function assertNoDataOf(array $ids, TestResponse $response, ?Route $route, string $what = ''): void
     {
-        $body = (string) $response->getContent();
+        $body = self::bodyOf($response);
         $values = [...array_values($ids), ...$this->owner()->table('accounts')->where('company_id', $ids['company'])->pluck('id')->all(), 'Company B Trading'];
         foreach ($values as $value) {
             $this->assertStringNotContainsString($value, $body, ($route ? "{$route->methods()[0]} {$route->uri()}" : $what) . " leaked a value of company B ({$value})");
         }
     }
 
+    /** What a response carries: a file's contents (each file of a ZIP, as the company export), otherwise its body. */
+    private static function bodyOf(TestResponse $response): string
+    {
+        $base = $response->baseResponse;
+        if (! $base instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse) {
+            return (string) $response->getContent();
+        }
+        $path = $base->getFile()->getPathname();
+        $zip = new \ZipArchive();
+        if ($zip->open($path) !== true) {
+            return (string) file_get_contents($path);
+        }
+        $body = '';
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $body .= $zip->getFromIndex($i) . "\n";
+        }
+        $zip->close();
+
+        return $body;
+    }
+
     private function describe(Route $route, string $case, TestResponse $response): string
     {
-        return "{$route->methods()[0]} {$route->uri()} with {$case}: got {$response->status()} " . Str::limit((string) $response->getContent(), 300);
+        return "{$route->methods()[0]} {$route->uri()} with {$case}: got {$response->getStatusCode()} " . Str::limit((string) $response->getContent(), 300);
     }
 
     /** @return array<string, int> */
