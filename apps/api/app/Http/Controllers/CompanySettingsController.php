@@ -86,6 +86,11 @@ final class CompanySettingsController extends Controller
             // The one optional approval step: above these amounts (base currency), someone other than the creator approves.
             'approval' => ['sometimes', 'array:' . implode(',', self::APPROVAL_LIMITS)],
             'approval.*' => ['nullable', 'decimal:0,2', 'gt:0'],
+            // Payment reminders (048): an email to the customer so many days after an invoice falls due, while owed.
+            'reminders' => ['sometimes', 'array:enabled,days'],
+            'reminders.enabled' => ['required_with:reminders', 'boolean'],
+            'reminders.days' => ['required_with:reminders', 'array', 'min:1', 'max:3'],
+            'reminders.days.*' => ['integer', 'between:1,365', 'distinct'],
         ]);
 
         if ($data['version'] !== $this->version($company)) {
@@ -101,6 +106,12 @@ final class CompanySettingsController extends Controller
             $limits = [...($company->settings['approval'] ?? []), ...$data['approval']];
             $company->settings = [...($company->settings ?? []), 'approval' => array_filter($limits, fn ($v) => $v !== null && $v !== '')];
             unset($data['approval']);
+        }
+        if (array_key_exists('reminders', $data)) {
+            $days = array_map('intval', $data['reminders']['days']);
+            sort($days);
+            $company->settings = [...($company->settings ?? []), 'reminders' => ['enabled' => (bool) $data['reminders']['enabled'], 'days' => $days]];
+            unset($data['reminders']);
         }
         $company->fill($data);
         $changes = AuditLogger::diff($before, $this->editable($company));
@@ -230,6 +241,7 @@ final class CompanySettingsController extends Controller
         }
 
         $fields['approval'] = array_intersect_key($company->settings['approval'] ?? [], array_flip(self::APPROVAL_LIMITS));
+        $fields['reminders'] = \App\Domain\Sales\InvoiceReminders::settingsOf($company);
 
         return $fields;
     }

@@ -43,7 +43,9 @@ final class InvoiceController extends Controller
                 'credit' => (bool) $membership?->can('invoices.create'),
                 'apply' => (bool) $membership?->can('payments.receive'),
                 'refund' => (bool) $membership?->can('payments.pay'),   // paying a customer's credit back
+                'remind' => (bool) $membership?->can('invoices.create'),
             ],
+            'reminders' => $invoice->type === 'invoice' ? app(\App\Domain\Sales\InvoiceReminders::class)->sentFor($invoice->getKey()) : [],
         ], $status);
     }
 
@@ -141,6 +143,16 @@ final class InvoiceController extends Controller
     }
 
     /** Void a posted, unpaid invoice: its entry is reversed, the number is kept, the reason is audited. */
+    /** Module 2: a payment reminder by email to the customer, sent by hand (048). */
+    public function remind(Request $request, Document $invoice, \App\Domain\Sales\InvoiceReminders $reminders): JsonResponse
+    {
+        $this->authorizeCompany('invoices.create');
+        abort_unless($invoice->type === 'invoice', 404);
+        $reminders->send($this->current->get(), $invoice, 'manual', null, $request->user()->getKey());
+
+        return $this->present($invoice->refresh());
+    }
+
     public function void(Request $request, Document $invoice, InvoiceWorkflow $workflow): JsonResponse
     {
         $this->authorizeCompany('transactions.edit');

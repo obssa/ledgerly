@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { settingsBody, VAT_SHOWN } from "./settings";
+import { REMINDERS_SHOWN, reminderDays, settingsBody, VAT_SHOWN } from "./settings";
 
 const form = (entries: [string, string][]) => {
   const f = new FormData();
@@ -38,5 +38,21 @@ describe("approval limits", () => {
     const none = new FormData();
     none.append("version", "v1");
     expect(settingsBody(none)).not.toHaveProperty("approval");
+  });
+});
+
+describe("payment reminders", () => {
+  it("reads the days after the due date, at most three", () => {
+    expect(reminderDays("7, 30")).toEqual([7, 30]);
+    expect(reminderDays(" 3 14;30 60 ")).toEqual([3, 14, 30]);
+    expect(reminderDays("")).toEqual([]);
+  });
+  it("sends the reminder settings only when the form showed them", () => {
+    expect(settingsBody(form([["version", "v1"]]))).toEqual({ version: "v1" });
+    expect(settingsBody(form([["version", "v1"], [REMINDERS_SHOWN, "1"], ["reminders.days", "7, 30"]]))).toEqual({
+      version: "v1", reminders: { enabled: false, days: [7, 30] },
+    });
+    expect(settingsBody(form([["version", "v1"], [REMINDERS_SHOWN, "1"], ["reminders.enabled", "on"], ["reminders.days", "14"]])).reminders)
+      .toEqual({ enabled: true, days: [14] });
   });
 });

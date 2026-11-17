@@ -2553,6 +2553,52 @@ BEGIN
   UPDATE memberships SET role = 'accountant', permissions = '[]' WHERE id = m;
   RAISE NOTICE 'PASS T74 only a custom role has permissions of its own, each a permission name, never every permission';
 END $$;
+-- T75: invoice reminders (048). Only for a posted invoice of the company with something owed; kept as sent; a
+-- scheduled step goes once; another company sees none; the scheduler's list is empty inside a company.
+-- Company A as its owner f1; invoice d4 was posted in T40 with 100 owed.
+DO $$
+DECLARE
+  inv constant uuid := '00000000-0000-0000-0000-0000000000d4';
+  draft uuid;
+BEGIN
+  IF (SELECT status FROM documents WHERE id = inv) NOT IN ('posted', 'part_paid') OR (SELECT amount_due FROM documents WHERE id = inv) <= 0 THEN
+    RAISE EXCEPTION 'FAIL T75: fixture invoice d4 is no longer posted and owed';
+  END IF;
+  SELECT id INTO draft FROM documents WHERE company_id = app_company_id() AND type = 'invoice' AND status = 'draft' LIMIT 1;
+  BEGIN
+    INSERT INTO invoice_reminders (company_id, document_id, kind, sent_to, sent_by) VALUES (app_company_id(), draft, 'manual', 'buyer@example.test', app_user_id());
+    RAISE EXCEPTION 'FAIL T75a: a reminder was recorded for a draft';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO invoice_reminders (company_id, document_id, kind, sent_to) VALUES (app_company_id(), inv, 'manual', 'buyer@example.test');
+    RAISE EXCEPTION 'FAIL T75b: a reminder sent by hand named no sender';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO invoice_reminders (company_id, document_id, kind, sent_to, sent_by) VALUES (app_company_id(), inv, 'manual', 'buyer@example.test', app_user_id());
+  INSERT INTO invoice_reminders (company_id, document_id, kind, step, sent_to) VALUES (app_company_id(), inv, 'scheduled', 7, 'buyer@example.test');
+  BEGIN
+    INSERT INTO invoice_reminders (company_id, document_id, kind, step, sent_to) VALUES (app_company_id(), inv, 'scheduled', 7, 'buyer@example.test');
+    RAISE EXCEPTION 'FAIL T75c: a scheduled step went twice';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    UPDATE invoice_reminders SET sent_to = 'someone@else.test' WHERE document_id = inv;
+    RAISE EXCEPTION 'FAIL T75d: a sent reminder was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM invoice_reminders WHERE document_id = inv;
+    RAISE EXCEPTION 'FAIL T75e: a sent reminder was removed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  IF EXISTS (SELECT 1 FROM invoice_reminders_due(current_date + 400)) THEN
+    RAISE EXCEPTION 'FAIL T75f: the scheduler''s list was read inside a company';
+  END IF;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM invoice_reminders) THEN
+    RAISE EXCEPTION 'FAIL T75g: company B saw company A''s reminders';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T75 a reminder is for an owed posted invoice, kept as sent, once per step, and seen only by its company';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
