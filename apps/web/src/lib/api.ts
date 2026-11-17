@@ -362,6 +362,7 @@ export interface FixedAsset {
   annual_rate: string | null;
   depreciation_starts_on: string;
   opening_depreciation: string;
+  disposal: { date: string; proceeds: string; entry_id: string } | null;
   depreciated?: string;
   book_value?: string;
 }
@@ -947,6 +948,8 @@ export const ledgerly = {
   fixedAsset: (id: string, ctx: RequestOptions) => api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}`, ctx),
   saveFixedAsset: (id: string | null, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<FixedAssetDetail>(id ? `fixed-assets/${encodeURIComponent(id)}` : "fixed-assets", { ...ctx, method: id ? "PUT" : "POST", body }),
+  disposeFixedAsset: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}/dispose`, { ...ctx, method: "POST", body }),
   depreciationPreview: (periodEnd: string | undefined, ctx: RequestOptions) =>
     api<{ period_end: string; lines: { asset_id: string; code: string; name: string; amount: string }[]; total: string }>("depreciation/preview", { ...ctx, query: { period_end: periodEnd } }),
   runDepreciation: (periodEnd: string, ctx: RequestOptions) =>

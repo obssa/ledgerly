@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { Account, Dimension, FixedAsset } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
-import { runDepreciation, saveAsset } from "./actions";
+import { disposeAsset, runDepreciation, saveAsset } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -81,6 +81,32 @@ export function AssetForm({ asset, options, locked }: { asset?: FixedAsset; opti
         <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : asset ? "Save changes" : "Register asset"}</button>
         {locked && <span className="text-[13px] text-muted">It has been depreciated: how it wears out stays as it was.</span>}
       </div>
+    </form>
+  );
+}
+
+/** Sell or scrap an asset: the date, what it was sold for (nothing if scrapped) and where the money went. */
+export function DisposeAsset({ id, bookValue, banks }: { id: string; bookValue: string; banks: { id: string; code: string; name: string }[] }) {
+  const [state, action, pending] = useActionState(disposeAsset, undefined);
+  const bad = (n: string) => Boolean(state?.fields?.[n]);
+  return (
+    <form action={action} noValidate className="grid gap-3">
+      <Message state={state} />
+      <input type="hidden" name="id" value={id} />
+      <div className="flex flex-wrap items-end gap-2.5">
+        <div><label className="field-label" htmlFor="dispose_date">Date it went</label><input className={`field ${bad("date") ? "!border-bad" : ""}`} id="dispose_date" name="date" type="date" max={todayIn()} defaultValue={todayIn()} /></div>
+        <div><label className="field-label" htmlFor="proceeds">Sold for</label><input className={`field num w-[140px] ${bad("proceeds") ? "!border-bad" : ""}`} id="proceeds" name="proceeds" inputMode="decimal" placeholder="0.00 if scrapped" /></div>
+        <div className="min-w-[200px]">
+          <label className="field-label" htmlFor="bank_account_id">Paid into</label>
+          <select className={`field ${bad("bank_account_id") ? "!border-bad" : ""}`} id="bank_account_id" name="bank_account_id" defaultValue="">
+            <option value="">— (scrapped)</option>
+            {banks.map((b) => <option key={b.id} value={b.id}>{b.code} {b.name}</option>)}
+          </select>
+        </div>
+        <div className="min-w-[200px] flex-1"><label className="field-label" htmlFor="reason">Why (optional)</label><input className="field" id="reason" name="reason" maxLength={500} /></div>
+        <button type="submit" className="btn" disabled={pending}>{pending ? "Posting…" : "Dispose of it"}</button>
+      </div>
+      <p className="text-[13px] text-muted">Book value now {bookValue}. Post this month&apos;s depreciation first if it is due; the gain or loss against the book value posts to Gain or loss on disposal of assets.</p>
     </form>
   );
 }

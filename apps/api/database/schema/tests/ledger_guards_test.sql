@@ -2352,6 +2352,41 @@ DO $$ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   RAISE NOTICE 'PASS T69 assets use their own accounts, keep how they wear out once depreciated, and runs stay as posted';
 END $$;
+-- T70: disposing of fixed assets (043). An asset goes once, by its own disposal entry dated on or after it was
+-- acquired; after that it never changes. T69's van (cost 60,000, depreciated 900) is sold for 50,000: a loss of 9,100.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e701', app_company_id(), 9701, '2027-07-01', 'ETB', 'asset_disposal', '00000000-0000-0000-0000-0000000069f1');
+    RAISE EXCEPTION 'FAIL T70a: an asset was disposed of before it was acquired';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE fixed_assets SET status = 'disposed', disposed_on = '2027-09-10' WHERE id = '00000000-0000-0000-0000-0000000069f1';
+    RAISE EXCEPTION 'FAIL T70b: an asset was marked disposed without its disposal entry';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    ('00000000-0000-0000-0000-00000000e702', app_company_id(), 9702, '2027-09-10', 'ETB', 'asset_disposal', '00000000-0000-0000-0000-0000000069f1');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e702', 1, '00000000-0000-0000-0000-0000000069a2', 900, 0, 900),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e702', 2, '00000000-0000-0000-0000-000000000a10', 50000, 0, 50000),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e702', 3, '00000000-0000-0000-0000-000000000a40', 9100, 0, 9100),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e702', 4, '00000000-0000-0000-0000-0000000069a1', 0, 60000, -60000);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  UPDATE fixed_assets SET status = 'disposed', disposed_on = '2027-09-10', disposal_entry_id = '00000000-0000-0000-0000-00000000e702', proceeds = 50000
+   WHERE id = '00000000-0000-0000-0000-0000000069f1';
+  BEGIN
+    UPDATE fixed_assets SET name = 'Old van' WHERE id = '00000000-0000-0000-0000-0000000069f1';
+    RAISE EXCEPTION 'FAIL T70c: a disposed asset was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e703', app_company_id(), 9703, '2027-09-11', 'ETB', 'asset_disposal', '00000000-0000-0000-0000-0000000069f1');
+    RAISE EXCEPTION 'FAIL T70d: an asset was disposed of twice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T70 an asset is disposed of once, by its own entry, and then stays as it was';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

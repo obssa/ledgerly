@@ -79,6 +79,34 @@ final class FixedAssetTest extends TestCase
         $this->putJson("/api/v1/fixed-assets/{$laptop}", $edit, $this->h)->assertOk()->assertJsonPath('name', 'Laptop (finance)')->assertJsonPath('custodian', 'Hana');
     }
 
+    public function test_an_asset_sold_posts_its_gain_or_loss_and_leaves_the_register(): void
+    {
+        $laptop = $this->c['fixed_asset'];
+        Carbon::setTestNow(Carbon::parse('2027-02-10 09:00:00', 'UTC'));
+        $this->postJson('/api/v1/depreciation-runs', ['period_end' => '2026-12-31'], $this->h)->assertCreated();
+        $this->postJson('/api/v1/depreciation-runs', ['period_end' => '2027-01-31'], $this->h)->assertCreated();   // 2,000.00 depreciated, book value 34,000.00
+
+        $this->postJson("/api/v1/fixed-assets/{$laptop}/dispose", ['date' => '2027-01-20', 'proceeds' => '30000', 'bank_account_id' => $this->c['bank']], $this->h)
+            ->assertUnprocessable()->assertJsonValidationErrors('date');   // January's depreciation is already posted
+        $this->postJson("/api/v1/fixed-assets/{$laptop}/dispose", ['date' => '2027-02-05', 'proceeds' => '30000'], $this->h)
+            ->assertUnprocessable()->assertJsonValidationErrors('bank_account_id');
+        $sold = $this->postJson("/api/v1/fixed-assets/{$laptop}/dispose", ['date' => '2027-02-05', 'proceeds' => '30000', 'bank_account_id' => $this->c['bank'], 'reason' => 'Sold to staff'], $this->h)
+            ->assertOk()->assertJsonPath('status', 'disposed')->assertJsonPath('disposal.date', '2027-02-05')->assertJsonPath('disposal.proceeds', '30000.00')->assertJsonCount(0, 'ahead');
+        $lines = collect($this->getJson("/api/v1/journal-entries/{$sold->json('disposal.entry_id')}", $this->h)->assertOk()->assertJsonPath('source_type', 'asset_disposal')->json('lines'))
+            ->keyBy('code');
+        $this->assertSame(['2000.00', '30000.00', '36000.00', '4000.00'], [$lines['1590']['debit'], $lines['1100']['debit'] ?? $lines->firstWhere('account_id', $this->c['bank'])['debit'],
+            $lines['1500']['credit'], $lines['4960']['debit']]);   // a loss of 4,000.00: sold for 30,000.00, book value 34,000.00
+
+        // Gone: not depreciated, not changed, not sold again.
+        $this->getJson('/api/v1/depreciation/preview?period_end=2027-02-28', $this->h)->assertOk()->assertJsonCount(0, 'lines');
+        $this->postJson("/api/v1/fixed-assets/{$laptop}/dispose", ['date' => '2027-02-06'], $this->h)->assertUnprocessable()->assertJsonValidationErrors('date');
+        $scrapped = $this->register(['code' => 'S-1', 'name' => 'Old printer', 'cost' => '500', 'acquired_on' => '2026-11-05'])->assertCreated()->json('id');
+        $gone = $this->postJson("/api/v1/fixed-assets/{$scrapped}/dispose", ['date' => '2027-02-06'], $this->h)->assertOk();
+        $scrap = collect($this->getJson("/api/v1/journal-entries/{$gone->json('disposal.entry_id')}", $this->h)->assertOk()->json('lines'))->keyBy('code');
+        $this->assertSame(['500.00', '500.00'], [$scrap['1500']['credit'], $scrap['4960']['debit']]);   // scrapped undepreciated: all of it lost
+        $this->assertSame(1, $this->owner()->table('audit_log')->where(['subject_id' => $laptop, 'action' => 'asset_disposed'])->count());
+    }
+
     public function test_reducing_balance_and_the_residual_value(): void
     {
         $press = $this->register(['code' => 'M-1', 'name' => 'Coffee roaster', 'cost' => '10000', 'method' => 'reducing_balance', 'annual_rate' => '0.25', 'useful_life_months' => null])

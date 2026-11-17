@@ -192,6 +192,7 @@ final class TenantIsolationTest extends TestCase
             'asset at B\'s location' => ['PUT', "/api/v1/fixed-assets/{$this->a['fixed_asset']}", ['code' => 'IT-001', 'name' => 'Planted', 'location_id' => $this->b['dimension'],
                 'asset_account_id' => $this->a['rent'], 'depreciation_account_id' => $this->a['rent'], 'expense_account_id' => $this->a['rent'], 'acquired_on' => '2026-11-03',
                 'cost' => '36000', 'method' => 'straight_line', 'useful_life_months' => 36]],
+            'asset sold into B\'s bank' => ['POST', "/api/v1/fixed-assets/{$this->a['fixed_asset']}/dispose", ['date' => '2026-11-10', 'proceeds' => '100', 'bank_account_id' => $this->b['bank']]],
             'reconciliation ticking B\'s entry' => ['PUT', "/api/v1/reconciliations/{$this->a['reconciliation']}", ['cleared' => [$this->b['bank_line']]]],
         ];
 
