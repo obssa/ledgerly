@@ -215,6 +215,9 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/reports/cash-flow' => 'reports.view',
         'GET api/v1/reports/changes-in-equity' => 'reports.view',
         'GET api/v1/reports/financial-health' => 'reports.view',
+        'GET api/v1/reports/profit-by-dimension' => 'reports.view',
+        'GET api/v1/reports/sales' => 'reports.view',
+        'GET api/v1/reports/purchases' => 'reports.view',
     ];
 
     /** @var array<string, string> */

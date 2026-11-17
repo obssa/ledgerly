@@ -6,10 +6,12 @@ const CYCLE: { stage: string; reports: [string, string][] }[] = [
     ["Changes in equity", "/reports/changes-in-equity"]] },
   { stage: "Ledger and trial balance", reports: [["Trial balance", "/reports/trial-balance"], ["General ledger", "/reports/general-ledger"], ["Journal report", "/journal"],
     ["Audit adjustments", "/close"]] },
-  { stage: "Customers and suppliers", reports: [["AR ageing", "/reports/ar-ageing"], ["AP ageing", "/reports/ap-ageing"], ["Customer statements", "/customers"], ["Supplier statements", "/suppliers"]] },
+  { stage: "Customers and suppliers", reports: [["Sales analysis", "/reports/sales"], ["AR ageing", "/reports/ar-ageing"], ["Customer statements", "/customers"],
+    ["Purchases analysis", "/reports/purchases"], ["AP ageing", "/reports/ap-ageing"], ["Supplier statements", "/suppliers"]] },
   { stage: "Inventory and assets", reports: [["Inventory valuation", "/reports/inventory-valuation"], ["Bin cards", "/inventory"], ["Fixed asset register", "/fixed-assets"]] },
   { stage: "Tax", reports: [["VAT return worksheet", "/tax"], ["Withholding register", "/tax?kind=withholding"]] },
-  { stage: "Management", reports: [["Financial health", "/reports/financial-health"], ["Project profitability", "/projects"], ["Review queue", "/journal/review"]] },
+  { stage: "Management", reports: [["Financial health", "/reports/financial-health"], ["Profit by location, class or project", "/reports/profit-by-dimension"],
+    ["Project profitability", "/projects"], ["Review queue", "/journal/review"]] },
 ];
 
 export function ReportsNav({ current }: { current: string }) {
