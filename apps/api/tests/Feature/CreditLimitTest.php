@@ -51,7 +51,7 @@ final class CreditLimitTest extends TestCase
         $id = $this->draft('400')->assertCreated()->assertJsonPath('warnings', [])->json('id');   // 1,400.00
 
         $this->getJson("/api/v1/invoices/{$id}", $this->h)->assertOk()
-            ->assertJsonPath('can', ['edit' => true, 'approve' => true, 'void' => true, 'credit' => true, 'apply' => true, 'refund' => true])
+            ->assertJsonPath('can', ['edit' => true, 'approve' => true, 'void' => true, 'credit' => true, 'apply' => true, 'refund' => true, 'remind' => true])
             ->assertJsonPath('contact.name', 'Abyssinia Coffee customer');
     }
 
