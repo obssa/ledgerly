@@ -75,6 +75,7 @@ final class PaymentReceivedController extends Controller
             'amount' => ['required', 'decimal:0,2', 'gt:0', 'max:999999999999999999'],
             'fee' => ['nullable', 'decimal:0,2', 'min:0'],
             'withholding' => ['nullable', 'decimal:0,2', 'min:0'],
+            'withholding_certificate' => ['nullable', 'string', 'max:60'],   // the customer's certificate: it backs the credit against profit tax
             'allocations' => ['nullable', 'array', 'max:200'],
             'allocations.*.invoice_id' => ['required', 'uuid', 'distinct'],
             'allocations.*.amount' => ['required', 'decimal:0,2', 'gt:0'],

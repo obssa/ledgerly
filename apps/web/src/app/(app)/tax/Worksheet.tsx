@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import type { TaxDocumentRow, TaxRateRow, TaxWorksheet } from "@/lib/api";
+import type { TaxDocumentRow, TaxRateRow, TaxWithholdingRegister, TaxWorksheet } from "@/lib/api";
 import { formatAmount } from "@/lib/format";
 
 /* A tax worksheet, live or as it was filed: the figures, rate by rate, document by document, and what no document explains. */
@@ -46,6 +46,30 @@ function Documents({ rows, caption }: { rows: TaxDocumentRow[]; caption: string 
   );
 }
 
+function Register({ register, caption, path, who }: { register: TaxWithholdingRegister; caption: string; path: string; who: string }) {
+  return (
+    <Card className="mb-4 !p-2" label={caption}>
+      <div className="overflow-x-auto">
+        <table className="tbl">
+          <caption className="px-3 pt-2 text-left text-[14px] font-bold">{caption}</caption>
+          <thead><tr><th scope="col">Date</th><th scope="col">{who}</th><th scope="col">TIN</th><th scope="col">Certificate</th><th scope="col" className="!text-right">Gross</th><th scope="col" className="!text-right">Withheld</th></tr></thead>
+          <tbody>
+            {register.payments.length === 0 && <tr><td colSpan={6} className="text-muted">None in the period.</td></tr>}
+            {register.payments.map((p) => (
+              <tr key={p.id}>
+                <td className="num">{p.date}</td><td><Link href={`/${path}/${encodeURIComponent(p.id)}`} className="hover:underline">{p.contact ?? "—"}</Link></td>
+                <td className="num">{p.tax_id ?? "—"}</td><td>{p.certificate ?? "—"}</td>
+                <td className="num text-right">{formatAmount(p.gross)}</td><td className="num text-right">{formatAmount(p.withheld)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={4}>Total</td><td className="num text-right">{formatAmount(register.gross)}</td><td className="num text-right">{formatAmount(register.tax)}</td></tr></tfoot>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
 export function Worksheet({ sheet }: { sheet: TaxWorksheet }) {
   const vat = sheet.kind === "vat";
   const unexplained = sheet.other.output !== "0.00" || sheet.other.input !== "0.00";
@@ -73,25 +97,9 @@ export function Worksheet({ sheet }: { sheet: TaxWorksheet }) {
           <Card className="mb-4 !p-2" label="Purchase documents"><div className="overflow-x-auto"><Documents rows={sheet.purchases.documents} caption="Purchase documents" /></div></Card>
         </>
       )}
-      {!vat && sheet.withheld && (
-        <Card className="mb-4 !p-2" label="Withholding register">
-          <div className="overflow-x-auto">
-            <table className="tbl">
-              <caption className="px-3 pt-2 text-left text-[14px] font-bold">Payments to suppliers with tax withheld</caption>
-              <thead><tr><th scope="col">Date</th><th scope="col">Supplier</th><th scope="col">TIN</th><th scope="col">Reference</th><th scope="col" className="!text-right">Gross</th><th scope="col" className="!text-right">Withheld</th></tr></thead>
-              <tbody>
-                {sheet.withheld.payments.length === 0 && <tr><td colSpan={6} className="text-muted">None in the period.</td></tr>}
-                {sheet.withheld.payments.map((p) => (
-                  <tr key={p.id}>
-                    <td className="num">{p.date}</td><td><Link href={`/payments-made/${encodeURIComponent(p.id)}`} className="hover:underline">{p.contact ?? "—"}</Link></td>
-                    <td className="num">{p.tax_id ?? "—"}</td><td>{p.reference ?? ""}</td>
-                    <td className="num text-right">{formatAmount(p.gross)}</td><td className="num text-right">{formatAmount(p.withheld)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+      {!vat && sheet.withheld && <Register register={sheet.withheld} caption="Payments to suppliers with tax withheld" path="payments-made" who="Supplier" />}
+      {!vat && sheet.withheld_by_customers && sheet.withheld_by_customers.payments.length > 0 && (
+        <Register register={sheet.withheld_by_customers} caption="Tax customers withheld from payments to you (a credit against profit tax, not part of this return)" path="payments" who="Customer" />
       )}
       {unexplained && (
         <Card className="mb-4 !p-2" label="Not from a document">

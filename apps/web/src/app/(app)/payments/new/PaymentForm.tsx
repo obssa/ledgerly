@@ -39,6 +39,7 @@ export function PaymentForm({ options }: { options: ReceiveOptions & { customer:
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
           <Field name="amount" label={`Amount received (${currency})`} value={amount} onChange={setAmount} invalid={bad("amount")} />
           <Field name="withholding" label="Tax withheld by the customer" value={withholding} onChange={setWithholding} hint="On their withholding certificate" invalid={bad("withholding")} />
+          {withholding.trim() !== "" && <Field name="withholding_certificate" label="Their certificate number" hint="Keep the certificate: it backs the credit against profit tax" invalid={bad("withholding_certificate")} />}
           <Field name="fee" label="Bank fee kept" invalid={bad("fee")} />
           <div>
             <label className="field-label" htmlFor="payment_date">Date</label>

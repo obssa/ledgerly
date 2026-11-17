@@ -41,7 +41,8 @@ export default async function PaymentMadePage({ params, searchParams }: PageProp
                 <Link href={`/payments-made/${encodeURIComponent(payment.id)}/cheque`} className="font-semibold text-brand hover:underline">Print</Link></dd></div>
             )}
             <div><dt className="text-muted">Tax withheld</dt><dd className="num">{formatAmount(payment.withholding)}</dd></div>
-            <div><dt className="text-muted">Withholding receipt</dt><dd className="num">{payment.withholding_certificate ?? "—"}</dd></div>
+            <div><dt className="text-muted">Withholding receipt</dt><dd className="num">{payment.withholding_certificate ?? "—"}
+              {payment.withholding !== "0.00" && <> <Link href={`/payments-made/${encodeURIComponent(payment.id)}/withholding-certificate`} className="text-[13px] font-semibold text-brand hover:underline">Print it</Link></>}</dd></div>
             <div><dt className="text-muted">Bank fee</dt><dd className="num">{formatAmount(payment.fee)}</dd></div>
             {Number(payment.fx_rate) !== 1 && <div><dt className="text-muted">Rate</dt><dd className="num">{payment.fx_rate}</dd></div>}
           </dl>

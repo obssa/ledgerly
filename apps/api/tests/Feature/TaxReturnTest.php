@@ -132,5 +132,14 @@ final class TaxReturnTest extends TestCase
         $this->assertSame(['20.00', '0.00', '20.00'], [$s->json('output_tax'), $s->json('input_tax'), $s->json('net')]);
         $this->assertSame([['1150.00', '20.00', 'TT-55']], collect($s->json('withheld.payments'))->map(fn ($p) => [$p['gross'], $p['withheld'], $p['reference']])->all());
         $this->assertSame('0.00', $s->json('other.output'));
+        $this->assertSame('WHT-0091', $s->json('withheld.payments.0.certificate'));
+
+        // A customer who withheld tax from a payment: listed with their certificate, not part of the return.
+        $this->postJson('/api/v1/payments-received', ['contact_id' => $this->c['contact'], 'account_id' => $this->c['bank'], 'payment_date' => '2026-11-15',
+            'method' => 'bank_transfer', 'currency' => 'ETB', 'amount' => '2240', 'withholding' => '60', 'withholding_certificate' => 'CUST-WHT-7',
+            'allocations' => [['invoice_id' => $this->sale, 'amount' => '2300']]], $this->h)->assertCreated();
+        $after = $this->sheet('withholding');
+        $this->assertSame('20.00', $after->json('output_tax'));
+        $this->assertSame([['CUST-WHT-7', '2300.00', '60.00']], collect($after->json('withheld_by_customers.payments'))->map(fn ($p) => [$p['certificate'], $p['gross'], $p['withheld']])->all());
     }
 }

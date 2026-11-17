@@ -358,7 +358,8 @@ export interface TaxWorksheet {
   net: string;
   sales?: { rates: TaxRateRow[]; documents: TaxDocumentRow[]; taxable: string; tax: string };
   purchases?: { rates: TaxRateRow[]; documents: TaxDocumentRow[]; taxable: string; tax: string };
-  withheld?: { payments: { id: string; date: string; contact: string | null; tax_id: string | null; reference: string | null; gross: string; withheld: string }[]; gross: string; tax: string };
+  withheld?: TaxWithholdingRegister;
+  withheld_by_customers?: TaxWithholdingRegister;
   other: { output: string; input: string; entries: { id: string; number: number; date: string; memo: string | null; source_type: string; output: string; input: string }[] };
   filed?: { id: string; period_start: string; period_end: string; filed_on: string }[];
   can?: { file: boolean };
@@ -372,6 +373,12 @@ export interface TaxCalendar {
   due_soon: number;
   kinds: Partial<Record<TaxKind, { note: string | null; periods: { period_start: string; period_end: string; due_on: string; status: FilingStatus;
     return: { id: string; filed_on: string; settled_on: string | null } | null }[] }>>;
+}
+
+export interface TaxWithholdingRegister {
+  payments: { id: string; date: string; contact: string | null; tax_id: string | null; reference: string | null; certificate: string | null; gross: string; withheld: string }[];
+  gross: string;
+  tax: string;
 }
 
 export interface TaxReturn {

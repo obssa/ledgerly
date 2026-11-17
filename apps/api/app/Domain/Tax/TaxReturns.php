@@ -71,9 +71,9 @@ final class TaxReturns
             $documentsOutput = Money::of($sales['tax'], $base);
             $documentsInput = Money::of($purchases['tax'], $base);
         } else {
-            $register = $this->withholdingRegister($id, $from, $to);
+            $register = $this->withholdingRegister($id, $from, $to, 'out');
             $explained = $register['entries'];
-            $sides = ['withheld' => $register];
+            $sides = ['withheld' => $register, 'withheld_by_customers' => $this->withholdingRegister($id, $from, $to, 'in')];
             $documentsOutput = Money::of($register['tax'], $base);
             $documentsInput = Money::zero($base);
         }
@@ -210,13 +210,18 @@ final class TaxReturns
         ];
     }
 
-    /** @return array{payments: list<array<string, mixed>>, gross: string, tax: string, entries: list<string>} the withholding register */
-    private function withholdingRegister(string $companyId, string $from, string $to): array
+    /**
+     * The withholding register: payments to suppliers with tax withheld ('out', the return), or payments from customers
+     * who withheld tax ('in', a credit against profit tax, kept with their certificates).
+     *
+     * @return array{payments: list<array<string, mixed>>, gross: string, tax: string, entries: list<string>}
+     */
+    private function withholdingRegister(string $companyId, string $from, string $to, string $direction): array
     {
         $rows = DB::table('payments as p')->leftJoin('contacts as c', 'c.id', '=', 'p.contact_id')
-            ->where(['p.company_id' => $companyId, 'p.direction' => 'out', 'p.status' => 'posted'])->where('p.withholding', '>', 0)
+            ->where(['p.company_id' => $companyId, 'p.direction' => $direction === 'in' ? 'in' : 'out', 'p.status' => 'posted'])->where('p.withholding', '>', 0)
             ->whereBetween('p.payment_date', [$from, $to])->orderBy('p.payment_date')
-            ->select('p.id', 'p.payment_date', 'p.reference', 'c.name as contact', 'c.tax_id', 'p.journal_entry_id')
+            ->select('p.id', 'p.payment_date', 'p.reference', 'p.withholding_certificate', 'c.name as contact', 'c.tax_id', 'p.journal_entry_id')
             ->selectRaw('round((p.amount + p.withholding) * p.fx_rate, 2)::numeric(20,2)::text AS gross')
             ->selectRaw('round(p.withholding * p.fx_rate, 2)::numeric(20,2)::text AS withheld')
             ->limit(2000)->get();
@@ -224,7 +229,7 @@ final class TaxReturns
 
         return [
             'payments' => $rows->map(fn ($p) => ['id' => $p->id, 'date' => $p->payment_date, 'contact' => $p->contact, 'tax_id' => $p->tax_id,
-                'reference' => $p->reference, 'gross' => $p->gross, 'withheld' => $p->withheld])->values()->all(),
+                'reference' => $p->reference, 'certificate' => $p->withholding_certificate, 'gross' => $p->gross, 'withheld' => $p->withheld])->values()->all(),
             'gross' => $sum('gross'), 'tax' => $sum('withheld'),
             'entries' => $rows->pluck('journal_entry_id')->filter()->values()->all(),
         ];
