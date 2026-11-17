@@ -1,5 +1,6 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import QRCode from "qrcode";
 import { ledgerly } from "@/lib/api";
@@ -134,6 +135,15 @@ export async function signOutEverywhere(): Promise<void> {
   if (token) await ledgerly.logoutEverywhere(token).catch(() => undefined);
   await endSession();
   redirect("/sign-in");
+}
+
+/** Signs out one other device (Module 11). This device signs out with the buttons above. */
+export async function endDeviceSession(form: FormData): Promise<void> {
+  const { token } = await getSession();
+  if (!token) redirect("/sign-in");
+  const id = String(form.get("id") ?? "");
+  if (/^\d{1,18}$/.test(id)) await ledgerly.endDeviceSession(id, token).catch(() => undefined); // gone already: the list shows it
+  refresh();
 }
 
 /** Sends the confirmation email again (company setup needs a confirmed address). */

@@ -103,6 +103,8 @@ final class DemoLoginTest extends TestCase
             ['POST', '/api/v1/auth/mfa/enrol', []],
             ['DELETE', '/api/v1/auth/mfa', []],
             ['POST', '/api/v1/auth/logout-everywhere', []],
+            ['GET', '/api/v1/auth/sessions', []],
+            ['DELETE', '/api/v1/auth/sessions/1', []],
             ['POST', '/api/v1/auth/email/resend', []],
             ['POST', '/api/v1/companies', ['legal_name' => 'Mine now', 'country_code' => 'ET', 'fiscal_year_start_month' => 7]],
         ] as [$method, $uri, $body]) {

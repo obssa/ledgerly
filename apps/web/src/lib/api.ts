@@ -1016,6 +1016,9 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   return body as T;
 }
 
+export type { SignedInSession } from "./sessions";
+import type { SignedInSession } from "./sessions";
+
 export interface User {
   id: string;
   name: string;
@@ -1055,6 +1058,8 @@ export const ledgerly = {
   register: (body: { name: string; email: string; password: string }) => api<AuthResult>("auth/register", { method: "POST", body }),
   logout: (token: string) => api<null>("auth/logout", { method: "POST", token }),
   logoutEverywhere: (token: string) => api<null>("auth/logout-everywhere", { method: "POST", token }),
+  sessions: (token: string) => api<{ data: SignedInSession[] }>("auth/sessions", { token }),
+  endDeviceSession: (id: string, token: string) => api<null>(`auth/sessions/${encodeURIComponent(id)}`, { method: "DELETE", token }),
   verifyEmail: (token: string) => api<{ message: string }>("auth/email/verify", { method: "POST", body: { token } }),
   resendVerification: (token: string) => api<{ message: string }>("auth/email/resend", { method: "POST", token }),
   forgotPassword: (email: string) => api<{ message: string }>("auth/password/forgot", { method: "POST", body: { email } }),

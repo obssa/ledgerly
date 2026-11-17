@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Domain\Tenancy\Models\Membership;
+use App\Support\ClientAddress;
+use App\Support\DeviceName;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -47,10 +49,20 @@ class User extends Authenticatable
         return Attribute::get(fn () => $this->mfa_confirmed_at !== null);
     }
 
-    /** A new API token for one signed-in session; it expires (config/sanctum.php). */
+    /**
+     * A new API token for one signed-in session; it expires (config/sanctum.php). It remembers the device and
+     * address it was signed in from, for the list of signed-in devices (SessionController).
+     */
     public function issueToken(): string
     {
-        return $this->createToken('web', ['*'], now()->addMinutes((int) config('sanctum.expiration', 720)))->plainTextToken;
+        $new = $this->createToken('web', ['*'], now()->addMinutes((int) config('sanctum.expiration', 720)));
+        $request = request();
+        $new->accessToken->forceFill([
+            'device' => DeviceName::of(ClientAddress::agent($request)),
+            'ip_address' => mb_substr(ClientAddress::of($request), 0, 45),
+        ])->save();
+
+        return $new->plainTextToken;
     }
 
     public function memberships(): HasMany

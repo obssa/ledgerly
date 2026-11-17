@@ -12,6 +12,7 @@ use App\Http\Controllers\JournalRequestController;
 use App\Http\Controllers\AnalysisReportController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\SessionController;
 use App\Http\Controllers\SavedReportController;
 use App\Http\Controllers\PeopleController;
 use App\Http\Controllers\StockReportController;
@@ -112,6 +113,8 @@ Route::prefix('v1')->group(function () {
         // Not for the shared demo accounts (config/demo.php).
         Route::middleware('not.demo')->group(function () {
             Route::post('auth/logout-everywhere', [AccountController::class, 'logoutEverywhere']);
+            Route::get('auth/sessions', [SessionController::class, 'index']);
+            Route::delete('auth/sessions/{session}', [SessionController::class, 'destroy']);
             Route::post('auth/email/resend', [AccountController::class, 'resendVerification']);
             Route::post('auth/password', [AccountController::class, 'changePassword']);
 
