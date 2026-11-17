@@ -959,6 +959,8 @@ export interface Member {
   id: string;
   user: { id: string; name: string; email: string };
   role: string;
+  /** A custom role's own permissions (with company.view); empty for every other role. */
+  permissions: string[];
   status: "invited" | "active" | "deactivated";
   invited_at: string | null;
   joined_at: string;
@@ -1017,6 +1019,8 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 }
 
 export type { SignedInSession } from "./sessions";
+export type { Grantable } from "./team";
+import type { Grantable } from "./team";
 import type { SignedInSession } from "./sessions";
 
 /** A file from the API (not JSON), passed on as it came; an error answer becomes an ApiError as in api(). */
@@ -1244,11 +1248,12 @@ export const ledgerly = {
   updateItem: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   warehouses: (ctx: RequestOptions) => api<{ data: Warehouse[] }>("warehouses", ctx),
   people: (ctx: RequestOptions) => api<{ data: { id: string; name: string }[] }>("people", ctx),
-  members: (ctx: RequestOptions) => api<{ data: Member[]; roles: string[] }>("members", ctx),
-  inviteMember: (body: { email: string; name?: string; role: string }, ctx: RequestOptions) => api<Member>("members/invitations", { ...ctx, method: "POST", body }),
-  changeMember: (id: string, action: "role" | "resend" | "deactivate" | "reactivate", role: string | undefined, ctx: RequestOptions) =>
+  members: (ctx: RequestOptions) => api<{ data: Member[]; roles: string[]; grantable: Grantable[] }>("members", ctx),
+  inviteMember: (body: { email: string; name?: string; role: string; permissions?: string[] }, ctx: RequestOptions) =>
+    api<Member>("members/invitations", { ...ctx, method: "POST", body }),
+  changeMember: (id: string, action: "role" | "resend" | "deactivate" | "reactivate", role: string | undefined, ctx: RequestOptions, permissions?: string[]) =>
     action === "role"
-      ? api<Member>(`members/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body: { role } })
+      ? api<Member>(`members/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body: { role, ...(role === "custom" ? { permissions } : {}) } })
       : api<Member>(`members/${encodeURIComponent(id)}/${action}`, { ...ctx, method: "POST", body: {} }),
   createWarehouse: (name: string, ctx: RequestOptions) => api<Warehouse>("warehouses", { ...ctx, method: "POST", body: { name } }),
   stock: (ctx: RequestOptions) => api<StockOnHand>("stock", ctx),

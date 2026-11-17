@@ -159,4 +159,50 @@ final class TeamTest extends TestCase
         $this->getJson('/api/v1/auth/invitation?token=' . str_repeat('a', 64))->assertNotFound();
         $this->getJson('/api/v1/auth/invitation?token=short')->assertUnprocessable();
     }
+
+    public function test_a_custom_role_works_with_exactly_the_permissions_chosen_for_it(): void
+    {
+        $grantable = collect($this->getJson('/api/v1/members', $this->h)->assertOk()->json('grantable'))->pluck('permission');
+        $this->assertContains('invoices.view', $grantable);
+        foreach (['users.manage', 'company.export', 'company.manage', 'periods.reopen', '*'] as $kept) {
+            $this->assertNotContains($kept, $grantable, "{$kept} is for owners and admins only");
+        }
+
+        $invite = fn (array $permissions) => $this->postJson('/api/v1/members/invitations',
+            ['email' => 'tigist@example.test', 'name' => 'Tigist', 'role' => 'custom', 'permissions' => $permissions], $this->h);
+        $invite([])->assertUnprocessable()->assertJsonValidationErrors('permissions');
+        $invite(['*'])->assertUnprocessable()->assertJsonValidationErrors('permissions.0');
+        $invite(['users.manage'])->assertUnprocessable()->assertJsonValidationErrors('permissions.0');
+        $m = $invite(['reports.view', 'invoices.view'])->assertCreated()->assertJsonPath('role', 'custom')
+            ->assertJsonPath('permissions', ['company.view', 'invoices.view', 'reports.view'])->json('id');
+        // Other roles keep only their name's permissions, whatever is sent.
+        $this->postJson('/api/v1/members/invitations', ['email' => 'dawit@example.test', 'name' => 'Dawit', 'role' => 'viewer', 'permissions' => ['payments.pay']], $this->h)
+            ->assertCreated()->assertJsonPath('permissions', []);
+
+        $tigist = User::query()->where('email', 'tigist@example.test')->sole();
+        $token = $this->tokenFor($tigist);
+        $this->signedOut();
+        $this->postJson('/api/v1/auth/invitation/accept', ['token' => $token, 'password' => 'Coffee-Ledger-2026!'])->assertOk();
+
+        $this->actingAs($tigist, 'sanctum');
+        $this->getJson('/api/v1/invoices', $this->h)->assertOk();
+        $this->getJson('/api/v1/reports/trial-balance?as_of=2026-12-31', $this->h)->assertOk();
+        $this->postJson('/api/v1/invoices', [], $this->h)->assertForbidden();
+        $this->getJson('/api/v1/members', $this->h)->assertForbidden();
+
+        $this->actingAs($this->me, 'sanctum');
+        $this->putJson("/api/v1/members/{$m}", ['role' => 'custom', 'permissions' => ['invoices.view', 'invoices.create']], $this->h)->assertOk()
+            ->assertJsonPath('permissions', ['company.view', 'invoices.create', 'invoices.view']);
+        $this->actingAs($tigist, 'sanctum');
+        $this->getJson('/api/v1/reports/trial-balance?as_of=2026-12-31', $this->h)->assertForbidden();
+        $this->postJson('/api/v1/invoices', [], $this->h)->assertUnprocessable();   // allowed now: only the empty draft is refused
+
+        $this->actingAs($this->me, 'sanctum');
+        $this->putJson("/api/v1/members/{$m}", ['role' => 'viewer'], $this->h)->assertOk()->assertJsonPath('permissions', []);
+        $this->assertSame('[]', $this->owner()->table('memberships')->where('id', $m)->value('permissions'));
+        $changes = $this->owner()->table('audit_log')->where(['subject_id' => $m, 'action' => 'member_role_changed'])->orderBy('id')->get();
+        $this->assertCount(2, $changes);
+        $this->assertStringContainsString('reports.view', (string) $changes[0]->before);
+        $this->assertStringContainsString('invoices.create', (string) $changes[0]->after);
+    }
 }

@@ -24,7 +24,7 @@ use Illuminate\Validation\ValidationException;
  */
 final class TeamController extends Controller
 {
-    public const ROLES = ['owner', 'admin', 'accountant', 'bookkeeper', 'sales', 'purchasing', 'approver', 'viewer'];
+    public const ROLES = ['owner', 'admin', 'accountant', 'bookkeeper', 'sales', 'purchasing', 'approver', 'viewer', 'custom'];
 
     private const LINK_DAYS = 7;
 
@@ -37,12 +37,14 @@ final class TeamController extends Controller
         $this->authorizeCompany('users.manage');
         $rows = DB::table('memberships as m')->join('users as u', 'u.id', '=', 'm.user_id')->where('m.company_id', $this->current->id())
             ->orderByRaw("CASE m.status WHEN 'active' THEN 0 WHEN 'invited' THEN 1 ELSE 2 END")->orderBy('u.name')->limit(500)
-            ->get(['m.id', 'm.role', 'm.status', 'm.invited_at', 'm.created_at', 'u.id as user_id', 'u.name', 'u.email']);
+            ->get(['m.id', 'm.role', 'm.permissions', 'm.status', 'm.invited_at', 'm.created_at', 'u.id as user_id', 'u.name', 'u.email']);
 
         return response()->json([
             'data' => $rows->map(fn ($r) => ['id' => $r->id, 'user' => ['id' => $r->user_id, 'name' => $r->name, 'email' => $r->email], 'role' => $r->role,
-                'status' => $r->status, 'invited_at' => $r->invited_at, 'joined_at' => $r->created_at, 'me' => $r->user_id === $request->user()->getKey()]),
-            'roles' => $this->current->membership()?->role === 'owner' ? self::ROLES : array_values(array_diff(self::ROLES, ['owner'])),
+                'permissions' => self::permissionsOf($r), 'status' => $r->status, 'invited_at' => $r->invited_at, 'joined_at' => $r->created_at,
+                'me' => $r->user_id === $request->user()->getKey()]),
+            'roles' => $this->rolesICanGive(),
+            'grantable' => collect(config('permissions.grantable'))->map(fn ($label, $permission) => ['permission' => $permission, 'label' => $label])->values(),
         ]);
     }
 
@@ -53,10 +55,12 @@ final class TeamController extends Controller
             'email' => ['required', 'email:rfc', 'max:190'],
             'name' => ['nullable', 'string', 'max:120'],
             'role' => ['required', Rule::in($this->rolesICanGive())],
+            ...self::permissionRules(),
         ]);
         $email = Str::lower(trim($data['email']));
+        $permissions = self::grants($data);
 
-        [$member, $user, $token, $new] = DB::transaction(function () use ($data, $email, $request) {
+        [$member, $user, $token, $new] = DB::transaction(function () use ($data, $email, $permissions, $request) {
             $userId = DB::selectOne('SELECT app_user_id_for_invite(?) AS id', [$email])->id;
             if ($userId !== null) {
                 $status = DB::table('memberships')->where(['company_id' => $this->current->id(), 'user_id' => $userId])->value('status');
@@ -78,10 +82,10 @@ final class TeamController extends Controller
             }
             $member = (string) Str::uuid();
             DB::table('memberships')->insert(['id' => $member, 'company_id' => $this->current->id(), 'user_id' => $userId, 'role' => $data['role'],
-                'status' => 'invited', 'invited_at' => now()]);
+                'permissions' => json_encode($permissions), 'status' => 'invited', 'invited_at' => now()]);
             $token = $this->issue($member, $new);
-            $this->audit->record($this->current->id(), 'member_invited', 'membership', $member, null, ['email' => $email, 'role' => $data['role'], 'new_account' => $new],
-                userId: $request->user()->getKey());
+            $this->audit->record($this->current->id(), 'member_invited', 'membership', $member, null,
+                ['email' => $email, 'role' => $data['role'], 'permissions' => $permissions, 'new_account' => $new], userId: $request->user()->getKey());
 
             return [$member, User::query()->findOrFail($userId), $token, $new];
         });
@@ -114,9 +118,10 @@ final class TeamController extends Controller
     {
         $this->authorizeCompany('users.manage');
         $m = $this->find($membership);
-        $role = $request->validate(['role' => ['required', Rule::in(self::ROLES)]])['role'];
-        if ($role !== $m->role) {
-            $this->change($m, ['role' => $role], 'member_role_changed', $request);
+        $data = $request->validate(['role' => ['required', Rule::in(self::ROLES)], ...self::permissionRules()]);
+        $permissions = self::grants($data);
+        if ($data['role'] !== $m->role || $permissions !== self::permissionsOf($m)) {
+            $this->change($m, ['role' => $data['role'], 'permissions' => $permissions], 'member_role_changed', $request);
         }
 
         return response()->json($this->member($m->id));
@@ -179,13 +184,15 @@ final class TeamController extends Controller
         $user->notify(new InvitationToJoin($token, (string) ($company->trading_name ?: $company->legal_name), (string) $request->user()->name, $role, $new, self::LINK_DAYS));
     }
 
-    /** @param array<string, string> $set */
+    /** @param array<string, string|list<string>> $set */
     private function change(object $m, array $set, string $action, Request $request): void
     {
+        $before = array_intersect_key([...(array) $m, 'permissions' => self::permissionsOf($m)], $set);
+        $row = array_map(fn ($v) => is_array($v) ? json_encode($v) : $v, $set);
         try {
-            DB::transaction(function () use ($m, $set, $action, $request) {
-                DB::table('memberships')->where('id', $m->id)->update([...$set, 'updated_at' => now()]);
-                $this->audit->record($this->current->id(), $action, 'membership', $m->id, array_intersect_key((array) $m, $set), $set, userId: $request->user()->getKey());
+            DB::transaction(function () use ($m, $set, $row, $before, $action, $request) {
+                DB::table('memberships')->where('id', $m->id)->update([...$row, 'updated_at' => now()]);
+                $this->audit->record($this->current->id(), $action, 'membership', $m->id, $before, $set, userId: $request->user()->getKey());
             });
         } catch (QueryException $e) {
             // The database's rules (008): only an owner changes the owner role, and a company keeps an owner.
@@ -221,9 +228,44 @@ final class TeamController extends Controller
     private function member(string $id): array
     {
         $r = DB::table('memberships as m')->join('users as u', 'u.id', '=', 'm.user_id')->where('m.id', $id)
-            ->first(['m.id', 'm.role', 'm.status', 'm.invited_at', 'm.created_at', 'u.id as user_id', 'u.name', 'u.email']);
+            ->first(['m.id', 'm.role', 'm.permissions', 'm.status', 'm.invited_at', 'm.created_at', 'u.id as user_id', 'u.name', 'u.email']);
 
-        return ['id' => $r->id, 'user' => ['id' => $r->user_id, 'name' => $r->name, 'email' => $r->email], 'role' => $r->role, 'status' => $r->status,
-            'invited_at' => $r->invited_at, 'joined_at' => $r->created_at];
+        return ['id' => $r->id, 'user' => ['id' => $r->user_id, 'name' => $r->name, 'email' => $r->email], 'role' => $r->role,
+            'permissions' => self::permissionsOf($r), 'status' => $r->status, 'invited_at' => $r->invited_at, 'joined_at' => $r->created_at];
+    }
+
+    /** @return array<string, list<mixed>> a custom role names at least one permission it may be given, one by one */
+    private static function permissionRules(): array
+    {
+        return [
+            'permissions' => ['exclude_unless:role,custom', 'required', 'array', 'min:1', 'max:' . count(config('permissions.grantable'))],
+            'permissions.*' => ['string', 'distinct', Rule::in(array_keys(config('permissions.grantable')))],
+        ];
+    }
+
+    /**
+     * What is stored on the membership: for a custom role its chosen permissions and company.view (every form names
+     * accounts and taxes), sorted; for any other role nothing, as its name says it all (the database insists, 047).
+     *
+     * @param array<string, mixed> $data
+     * @return list<string>
+     */
+    private static function grants(array $data): array
+    {
+        if ($data['role'] !== 'custom') {
+            return [];
+        }
+        $grants = array_values(array_unique([...$data['permissions'], 'company.view']));
+        sort($grants);
+
+        return $grants;
+    }
+
+    /** @return list<string> */
+    private static function permissionsOf(object $m): array
+    {
+        $stored = is_string($m->permissions ?? null) ? json_decode($m->permissions, true) : ($m->permissions ?? []);
+
+        return is_array($stored) ? array_values($stored) : [];
     }
 }

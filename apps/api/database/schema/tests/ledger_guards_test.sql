@@ -2518,6 +2518,41 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T73 an invitation link is made by an owner or admin, seen only by its company, used once, and accepted by the invited person';
 END $$;
+-- T74: custom roles (047). Only a custom role has permissions of its own, as a list of "module.action" or
+-- "module.*", never "*". Company A, as its owner f1; f9 is the accountant who joined in T73.
+DO $$
+DECLARE
+  m uuid := '00000000-0000-0000-0000-0000000073e1';
+BEGIN
+  BEGIN
+    UPDATE memberships SET permissions = '["invoices.view"]' WHERE id = m;
+    RAISE EXCEPTION 'FAIL T74a: an accountant got permissions of their own';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE memberships SET role = 'custom', permissions = '["*"]' WHERE id = m;
+    RAISE EXCEPTION 'FAIL T74b: a custom role was given every permission';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE memberships SET role = 'custom', permissions = '["invoices.view", 5]' WHERE id = m;
+    RAISE EXCEPTION 'FAIL T74c: a permission that is not a name was stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE memberships SET role = 'custom', permissions = '{"invoices": "view"}' WHERE id = m;
+    RAISE EXCEPTION 'FAIL T74d: permissions that are not a list were stored';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO memberships (company_id, user_id, role, status, permissions, invited_at)
+      VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000f2', 'viewer', 'invited', '["reports.view"]', now());
+    RAISE EXCEPTION 'FAIL T74e: a viewer was invited with permissions of their own';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  UPDATE memberships SET role = 'custom', permissions = '["invoices.view", "reports.*"]' WHERE id = m;
+  IF (SELECT role || ' ' || permissions::text FROM memberships WHERE id = m) <> 'custom ["invoices.view", "reports.*"]' THEN
+    RAISE EXCEPTION 'FAIL T74f: a custom role did not keep its permissions';
+  END IF;
+  UPDATE memberships SET role = 'accountant', permissions = '[]' WHERE id = m;
+  RAISE NOTICE 'PASS T74 only a custom role has permissions of its own, each a permission name, never every permission';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
