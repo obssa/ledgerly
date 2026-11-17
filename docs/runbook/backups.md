@@ -35,8 +35,8 @@ The private key is in two places:
 3. **Create a token for this bucket only.** In R2, go to Manage API tokens and create a token with "Object Read &
    Write", limited to that one bucket. Note the Access Key ID, the Secret Access Key, and your account ID (shown on
    the R2 page).
-4. **Run the setup script.** On your machine, run `backup-setup.sh` (handed over in the session; it needs `gh`
-   signed in and Docker). It:
+4. **Run the setup script.** On your machine, from the repository, run `bash scripts/ops/backup-setup.sh` (on Windows,
+   through Git Bash). It needs `gh` signed in and Docker. It:
    - asks for the four values above, the secret ones without showing them;
    - makes an age key pair into `~/ledgerly-backup-key.txt`, unless one is already there;
    - sets the variables `R2_ACCOUNT_ID`, `R2_BUCKET`, `BACKUP_AGE_RECIPIENT` and `BACKUP_ENABLED=true`;
