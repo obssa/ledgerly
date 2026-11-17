@@ -2,7 +2,7 @@
 
 /*
 | Role => permissions. "module.*" grants every action in a module; "*" grants everything.
-| The 'custom' role starts empty and gets grants stored on the membership (Advanced plan).
+| The 'custom' role starts empty and gets grants stored on the membership, chosen from 'grantable' below.
 |
 | transactions.edit  edit a posted document while its period is open (history is always kept)
 | periods.reopen     edit or void inside a closed period or fiscal year; owner and admin only (via '*')
@@ -64,5 +64,61 @@ return [
         'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review', 'projects.view', 'projects.time', 'assets.view'],
         'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'banking.view', 'reports.view', 'tax.view', 'projects.view', 'assets.view'],
         'custom' => [],
+    ],
+
+    /*
+    | What an owner or admin may give a custom role, one by one, with how the Team page names it. company.view is
+    | always given too (every form names accounts and taxes). Left out on purpose: users.manage, company.export,
+    | company.manage and periods.reopen stay with owners and admins (the database allows them to no one else).
+    */
+    'grantable' => [
+        'invoices.view' => 'Sales: see invoices and credit notes',
+        'invoices.create' => 'Sales: write invoices and credit notes as drafts',
+        'invoices.approve' => 'Sales: post invoices',
+        'payments.view' => 'Payments: see payments received and made',
+        'payments.receive' => 'Payments: record money received',
+        'payments.pay' => 'Payments: pay suppliers and refund customers',
+        'payments.reverse' => 'Payments: reverse a payment',
+        'contacts.view' => 'Contacts: see customers and suppliers',
+        'contacts.create' => 'Contacts: add customers and suppliers',
+        'contacts.edit' => 'Contacts: change or archive customers and suppliers',
+        'bills.view' => 'Purchases: see bills',
+        'bills.create' => 'Purchases: enter bills as drafts',
+        'bills.approve' => 'Purchases: post bills',
+        'expenses.view' => 'Expenses: see expenses',
+        'expenses.create' => 'Expenses: record expenses',
+        'transactions.edit' => 'Edit posted documents while the period is open',
+        'inventory.view' => 'Inventory: see items and stock',
+        'inventory.items' => 'Inventory: add and change items and warehouses',
+        'inventory.transfer' => 'Inventory: move stock between warehouses',
+        'inventory.adjust' => 'Inventory: adjust stock (posts to the ledger)',
+        'banking.view' => 'Banking: see accounts, balances and registers',
+        'banking.manage' => 'Banking: open and change bank, wallet and cash accounts',
+        'banking.review' => 'Banking: import statements and categorise lines',
+        'banking.reconcile' => 'Banking: reconcile accounts',
+        'banking.transfer' => 'Banking: transfer between accounts',
+        'banking.deposit' => 'Banking: deposit cash and cheques',
+        'banking.count' => 'Banking: count cash boxes',
+        'accounting.view' => 'Accounting: see the chart with balances and the journal',
+        'accounting.chart' => 'Accounting: change the chart of accounts',
+        'accounting.dimensions' => 'Accounting: manage locations, classes and projects',
+        'accounting.opening' => 'Accounting: enter opening balances',
+        'accounting.rates' => 'Accounting: enter exchange rates',
+        'accounting.revalue' => 'Accounting: revalue foreign currency balances',
+        'journals.create' => 'Journals: write manual journal entries',
+        'journals.approve' => 'Journals: approve manual journal entries',
+        'journals.review' => 'Journals: review unusual entries',
+        'periods.close' => 'Close periods',
+        'reports.view' => 'Reports: see and export reports',
+        'tax.view' => 'Tax: see worksheets and returns',
+        'tax.manage' => 'Tax: manage tax rates',
+        'tax.file' => 'Tax: file and settle returns',
+        'projects.view' => 'Projects: see projects and their profit',
+        'projects.manage' => 'Projects: manage projects and everyone\'s hours',
+        'projects.time' => 'Projects: log one\'s own hours',
+        'assets.view' => 'Fixed assets: see the register',
+        'assets.manage' => 'Fixed assets: register and edit assets',
+        'assets.depreciate' => 'Fixed assets: post depreciation',
+        'audit.view' => 'See the audit log',
     ],
 ];

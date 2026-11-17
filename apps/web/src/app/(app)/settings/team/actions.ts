@@ -15,6 +15,11 @@ async function context(): Promise<{ token: string; companyId: string }> {
   return { token, companyId };
 }
 
+/** The permissions ticked for a custom role. */
+function chosen(form: FormData): string[] {
+  return form.getAll("permissions").map(String).filter((p) => /^[a-z]+\.[a-z_]+$/.test(p));
+}
+
 function refusal(error: unknown): FormState {
   if (error instanceof ApiError && error.status === 401) redirect("/sign-in");
   if (error instanceof ApiError && error.status === 403) {
@@ -27,7 +32,8 @@ function refusal(error: unknown): FormState {
 export async function inviteMember(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   try {
-    const m = await ledgerly.inviteMember({ email: text(form, "email") ?? "", name: text(form, "name"), role: text(form, "role") ?? "" }, ctx);
+    const role = text(form, "role") ?? "";
+    const m = await ledgerly.inviteMember({ email: text(form, "email") ?? "", name: text(form, "name"), role, ...(role === "custom" ? { permissions: chosen(form) } : {}) }, ctx);
     refresh();
     return { notice: `Invited ${m.user.email}. The link in their email works for 7 days.` };
   } catch (error) {
@@ -40,9 +46,9 @@ export async function changeMember(_: FormState | undefined, form: FormData): Pr
   const action = text(form, "action");
   if (action !== "role" && action !== "resend" && action !== "deactivate" && action !== "reactivate") return { error: "Choose what to do." };
   try {
-    const m = await ledgerly.changeMember(text(form, "id") ?? "", action, text(form, "role"), ctx);
+    const m = await ledgerly.changeMember(text(form, "id") ?? "", action, text(form, "role"), ctx, chosen(form));
     refresh();
-    const done = { role: `${m.user.name} is now ${m.role}.`, resend: `Sent again to ${m.user.email}.`, deactivate: `${m.user.name} is deactivated.`, reactivate: `${m.user.name} is active again.` };
+    const done = { role: m.role === "custom" ? `${m.user.name}'s access is saved.` : `${m.user.name} is now ${m.role}.`, resend: `Sent again to ${m.user.email}.`, deactivate: `${m.user.name} is deactivated.`, reactivate: `${m.user.name} is active again.` };
     return { notice: done[action] };
   } catch (error) {
     return refusal(error);

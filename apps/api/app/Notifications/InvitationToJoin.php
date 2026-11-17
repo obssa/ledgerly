@@ -44,6 +44,10 @@ final class InvitationToJoin extends Notification
 
     private function roleWords(): string
     {
-        return in_array($this->role, ['owner', 'admin', 'accountant', 'approver'], true) ? "an {$this->role}" : "a {$this->role}";
+        return match (true) {
+            $this->role === 'custom' => 'a team member with the access chosen for you',
+            in_array($this->role, ['owner', 'admin', 'accountant', 'approver'], true) => "an {$this->role}",
+            default => "a {$this->role}",
+        };
     }
 }

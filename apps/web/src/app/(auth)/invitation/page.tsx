@@ -38,7 +38,7 @@ async function Invitation({ searchParams }: Pick<PageProps<"/invitation">, "sear
   return (
     <>
       <p className="mt-1.5 text-sm text-muted">
-        You are invited to <strong className="text-ink">{invitation.company_name}</strong> as {invitation.role}, with the email {invitation.email}.
+        You are invited to <strong className="text-ink">{invitation.company_name}</strong> as {invitation.role === "custom" ? "a team member with the access chosen for you" : invitation.role}, with the email {invitation.email}.
         {invitation.new_account ? " Choose your password to finish your account." : " Accept, then sign in with your Ledgerly account as usual."}
       </p>
       <AuthForm

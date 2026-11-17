@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getMembers } from "@/lib/data";
+import { roleSummary } from "@/lib/team";
 import { InviteForm, MemberControls } from "./TeamForms";
 
 export const metadata = { title: "Team" };
@@ -17,7 +18,7 @@ export default async function TeamPage() {
       {!team ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <>
           <Card className="mb-4" label="Invite someone">
-            <InviteForm roles={team.roles} />
+            <InviteForm roles={team.roles} grantable={team.grantable} />
           </Card>
           <Card className="!p-2" label="People">
             <div className="overflow-x-auto">
@@ -28,10 +29,10 @@ export default async function TeamPage() {
                     <tr key={m.id} className="align-top">
                       <td><span className="font-semibold">{m.user.name}</span>{m.me && <span className="ml-1 text-[12px] text-muted">(you)</span>}
                         <span className="block text-[12px] text-muted">{m.user.email}</span></td>
-                      <td className="text-[13px]">{m.role}</td>
+                      <td className="text-[13px]">{roleSummary(m.role, m.permissions)}</td>
                       <td><Pill tone={TONE[m.status]}>{m.status}</Pill>
                         {m.status === "invited" && m.invited_at && <span className="block text-[11px] text-muted">since {m.invited_at.slice(0, 10)}</span>}</td>
-                      <td className="text-right"><MemberControls member={m} roles={team.roles} /></td>
+                      <td className="text-right"><MemberControls member={m} roles={team.roles} grantable={team.grantable} /></td>
                     </tr>
                   ))}
                 </tbody>
