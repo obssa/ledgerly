@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SAVEABLE } from "@/lib/saved-reports";
+import { PrintButton } from "./PrintButton";
 
 /** The reports, grouped by the accounting cycle; every entry is a page that exists. */
 const CYCLE: { stage: string; reports: [string, string][] }[] = [
@@ -34,13 +35,14 @@ export function ReportsNav({ current }: { current: string }) {
   );
 }
 
-/** A CSV download of the report as shown (the export is recorded in the audit log), and saving it to open again or be sent. */
+/** A CSV download, or print and save as PDF, of the report as shown (each recorded in the audit log), and saving it to open again or be sent. */
 export function ExportLink({ report, params }: { report: string; params: Record<string, string | undefined> }) {
   const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
   return (
     <span className="flex flex-wrap gap-2 print:hidden">
       {SAVEABLE[report] && <Link className="btn" href={`/reports/saved?${new URLSearchParams({ report, ...Object.fromEntries(Object.entries(params).filter(([, v]) => v)) }).toString()}`}>Save</Link>}
       <a className="btn" href={`/reports/export/${report}${query ? `?${query}` : ""}`}>Download CSV</a>
+      <PrintButton report={report} params={params} />
     </span>
   );
 }

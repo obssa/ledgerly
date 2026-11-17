@@ -28,7 +28,7 @@ final class ReportExportController extends Controller
         $this->authorizeCompany('reports.view');
         $data = $request->validate([
             'report' => ['required', Rule::in(self::REPORTS)],
-            'format' => ['required', Rule::in(['csv'])],
+            'format' => ['required', Rule::in(['csv', 'pdf'])],   // pdf: printed or saved as PDF from the browser
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d'],
             'as_of' => ['nullable', 'date_format:Y-m-d'],

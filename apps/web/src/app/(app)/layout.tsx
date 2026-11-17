@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { Sidebar } from "@/components/app-shell/Sidebar";
 import { Topbar } from "@/components/app-shell/Topbar";
-import { CompanyBadge, UserMenu } from "@/components/app-shell/ShellParts";
+import { CompanyBadge, PrintedCompany, UserMenu } from "@/components/app-shell/ShellParts";
 import Link from "next/link";
 import { isDemoMode } from "@/lib/api";
 import { getSession } from "@/lib/session";
@@ -37,9 +37,14 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           </Suspense>
         }
       />
-      <main className="min-w-0 flex-[999_1_560px] px-8 pb-10 pt-5">
+      <main className="min-w-0 flex-[999_1_560px] px-8 pb-10 pt-5 print:p-0">
+        <div className="print:hidden">
+          <Suspense fallback={null}>
+            <DemoBanner />
+          </Suspense>
+        </div>
         <Suspense fallback={null}>
-          <DemoBanner />
+          <PrintedCompany />
         </Suspense>
         <Topbar
           user={

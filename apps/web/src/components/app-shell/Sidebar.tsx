@@ -60,7 +60,7 @@ const footer: NavItem[] = [
 /** `company` is rendered on the server (CompanyBadge) and passed in, since this component runs in the browser. */
 export function Sidebar({ company }: { company: ReactNode }) {
   return (
-    <nav aria-label="Main" className="flex-[1_1_240px] max-w-full bg-side px-3.5 py-5 text-side-text lg:max-w-[260px]">
+    <nav aria-label="Main" className="flex-[1_1_240px] max-w-full bg-side px-3.5 py-5 text-side-text lg:max-w-[260px] print:hidden">
       <div className="flex items-center gap-2.5 px-3 pb-5">
         <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
           <rect width="28" height="28" rx="8" fill="#34D399" />
