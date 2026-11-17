@@ -14,6 +14,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\CompanyExportController;
+use App\Http\Controllers\ProjectMilestoneController;
 use App\Http\Controllers\SavedReportController;
 use App\Http\Controllers\PeopleController;
 use App\Http\Controllers\StockReportController;
@@ -212,6 +213,10 @@ Route::prefix('v1')->group(function () {
             Route::post('projects', [ProjectController::class, 'store']);
             Route::get('projects/{project}', [ProjectController::class, 'show'])->whereUuid('project');
             Route::put('projects/{project}', [ProjectController::class, 'update'])->whereUuid('project');
+            Route::post('projects/{project}/milestones', [ProjectMilestoneController::class, 'store'])->whereUuid('project');
+            Route::put('projects/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'update'])->whereUuid(['project', 'milestone']);
+            Route::delete('projects/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'destroy'])->whereUuid(['project', 'milestone']);
+            Route::post('projects/{project}/milestones/{milestone}/bill', [ProjectMilestoneController::class, 'bill'])->whereUuid(['project', 'milestone']);
             Route::get('tax/worksheet', [TaxReturnController::class, 'worksheet']);
             Route::get('tax/calendar', [TaxReturnController::class, 'calendar']);
             Route::get('tax/audit-file', [TaxReturnController::class, 'auditFile']);

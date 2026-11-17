@@ -76,6 +76,7 @@ final class ProjectController extends Controller
             'accounts' => $accounts->map(fn ($a) => ['account_id' => $a->id, 'code' => $a->code, 'name' => $a->name, 'type' => $a->type, 'amount' => $a->amount])->values(),
             'documents' => $documents->map(fn ($d) => ['id' => $d->id, 'type' => $d->type, 'number' => $d->number, 'date' => $d->issue_date,
                 'contact' => $d->contact, 'currency' => $d->currency, 'amount' => $d->amount])->values(),
+            'milestones' => ProjectMilestoneController::listFor($companyId, $p->id),
             'can' => ['manage' => (bool) $this->current->membership()?->can('projects.manage')],
         ]);
     }

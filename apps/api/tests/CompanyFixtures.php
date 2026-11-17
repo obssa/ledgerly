@@ -121,6 +121,8 @@ trait CompanyFixtures
         // Three billable hours on it, not billed yet.
         $ids['time_entry'] = $this->postJson('/api/v1/time-entries', ['project_id' => $ids['project'], 'work_date' => '2026-11-09', 'hours' => '3',
             'billable' => true, 'rate' => '400', 'note' => 'Site survey'], $h)->assertCreated()->json('id');
+        $ids['milestone'] = $this->postJson("/api/v1/projects/{$ids['project']}/milestones", ['name' => 'Survey report', 'amount' => '5000'], $h)
+            ->assertCreated()->json('data.0.id');
         // A laptop on the fixed asset register, 36 months straight line from December.
         $byCode = fn (string $code) => $this->owner()->table('accounts')->where(['company_id' => $company, 'code' => $code])->value('id');
         $ids['fixed_asset'] = $this->postJson('/api/v1/fixed-assets', ['code' => 'IT-001', 'name' => "{$name} laptop", 'asset_account_id' => $byCode('1500'),
@@ -147,7 +149,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(195, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(199, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -180,6 +182,7 @@ trait CompanyFixtures
             'taxReturn' => $ids['tax_return'],
             'project' => $ids['project'],
             'timeEntry' => $ids['time_entry'],
+            'milestone' => $ids['milestone'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

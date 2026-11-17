@@ -96,6 +96,6 @@ final class ProjectTest extends TestCase
         $this->postJson('/api/v1/projects', ['code' => 'P-1', 'name' => 'Again', 'status' => 'active', 'billing' => 'fixed_fee'], $this->h)->assertUnprocessable()->assertJsonValidationErrors('code');
         $this->postJson('/api/v1/projects', ['code' => 'P-3', 'name' => 'For a supplier', 'status' => 'active', 'billing' => 'fixed_fee', 'customer_id' => $this->c['supplier']], $this->h)
             ->assertUnprocessable()->assertJsonValidationErrors('customer_id');
-        $this->assertSame(['project_created', 'project_updated'], $this->owner()->table('audit_log')->where('subject_id', $p)->orderBy('id')->pluck('action')->all());
+        $this->assertSame(['project_created', 'project_updated'], $this->owner()->table('audit_log')->where('subject_id', $p)->where('action', 'like', 'project_%')->orderBy('id')->pluck('action')->all());
     }
 }

@@ -2599,6 +2599,51 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T75 a reminder is for an owed posted invoice, kept as sent, once per step, and seen only by its company';
 END $$;
+-- T76: project milestones (049). A milestone belongs to a project of the company and is billed on an invoice to the
+-- project's customer; once billed on an invoice that stands it is fixed and kept, until that invoice is voided.
+-- Company A as its owner f1; project d71 (customer c1) and its draft invoice 67d1 come from T67.
+DO $$
+DECLARE
+  m uuid;
+BEGIN
+  BEGIN
+    INSERT INTO project_milestones (company_id, project_id, name, amount) VALUES (app_company_id(), '00000000-0000-0000-0000-000000000d72', 'Fit-out', 100);
+    RAISE EXCEPTION 'FAIL T76a: a milestone was put on a class, not a project';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO project_milestones (company_id, project_id, name, amount, due_on) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-000000000d71', 'Foundations', 100000, '2027-09-30') RETURNING id INTO m;
+
+  INSERT INTO contacts (id, company_id, name, is_customer) VALUES ('00000000-0000-0000-0000-0000000076c1', app_company_id(), 'Another customer', true);
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency) VALUES
+    ('00000000-0000-0000-0000-0000000076d1', app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000076c1', '2027-08-01', 'ETB');
+  BEGIN
+    UPDATE project_milestones SET invoice_id = '00000000-0000-0000-0000-0000000076d1' WHERE id = m;
+    RAISE EXCEPTION 'FAIL T76b: a milestone was billed to someone other than the project''s customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  UPDATE project_milestones SET invoice_id = '00000000-0000-0000-0000-0000000067d1' WHERE id = m;
+  BEGIN
+    UPDATE project_milestones SET amount = 1 WHERE id = m;
+    RAISE EXCEPTION 'FAIL T76c: a billed milestone''s amount changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM project_milestones WHERE id = m;
+    RAISE EXCEPTION 'FAIL T76d: a billed milestone was removed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE project_milestones SET due_on = '2027-10-15' WHERE id = m;   -- the date is only a plan
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM project_milestones) THEN
+    RAISE EXCEPTION 'FAIL T76e: company B saw company A''s milestones';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+
+  -- Voiding the invoice opens the milestone again.
+  UPDATE documents SET status = 'void' WHERE id = '00000000-0000-0000-0000-0000000067d1';
+  UPDATE project_milestones SET amount = 120000, invoice_id = NULL WHERE id = m;
+  DELETE FROM project_milestones WHERE id = m;
+  RAISE NOTICE 'PASS T76 a milestone is billed once to the project''s customer, then kept as billed until its invoice is voided';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

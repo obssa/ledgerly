@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseLines } from "./invoice";
-import { projectBody, timeBody } from "./projects";
+import { projectBody, timeBody, milestoneTotal } from "./projects";
 
 describe("projectBody", () => {
   it("sends the code only when the project is new, and empty fields as null", () => {
@@ -30,5 +30,13 @@ describe("timeBody", () => {
     expect(timeBody(f)).toEqual({ project_id: "p1", work_date: "2026-11-10", hours: "2.5", billable: false, rate: "1200", note: null });
     f.append("billable", "on");
     expect(timeBody(f).billable).toBe(true);
+  });
+});
+
+describe("milestoneTotal", () => {
+  it("adds the milestones exactly, in cents", () => {
+    expect(milestoneTotal([])).toBe("0.00");
+    expect(milestoneTotal([{ amount: "1500.00" }, { amount: "0.10" }, { amount: "0.20" }])).toBe("1500.30");
+    expect(milestoneTotal([{ amount: "9999999999999999.99" }, { amount: "0.01" }])).toBe("10000000000000000.00");
   });
 });

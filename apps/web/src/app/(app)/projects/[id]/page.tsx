@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCustomers, getProject, getTimeOptions } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { PROJECT_BILLING, PROJECT_STATUSES } from "@/lib/projects";
+import { milestoneTotal, PROJECT_BILLING, PROJECT_STATUSES } from "@/lib/projects";
 import { ProjectForm } from "../ProjectForm";
 import { BillTime } from "../TimeForms";
+import { AddMilestone, MilestoneControls } from "../MilestoneForms";
 
 export const metadata = { title: "Project" };
 
@@ -25,6 +26,8 @@ function Against({ label, actual, budget }: { label: string; actual: string; bud
 }
 
 /** Module 9a: one project, its income, costs and profit (all time or a period), account by account, and its documents. */
+const MILESTONE = { planned: "Planned", drafted: "On a draft invoice", invoiced: "Invoiced", paid: "Paid" } as const;
+
 export default async function ProjectPage({ params, searchParams }: PageProps<"/projects/[id]">) {
   const { id } = await params;
   const q = await searchParams;
@@ -57,6 +60,40 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           {" "}Read from the ledger lines tagged with the project{period.from || period.to ? ", for the period above" : ""}.
         </p>
       </Card>
+      {(p.billing === "fixed_fee" || (p.milestones ?? []).length > 0) && (
+        <Card className="mb-4 !p-2" label="Milestones">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 px-3 pt-2">
+            <h2 className="text-[15px] font-bold">Milestones</h2>
+            {p.contract_value && (
+              <span className="text-[13px] text-muted">Scheduled <span className="num font-semibold">{formatAmount(milestoneTotal(p.milestones ?? []))}</span> of the contract&apos;s <span className="num">{formatAmount(p.contract_value)}</span></span>
+            )}
+          </div>
+          {(p.milestones ?? []).length === 0 ? (
+            <p className="px-3 py-2 text-[13px] text-muted">No milestones yet. Split the contract into the stages you invoice.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="tbl">
+                <thead><tr><th scope="col">Milestone</th><th scope="col">Due</th><th scope="col" className="!text-right">Amount</th><th scope="col">Billing</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+                <tbody>
+                  {(p.milestones ?? []).map((m) => (
+                    <tr key={m.id} className="align-top">
+                      <td className="font-semibold">{m.name}</td>
+                      <td className="num whitespace-nowrap">{m.due_on ?? ""}</td>
+                      <td className="num text-right">{formatAmount(m.amount)}</td>
+                      <td>
+                        <Pill tone={m.status === "paid" ? "good" : m.status === "planned" ? "neutral" : "warn"}>{MILESTONE[m.status]}</Pill>
+                        {m.invoice && <Link href={`/invoices/${encodeURIComponent(m.invoice.id)}`} className="ml-2 text-[13px] font-semibold text-brand hover:underline">{m.invoice.number ?? "Draft"}</Link>}
+                      </td>
+                      <td className="text-right">{p.can.manage && <MilestoneControls projectId={p.id} milestone={m} incomeAccounts={timeOptions?.incomeAccounts ?? []} canBill={Boolean(p.customer)} />}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {p.can.manage && <div className="border-t border-line px-3 py-3"><AddMilestone projectId={p.id} hasContractValue={Boolean(p.contract_value)} /></div>}
+        </Card>
+      )}
       <Card className="mb-4" label="Time">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-[15px] font-bold">Time</h2>
