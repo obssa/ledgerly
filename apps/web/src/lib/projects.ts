@@ -23,3 +23,10 @@ export function timeBody(form: FormData): Record<string, unknown> {
     billable: form.get("billable") === "on", rate: clean(value("rate")) || null, note: value("note") || null,
   };
 }
+
+/** What a project's milestones add up to: amounts as the API sends them ("1500.00"), summed in cents so it is exact. */
+export function milestoneTotal(milestones: { amount: string }[]): string {
+  const cents = milestones.reduce((sum, m) => sum + BigInt(m.amount.replace(".", "")), BigInt(0));
+  const text = cents.toString().padStart(3, "0");
+  return `${text.slice(0, -2)}.${text.slice(-2)}`;
+}

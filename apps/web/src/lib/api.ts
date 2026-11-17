@@ -412,7 +412,20 @@ export interface ProjectDetail extends Project {
   time: { logged_hours: string; unbilled_hours: string; unbilled_value: string; unpriced: boolean };
   accounts: { account_id: string; code: string; name: string; type: string; amount: string }[];
   documents: { id: string; type: string; number: string | null; date: string; contact: string; currency: string; amount: string }[];
+  /** Milestones of a fixed-fee project, billed one by one (049). */
+  milestones?: ProjectMilestone[];
   can: { manage: boolean };
+}
+
+export interface ProjectMilestone {
+  id: string;
+  name: string;
+  amount: string;
+  due_on: string | null;
+  position: number;
+  /** planned (not billed, or its invoice voided), drafted (on a draft invoice), invoiced (posted, owed) or paid. */
+  status: "planned" | "drafted" | "invoiced" | "paid";
+  invoice: { id: string; number: string | null; status: string } | null;
 }
 
 /** Module 9a: hours logged against a project. */
@@ -1146,6 +1159,12 @@ export const ledgerly = {
     api<{ data: TimeEntry[]; can: { manage: boolean } }>("time-entries", { ...ctx, query: q }),
   logTime: (body: Record<string, unknown>, ctx: RequestOptions) => api<TimeEntry>("time-entries", { ...ctx, method: "POST", body }),
   removeTime: (id: string, ctx: RequestOptions) => api<null>(`time-entries/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE" }),
+  addMilestone: (projectId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ data: ProjectMilestone[] }>(`projects/${encodeURIComponent(projectId)}/milestones`, { ...ctx, method: "POST", body }),
+  removeMilestone: (projectId: string, id: string, ctx: RequestOptions) =>
+    api<{ data: ProjectMilestone[] }>(`projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE" }),
+  billMilestone: (projectId: string, id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ invoice: { id: string; total: string } }>(`projects/${encodeURIComponent(projectId)}/milestones/${encodeURIComponent(id)}/bill`, { ...ctx, method: "POST", body }),
   billTime: (projectId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ invoice: { id: string; total: string }; entries: number }>(`projects/${encodeURIComponent(projectId)}/bill-time`, { ...ctx, method: "POST", body }),
   taxWorksheet: (q: { kind?: string; from?: string; to?: string }, ctx: RequestOptions) => api<TaxWorksheet>("tax/worksheet", { ...ctx, query: q }),

@@ -78,7 +78,13 @@ final class TenantIsolationTest extends TestCase
             $this->assertNoDataOf($this->b, $response, $route);
 
             // Control: the same route with A's own record is found, so the 404 above is isolation, not a broken route.
-            $own = $this->callRoute($route, $this->a, ['X-Company-Id' => $this->a['company']]);
+            // Rolled back, so a route that removes or uses up a record (a milestone deleted) leaves it for the next.
+            DB::beginTransaction();
+            try {
+                $own = $this->callRoute($route, $this->a, ['X-Company-Id' => $this->a['company']]);
+            } finally {
+                DB::rollBack();
+            }
             $this->assertNotSame(404, $own->getStatusCode(), $this->describe($route, "company A's own id", $own));
             $this->assertLessThan(500, $own->getStatusCode(), $this->describe($route, "company A's own id", $own));
         }

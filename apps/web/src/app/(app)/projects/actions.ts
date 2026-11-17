@@ -76,3 +76,43 @@ export async function billTime(_: FormState | undefined, form: FormData): Promis
   }
   redirect(`/invoices/${encodeURIComponent(invoice)}`);
 }
+
+/** Module 9a: a milestone, given as an amount or a share of the contract value. */
+export async function addMilestone(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const amount = (text(form, "amount") ?? "").replace(/,/g, "");
+  const percent = (text(form, "percent") ?? "").replace(/,/g, "");
+  try {
+    await ledgerly.addMilestone(text(form, "project_id") ?? "", {
+      name: text(form, "name") ?? "", ...(amount ? { amount } : percent ? { percent } : {}), due_on: text(form, "due_on") ?? null,
+    }, ctx);
+  } catch (error) {
+    return refusal(error, "manage projects");
+  }
+  refresh();
+  return { notice: "Milestone added." };
+}
+
+export async function removeMilestone(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.removeMilestone(text(form, "project_id") ?? "", text(form, "milestone_id") ?? "", ctx);
+  } catch (error) {
+    return refusal(error, "manage projects");
+  }
+  refresh();
+  return { notice: "Removed." };
+}
+
+/** Bills the milestone on a draft invoice to the project's customer, then opens it to check and post. */
+export async function billMilestone(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let invoice: string;
+  try {
+    invoice = (await ledgerly.billMilestone(text(form, "project_id") ?? "", text(form, "milestone_id") ?? "",
+      { issue_date: text(form, "issue_date") ?? "", income_account_id: text(form, "income_account_id") ?? "" }, ctx)).invoice.id;
+  } catch (error) {
+    return refusal(error, "bill milestones");
+  }
+  redirect(`/invoices/${encodeURIComponent(invoice)}`);
+}
