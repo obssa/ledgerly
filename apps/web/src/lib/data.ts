@@ -1,10 +1,11 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
+import { isDate } from "./reports";
 
 /**
  * Server-side data access. In demo mode returns sample data; otherwise calls the API with the session's
@@ -909,6 +910,34 @@ export async function getTrialBalance(asOf: string): Promise<TrialBalanceRow[] |
   if (isDemoMode()) return null;
   return (await withApi((ctx) => ledgerly.trialBalance(asOf, ctx))).data;
 }
+
+/** The period a report shows by default: the current fiscal year to today (the company's), or the month if none. */
+export async function getReportPeriod(q: { from?: unknown; to?: unknown }): Promise<{ from: string; to: string }> {
+  const today = await getCompanyToday();
+  const to = isDate(q.to) ? q.to : today;
+  if (isDate(q.from)) return { from: q.from, to };
+  if (isDemoMode()) return { from: `${to.slice(0, 4)}-01-01`, to };
+  const years = await withApi((ctx) => ledgerly.fiscalYears(ctx)).catch(() => ({ data: [] as FiscalYear[] }));
+  const year = years.data.find((y) => y.starts_on <= to && y.ends_on >= to);
+  return { from: year?.starts_on ?? `${to.slice(0, 7)}-01`, to };
+}
+
+/** Module 10 statements; null in the demo, or when the period is refused. */
+async function statement<T>(call: (ctx: { token: string; companyId: string }) => Promise<T>): Promise<T | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi(call);
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 422 || error.status === 403)) return null;
+    throw error;
+  }
+}
+
+export const getBalanceSheet = (asOf: string): Promise<BalanceSheet | null> => statement((ctx) => ledgerly.balanceSheet(asOf, ctx));
+export const getCashFlow = (q: { from: string; to: string }): Promise<CashFlowStatement | null> => statement((ctx) => ledgerly.cashFlow(q, ctx));
+export const getChangesInEquity = (q: { from: string; to: string }): Promise<ChangesInEquity | null> => statement((ctx) => ledgerly.changesInEquity(q, ctx));
+export const getFinancialHealth = (q: { from: string; to: string }): Promise<FinancialHealth | null> => statement((ctx) => ledgerly.financialHealth(q, ctx));
 
 export async function getProfitAndLoss(q: { from: string; to: string; compare_from?: string; compare_to?: string }): Promise<ProfitAndLoss> {
   await connection();

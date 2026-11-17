@@ -1,0 +1,27 @@
+import { describe, expect, it } from "vitest";
+import { isDate, periodLabel, previousPeriod, showRatio } from "./reports";
+
+describe("previousPeriod", () => {
+  it("is the same length, ending the day before", () => {
+    expect(previousPeriod("2026-10-01", "2026-10-31")).toEqual({ from: "2026-08-31", to: "2026-09-30" });
+    expect(previousPeriod("2026-01-01", "2026-12-31")).toEqual({ from: "2025-01-01", to: "2025-12-31" });
+    expect(previousPeriod("2026-11-17", "2026-11-17")).toEqual({ from: "2026-11-16", to: "2026-11-16" });
+  });
+});
+
+describe("periodLabel", () => {
+  it("names a whole month, otherwise both ends", () => {
+    expect(periodLabel("2026-10-01", "2026-10-31")).toBe("October 2026");
+    expect(periodLabel("2026-01-01", "2026-11-17")).toBe("1 Jan 2026 to 17 Nov 2026");
+  });
+});
+
+describe("isDate and showRatio", () => {
+  it("accepts real dates only, and shows a missing ratio as a dash", () => {
+    expect(isDate("2026-02-28")).toBe(true);
+    expect(isDate("2026-13-01")).toBe(false);
+    expect(isDate("yesterday")).toBe(false);
+    expect(showRatio(null, "%")).toBe("—");
+    expect(showRatio("40.0", "%")).toBe("40.0%");
+  });
+});

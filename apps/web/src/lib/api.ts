@@ -819,6 +819,47 @@ export interface ProfitAndLoss {
   totals: Record<"income" | "cost_of_sales" | "gross_profit" | "expenses" | "net_profit", { current: string; previous: string | null }>;
 }
 
+/** Module 10: the balance sheet at a date, with the accounting equation checked. */
+export interface BalanceSheet {
+  sections: Record<"assets" | "liabilities" | "equity", { code: string; name: string; amount: string }[]>;
+  equation: { assets: string; liabilities: string; equity: string; profit_to_date: string; liabilities_and_equity: string; difference: string; balanced: boolean };
+}
+
+export interface CashFlowStatement {
+  from: string;
+  to: string;
+  currency: string;
+  net_profit: string;
+  sections: Record<"operating" | "investing" | "financing", { code: string; name: string; amount: string }[]>;
+  totals: Record<"operating" | "investing" | "financing", string>;
+  net_change: string;
+  opening_cash: string;
+  closing_cash: string;
+  cash_change: string;
+  balanced: boolean;
+}
+
+export interface ChangesInEquity {
+  from: string;
+  to: string;
+  currency: string;
+  lines: { code: string | null; name: string; opening: string; movement: string; closing: string }[];
+  net_profit: string;
+  opening: string;
+  movement: string;
+  closing: string;
+}
+
+export interface FinancialHealth {
+  from: string;
+  to: string;
+  days: number;
+  currency: string;
+  figures: Record<"current_assets" | "current_liabilities" | "inventory" | "cash" | "receivables" | "payables" | "revenue" | "gross_profit" | "net_profit" | "credit_sales" | "purchases", string>
+    & { monthly_cash_outflow: string | null };
+  ratios: Record<"current_ratio" | "quick_ratio" | "cash_runway_months" | "dso_days" | "dpo_days" | "gross_margin" | "net_margin", string | null>;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) {
     super(message);
@@ -1136,6 +1177,10 @@ export const ledgerly = {
   closeChecklist: (periodEnd: string | undefined, ctx: RequestOptions) => api<CloseChecklist>("close-checklist", { ...ctx, query: { period_end: periodEnd } }),
   generalLedger: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<GeneralLedger>("reports/general-ledger", { ...ctx, query: q }),
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
+  balanceSheet: (asOf: string, ctx: RequestOptions) => api<BalanceSheet>("reports/balance-sheet", { ...ctx, query: { as_of: asOf } }),
+  cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),
+  changesInEquity: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<ChangesInEquity>("reports/changes-in-equity", { ...ctx, query: q }),
+  financialHealth: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<FinancialHealth>("reports/financial-health", { ...ctx, query: q }),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>
     api<ProfitAndLoss>("reports/profit-and-loss", { ...ctx, query: q }),
 };

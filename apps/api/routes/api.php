@@ -9,6 +9,7 @@ use App\Http\Controllers\ChartController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
+use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RecurringJournalController;
@@ -304,6 +305,9 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/ar-ageing', [LedgerController::class, 'arAgeing']);
             Route::get('reports/ap-ageing', [LedgerController::class, 'apAgeing']);
             Route::get('reports/profit-and-loss', [LedgerController::class, 'profitAndLoss']);
+            Route::get('reports/cash-flow', [FinancialStatementController::class, 'cashFlow']);
+            Route::get('reports/changes-in-equity', [FinancialStatementController::class, 'changesInEquity']);
+            Route::get('reports/financial-health', [FinancialStatementController::class, 'health']);
         });
     });
 });
