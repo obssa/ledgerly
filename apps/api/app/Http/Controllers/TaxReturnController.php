@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Tax\TaxAuditFile;
+use App\Domain\Tax\TaxCalendar;
 use App\Domain\Tax\TaxReturns;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use DateTimeImmutable;
@@ -23,6 +25,27 @@ final class TaxReturnController extends Controller
 {
     public function __construct(private readonly CurrentCompany $current, private readonly TaxReturns $returns, private readonly AuditLogger $audit)
     {
+    }
+
+    /** The filing calendar: the past year's periods and the current one, each with its due date and where it stands. */
+    public function calendar(TaxCalendar $calendar): JsonResponse
+    {
+        $this->authorizeCompany('tax.view');
+
+        return response()->json([...$calendar->for($this->current->get(), $this->current->today()), 'today' => $this->current->today()]);
+    }
+
+    /** The tax audit file of a period (last month by default): its documents or its ledger lines, as CSV. */
+    public function auditFile(Request $request, TaxAuditFile $file): JsonResponse
+    {
+        $this->authorizeCompany('tax.view');
+        [, $from, $to] = $this->period($request, false);
+        $part = $request->validate(['part' => ['nullable', Rule::in(['documents', 'ledger'])]])['part'] ?? 'ledger';
+        $result = $part === 'documents' ? $file->documents($this->current->id(), $from, $to) : $file->ledger($this->current->id(), $from, $to);
+        $this->audit->record($this->current->id(), 'tax_audit_file_exported', 'company', $this->current->id(), null,
+            ['part' => $part, 'from' => $from, 'to' => $to, 'rows' => $result['rows']], userId: $request->user()->getKey());
+
+        return response()->json(['filename' => "{$part}-{$from}-to-{$to}.csv", ...$result]);
     }
 
     /** The worksheet of a period: last month by default. */

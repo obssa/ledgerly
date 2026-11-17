@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
@@ -71,13 +71,13 @@ export async function getJournalRequests(status = "pending"): Promise<{ data: Jo
 }
 
 /** Module 7: a tax worksheet and the filed returns; null in the demo, or for a role that does not see tax. */
-export async function getTaxCentre(q: { kind?: string; from?: string; to?: string }): Promise<{ sheet: TaxWorksheet; returns: TaxReturn[] } | null> {
+export async function getTaxCentre(q: { kind?: string; from?: string; to?: string }): Promise<{ sheet: TaxWorksheet; returns: TaxReturn[]; calendar: TaxCalendar } | null> {
   await connection();
   if (isDemoMode()) return null;
   try {
     return await withApi(async (ctx) => {
-      const [sheet, returns] = await Promise.all([ledgerly.taxWorksheet(q, ctx), ledgerly.taxReturns(ctx)]);
-      return { sheet, returns: returns.data };
+      const [sheet, returns, calendar] = await Promise.all([ledgerly.taxWorksheet(q, ctx), ledgerly.taxReturns(ctx), ledgerly.taxCalendar(ctx)]);
+      return { sheet, returns: returns.data, calendar };
     });
   } catch (error) {
     if (error instanceof ApiError && (error.status === 403 || error.status === 422)) return null;

@@ -82,5 +82,14 @@
     "airtel_money",
     "card"
   ],
-  "timezone": "Africa/Nairobi"
+  "timezone": "Africa/Nairobi",
+  "rules": {
+    "filing": {
+      "vat": {
+        "frequency": "monthly",
+        "due_day_of_next_month": 20,
+        "note": "VAT return and payment by the 20th of the following month (VAT Act 2013). To be confirmed by the tax adviser."
+      }
+    }
+  }
 }

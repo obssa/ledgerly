@@ -99,6 +99,18 @@
     },
     "cash_payment_limit": "50000.00",
     "cash_payment_limit_note": "Payments above ETB 50,000 must go through a bank or an authorised electronic channel; Ledgerly warns when a cash payment is above the limit.",
-    "books_required_note": "Category A taxpayers (annual turnover above ETB 2,000,000), VAT-registered businesses and professional service providers must keep books of account."
+    "books_required_note": "Category A taxpayers (annual turnover above ETB 2,000,000), VAT-registered businesses and professional service providers must keep books of account.",
+    "filing": {
+      "vat": {
+        "frequency": "monthly",
+        "due_days_after_period": 30,
+        "note": "VAT return and payment within 30 days after the end of each month (VAT Proclamation No. 1341/2024). To be confirmed by the tax adviser."
+      },
+      "withholding": {
+        "frequency": "monthly",
+        "due_days_after_period": 30,
+        "note": "Tax withheld is paid to the authority within 30 days after the end of the month it was withheld in (Income Tax Proclamation No. 979/2016, as amended). To be confirmed by the tax adviser."
+      }
+    }
   }
 }
