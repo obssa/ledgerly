@@ -537,6 +537,35 @@ export interface Item {
 
 export interface Warehouse { id: string; name: string; is_active: boolean }
 
+/** Module 4/10: per stock item, on hand at the start, in, out and on hand at the end of a period. */
+export interface StockMovement {
+  from: string;
+  to: string;
+  warehouse: { id: string; name: string } | null;
+  currency: string;
+  rows: {
+    item: { id: string; sku: string | null; name: string; unit: string };
+    opening_qty: string; opening_value: string; in_qty: string; in_value: string; out_qty: string; out_value: string; sold_qty: string;
+    closing_qty: string; closing_value: string;
+  }[];
+  totals: { opening_value: string; in_value: string; out_value: string; closing_value: string };
+}
+
+export type StockBand = "0-30" | "31-90" | "91-180" | "over-180" | "never";
+
+/** Module 4/10: what is on hand at a date, by days since it last sold. */
+export interface StockAgeing {
+  as_of: string;
+  warehouse: { id: string; name: string } | null;
+  currency: string;
+  rows: {
+    item: { id: string; sku: string | null; name: string; unit: string };
+    quantity: string; value: string; last_sold_on: string | null; last_received_on: string | null; days_since_sale: number | null; band: StockBand;
+  }[];
+  bands: { band: StockBand; items: number; value: string }[];
+  total_value: string;
+}
+
 /** GET /stock: what is on hand per item and warehouse, valued at weighted average. */
 export interface StockOnHand {
   data: { item: { id: string; sku: string | null; name: string; unit: string; reorder_point: string | null }; warehouse: { id: string; name: string }; quantity: string; value: string; average_cost: string }[];
@@ -1166,6 +1195,8 @@ export const ledgerly = {
   transferStock: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ value: string }>("stock/transfers", { ...ctx, method: "POST", body }),
   reorder: (ctx: RequestOptions) =>
     api<{ data: { item: { id: string; sku: string | null; name: string; unit: string; reorder_point: string; purchase_price: string | null }; on_hand: string }[] }>("stock/reorder", ctx),
+  stockMovement: (q: { from?: string; to?: string; warehouse_id?: string }, ctx: RequestOptions) => api<StockMovement>("reports/stock-movement", { ...ctx, query: q }),
+  stockAgeing: (q: { as_of?: string; warehouse_id?: string }, ctx: RequestOptions) => api<StockAgeing>("reports/stock-ageing", { ...ctx, query: q }),
   inventoryValuation: (asOf: string | undefined, ctx: RequestOptions) =>
     api<{ as_of: string; rows: { item_id: string; name: string; sku: string | null; unit: string; warehouse: string; quantity: string; value: string }[]; stock_value: string; inventory_account: string; difference: string }>(
       "reports/inventory-valuation", { ...ctx, query: { as_of: asOf } }),

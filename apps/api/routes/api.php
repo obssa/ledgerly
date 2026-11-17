@@ -10,6 +10,7 @@ use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
 use App\Http\Controllers\AnalysisReportController;
+use App\Http\Controllers\StockReportController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
@@ -305,6 +306,8 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/balance-sheet', [LedgerController::class, 'balanceSheet']);
             Route::get('reports/bin-card', [LedgerController::class, 'binCard']);
             Route::get('reports/inventory-valuation', [LedgerController::class, 'inventoryValuation']);
+            Route::get('reports/stock-movement', [StockReportController::class, 'movement']);
+            Route::get('reports/stock-ageing', [StockReportController::class, 'ageing']);
             Route::get('reports/ar-ageing', [LedgerController::class, 'arAgeing']);
             Route::get('reports/ap-ageing', [LedgerController::class, 'apAgeing']);
             Route::get('reports/profit-and-loss', [LedgerController::class, 'profitAndLoss']);

@@ -25,6 +25,15 @@ export function periodLabel(from: string, to: string): string {
   return `${fmt(f, { day: "numeric", month: "short", year: "numeric" })} to ${fmt(t, { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
+/** A stock ageing band as words: slow-moving is 91 to 180 days since the last sale, dead stock over 180 or never sold. */
+export const STOCK_BANDS: Record<string, { label: string; note?: string }> = {
+  "0-30": { label: "Sold in the last 30 days" },
+  "31-90": { label: "31 to 90 days" },
+  "91-180": { label: "91 to 180 days", note: "slow-moving" },
+  "over-180": { label: "Over 180 days", note: "dead stock" },
+  never: { label: "Never sold", note: "dead stock" },
+};
+
 /** A ratio from the API for display: null as a dash, a percentage or a number of days or months with its unit. */
 export function showRatio(v: string | null, unit: "" | "%" | " days" | " months" = ""): string {
   return v === null ? "—" : `${v}${unit}`;
