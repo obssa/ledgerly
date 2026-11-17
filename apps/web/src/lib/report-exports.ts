@@ -8,11 +8,11 @@ import type { Cell } from "./csv";
  */
 
 type Ctx = { token: string; companyId: string };
-type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string };
+type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
-  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing"] as const;
+  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 const ageing = (title: string, r: Awaited<ReturnType<typeof ledgerly.arAgeing>>): Export => ({
@@ -82,6 +82,19 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       const r = await ledgerly.documentAnalysis(report, { group: p.group ?? "contact", from: p.from, to: p.to }, ctx);
       return { title: `${report}-by-${r.group}`, rows: [[r.group, "Quantity", "Documents", "Amount", "Tax", "Share %"],
         ...r.rows.map((x) => [x.label, x.quantity, x.documents, x.amount, x.tax, x.share]), ["Total", null, null, r.totals.amount, r.totals.tax, null]] };
+    }
+    case "audit-log": {
+      // Every row of the period (up to 50,000), page by page as the API gives them.
+      const rows: Cell[][] = [["Id", "When", "Who", "Action", "Record", "Record id", "Before", "After", "Reason", "IP"]];
+      let before: string | undefined;
+      for (let page = 0; page < 500; page++) {
+        const log = await ledgerly.auditLog({ from: p.from, to: p.to, action: p.action, user_id: p.user_id, before_id: before }, ctx);
+        for (const e of log.data) rows.push([e.id, e.at, e.user?.name ?? e.actor_type, e.action, e.subject_type, e.subject_id,
+          e.before ? JSON.stringify(e.before) : null, e.after ? JSON.stringify(e.after) : null, e.reason, e.ip]);
+        if (!log.more || log.next_before_id === null) break;
+        before = String(log.next_before_id);
+      }
+      return { title: "audit-log", rows };
     }
     case "ar-ageing":
       return ageing("ar-ageing", await ledgerly.arAgeing(p.as_of, ctx));

@@ -47,6 +47,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
       { href: "/close", label: "Close the books" },
       { href: "/opening-balances", label: "Opening balances" },
       { href: "/reports", label: "Reports" },
+      { href: "/audit", label: "Audit log" },
     ],
   },
 ];

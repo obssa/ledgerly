@@ -17,7 +17,7 @@ use Illuminate\Validation\Rule;
 final class ReportExportController extends Controller
 {
     public const REPORTS = ['profit-and-loss', 'balance-sheet', 'trial-balance', 'general-ledger', 'cash-flow', 'changes-in-equity',
-        'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing'];
+        'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'audit-log'];
 
     public function __construct(private readonly CurrentCompany $current, private readonly AuditLogger $audit)
     {
@@ -32,7 +32,7 @@ final class ReportExportController extends Controller
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d'],
             'as_of' => ['nullable', 'date_format:Y-m-d'],
-            'options' => ['nullable', 'array:kind,group,account_id'],
+            'options' => ['nullable', 'array:kind,group,account_id,action,user_id'],
             'options.*' => ['nullable', 'string', 'max:60'],
             'rows' => ['required', 'integer', 'min:0', 'max:1000000'],
         ]);

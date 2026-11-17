@@ -34,6 +34,7 @@
 | accounting.revalue revalue foreign-currency balances at a month end (accountant via 'accounting.*')
 | journals.approve   approve or reject a manual journal above settings.approval.journal_above, not one you asked for
 |                    (accountant via 'journals.*', approver)
+| audit.view         the audit log, its export and the check of its hash chain (accountant; owner and admin)
 | assets.view        the fixed asset register, each asset's depreciation schedule (accountant via 'assets.*',
 |                    bookkeeper, approver, viewer)
 | assets.manage      register fixed assets and edit them (accountant via 'assets.*')
@@ -54,7 +55,7 @@ return [
     'roles' => [
         'owner' => ['*'],
         'admin' => ['*'],
-        'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'inventory.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*', 'projects.*', 'assets.*'],
+        'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'inventory.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*', 'projects.*', 'assets.*', 'audit.view'],
         'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'banking.*', 'contacts.*', 'reports.view', 'projects.view', 'projects.time', 'assets.view'],
         'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view', 'projects.time'],
         'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'projects.time'],
