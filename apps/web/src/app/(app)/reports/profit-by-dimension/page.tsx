@@ -2,7 +2,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { getProfitByDimension, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel } from "@/lib/reports";
-import { ReportsNav } from "../ReportsNav";
+import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Profit by location, class or project" };
 
@@ -18,7 +18,7 @@ export default async function ProfitByDimensionPage({ searchParams }: PageProps<
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Profit by location, class or project" />
+      <PageTitle eyebrow="Reports / Management" title="Profit by location, class or project" actions={<ExportLink report="profit-by-dimension" params={{ kind, ...period }} />} />
       <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
         <div><label className="field-label" htmlFor="kind">By</label>
           <select className="field" id="kind" name="kind" defaultValue={kind}>{KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>

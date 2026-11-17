@@ -4,7 +4,7 @@ import { parse } from "@/lib/decimal";
 import { getCompanySettings, getProfitAndLoss, getReportPeriod, getShellContext } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel, previousPeriod } from "@/lib/reports";
-import { PeriodForm, ReportsNav } from "./ReportsNav";
+import { ExportLink, PeriodForm, ReportsNav } from "./ReportsNav";
 
 export const metadata = { title: "Profit and loss" };
 
@@ -70,7 +70,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" />
+      <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" actions={<ExportLink report="profit-and-loss" params={period} />} />
       <PeriodForm from={period.from} to={period.to} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports" />

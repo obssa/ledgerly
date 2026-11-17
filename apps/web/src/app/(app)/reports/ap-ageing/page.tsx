@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { getApAgeing } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
+import { ExportLink } from "../ReportsNav";
 
 export const metadata = { title: "AP ageing" };
 
@@ -18,7 +19,7 @@ export default async function ApAgeingPage({ searchParams }: PageProps<"/reports
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Payables</>} title="AP ageing" />
+      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Payables</>} title="AP ageing" actions={<ExportLink report="ap-ageing" params={{ as_of: asOf }} />} />
       {ageing === null ? (
         <Card><p className="text-sm text-muted">Not available in the demo.</p></Card>
       ) : (

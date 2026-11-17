@@ -2,7 +2,7 @@ import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCashFlow, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel } from "@/lib/reports";
-import { PeriodForm, ReportsNav } from "../ReportsNav";
+import { ExportLink, PeriodForm, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Cash flow statement" };
 
@@ -15,7 +15,7 @@ export default async function CashFlowPage({ searchParams }: PageProps<"/reports
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" />
+      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" actions={<ExportLink report="cash-flow" params={period} />} />
       <PeriodForm from={period.from} to={period.to} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/cash-flow" />

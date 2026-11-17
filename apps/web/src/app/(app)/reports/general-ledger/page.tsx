@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { getChart, getDimensions, getGeneralLedger, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
+import { ExportLink } from "../ReportsNav";
 import { defaultPeriod, drCr } from "@/lib/ledger";
 
 export const metadata = { title: "General ledger" };
@@ -27,7 +28,8 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>} title="General ledger" />
+      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>} title="General ledger"
+        actions={<ExportLink report="general-ledger" params={{ from: filters.from, to: filters.to, account_id: filters.account_id }} />} />
       <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
         <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={filters.from} /></div>
         <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={filters.to} /></div>

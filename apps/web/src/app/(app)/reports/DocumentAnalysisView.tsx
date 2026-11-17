@@ -2,7 +2,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { getDocumentAnalysis, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel } from "@/lib/reports";
-import { ReportsNav } from "./ReportsNav";
+import { ExportLink, ReportsNav } from "./ReportsNav";
 
 /** Sales or purchases in a period by customer or supplier, item or month (credits taken off, base currency). */
 export async function DocumentAnalysisView({ side, q }: { side: "sales" | "purchases"; q: Record<string, string | string[] | undefined> }) {
@@ -16,7 +16,7 @@ export async function DocumentAnalysisView({ side, q }: { side: "sales" | "purch
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Customers and suppliers" title={side === "sales" ? "Sales analysis" : "Purchases analysis"} />
+      <PageTitle eyebrow="Reports / Customers and suppliers" title={side === "sales" ? "Sales analysis" : "Purchases analysis"} actions={<ExportLink report={side} params={{ group, ...period }} />} />
       <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
         <div><label className="field-label" htmlFor="group">By</label>
           <select className="field" id="group" name="group" defaultValue={group}>{groups.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>

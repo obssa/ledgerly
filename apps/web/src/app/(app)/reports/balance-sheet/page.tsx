@@ -2,7 +2,7 @@ import { Card, PageTitle, Pill } from "@/components/ui";
 import { getBalanceSheet, getCompanySettings, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { isDate } from "@/lib/reports";
-import { PeriodForm, ReportsNav } from "../ReportsNav";
+import { ExportLink, PeriodForm, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Balance sheet" };
 
@@ -22,7 +22,7 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Balance sheet" />
+      <PageTitle eyebrow="Reports / Financial statements" title="Balance sheet" actions={<ExportLink report="balance-sheet" params={{ as_of: asOf }} />} />
       <PeriodForm to={asOf} single />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/balance-sheet" />
