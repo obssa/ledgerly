@@ -1,0 +1,85 @@
+# Monthly restore drill (SECURITY.md S11): the newest backup is downloaded from R2, decrypted, restored into a
+# throwaway PostgreSQL, and every company's ledger and audit chain is verified. The run is the record of the drill.
+# Setup: docs/runbook/backups.md. Secret BACKUP_AGE_IDENTITY: the age private key that opens the backups.
+name: restore drill
+
+on:
+  schedule:
+    - cron: '0 4 1 * *'   # the 1st of each month
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drill:
+    if: vars.BACKUP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env: { POSTGRES_PASSWORD: drill, POSTGRES_DB: drill }
+        ports: ['5432:5432']
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      R2_ENDPOINT: https://${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      BUCKET: ${{ vars.R2_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: drill
+      PGDATABASE: drill
+    steps:
+      - name: Tools
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq age postgresql-common >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null && sudo apt-get install -y -qq postgresql-client-18 >/dev/null
+      - name: Download and decrypt the newest backup
+        env:
+          IDENTITY: ${{ secrets.BACKUP_AGE_IDENTITY }}
+        run: |
+          set -o pipefail
+          test -n "$IDENTITY" || { echo "BACKUP_AGE_IDENTITY is not set (docs/runbook/backups.md)"; exit 1; }
+          KEY=$(aws s3 ls --endpoint-url "$R2_ENDPOINT" --recursive "s3://$BUCKET/ledgerly/db/" | sort | tail -1 | awk '{print $4}')
+          test -n "$KEY" || { echo "No backup found in the bucket"; exit 1; }
+          echo "BACKUP=$KEY" >> "$GITHUB_ENV"
+          aws s3 cp --endpoint-url "$R2_ENDPOINT" --only-show-errors "s3://$BUCKET/$KEY" backup.dump.age
+          install -m 600 /dev/null identity.txt && printf '%s\n' "$IDENTITY" > identity.txt
+          age -d -i identity.txt backup.dump.age > backup.dump
+          rm -f identity.txt backup.dump.age
+      - name: Restore
+        run: |
+          # A fresh database: its empty public schema goes, so a backup of tables kept in public restores too.
+          psql -X -v ON_ERROR_STOP=1 -c 'DROP SCHEMA IF EXISTS public CASCADE'
+          /usr/lib/postgresql/18/bin/pg_restore --no-owner --no-privileges --exit-on-error -d drill backup.dump
+      - name: Verify every company's books and audit chain
+        run: |
+          SCHEMA=$(psql -At -c "SELECT n.nspname FROM pg_namespace n JOIN pg_class c ON c.relnamespace = n.oid WHERE c.relname = 'journal_entries' LIMIT 1")
+          test -n "$SCHEMA" || { echo "No Ledgerly tables were restored"; exit 1; }
+          psql -X -v ON_ERROR_STOP=1 -v schema="$SCHEMA" <<'SQL' | tee drill.txt
+          SET search_path = :"schema", pg_temp;
+          SELECT 'companies' AS what, count(*) FROM companies
+          UNION ALL SELECT 'journal entries', count(*) FROM journal_entries
+          UNION ALL SELECT 'documents', count(*) FROM documents
+          UNION ALL SELECT 'audit log rows', count(*) FROM audit_log;
+          DO $$
+          DECLARE c record; problems int := 0; broken bigint;
+          BEGIN
+            FOR c IN SELECT id, legal_name FROM companies ORDER BY id LOOP
+              IF EXISTS (SELECT 1 FROM ledger_verify(c.id)) THEN
+                problems := problems + 1; RAISE WARNING 'ledger problem in company %', c.id;
+              END IF;
+              broken := audit_log_verify(c.id);
+              IF broken IS NOT NULL THEN
+                problems := problems + 1; RAISE WARNING 'audit chain of company % breaks at row %', c.id, broken;
+              END IF;
+            END LOOP;
+            IF problems > 0 THEN RAISE EXCEPTION '% problems found in the restored backup', problems; END IF;
+            RAISE NOTICE 'every ledger balances and every audit chain is intact';
+          END $$;
+          SQL
+          rm -f backup.dump
+          { echo "### Restore drill"; echo "- Backup: \`$BACKUP\`"; echo '```'; cat drill.txt; echo '```'; echo "- Every ledger balances and every audit chain is intact."; } >> "$GITHUB_STEP_SUMMARY"
