@@ -27,8 +27,9 @@ final class ReportExportTest extends TestCase
             json_decode((string) $log->after, true));
 
         $this->postJson('/api/v1/reports/exports', ['report' => 'payroll', 'format' => 'csv', 'rows' => 1], $h)->assertUnprocessable()->assertJsonValidationErrors('report');
-        $this->postJson('/api/v1/reports/exports', ['report' => 'sales', 'format' => 'xlsx', 'rows' => 1], $h)->assertUnprocessable()->assertJsonValidationErrors('format');
-        // Printed, or saved as PDF from the browser: recorded the same way, with its format.
+        $this->postJson('/api/v1/reports/exports', ['report' => 'sales', 'format' => 'docx', 'rows' => 1], $h)->assertUnprocessable()->assertJsonValidationErrors('format');
+        // An Excel download, and a report printed or saved as PDF from the browser: recorded the same way, with its format.
+        $this->postJson('/api/v1/reports/exports', ['report' => 'balance-sheet', 'format' => 'xlsx', 'as_of' => '2026-11-17', 'rows' => 30], $h)->assertCreated();
         $this->postJson('/api/v1/reports/exports', ['report' => 'balance-sheet', 'format' => 'pdf', 'as_of' => '2026-11-17', 'rows' => 30], $h)->assertCreated();
         $this->assertSame('pdf', json_decode((string) $this->owner()->table('audit_log')->where(['company_id' => $c['company'], 'action' => 'report_exported'])
             ->orderByDesc('id')->value('after'), true)['format']);

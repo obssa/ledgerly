@@ -4,9 +4,10 @@ import { getReportPeriod } from "@/lib/data";
 import { EXPORTABLE, exportRows, type ExportableReport } from "@/lib/report-exports";
 import { isDate } from "@/lib/reports";
 import { getSession } from "@/lib/session";
+import { toXlsx } from "@/lib/xlsx";
 
 /*
- * Module 10: a report as a CSV file. The report is read from the API under the person's own session (so their role
+ * Module 10: a report as a CSV file, or with ?format=xlsx as an Excel workbook (src/lib/xlsx.ts). The report is read from the API under the person's own session (so their role
  * decides what they get), and the export is recorded in the audit log before the file is handed over (who, when, which
  * report, which period, how many rows). A UTF-8 byte order mark lets spreadsheets read Amharic names.
  */
@@ -21,6 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
   const word = (n: string) => (/^[a-z_]{1,20}$/.test(q.get(n) ?? "") ? (q.get(n) as string) : undefined);
   const uuid = (n: string) => (/^[0-9a-f-]{36}$/.test(q.get(n) ?? "") ? (q.get(n) as string) : undefined);
   const id = uuid("account_id");
+  const format = q.get("format") === "xlsx" ? "xlsx" : "csv";
 
   try {
     const period = await getReportPeriod({ from: q.get("from") ?? undefined, to: q.get("to") ?? undefined });
@@ -29,10 +31,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
     const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing"].includes(report);
     const { title, rows } = await exportRows(report as ExportableReport, { ...period, as_of: asOf, ...options }, ctx);
     await ledgerly.recordExport({
-      report, format: "csv", ...(pointInTime ? { as_of: asOf } : { from: period.from, to: period.to }),
+      report, format, ...(pointInTime ? { as_of: asOf } : { from: period.from, to: period.to }),
       options: Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)), rows: Math.max(0, rows.length - 1),
     }, ctx);
-    const name = `${title}-${pointInTime ? asOf : `${period.from}-to-${period.to}`}.csv`.replace(/[^a-z0-9.-]/gi, "");
+    const name = `${title}-${pointInTime ? asOf : `${period.from}-to-${period.to}`}.${format}`.replace(/[^a-z0-9.-]/gi, "");
+    if (format === "xlsx") {
+      const workbook = toXlsx(title.replace(/-/g, " "), rows);
+      return new Response(workbook.buffer as ArrayBuffer, {
+        headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
+      });
+    }
     return new Response(`﻿${toCsv(rows)}`, {
       headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
     });
