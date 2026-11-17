@@ -61,6 +61,7 @@ final class CreditNoteController extends Controller
             'lines.*.discount_rate' => ['nullable', 'decimal:0,6', 'between:0,1'],
             'lines.*.account_id' => ['required', 'uuid', Rule::exists('accounts', 'id')->where('type', 'income')],
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')],
+            'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
         ], ['notes.required' => 'Say why: the reason is printed on the credit note.']);
 
         $creditNote = $save->handle([...$data, 'prices_include_tax' => (bool) $invoice->prices_include_tax], null, $request->user()->getKey(), $invoice);

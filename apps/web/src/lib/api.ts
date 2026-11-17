@@ -342,6 +342,34 @@ export interface JournalRequest {
   can: { approve: boolean; withdraw: boolean };
 }
 
+/** Module 9a: a project, with its income, costs and profit from the ledger. */
+export interface Project {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+  customer: { id: string; name: string } | null;
+  status: "active" | "on_hold" | "completed" | "cancelled";
+  billing: "fixed_fee" | "time_and_materials" | "non_billable";
+  starts_on: string | null;
+  ends_on: string | null;
+  contract_value: string | null;
+  budget_income: string | null;
+  budget_cost: string | null;
+  notes: string | null;
+  income: string;
+  costs: string;
+  profit: string;
+}
+
+export interface ProjectDetail extends Project {
+  from: string | null;
+  to: string | null;
+  accounts: { account_id: string; code: string; name: string; type: string; amount: string }[];
+  documents: { id: string; type: string; number: string | null; date: string; contact: string; currency: string; amount: string }[];
+  can: { manage: boolean };
+}
+
 /** Module 7: a tax worksheet, built from the ledger (VAT: output and input; withholding: what was withheld). */
 export type TaxKind = "vat" | "withholding";
 
@@ -860,6 +888,10 @@ export const ledgerly = {
     api<RecurringJournal>(`recurring-journals/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   postDueRecurring: (ctx: RequestOptions) =>
     api<{ data: { id: string; name: string; posted: number[]; error: string | null }[]; posted: number }>("recurring-journals/post-due", { ...ctx, method: "POST", body: {} }),
+  projects: (ctx: RequestOptions) => api<{ data: Project[]; can: { manage: boolean } }>("projects", ctx),
+  project: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) => api<ProjectDetail>(`projects/${encodeURIComponent(id)}`, { ...ctx, query: q }),
+  saveProject: (id: string | null, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<ProjectDetail>(id ? `projects/${encodeURIComponent(id)}` : "projects", { ...ctx, method: id ? "PUT" : "POST", body }),
   taxWorksheet: (q: { kind?: string; from?: string; to?: string }, ctx: RequestOptions) => api<TaxWorksheet>("tax/worksheet", { ...ctx, query: q }),
   taxCalendar: (ctx: RequestOptions) => api<TaxCalendar>("tax/calendar", ctx),
   taxAuditFile: (q: { part: string; from?: string; to?: string }, ctx: RequestOptions) =>

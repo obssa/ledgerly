@@ -11,6 +11,7 @@ export interface InvoiceLineInput {
   account_id: string;
   tax_rate_id: string | null;
   item_id?: string | null;
+  project_id?: string | null;
 }
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.replace(/[,\s]/g, "") : "");
@@ -32,6 +33,7 @@ export function parseLines(json: FormDataEntryValue | null): InvoiceLineInput[] 
     account_id: str(l?.account_id),
     tax_rate_id: str(l?.tax_rate_id) || null,
     ...(str(l?.item_id) ? { item_id: str(l?.item_id) } : {}),
+    ...(str(l?.project_id) ? { project_id: str(l?.project_id) } : {}),
   }));
 }
 

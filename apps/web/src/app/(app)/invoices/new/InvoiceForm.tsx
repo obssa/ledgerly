@@ -47,6 +47,7 @@ interface Line {
   unitPrice: string;
   taxRateId: string;
   accountId: string;
+  projectId?: string;
 }
 
 const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
@@ -73,6 +74,7 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
   const [issueDate, setIssueDate] = useState(today);
   const [currency, setCurrency] = useState(options.baseCurrency);
   const [inclusive, setInclusive] = useState(false);
+  const projects = options.projects ?? [];
   const [lines, setLines] = useState<Line[]>([{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const items = options.items ?? [];
   const stockLine = lines.some((l) => items.find((i) => i.id === l.itemId)?.type === "inventory");
@@ -97,7 +99,7 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
-  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null })));
+  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null })));
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
   const bad = (name: string) => Boolean(state?.fields?.[name]);
 
@@ -190,7 +192,7 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr>{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}<th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">{words.account}</th><th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+                <tr>{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}<th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
               </thead>
               <tbody>
                 {lines.map((l, i) => {
@@ -220,6 +222,14 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
                           {options.accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
                         </select>
                       </td>
+                      {projects.length > 0 && (
+                        <td>
+                          <select aria-label="Project" className="field w-[150px]" value={l.projectId ?? ""} onChange={(e) => update(l.key, { projectId: e.target.value })}>
+                            <option value="">—</option>
+                            {projects.map((p) => <option key={p.id} value={p.id}>{p.code} {p.name}</option>)}
+                          </select>
+                        </td>
+                      )}
                       <td className="num text-right font-semibold">{amt ? formatAmount(amt.subtotal, currency) : <span className="text-muted">—</span>}</td>
                       <td className="!pl-0"><button type="button" className="btn !px-3" aria-label={`Remove line ${i + 1}`} onClick={() => removeLine(l.key)}>×</button></td>
                     </tr>

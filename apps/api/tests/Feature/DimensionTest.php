@@ -46,7 +46,7 @@ final class DimensionTest extends TestCase
         $this->putJson("/api/v1/dimensions/{$id}", ['name' => 'Sheger hotel fit-out', 'is_active' => false, 'code' => 'P-999'], $this->h)
             ->assertOk()->assertJsonPath('name', 'Sheger hotel fit-out')->assertJsonPath('is_active', false)->assertJsonPath('code', 'P-001');
 
-        $this->getJson('/api/v1/dimensions?kind=project', $this->h)->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/dimensions?kind=project', $this->h)->assertOk()->assertJsonCount(2, 'data');   // with the fixture's project P-1
         $audit = $this->owner()->table('audit_log')->where(['company_id' => $this->c['company'], 'subject_type' => 'dimension', 'action' => 'updated'])->sole();
         $this->assertEquals(['name' => 'Hotel fit-out', 'is_active' => true], json_decode($audit->before, true));
     }

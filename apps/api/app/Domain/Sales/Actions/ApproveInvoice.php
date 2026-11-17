@@ -142,6 +142,7 @@ final class ApproveInvoice
             'subtotal' => Money::of($line->line_subtotal, $invoice->currency),
             'tax' => Money::of($line->line_tax, $invoice->currency),
             'tax_account_id' => $taxAccount($line->tax_rate_id),
+            'project_id' => $line->project_id,
         ])->all();
 
         return $this->builder->build(
@@ -183,6 +184,7 @@ final class ApproveInvoice
                 'subtotal' => $reclaimable ? $subtotal : $subtotal->plus($tax),
                 'tax' => $reclaimable ? $tax : Money::zero($bill->currency),
                 'tax_account_id' => $reclaimable ? $vatReceivable : null,
+                'project_id' => $line->project_id,
             ];
         }
 

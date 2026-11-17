@@ -9,6 +9,7 @@ use App\Http\Controllers\ChartController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
+use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RecurringJournalController;
 use App\Http\Controllers\ReviewQueueController;
 use App\Http\Controllers\RevaluationController;
@@ -166,6 +167,10 @@ Route::prefix('v1')->group(function () {
             Route::post('recurring-journals/{recurringJournal}/resume', [RecurringJournalController::class, 'resume'])->whereUuid('recurringJournal');
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
+            Route::get('projects', [ProjectController::class, 'index']);
+            Route::post('projects', [ProjectController::class, 'store']);
+            Route::get('projects/{project}', [ProjectController::class, 'show'])->whereUuid('project');
+            Route::put('projects/{project}', [ProjectController::class, 'update'])->whereUuid('project');
             Route::get('tax/worksheet', [TaxReturnController::class, 'worksheet']);
             Route::get('tax/calendar', [TaxReturnController::class, 'calendar']);
             Route::get('tax/audit-file', [TaxReturnController::class, 'auditFile']);
