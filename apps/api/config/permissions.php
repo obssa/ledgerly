@@ -36,7 +36,10 @@
 |                    (accountant via 'journals.*', approver)
 | projects.view      projects with their income, costs and profit (accountant via 'projects.*', bookkeeper,
 |                    approver, viewer)
-| projects.manage    add projects and edit their details, status and budget (accountant via 'projects.*')
+| projects.manage    add projects and edit their details, status and budget; see and edit everyone's hours and bill
+|                    them (accountant via 'projects.*')
+| projects.time      log one's own hours against projects (accountant via 'projects.*', bookkeeper, sales,
+|                    purchasing, approver)
 | tax.view           the tax worksheets and filed returns (accountant via 'tax.*', viewer)
 | tax.file           file a tax return and settle it (accountant via 'tax.*')
 | journals.review    mark an entry of the review queue of unusual entries reviewed, with a note (accountant via
@@ -48,10 +51,10 @@ return [
         'owner' => ['*'],
         'admin' => ['*'],
         'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'inventory.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*', 'projects.*'],
-        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'banking.*', 'contacts.*', 'reports.view', 'projects.view'],
-        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view'],
-        'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer'],
-        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review', 'projects.view'],
+        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'banking.*', 'contacts.*', 'reports.view', 'projects.view', 'projects.time'],
+        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view', 'projects.time'],
+        'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'projects.time'],
+        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review', 'projects.view', 'projects.time'],
         'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'banking.view', 'reports.view', 'tax.view', 'projects.view'],
         'custom' => [],
     ],

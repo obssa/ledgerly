@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCustomers, getProject } from "@/lib/data";
+import { getCustomers, getProject, getTimeOptions } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { PROJECT_BILLING, PROJECT_STATUSES } from "@/lib/projects";
 import { ProjectForm } from "../ProjectForm";
+import { BillTime } from "../TimeForms";
 
 export const metadata = { title: "Project" };
 
@@ -28,7 +29,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const { id } = await params;
   const q = await searchParams;
   const period = { from: date(q.from), to: date(q.to) };
-  const [p, customers] = await Promise.all([getProject(id, period), getCustomers({})]);
+  const [p, customers, timeOptions] = await Promise.all([getProject(id, period), getCustomers({}), getTimeOptions()]);
   if (!p) notFound();
 
   return (
@@ -55,6 +56,22 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           {BILLING[p.billing]}{p.starts_on && <>, from <span className="num">{p.starts_on}</span></>}{p.ends_on && <> to <span className="num">{p.ends_on}</span></>}.
           {" "}Read from the ledger lines tagged with the project{period.from || period.to ? ", for the period above" : ""}.
         </p>
+      </Card>
+      <Card className="mb-4" label="Time">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-[15px] font-bold">Time</h2>
+          <Link href={`/time?project=${encodeURIComponent(p.id)}`} className="text-[13px] font-semibold text-brand hover:underline">The hours, one by one</Link>
+        </div>
+        <dl className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">
+          <div><dt className="text-muted">Hours logged</dt><dd className="num">{p.time.logged_hours}</dd></div>
+          <div><dt className="text-muted">Billable, not billed</dt><dd className="num font-semibold">{p.time.unbilled_hours}</dd></div>
+          <div><dt className="text-muted">Their value</dt><dd className="num font-semibold">{formatAmount(p.time.unbilled_value)}</dd></div>
+          {p.hourly_rate && <div><dt className="text-muted">Hourly rate</dt><dd className="num">{formatAmount(p.hourly_rate)}</dd></div>}
+        </dl>
+        {p.time.unpriced && <p className="mt-2 text-[13px] text-warn">Some hours have no rate and the project has none: give it an hourly rate below before billing.</p>}
+        {p.can.manage && p.customer && p.time.unbilled_hours !== "0.00" && timeOptions && (
+          <div className="mt-4 border-t border-line pt-4"><BillTime projectId={p.id} incomeAccounts={timeOptions.incomeAccounts} /></div>
+        )}
       </Card>
       <Card className="mb-4 !p-2" label="By account">
         <div className="overflow-x-auto">

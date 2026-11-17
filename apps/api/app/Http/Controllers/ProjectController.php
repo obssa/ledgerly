@@ -59,10 +59,20 @@ final class ProjectController extends Controller
             ->select('d.id', 'd.type', 'd.number', 'd.issue_date', 'c.name as contact', 'd.currency')
             ->selectRaw('sum(dl.line_subtotal)::numeric(20,2)::text AS amount')->get();
         $figures = $this->figures([$p->id], $q['from'] ?? null, $q['to'] ?? null)[$p->id] ?? ['income' => '0.00', 'costs' => '0.00', 'profit' => '0.00'];
+        // Billable hours not yet on an invoice that stands, valued at their rate or the project's.
+        $unbilled = DB::table('time_entries as t')
+            ->leftJoin('documents as i', fn ($j) => $j->on('i.company_id', '=', 't.company_id')->on('i.id', '=', 't.invoice_id'))
+            ->where(['t.company_id' => $companyId, 't.project_id' => $p->id, 't.billable' => true])->where(fn ($w) => $w->whereNull('i.id')->orWhere('i.status', 'void'))
+            ->selectRaw('coalesce(sum(t.hours), 0)::numeric(10,2)::text AS hours')
+            ->selectRaw('coalesce(sum(round(t.hours * coalesce(t.rate, ?), 2)), 0)::numeric(20,2)::text AS value', [$p->hourly_rate ?? 0])
+            ->selectRaw('count(*) FILTER (WHERE t.rate IS NULL) AS without_rate')->first();
+        $logged = DB::table('time_entries')->where(['company_id' => $companyId, 'project_id' => $p->id])->sum('hours');
 
         return response()->json([
             ...$this->row($p), ...$figures,
             'from' => $q['from'] ?? null, 'to' => $q['to'] ?? null,
+            'time' => ['logged_hours' => number_format((float) $logged, 2, '.', ''), 'unbilled_hours' => $unbilled->hours, 'unbilled_value' => $unbilled->value,
+                'unpriced' => $p->hourly_rate === null && (int) $unbilled->without_rate > 0],
             'accounts' => $accounts->map(fn ($a) => ['account_id' => $a->id, 'code' => $a->code, 'name' => $a->name, 'type' => $a->type, 'amount' => $a->amount])->values(),
             'documents' => $documents->map(fn ($d) => ['id' => $d->id, 'type' => $d->type, 'number' => $d->number, 'date' => $d->issue_date,
                 'contact' => $d->contact, 'currency' => $d->currency, 'amount' => $d->amount])->values(),
@@ -121,6 +131,7 @@ final class ProjectController extends Controller
             'contract_value' => ['nullable', 'decimal:0,2', 'min:0'],
             'budget_income' => ['nullable', 'decimal:0,2', 'min:0'],
             'budget_cost' => ['nullable', 'decimal:0,2', 'min:0'],
+            'hourly_rate' => ['nullable', 'decimal:0,2', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ], ['code.regex' => 'Letters, digits, dot, dash or underscore, up to 20.', 'code.prohibited' => 'A project keeps its code: add a new project instead.']);
     }
@@ -128,8 +139,9 @@ final class ProjectController extends Controller
     /** @param array<string, mixed> $data @return array<string, mixed> */
     private function details(array $data): array
     {
-        return array_intersect_key([...array_fill_keys(['customer_id', 'starts_on', 'ends_on', 'contract_value', 'budget_income', 'budget_cost', 'notes'], null), ...$data],
-            array_flip(['customer_id', 'status', 'billing', 'starts_on', 'ends_on', 'contract_value', 'budget_income', 'budget_cost', 'notes']));
+        $keys = ['customer_id', 'starts_on', 'ends_on', 'contract_value', 'budget_income', 'budget_cost', 'hourly_rate', 'notes'];
+
+        return array_intersect_key([...array_fill_keys($keys, null), ...$data], array_flip(['status', 'billing', ...$keys]));
     }
 
     /** Income (income accounts) and costs (expense accounts) tagged with each project, from the ledger. @param list<string> $ids */
@@ -163,7 +175,7 @@ final class ProjectController extends Controller
             ->leftJoin('contacts as c', 'c.id', '=', 'p.customer_id')
             ->where(['d.company_id' => $this->current->id(), 'd.kind' => 'project'])
             ->select('d.id', 'd.code', 'd.name', 'd.is_active', 'p.customer_id', 'c.name as customer', 'p.status', 'p.billing', 'p.starts_on', 'p.ends_on',
-                'p.contract_value', 'p.budget_income', 'p.budget_cost', 'p.notes');
+                'p.contract_value', 'p.budget_income', 'p.budget_cost', 'p.hourly_rate', 'p.notes');
     }
 
     /** The project, if it is this company's; another company's is not found. */
@@ -186,6 +198,6 @@ final class ProjectController extends Controller
             'customer' => $p->customer_id ? ['id' => $p->customer_id, 'name' => $p->customer] : null,
             'status' => $p->status ?? ($p->is_active ? 'active' : 'completed'), 'billing' => $p->billing ?? 'fixed_fee',
             'starts_on' => $p->starts_on, 'ends_on' => $p->ends_on, 'contract_value' => $money($p->contract_value),
-            'budget_income' => $money($p->budget_income), 'budget_cost' => $money($p->budget_cost), 'notes' => $p->notes];
+            'budget_income' => $money($p->budget_income), 'budget_cost' => $money($p->budget_cost), 'hourly_rate' => $money($p->hourly_rate), 'notes' => $p->notes];
     }
 }

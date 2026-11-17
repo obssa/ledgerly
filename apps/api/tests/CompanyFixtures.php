@@ -118,6 +118,9 @@ trait CompanyFixtures
         // A project for the customer, with a contract value.
         $ids['project'] = $this->postJson('/api/v1/projects', ['code' => 'P-1', 'name' => "{$name} fit-out", 'customer_id' => $ids['contact'], 'status' => 'active',
             'billing' => 'fixed_fee', 'contract_value' => '5000'], $h)->assertCreated()->json('id');
+        // Three billable hours on it, not billed yet.
+        $ids['time_entry'] = $this->postJson('/api/v1/time-entries', ['project_id' => $ids['project'], 'work_date' => '2026-11-09', 'hours' => '3',
+            'billable' => true, 'rate' => '400', 'note' => 'Site survey'], $h)->assertCreated()->json('id');
         // The VAT return for September, filed on 10 Oct (nothing was posted then, so it is all zero).
         $ids['tax_return'] = $this->postJson('/api/v1/tax-returns', ['kind' => 'vat', 'period_start' => '2026-09-01', 'period_end' => '2026-09-30',
             'filed_on' => '2026-10-10', 'reference' => "{$name} VAT Sep"], $h)->assertCreated()->json('id');
@@ -135,7 +138,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(158, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(163, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -167,6 +170,7 @@ trait CompanyFixtures
             'recurringJournal' => $ids['recurring_journal'],
             'taxReturn' => $ids['tax_return'],
             'project' => $ids['project'],
+            'timeEntry' => $ids['time_entry'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

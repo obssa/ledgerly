@@ -2247,6 +2247,47 @@ DO $$ BEGIN
   EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   RAISE NOTICE 'PASS T67 a project is a project of the company for one of its customers, and document lines name only its projects';
 END $$;
+-- T68: time entries (041). Logged against a project of the company by one of its members, entered by the person
+-- signed in; billed only when billable, on an invoice of the company; a billed entry never changes or goes, until its
+-- invoice is void. Company A, as user f1, on T67's project d71; f2 is not a member of company A.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO time_entries (company_id, project_id, user_id, work_date, hours, created_by) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000d72', '00000000-0000-0000-0000-0000000000f1', '2027-08-02', 3, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T68a: hours were logged against a class';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO time_entries (company_id, project_id, user_id, work_date, hours, created_by) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000d71', '00000000-0000-0000-0000-0000000000f2', '2027-08-02', 3, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T68b: hours were logged for someone who is not a member';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO time_entries (company_id, project_id, user_id, work_date, hours, created_by) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-000000000d71', '00000000-0000-0000-0000-0000000000f1', '2027-08-02', 25, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T68c: a day had more than 24 hours';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO time_entries (id, company_id, project_id, user_id, work_date, hours, rate, created_by) VALUES
+    ('00000000-0000-0000-0000-0000000068e1', app_company_id(), '00000000-0000-0000-0000-000000000d71', '00000000-0000-0000-0000-0000000000f1', '2027-08-02', 6.5, 900, '00000000-0000-0000-0000-0000000000f1'),
+    ('00000000-0000-0000-0000-0000000068e2', app_company_id(), '00000000-0000-0000-0000-000000000d71', '00000000-0000-0000-0000-0000000000f1', '2027-08-03', 2, null, '00000000-0000-0000-0000-0000000000f1');
+  UPDATE time_entries SET billable = false WHERE id = '00000000-0000-0000-0000-0000000068e2';
+  BEGIN
+    UPDATE time_entries SET invoice_id = '00000000-0000-0000-0000-0000000067d1' WHERE id = '00000000-0000-0000-0000-0000000068e2';
+    RAISE EXCEPTION 'FAIL T68d: non-billable hours were billed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- Billed on T67's draft invoice: the entry is fixed and stays.
+  UPDATE time_entries SET invoice_id = '00000000-0000-0000-0000-0000000067d1' WHERE id = '00000000-0000-0000-0000-0000000068e1';
+  BEGIN
+    UPDATE time_entries SET hours = 8 WHERE id = '00000000-0000-0000-0000-0000000068e1';
+    RAISE EXCEPTION 'FAIL T68e: billed hours were changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM time_entries WHERE id = '00000000-0000-0000-0000-0000000068e1';
+    RAISE EXCEPTION 'FAIL T68f: billed hours were removed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  DELETE FROM time_entries WHERE id = '00000000-0000-0000-0000-0000000068e2';   -- unbilled hours can go
+  RAISE NOTICE 'PASS T68 hours are logged on a project by a member, billed only when billable, and fixed once billed';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

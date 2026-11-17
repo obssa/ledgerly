@@ -45,6 +45,7 @@ export function ProjectForm({ project, customers }: { project?: Project; custome
         {field("contract_value", "Contract value", { value: project?.contract_value })}
         {field("budget_income", "Income budget", { value: project?.budget_income })}
         {field("budget_cost", "Cost budget", { value: project?.budget_cost })}
+        {field("hourly_rate", "Hourly rate", { value: project?.hourly_rate, hint: "For hours logged without a rate of their own" })}
       </div>
       <div>
         <label className="field-label" htmlFor="notes">Notes</label>

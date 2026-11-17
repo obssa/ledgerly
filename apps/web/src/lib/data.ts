@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type Project, type ProjectDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type Project, type ProjectDetail, type TimeEntry, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
@@ -80,6 +80,31 @@ export async function getProjects(): Promise<{ data: Project[]; can: { manage: b
     if (error instanceof ApiError && error.status === 403) return null;
     throw error;
   }
+}
+
+/** Hours: one's own, or everyone's for whoever manages projects; null in the demo or for a role that logs no time. */
+export async function getTimeEntries(q: { project_id?: string; from?: string; to?: string }): Promise<{ data: TimeEntry[]; can: { manage: boolean } } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.timeEntries(q, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 403 || error.status === 422)) return null;
+    throw error;
+  }
+}
+
+/** Active projects to log hours against, and income accounts to bill them to. */
+export async function getTimeOptions(): Promise<{ projects: { id: string; code: string; name: string }[]; incomeAccounts: { id: string; code: string; name: string }[] } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi(async (ctx) => {
+    const [dimensions, accounts] = await Promise.all([ledgerly.dimensions(ctx), ledgerly.accounts(ctx)]);
+    return {
+      projects: dimensions.data.filter((d) => d.kind === "project" && d.is_active).map((d) => ({ id: d.id, code: d.code, name: d.name })),
+      incomeAccounts: accounts.data.filter((a) => a.type === "income" && a.is_active).map((a) => ({ id: a.id, code: a.code, name: a.name })),
+    };
+  });
 }
 
 export async function getProject(id: string, q: { from?: string; to?: string }): Promise<ProjectDetail | null> {

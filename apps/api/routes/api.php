@@ -39,6 +39,7 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierCreditController;
 use App\Http\Controllers\TaxRateController;
 use App\Http\Controllers\TaxReturnController;
+use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\WarehouseController;
 use App\Domain\Banking\Models\BankTransaction;
 use App\Domain\Banking\Models\Reconciliation;
@@ -168,6 +169,11 @@ Route::prefix('v1')->group(function () {
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
             Route::get('projects', [ProjectController::class, 'index']);
+            Route::post('projects/{project}/bill-time', [TimeEntryController::class, 'bill'])->whereUuid('project');
+            Route::get('time-entries', [TimeEntryController::class, 'index']);
+            Route::post('time-entries', [TimeEntryController::class, 'store']);
+            Route::put('time-entries/{timeEntry}', [TimeEntryController::class, 'update'])->whereUuid('timeEntry');
+            Route::delete('time-entries/{timeEntry}', [TimeEntryController::class, 'destroy'])->whereUuid('timeEntry');
             Route::post('projects', [ProjectController::class, 'store']);
             Route::get('projects/{project}', [ProjectController::class, 'show'])->whereUuid('project');
             Route::put('projects/{project}', [ProjectController::class, 'update'])->whereUuid('project');
