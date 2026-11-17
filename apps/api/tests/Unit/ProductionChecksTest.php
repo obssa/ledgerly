@@ -18,7 +18,9 @@ final class ProductionChecksTest extends TestCase
     public function test_debug_on_or_no_app_key_stops_it(): void
     {
         $this->assertCount(1, ProductionChecks::problems(debug: true, ownerPassword: '', console: false, configCached: true, appKey: 'base64:k'));
-        $this->assertCount(1, ProductionChecks::problems(debug: false, ownerPassword: '', console: true, configCached: false, appKey: ''));
+        $this->assertCount(1, ProductionChecks::problems(debug: false, ownerPassword: '', console: false, configCached: true, appKey: ''));
+        // A build's package discovery and a deploy's commands run from the console before the settings are complete.
+        $this->assertSame([], ProductionChecks::problems(debug: true, ownerPassword: '', console: true, configCached: false, appKey: ''));
     }
 
     public function test_the_owner_password_is_allowed_only_to_a_deploys_migrations(): void

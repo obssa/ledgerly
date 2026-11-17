@@ -33,13 +33,15 @@ final class ProductionChecks
     public static function problems(bool $debug, string $ownerPassword, bool $console, bool $configCached, string $appKey): array
     {
         $problems = [];
-        if ($debug) {
+        // Debug and the app key matter to what answers requests. Console commands (composer's package discovery
+        // in a build, a deploy's migrations) run before the release's settings are complete, so they are not held to it.
+        if ($debug && ! $console) {
             $problems[] = 'APP_DEBUG is on (error pages would show code and settings).';
         }
         if ($ownerPassword !== '' && (! $console || $configCached)) {
             $problems[] = 'DB_OWNER_PASSWORD is set (only a deploy\'s migrations may have it, never the running API or a cached configuration).';
         }
-        if ($appKey === '') {
+        if ($appKey === '' && ! $console) {
             $problems[] = 'APP_KEY is not set.';
         }
 
