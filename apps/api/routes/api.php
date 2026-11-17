@@ -14,6 +14,7 @@ use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RecurringJournalController;
+use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\ReviewQueueController;
 use App\Http\Controllers\RevaluationController;
 use App\Http\Controllers\ChequeController;
@@ -311,6 +312,7 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/financial-health', [FinancialStatementController::class, 'health']);
             Route::get('reports/profit-by-dimension', [AnalysisReportController::class, 'profitByDimension']);
             Route::get('reports/sales', [AnalysisReportController::class, 'sales']);
+            Route::post('reports/exports', [ReportExportController::class, 'store']);
             Route::get('reports/purchases', [AnalysisReportController::class, 'purchases']);
         });
     });

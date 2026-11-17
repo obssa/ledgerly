@@ -1202,6 +1202,7 @@ export const ledgerly = {
   cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),
   changesInEquity: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<ChangesInEquity>("reports/changes-in-equity", { ...ctx, query: q }),
   financialHealth: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<FinancialHealth>("reports/financial-health", { ...ctx, query: q }),
+  recordExport: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ recorded: boolean; at: string }>("reports/exports", { ...ctx, method: "POST", body }),
   profitByDimension: (q: { kind: string; from?: string; to?: string }, ctx: RequestOptions) => api<ProfitByDimension>("reports/profit-by-dimension", { ...ctx, query: q }),
   documentAnalysis: (side: "sales" | "purchases", q: { group: string; from?: string; to?: string }, ctx: RequestOptions) =>
     api<DocumentAnalysis>(`reports/${side}`, { ...ctx, query: q }),

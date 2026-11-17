@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getTrialBalance, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
+import { ExportLink } from "../ReportsNav";
 import { defaultPeriod, trialTotals } from "@/lib/ledger";
 
 export const metadata = { title: "Trial balance" };
@@ -19,7 +20,8 @@ export default async function TrialBalancePage({ searchParams }: PageProps<"/rep
   return (
     <>
       <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>}
-        title={<>Trial balance {rows && (totals.balanced ? <Pill tone="good">Balanced</Pill> : <Pill tone="bad">Out of balance</Pill>)}</>} />
+        title={<>Trial balance {rows && (totals.balanced ? <Pill tone="good">Balanced</Pill> : <Pill tone="bad">Out of balance</Pill>)}</>}
+        actions={<ExportLink report="trial-balance" params={{ as_of: asOf }} />} />
       <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
         <div><label className="field-label" htmlFor="as_of">As at</label><input className="field" id="as_of" name="as_of" type="date" defaultValue={asOf} /></div>
         <button type="submit" className="btn">Show</button>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { getArAgeing } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
+import { ExportLink } from "../ReportsNav";
 
 export const metadata = { title: "AR ageing" };
 
@@ -18,7 +19,7 @@ export default async function ArAgeingPage({ searchParams }: PageProps<"/reports
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Receivables</>} title="AR ageing" />
+      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Receivables</>} title="AR ageing" actions={<ExportLink report="ar-ageing" params={{ as_of: asOf }} />} />
       {ageing === null ? (
         <Card><p className="text-sm text-muted">Not available in the demo.</p></Card>
       ) : (

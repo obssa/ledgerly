@@ -2,7 +2,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { getChangesInEquity, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel } from "@/lib/reports";
-import { PeriodForm, ReportsNav } from "../ReportsNav";
+import { ExportLink, PeriodForm, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Changes in equity" };
 
@@ -13,7 +13,7 @@ export default async function ChangesInEquityPage({ searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Changes in equity" />
+      <PageTitle eyebrow="Reports / Financial statements" title="Changes in equity" actions={<ExportLink report="changes-in-equity" params={period} />} />
       <PeriodForm from={period.from} to={period.to} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/changes-in-equity" />

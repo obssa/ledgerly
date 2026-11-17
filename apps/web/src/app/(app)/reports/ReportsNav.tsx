@@ -30,6 +30,12 @@ export function ReportsNav({ current }: { current: string }) {
   );
 }
 
+/** A CSV download of the report as shown; the export is recorded in the audit log. */
+export function ExportLink({ report, params }: { report: string; params: Record<string, string | undefined> }) {
+  const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
+  return <a className="btn print:hidden" href={`/reports/export/${report}${query ? `?${query}` : ""}`}>Download CSV</a>;
+}
+
 /** From and to: a plain GET form, so it works without JavaScript. */
 export function PeriodForm({ from, to, single }: { from?: string; to: string; single?: boolean }) {
   return (
