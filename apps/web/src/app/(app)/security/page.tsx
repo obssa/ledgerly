@@ -1,6 +1,7 @@
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getSecurityStatus } from "@/lib/data";
-import { changePassword, signOutEverywhere } from "@/app/(auth)/actions";
+import { getDeviceSessions, getSecurityStatus } from "@/lib/data";
+import { sessionTime } from "@/lib/sessions";
+import { changePassword, endDeviceSession, signOutEverywhere } from "@/app/(auth)/actions";
 import { AuthForm } from "@/app/(auth)/AuthForm";
 import { AuthenticatorSetup } from "./AuthenticatorSetup";
 
@@ -11,7 +12,7 @@ export const metadata = { title: "Sign-in security" };
  * app (src/lib/data.ts); anyone else can turn it on for themselves.
  */
 export default async function SecurityPage() {
-  const { mfaEnabled, demo } = await getSecurityStatus();
+  const [{ mfaEnabled, demo }, sessions] = await Promise.all([getSecurityStatus(), getDeviceSessions()]);
 
   return (
     <>
@@ -58,6 +59,49 @@ export default async function SecurityPage() {
             </form>
           </Card>
         </div>
+      )}
+
+      {sessions && (
+        <Card className="mt-4 max-w-[820px]" label="Signed-in devices">
+          <h2 className="text-[19px] font-bold">Signed-in devices</h2>
+          <p className="mt-1.5 text-sm text-muted">
+            Where you are signed in now. Don&apos;t recognise one? Sign it out, then change your password.
+          </p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[13px] text-muted">
+                  <th className="py-2 pr-3 font-medium">Device</th>
+                  <th className="py-2 pr-3 font-medium">Address</th>
+                  <th className="py-2 pr-3 font-medium">Signed in</th>
+                  <th className="py-2 pr-3 font-medium">Last active</th>
+                  <th className="py-2 font-medium"><span className="sr-only">Sign out</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((s) => (
+                  <tr key={s.id} className="border-t border-line">
+                    <td className="py-2 pr-3">
+                      {s.device}
+                      {s.current && <span className="ml-2"><Pill tone="good">This device</Pill></span>}
+                    </td>
+                    <td className="num py-2 pr-3">{s.address ?? ""}</td>
+                    <td className="num whitespace-nowrap py-2 pr-3">{sessionTime(s.signed_in_at)}</td>
+                    <td className="num whitespace-nowrap py-2 pr-3">{sessionTime(s.last_active_at)}</td>
+                    <td className="py-2 text-right">
+                      {!s.current && (
+                        <form action={endDeviceSession}>
+                          <input type="hidden" name="id" value={s.id} />
+                          <button type="submit" className="btn !py-1 text-[13px]">Sign out</button>
+                        </form>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </>
   );

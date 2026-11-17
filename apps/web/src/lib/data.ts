@@ -6,6 +6,7 @@ import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDi
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
 import { isDate } from "./reports";
+import { sortSessions, type SignedInSession } from "./sessions";
 
 /**
  * Server-side data access. In demo mode returns sample data; otherwise calls the API with the session's
@@ -42,6 +43,19 @@ export async function getSecurityStatus(): Promise<{ mfaEnabled: boolean; demo: 
   if (isDemoMode()) return { mfaEnabled: false, demo: true };
   const { user } = await withApi(({ token }) => ledgerly.me(token));
   return { mfaEnabled: user.mfa_enabled, demo: false };
+}
+
+/**
+ * The devices the signed-in person is signed in on, this one first. Null in demo mode and for the shared demo
+ * accounts, whose sessions belong to every visitor.
+ */
+export async function getDeviceSessions(): Promise<SignedInSession[] | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi(({ token }) => ledgerly.sessions(token).then((r) => sortSessions(r.data)).catch((error: unknown) => {
+    if (error instanceof ApiError && error.status === 403 && (error.body as { type?: string } | null)?.type === "DemoAccount") return null;
+    throw error;
+  }));
 }
 
 /** The profile and fiscal settings of the company being worked in. In the demo nothing can be changed. */
