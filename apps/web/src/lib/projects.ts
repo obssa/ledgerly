@@ -11,6 +11,15 @@ export function projectBody(form: FormData, creating: boolean): Record<string, u
   const body: Record<string, unknown> = { name: value("name"), status: value("status") || "active", billing: value("billing") || "fixed_fee" };
   if (creating) body.code = value("code");
   for (const n of ["customer_id", "starts_on", "ends_on", "notes"]) body[n] = value(n) || null;
-  for (const n of ["contract_value", "budget_income", "budget_cost"]) body[n] = clean(value(n)) || null;
+  for (const n of ["contract_value", "budget_income", "budget_cost", "hourly_rate"]) body[n] = clean(value(n)) || null;
   return body;
+}
+
+/** The body of POST /time-entries: hours as typed (a comma for decimals is accepted), billable unless unticked. */
+export function timeBody(form: FormData): Record<string, unknown> {
+  const value = (n: string) => (typeof form.get(n) === "string" ? String(form.get(n)).trim() : "");
+  return {
+    project_id: value("project_id"), work_date: value("work_date"), hours: value("hours").replace(",", "."),
+    billable: form.get("billable") === "on", rate: clean(value("rate")) || null, note: value("note") || null,
+  };
 }
