@@ -185,6 +185,8 @@ final class TenantIsolationTest extends TestCase
             'reclassifying B\'s ledger line' => ['POST', '/api/v1/journal-entries/reclassify', ['line_ids' => [$this->b['bank_line']], 'to_account_id' => $this->a['rent'], 'date' => '2026-11-10']],
             'reclassifying onto B\'s account' => ['POST', '/api/v1/journal-entries/reclassify', ['line_ids' => [$this->a['bank_line']], 'to_account_id' => $this->b['rent'], 'date' => '2026-11-10']],
             'tax return settled from B\'s bank' => ['POST', "/api/v1/tax-returns/{$this->a['tax_return']}/settle", ['date' => '2026-11-10', 'bank_account_id' => $this->b['bank']]],
+            'invoice line on B\'s project' => ['POST', '/api/v1/invoices', $invoice([], ['project_id' => $this->b['project']])],
+            'project for B\'s customer' => ['POST', '/api/v1/projects', ['code' => 'P-X', 'name' => 'Planted', 'status' => 'active', 'billing' => 'fixed_fee', 'customer_id' => $this->b['contact']]],
             'reconciliation ticking B\'s entry' => ['PUT', "/api/v1/reconciliations/{$this->a['reconciliation']}", ['cleared' => [$this->b['bank_line']]]],
         ];
 
@@ -284,7 +286,7 @@ final class TenantIsolationTest extends TestCase
     /** @return array<string, int> */
     private function ledgerCounts(): array
     {
-        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines', 'recurring_journals', 'tax_returns'])
+        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines', 'recurring_journals', 'tax_returns', 'projects'])
             ->mapWithKeys(fn ($t) => [$t => $this->owner()->table($t)->count()])->all();
     }
 

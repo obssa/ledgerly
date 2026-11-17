@@ -54,12 +54,13 @@ final class InvoicePostingBuilder
             sourceId: $documentId,
         );
 
-        // Group credits by account so the ledger stays compact: one line per income or tax account.
+        // Group by account so the ledger stays compact: one line per income or cost account and project (job costing
+        // reads the project from the ledger line), one per tax account (tax is never a project's).
         $groups = [];
         foreach ($lines as $line) {
-            $this->addToGroup($groups, $line['income_account_id'], $line['subtotal']);
+            $this->addToGroup($groups, $line['income_account_id'] . '|' . ($line['project_id'] ?? ''), $line['subtotal']);
             if (! $line['tax']->isZero()) {
-                $this->addToGroup($groups, $line['tax_account_id'] ?? throw new \InvalidArgumentException('Taxed line without a tax account'), $line['tax']);
+                $this->addToGroup($groups, ($line['tax_account_id'] ?? throw new \InvalidArgumentException('Taxed line without a tax account')) . '|', $line['tax']);
             }
         }
 
@@ -67,27 +68,28 @@ final class InvoicePostingBuilder
         $receivableTxn = Money::zero($currency);
         $creditLines = [];
 
-        foreach ($groups as $accountId => $txnAmount) {
+        foreach ($groups as $key => $txnAmount) {
             if ($txnAmount->isZero()) {
                 continue;
             }
+            [$accountId, $projectId] = explode('|', $key, 2);
             $baseAmount = $currency === $baseCurrency
                 ? $txnAmount
                 : $txnAmount->convertTo($baseCurrency, $fxRate)->roundToCurrency();
 
             $receivableBase = $receivableBase->plus($baseAmount);
             $receivableTxn = $receivableTxn->plus($txnAmount);
-            $creditLines[] = [$accountId, $baseAmount, $txnAmount];
+            $creditLines[] = [$accountId, $baseAmount, $txnAmount, $projectId === '' ? [] : ['project_id' => $projectId]];
         }
 
         $draft->add($controlOnCredit
             ? JournalLineDraft::credit($receivableAccountId, $receivableBase, $receivableTxn, $documentNumber, $customerId)
             : JournalLineDraft::debit($receivableAccountId, $receivableBase, $receivableTxn, $documentNumber, $customerId));
 
-        foreach ($creditLines as [$accountId, $base, $txn]) {
+        foreach ($creditLines as [$accountId, $base, $txn, $dimensions]) {
             $draft->add($controlOnCredit
-                ? JournalLineDraft::debit($accountId, $base, $txn, $documentNumber, $customerId)
-                : JournalLineDraft::credit($accountId, $base, $txn, $documentNumber, $customerId));
+                ? JournalLineDraft::debit($accountId, $base, $txn, $documentNumber, $customerId, $dimensions)
+                : JournalLineDraft::credit($accountId, $base, $txn, $documentNumber, $customerId, $dimensions));
         }
 
         $draft->assertBalanced();

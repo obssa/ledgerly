@@ -63,6 +63,7 @@ final class SupplierCreditController extends Controller
             'lines.*.account_id' => ['required', 'uuid', Rule::exists('accounts', 'id')->where(fn (Builder $q) => $q->where('is_active', true)
                 ->where(fn (Builder $w) => $w->where('type', 'expense')->orWhere(fn (Builder $a) => $a->where('type', 'asset')->whereIn('subtype', ['fixed_asset', 'prepayment']))))],
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')->whereIn('kind', ['vat', 'tot'])],
+            'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
         ], ['notes.required' => 'Say why: goods returned, a price corrected.']);
 
         $credit = $save->handle([...$data, 'prices_include_tax' => (bool) $bill->prices_include_tax], null, $request->user()->getKey(), $bill);

@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type Project, type ProjectDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
@@ -68,6 +68,29 @@ export async function getJournalRequests(status = "pending"): Promise<{ data: Jo
   await connection();
   if (isDemoMode()) return { data: [], pending: 0 };
   return withApi((ctx) => ledgerly.journalRequests(status, ctx));
+}
+
+/** Module 9a: the projects with their profit; null in the demo or for a role that does not see projects. */
+export async function getProjects(): Promise<{ data: Project[]; can: { manage: boolean } } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.projects(ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return null;
+    throw error;
+  }
+}
+
+export async function getProject(id: string, q: { from?: string; to?: string }): Promise<ProjectDetail | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.project(id, q, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && [403, 404, 422].includes(error.status)) return null;
+    throw error;
+  }
 }
 
 /** Module 7: a tax worksheet and the filed returns; null in the demo, or for a role that does not see tax. */
@@ -227,8 +250,14 @@ export interface InvoiceOptions {
   /** Items to pick on a line, and the warehouses stock lines use. */
   items?: { id: string; name: string; type: string; unit: string; price: string | null; account_id: string | null }[];
   warehouses?: { id: string; name: string }[];
+  /** Active projects a line can be tagged with (job costing). */
+  projects?: { id: string; code: string; name: string }[];
   demo: boolean;
 }
+
+/** Active projects, for tagging document lines. */
+const activeProjects = async (ctx: { token: string; companyId: string }) =>
+  (await ledgerly.dimensions(ctx)).data.filter((d) => d.kind === "project" && d.is_active).map((d) => ({ id: d.id, code: d.code, name: d.name }));
 
 /** What the new-invoice screen offers: active customers, income accounts, sales tax rates in force, currencies. */
 export async function getInvoiceOptions(): Promise<InvoiceOptions> {
@@ -261,6 +290,7 @@ export async function getInvoiceOptions(): Promise<InvoiceOptions> {
       manualNumbers: numbering.data.find((n) => n.doc_type === "invoice")?.mode === "manual",
       items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
+      projects: await activeProjects(ctx),
       demo: false,
     };
   });
@@ -291,6 +321,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       manualNumbers: numbering.data.find((n) => n.doc_type === "bill")?.mode === "manual",
       items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
+      projects: await activeProjects(ctx),
       demo: false,
     };
   });

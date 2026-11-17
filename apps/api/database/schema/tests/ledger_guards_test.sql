@@ -2209,6 +2209,44 @@ DO $$ DECLARE figures jsonb := '{"boxes": []}'; BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T66 a tax return is filed once for its period, locks that tax there, and is settled once after it';
 END $$;
+-- T67: projects and job costing (040). A project's details belong to a project of the company, for one of its
+-- customers; a document line names a project of its own company. Company A, as user f1 (d43 is company B's location).
+DO $$ BEGIN
+  INSERT INTO dimensions (id, company_id, kind, code, name) VALUES
+    ('00000000-0000-0000-0000-000000000d71', app_company_id(), 'project', 'P-T67', 'Bole road resurfacing'),
+    ('00000000-0000-0000-0000-000000000d72', app_company_id(), 'class', 'CL-T67', 'Retail');
+  -- c7 is a supplier of company A (added with the bills above), not a customer.
+  BEGIN
+    INSERT INTO projects (dimension_id, company_id) VALUES ('00000000-0000-0000-0000-000000000d72', app_company_id());
+    RAISE EXCEPTION 'FAIL T67a: a class was given project details';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO projects (dimension_id, company_id, customer_id) VALUES
+      ('00000000-0000-0000-0000-000000000d71', app_company_id(), '00000000-0000-0000-0000-0000000000c7');
+    RAISE EXCEPTION 'FAIL T67b: a project was for a supplier, not a customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO projects (dimension_id, company_id, customer_id, billing, contract_value, budget_cost) VALUES
+    ('00000000-0000-0000-0000-000000000d71', app_company_id(), '00000000-0000-0000-0000-0000000000c1', 'fixed_fee', 500000, 380000);
+  BEGIN
+    UPDATE projects SET company_id = '00000000-0000-0000-0000-00000000000b' WHERE dimension_id = '00000000-0000-0000-0000-000000000d71';
+    RAISE EXCEPTION 'FAIL T67c: a project moved to another company';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency) VALUES
+    ('00000000-0000-0000-0000-0000000067d1', app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-08-01', 'ETB');
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, project_id) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-0000000067d1', 1, 'Progress claim 1', 1, 100000, '00000000-0000-0000-0000-000000000a40', 100000, '00000000-0000-0000-0000-000000000d71');
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, project_id) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000067d1', 2, 'Planted', 1, 1, '00000000-0000-0000-0000-000000000a40', 1, '00000000-0000-0000-0000-000000000d43');
+    RAISE EXCEPTION 'FAIL T67d: a document line named another company''s dimension as its project';
+  EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN
+    UPDATE document_lines SET project_id = '00000000-0000-0000-0000-000000000d72' WHERE document_id = '00000000-0000-0000-0000-0000000067d1';
+    RAISE EXCEPTION 'FAIL T67e: a document line named a class as its project';
+  EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T67 a project is a project of the company for one of its customers, and document lines name only its projects';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

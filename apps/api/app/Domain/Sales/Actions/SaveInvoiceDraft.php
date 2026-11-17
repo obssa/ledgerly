@@ -183,6 +183,7 @@ final class SaveInvoiceDraft
                 'discount_rate' => (string) ($line['discount_rate'] ?? '0'),
                 'tax_rate_id' => $line['tax_rate_id'] ?? null,
                 'account_id' => $line['account_id'],
+                'project_id' => $line['project_id'] ?? null,
                 'line_subtotal' => $result->subtotal->toDecimalString(),
                 'line_tax' => $result->tax->toDecimalString(),
             ];
