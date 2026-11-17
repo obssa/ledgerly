@@ -954,6 +954,19 @@ export interface SavedReport {
   covers: { from?: string; to?: string; as_of?: string };
 }
 
+/** Module 11: a person in the company, invited, active or deactivated. */
+export interface Member {
+  id: string;
+  user: { id: string; name: string; email: string };
+  role: string;
+  status: "invited" | "active" | "deactivated";
+  invited_at: string | null;
+  joined_at: string;
+  me?: boolean;
+}
+
+export interface Invitation { company_name: string; role: string; email: string; name: string; new_account: boolean; expires_at: string }
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) {
     super(message);
@@ -1045,6 +1058,9 @@ export const ledgerly = {
   verifyEmail: (token: string) => api<{ message: string }>("auth/email/verify", { method: "POST", body: { token } }),
   resendVerification: (token: string) => api<{ message: string }>("auth/email/resend", { method: "POST", token }),
   forgotPassword: (email: string) => api<{ message: string }>("auth/password/forgot", { method: "POST", body: { email } }),
+  invitation: (token: string) => api<Invitation>("auth/invitation", { query: { token } }),
+  acceptInvitation: (body: { token: string; name?: string; password?: string }) =>
+    api<{ accepted: boolean; company: string; email: string }>("auth/invitation/accept", { method: "POST", body }),
   resetPassword: (body: { token: string; password: string }) => api<{ message: string }>("auth/password/reset", { method: "POST", body }),
   changePassword: (body: { current_password: string; password: string }, token: string) =>
     api<{ token: string }>("auth/password", { method: "POST", body, token }),
@@ -1207,6 +1223,12 @@ export const ledgerly = {
   updateItem: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   warehouses: (ctx: RequestOptions) => api<{ data: Warehouse[] }>("warehouses", ctx),
   people: (ctx: RequestOptions) => api<{ data: { id: string; name: string }[] }>("people", ctx),
+  members: (ctx: RequestOptions) => api<{ data: Member[]; roles: string[] }>("members", ctx),
+  inviteMember: (body: { email: string; name?: string; role: string }, ctx: RequestOptions) => api<Member>("members/invitations", { ...ctx, method: "POST", body }),
+  changeMember: (id: string, action: "role" | "resend" | "deactivate" | "reactivate", role: string | undefined, ctx: RequestOptions) =>
+    action === "role"
+      ? api<Member>(`members/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body: { role } })
+      : api<Member>(`members/${encodeURIComponent(id)}/${action}`, { ...ctx, method: "POST", body: {} }),
   createWarehouse: (name: string, ctx: RequestOptions) => api<Warehouse>("warehouses", { ...ctx, method: "POST", body: { name } }),
   stock: (ctx: RequestOptions) => api<StockOnHand>("stock", ctx),
   adjustStock: (body: Record<string, unknown>, ctx: RequestOptions) =>

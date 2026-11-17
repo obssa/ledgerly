@@ -31,6 +31,12 @@ final class PermissionMatrixTest extends TestCase
     private const ROUTES = [
         'GET api/v1/company' => 'company.view',
         'GET api/v1/people' => 'company.view',
+        'GET api/v1/members' => 'users.manage',
+        'POST api/v1/members/invitations' => 'users.manage',
+        'PUT api/v1/members/{membership}' => 'users.manage',
+        'POST api/v1/members/{membership}/resend' => 'users.manage',
+        'POST api/v1/members/{membership}/deactivate' => 'users.manage',
+        'POST api/v1/members/{membership}/reactivate' => 'users.manage',
         'PUT api/v1/company' => 'company.manage',
         'PUT api/v1/company/period-lock' => 'periods.close',
         'GET api/v1/close-checklist' => 'periods.close',

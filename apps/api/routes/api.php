@@ -10,6 +10,8 @@ use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
 use App\Http\Controllers\AnalysisReportController;
+use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\TeamController;
 use App\Http\Controllers\SavedReportController;
 use App\Http\Controllers\PeopleController;
 use App\Http\Controllers\StockReportController;
@@ -97,6 +99,8 @@ Route::prefix('v1')->group(function () {
     Route::post('auth/email/verify', [AccountController::class, 'verifyEmail'])->middleware('throttle:auth');
     Route::post('auth/password/forgot', [AccountController::class, 'forgotPassword'])->middleware('throttle:auth');
     Route::post('auth/password/reset', [AccountController::class, 'resetPassword'])->middleware('throttle:auth');
+    Route::get('auth/invitation', [InvitationController::class, 'show'])->middleware('throttle:auth');
+    Route::post('auth/invitation/accept', [InvitationController::class, 'accept'])->middleware('throttle:auth');
     Route::get('auth/demo', [DemoController::class, 'index']);
     Route::post('auth/demo', [DemoController::class, 'login'])->middleware('throttle:auth');
 
@@ -123,6 +127,15 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['company', 'idempotent'])->group(function () {
             Route::get('company', [CompanySettingsController::class, 'show']);
             Route::get('people', [PeopleController::class, 'index']);
+            Route::get('members', [TeamController::class, 'index']);
+            // Every visitor shares the demo accounts: none of them sends invitations or changes who works in the demo.
+            Route::middleware('not.demo')->group(function () {
+                Route::post('members/invitations', [TeamController::class, 'invite']);
+                Route::put('members/{membership}', [TeamController::class, 'update']);
+                Route::post('members/{membership}/resend', [TeamController::class, 'resend']);
+                Route::post('members/{membership}/deactivate', [TeamController::class, 'deactivate']);
+                Route::post('members/{membership}/reactivate', [TeamController::class, 'reactivate']);
+            });
             Route::put('company', [CompanySettingsController::class, 'update']);
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);
             Route::get('close-checklist', [CompanySettingsController::class, 'closeChecklist']);

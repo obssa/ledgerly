@@ -158,4 +158,20 @@ final class DemoLoginTest extends TestCase
         }
         $this->assertSame(0, $this->owner()->table('demo_accounts')->count());
     }
+
+    public function test_the_shared_demo_owner_sends_no_invitations_and_changes_no_one(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+        $this->setUpDemo();
+        $owner = $this->signInAs('owner');
+        $h = ['X-Company-Id' => $owner['company']];
+        $members = $this->withToken($owner['token'])->getJson('/api/v1/members', $h)->assertOk()->json('data');
+        $this->withToken($owner['token'])->postJson('/api/v1/members/invitations', ['email' => 'someone@example.test', 'name' => 'Someone', 'role' => 'viewer'], $h)
+            ->assertForbidden()->assertJsonPath('type', 'DemoAccount');
+        $viewer = collect($members)->firstWhere('role', 'viewer')['id'];
+        $this->withToken($owner['token'])->postJson("/api/v1/members/{$viewer}/deactivate", [], $h)->assertForbidden();
+        $this->withToken($owner['token'])->putJson("/api/v1/members/{$viewer}", ['role' => 'owner'], $h)->assertForbidden();
+        \Illuminate\Support\Facades\Notification::assertNothingSent();
+        $this->assertSame('active', $this->owner()->table('memberships')->where('id', $viewer)->value('status'));
+    }
 }

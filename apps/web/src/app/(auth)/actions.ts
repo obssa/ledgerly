@@ -165,6 +165,18 @@ export async function resetPassword(_: FormState | undefined, form: FormData): P
   }
 }
 
+/** Module 11: accepting an invitation from its emailed link; a new account chooses its name and password here. */
+export async function acceptInvitation(_: FormState | undefined, form: FormData): Promise<FormState> {
+  try {
+    const password = String(form.get("password") ?? "");
+    const name = text(form, "name");
+    const { company, email } = await ledgerly.acceptInvitation({ token: text(form, "token") ?? "", ...(password ? { password } : {}), ...(name ? { name } : {}) });
+    return { notice: `You joined ${company}. Sign in as ${email} to start.` };
+  } catch (error) {
+    return formStateFromError(error);
+  }
+}
+
 export async function changePassword(_: FormState | undefined, form: FormData): Promise<FormState> {
   const { token } = await getSession();
   if (!token) redirect("/sign-in");
