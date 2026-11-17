@@ -25,6 +25,7 @@ final class CloseChecklist
             $this->stockValued($id, $base, $periodEnd),
             $this->openDocuments($id, $periodEnd),
             $this->journalRequests($id, $periodEnd),
+            $this->depreciation($id, $periodEnd),
             $this->undeposited($id, $base, $periodEnd),
             $this->balanced($id, $base, $periodEnd),
         ];
@@ -97,6 +98,21 @@ final class CloseChecklist
         return ['key' => 'journal_requests', 'label' => 'Manual journals decided', 'status' => $n === 0 ? 'ok' : 'warn',
             'detail' => $n === 0 ? 'No manual journal of the period is waiting for approval.' : "{$n} manual journal" . ($n === 1 ? ' is' : 's are') . ' waiting for approval.',
             'items' => [], 'link' => '/journal'];
+    }
+
+    /** Depreciation posted through the last month end of the period, when assets were due by then (042). */
+    private function depreciation(string $company, string $end): array
+    {
+        $date = new \DateTimeImmutable($end);
+        $monthEnd = $date->format('Y-m-d') === $date->modify('last day of this month')->format('Y-m-d') ? $end : $date->modify('last day of previous month')->format('Y-m-d');
+        $due = DB::table('fixed_assets')->where(['company_id' => $company, 'status' => 'active'])->where('depreciation_starts_on', '<=', $monthEnd)->count();
+        $latest = DB::table('depreciation_runs')->where('company_id', $company)->max('period_end');
+        $ok = $due === 0 || ($latest !== null && $latest >= $monthEnd);
+
+        return ['key' => 'depreciation', 'label' => 'Depreciation posted', 'status' => $ok ? 'ok' : 'warn',
+            'detail' => $due === 0 ? 'No fixed asset is depreciated by then.' : ($ok ? "Depreciation is posted through {$latest}."
+                : 'Depreciation is posted ' . ($latest ? "through {$latest}" : 'for no month yet') . ": run it through {$monthEnd}."),
+            'items' => [], 'link' => '/fixed-assets'];
     }
 
     /** Receipts kept as undeposited funds at the date: money received but not yet in a bank. */

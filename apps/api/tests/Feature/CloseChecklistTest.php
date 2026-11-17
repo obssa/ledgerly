@@ -36,7 +36,7 @@ final class CloseChecklistTest extends TestCase
     {
         $list = $this->getJson('/api/v1/close-checklist?period_end=2026-11-10', $this->h)->assertOk()->assertJsonPath('period_end', '2026-11-10');
         $items = collect($list->json('items'))->keyBy('key');
-        $this->assertSame(['banks_reconciled', 'statement_lines', 'stock_valued', 'open_documents', 'journal_requests', 'undeposited', 'balanced'], $items->keys()->all());
+        $this->assertSame(['banks_reconciled', 'statement_lines', 'stock_valued', 'open_documents', 'journal_requests', 'depreciation', 'undeposited', 'balanced'], $items->keys()->all());
         $this->assertSame('warn', $items['banks_reconciled']['status']);
         $this->assertContains("/banking/{$this->c['bank']}/reconcile", array_column($items['banks_reconciled']['items'], 'link'));
         $this->assertSame(['warn', 'statement line'], [$items['statement_lines']['status'], substr($items['statement_lines']['detail'], 2, 14)]);

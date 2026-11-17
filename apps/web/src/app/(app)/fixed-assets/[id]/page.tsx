@@ -1,0 +1,61 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Card, PageTitle, Pill } from "@/components/ui";
+import { getAssetOptions, getFixedAsset } from "@/lib/data";
+import { formatAmount } from "@/lib/format";
+import { AssetForm } from "../AssetForms";
+
+export const metadata = { title: "Fixed asset" };
+
+/** Module 9c: one asset, its depreciation so far and the months ahead, and editing it. */
+export default async function FixedAssetPage({ params }: PageProps<"/fixed-assets/[id]">) {
+  const { id } = await params;
+  const [a, options] = await Promise.all([getFixedAsset(id), getAssetOptions()]);
+  if (!a) notFound();
+  const how = a.method === "straight_line" ? `Straight line over ${a.useful_life_months} months` : `Reducing balance at ${Number(a.annual_rate) * 100}% a year`;
+
+  return (
+    <>
+      <PageTitle eyebrow={<><Link href="/fixed-assets" className="hover:underline">Fixed assets</Link> / <span className="num">{a.code}</span></>}
+        title={<>{a.name} {a.status === "disposed" && <Pill>Disposed</Pill>}</>} />
+      <Card className="mb-4" label="Asset">
+        <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">
+          <div><dt className="text-muted">Cost</dt><dd className="num text-[18px] font-bold">{formatAmount(a.cost)}</dd></div>
+          <div><dt className="text-muted">Depreciated</dt><dd className="num text-[18px] font-bold">{formatAmount(a.depreciated)}</dd></div>
+          <div><dt className="text-muted">Book value</dt><dd className="num text-[18px] font-bold">{formatAmount(a.book_value)}</dd></div>
+          <div><dt className="text-muted">Residual value</dt><dd className="num">{formatAmount(a.residual_value)}</dd></div>
+          <div><dt className="text-muted">Depreciation</dt><dd>{how}, from <span className="num">{a.depreciation_starts_on}</span></dd></div>
+          <div><dt className="text-muted">Kept on</dt><dd><span className="num">{a.asset_account.code}</span> {a.asset_account.name}</dd></div>
+          <div><dt className="text-muted">Where, and who keeps it</dt><dd>{a.location?.name ?? "—"}{a.custodian ? `, ${a.custodian}` : ""}</dd></div>
+        </dl>
+      </Card>
+      <Card className="mb-4 !p-2" label="Schedule">
+        <div className="grid gap-4 overflow-x-auto md:grid-cols-2">
+          <table className="tbl">
+            <caption className="px-3 pt-2 text-left text-[14px] font-bold">Posted</caption>
+            <thead><tr><th scope="col">Month to</th><th scope="col" className="!text-right">Charge</th></tr></thead>
+            <tbody>
+              {a.opening_depreciation !== "0.00" && <tr><td>Before Ledgerly</td><td className="num text-right">{formatAmount(a.opening_depreciation)}</td></tr>}
+              {a.posted.length === 0 && a.opening_depreciation === "0.00" && <tr><td colSpan={2} className="text-muted">Nothing yet.</td></tr>}
+              {a.posted.map((p) => <tr key={p.period_end}><td className="num"><Link href={`/journal/${encodeURIComponent(p.entry_id)}`} className="hover:underline">{p.period_end}</Link></td><td className="num text-right">{formatAmount(p.amount)}</td></tr>)}
+            </tbody>
+          </table>
+          <table className="tbl">
+            <caption className="px-3 pt-2 text-left text-[14px] font-bold">The next months</caption>
+            <thead><tr><th scope="col">Month to</th><th scope="col" className="!text-right">Charge</th></tr></thead>
+            <tbody>
+              {a.ahead.length === 0 && <tr><td colSpan={2} className="text-muted">Fully depreciated.</td></tr>}
+              {a.ahead.map((p) => <tr key={p.period_end}><td className="num">{p.period_end}</td><td className="num text-right">{formatAmount(p.amount)}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      {a.can.manage && options && (
+        <Card label="Edit">
+          <h2 className="mb-3 text-[15px] font-bold">Edit</h2>
+          <AssetForm asset={a} options={options} locked={a.depreciated_by_runs} />
+        </Card>
+      )}
+    </>
+  );
+}

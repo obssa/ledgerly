@@ -41,6 +41,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
     label: "Books",
     items: [
       { href: "/accounts", label: "Chart of accounts" },
+      { href: "/fixed-assets", label: "Fixed assets" },
       { href: "/journal", label: "Journal entries" },
       { href: "/revaluation", label: "Currency revaluation" },
       { href: "/close", label: "Close the books" },

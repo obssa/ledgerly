@@ -9,6 +9,7 @@ use App\Http\Controllers\ChartController;
 use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
+use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RecurringJournalController;
 use App\Http\Controllers\ReviewQueueController;
@@ -168,6 +169,12 @@ Route::prefix('v1')->group(function () {
             Route::post('recurring-journals/{recurringJournal}/resume', [RecurringJournalController::class, 'resume'])->whereUuid('recurringJournal');
 
             Route::get('tax-rates', [TaxRateController::class, 'index']);
+            Route::get('fixed-assets', [FixedAssetController::class, 'index']);
+            Route::post('fixed-assets', [FixedAssetController::class, 'store']);
+            Route::get('fixed-assets/{fixedAsset}', [FixedAssetController::class, 'show'])->whereUuid('fixedAsset');
+            Route::put('fixed-assets/{fixedAsset}', [FixedAssetController::class, 'update'])->whereUuid('fixedAsset');
+            Route::get('depreciation/preview', [FixedAssetController::class, 'preview']);
+            Route::post('depreciation-runs', [FixedAssetController::class, 'run']);
             Route::get('projects', [ProjectController::class, 'index']);
             Route::post('projects/{project}/bill-time', [TimeEntryController::class, 'bill'])->whereUuid('project');
             Route::get('time-entries', [TimeEntryController::class, 'index']);
