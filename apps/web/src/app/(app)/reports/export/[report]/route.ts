@@ -19,12 +19,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
   const ctx = { token, companyId };
   const q = new URL(request.url).searchParams;
   const word = (n: string) => (/^[a-z_]{1,20}$/.test(q.get(n) ?? "") ? (q.get(n) as string) : undefined);
-  const id = /^[0-9a-f-]{36}$/.test(q.get("account_id") ?? "") ? (q.get("account_id") as string) : undefined;
+  const uuid = (n: string) => (/^[0-9a-f-]{36}$/.test(q.get(n) ?? "") ? (q.get(n) as string) : undefined);
+  const id = uuid("account_id");
 
   try {
     const period = await getReportPeriod({ from: q.get("from") ?? undefined, to: q.get("to") ?? undefined });
     const asOf = isDate(q.get("as_of")) ? (q.get("as_of") as string) : period.to;
-    const options = { kind: word("kind"), group: word("group"), account_id: id };
+    const options = { kind: word("kind"), group: word("group"), account_id: id, action: word("action"), user_id: uuid("user_id") };
     const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing"].includes(report);
     const { title, rows } = await exportRows(report as ExportableReport, { ...period, as_of: asOf, ...options }, ctx);
     await ledgerly.recordExport({

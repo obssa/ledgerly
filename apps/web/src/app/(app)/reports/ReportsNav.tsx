@@ -10,6 +10,7 @@ const CYCLE: { stage: string; reports: [string, string][] }[] = [
     ["Purchases analysis", "/reports/purchases"], ["AP ageing", "/reports/ap-ageing"], ["Supplier statements", "/suppliers"]] },
   { stage: "Inventory and assets", reports: [["Inventory valuation", "/reports/inventory-valuation"], ["Bin cards", "/inventory"], ["Fixed asset register", "/fixed-assets"]] },
   { stage: "Tax", reports: [["VAT return worksheet", "/tax"], ["Withholding register", "/tax?kind=withholding"]] },
+  { stage: "Audit", reports: [["Audit log", "/audit"]] },
   { stage: "Management", reports: [["Financial health", "/reports/financial-health"], ["Profit by location, class or project", "/reports/profit-by-dimension"],
     ["Project profitability", "/projects"], ["Review queue", "/journal/review"]] },
 ];

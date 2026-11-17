@@ -881,6 +881,31 @@ export interface DocumentAnalysis {
   totals: Record<"amount" | "tax", string>;
 }
 
+/** Module 10/11: the audit log, newest first. */
+export interface AuditEntry {
+  id: number;
+  at: string;
+  user: { id: string; name: string } | null;
+  actor_type: string;
+  action: string;
+  subject_type: string;
+  subject_id: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  reason: string | null;
+  ip: string | null;
+  device: string | null;
+}
+
+export interface AuditLog {
+  data: AuditEntry[];
+  more: boolean;
+  next_before_id: number | null;
+  actions: string[];
+  subject_types: string[];
+  people: { id: string; name: string }[];
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) {
     super(message);
@@ -1202,6 +1227,8 @@ export const ledgerly = {
   cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),
   changesInEquity: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<ChangesInEquity>("reports/changes-in-equity", { ...ctx, query: q }),
   financialHealth: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<FinancialHealth>("reports/financial-health", { ...ctx, query: q }),
+  auditLog: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<AuditLog>("audit-log", { ...ctx, query: q }),
+  verifyAuditLog: (ctx: RequestOptions) => api<{ intact: boolean; broken_at: number | null; rows: number; checked_at: string }>("audit-log/verify", ctx),
   recordExport: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ recorded: boolean; at: string }>("reports/exports", { ...ctx, method: "POST", body }),
   profitByDimension: (q: { kind: string; from?: string; to?: string }, ctx: RequestOptions) => api<ProfitByDimension>("reports/profit-by-dimension", { ...ctx, query: q }),
   documentAnalysis: (side: "sales" | "purchases", q: { group: string; from?: string; to?: string }, ctx: RequestOptions) =>
