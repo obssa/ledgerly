@@ -938,6 +938,22 @@ export interface AuditLog {
   people: { id: string; name: string }[];
 }
 
+/** Module 10: a report saved by the person signed in, with the dates its period covers today. */
+export interface SavedReport {
+  id: string;
+  name: string;
+  report: string;
+  period: string;
+  period_label: string;
+  from_date: string | null;
+  to_date: string | null;
+  options: Record<string, string>;
+  schedule: "none" | "weekly" | "monthly";
+  next_send_on: string | null;
+  last_sent_at: string | null;
+  covers: { from?: string; to?: string; as_of?: string };
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) {
     super(message);
@@ -1264,6 +1280,11 @@ export const ledgerly = {
   financialHealth: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<FinancialHealth>("reports/financial-health", { ...ctx, query: q }),
   auditLog: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<AuditLog>("audit-log", { ...ctx, query: q }),
   verifyAuditLog: (ctx: RequestOptions) => api<{ intact: boolean; broken_at: number | null; rows: number; checked_at: string }>("audit-log/verify", ctx),
+  savedReports: (ctx: RequestOptions) => api<{ data: SavedReport[] }>("saved-reports", ctx),
+  savedReport: (id: string, ctx: RequestOptions) => api<SavedReport>(`saved-reports/${encodeURIComponent(id)}`, ctx),
+  saveReport: (id: string | null, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<SavedReport>(id ? `saved-reports/${encodeURIComponent(id)}` : "saved-reports", { ...ctx, method: id ? "PUT" : "POST", body }),
+  deleteSavedReport: (id: string, ctx: RequestOptions) => api<{ removed: boolean }>(`saved-reports/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE" }),
   recordExport: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ recorded: boolean; at: string }>("reports/exports", { ...ctx, method: "POST", body }),
   profitByDimension: (q: { kind: string; from?: string; to?: string }, ctx: RequestOptions) => api<ProfitByDimension>("reports/profit-by-dimension", { ...ctx, query: q }),
   documentAnalysis: (side: "sales" | "purchases", q: { group: string; from?: string; to?: string }, ctx: RequestOptions) =>

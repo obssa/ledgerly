@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SAVEABLE } from "@/lib/saved-reports";
 
 /** The reports, grouped by the accounting cycle; every entry is a page that exists. */
 const CYCLE: { stage: string; reports: [string, string][] }[] = [
@@ -12,6 +13,7 @@ const CYCLE: { stage: string; reports: [string, string][] }[] = [
     ["Stock ageing (slow-moving)", "/reports/stock-ageing"], ["Bin cards", "/inventory"], ["Fixed asset register", "/fixed-assets"]] },
   { stage: "Tax", reports: [["VAT return worksheet", "/tax"], ["Withholding register", "/tax?kind=withholding"]] },
   { stage: "Audit", reports: [["Audit log", "/audit"]] },
+  { stage: "Saved", reports: [["Saved and scheduled reports", "/reports/saved"]] },
   { stage: "Management", reports: [["Financial health", "/reports/financial-health"], ["Profit by location, class or project", "/reports/profit-by-dimension"],
     ["Project profitability", "/projects"], ["Review queue", "/journal/review"]] },
 ];
@@ -32,10 +34,15 @@ export function ReportsNav({ current }: { current: string }) {
   );
 }
 
-/** A CSV download of the report as shown; the export is recorded in the audit log. */
+/** A CSV download of the report as shown (the export is recorded in the audit log), and saving it to open again or be sent. */
 export function ExportLink({ report, params }: { report: string; params: Record<string, string | undefined> }) {
   const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
-  return <a className="btn print:hidden" href={`/reports/export/${report}${query ? `?${query}` : ""}`}>Download CSV</a>;
+  return (
+    <span className="flex flex-wrap gap-2 print:hidden">
+      {SAVEABLE[report] && <Link className="btn" href={`/reports/saved?${new URLSearchParams({ report, ...Object.fromEntries(Object.entries(params).filter(([, v]) => v)) }).toString()}`}>Save</Link>}
+      <a className="btn" href={`/reports/export/${report}${query ? `?${query}` : ""}`}>Download CSV</a>
+    </span>
+  );
 }
 
 /** From and to: a plain GET form, so it works without JavaScript. */

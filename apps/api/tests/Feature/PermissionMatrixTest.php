@@ -222,6 +222,11 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/reports/sales' => 'reports.view',
         'POST api/v1/reports/exports' => 'reports.view',
         'GET api/v1/audit-log' => 'audit.view',
+        'GET api/v1/saved-reports' => 'reports.view',
+        'POST api/v1/saved-reports' => 'reports.view',
+        'GET api/v1/saved-reports/{savedReport}' => 'reports.view',
+        'PUT api/v1/saved-reports/{savedReport}' => 'reports.view',
+        'DELETE api/v1/saved-reports/{savedReport}' => 'reports.view',
         'GET api/v1/audit-log/verify' => 'audit.view',
         'GET api/v1/reports/purchases' => 'reports.view',
     ];
