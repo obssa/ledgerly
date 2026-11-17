@@ -342,6 +342,46 @@ export interface JournalRequest {
   can: { approve: boolean; withdraw: boolean };
 }
 
+/** Module 9c: a fixed asset on the register. */
+export interface FixedAsset {
+  id: string;
+  code: string;
+  name: string;
+  category: string | null;
+  status: "active" | "disposed";
+  location: { id: string; name: string } | null;
+  custodian: string | null;
+  asset_account: { id: string; code: string; name: string };
+  depreciation_account_id: string;
+  expense_account_id: string;
+  acquired_on: string;
+  cost: string;
+  residual_value: string;
+  method: "straight_line" | "reducing_balance";
+  useful_life_months: number | null;
+  annual_rate: string | null;
+  depreciation_starts_on: string;
+  opening_depreciation: string;
+  depreciated?: string;
+  book_value?: string;
+}
+
+export interface FixedAssetDetail extends FixedAsset {
+  posted: { period_end: string; amount: string; entry_id: string }[];
+  ahead: { period_end: string; amount: string }[];
+  depreciated: string;
+  book_value: string;
+  depreciated_by_runs: boolean;
+  can: { manage: boolean };
+}
+
+export interface FixedAssetRegister {
+  data: (FixedAsset & { depreciated: string; book_value: string })[];
+  runs: { id: string; period_end: string; total: string; entry: { id: string; number: number } }[];
+  next_period_end: string;
+  can: { manage: boolean; depreciate: boolean };
+}
+
 /** Module 9a: a project, with its income, costs and profit from the ledger. */
 export interface Project {
   id: string;
@@ -903,6 +943,14 @@ export const ledgerly = {
     api<RecurringJournal>(`recurring-journals/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   postDueRecurring: (ctx: RequestOptions) =>
     api<{ data: { id: string; name: string; posted: number[]; error: string | null }[]; posted: number }>("recurring-journals/post-due", { ...ctx, method: "POST", body: {} }),
+  fixedAssets: (ctx: RequestOptions) => api<FixedAssetRegister>("fixed-assets", ctx),
+  fixedAsset: (id: string, ctx: RequestOptions) => api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}`, ctx),
+  saveFixedAsset: (id: string | null, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<FixedAssetDetail>(id ? `fixed-assets/${encodeURIComponent(id)}` : "fixed-assets", { ...ctx, method: id ? "PUT" : "POST", body }),
+  depreciationPreview: (periodEnd: string | undefined, ctx: RequestOptions) =>
+    api<{ period_end: string; lines: { asset_id: string; code: string; name: string; amount: string }[]; total: string }>("depreciation/preview", { ...ctx, query: { period_end: periodEnd } }),
+  runDepreciation: (periodEnd: string, ctx: RequestOptions) =>
+    api<{ entry: { id: string; number: number }; total: string; assets: number }>("depreciation-runs", { ...ctx, method: "POST", body: { period_end: periodEnd } }),
   projects: (ctx: RequestOptions) => api<{ data: Project[]; can: { manage: boolean } }>("projects", ctx),
   project: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) => api<ProjectDetail>(`projects/${encodeURIComponent(id)}`, { ...ctx, query: q }),
   saveProject: (id: string | null, body: Record<string, unknown>, ctx: RequestOptions) =>

@@ -187,6 +187,11 @@ final class TenantIsolationTest extends TestCase
             'tax return settled from B\'s bank' => ['POST', "/api/v1/tax-returns/{$this->a['tax_return']}/settle", ['date' => '2026-11-10', 'bank_account_id' => $this->b['bank']]],
             'invoice line on B\'s project' => ['POST', '/api/v1/invoices', $invoice([], ['project_id' => $this->b['project']])],
             'project for B\'s customer' => ['POST', '/api/v1/projects', ['code' => 'P-X', 'name' => 'Planted', 'status' => 'active', 'billing' => 'fixed_fee', 'customer_id' => $this->b['contact']]],
+            'asset on B\'s expense account' => ['POST', '/api/v1/fixed-assets', ['code' => 'X-B', 'name' => 'Planted', 'asset_account_id' => $this->a['rent'],
+                'depreciation_account_id' => $this->a['rent'], 'expense_account_id' => $this->b['rent'], 'acquired_on' => '2026-11-03', 'cost' => '10', 'method' => 'straight_line', 'useful_life_months' => 12]],
+            'asset at B\'s location' => ['PUT', "/api/v1/fixed-assets/{$this->a['fixed_asset']}", ['code' => 'IT-001', 'name' => 'Planted', 'location_id' => $this->b['dimension'],
+                'asset_account_id' => $this->a['rent'], 'depreciation_account_id' => $this->a['rent'], 'expense_account_id' => $this->a['rent'], 'acquired_on' => '2026-11-03',
+                'cost' => '36000', 'method' => 'straight_line', 'useful_life_months' => 36]],
             'reconciliation ticking B\'s entry' => ['PUT', "/api/v1/reconciliations/{$this->a['reconciliation']}", ['cleared' => [$this->b['bank_line']]]],
         ];
 
@@ -286,7 +291,7 @@ final class TenantIsolationTest extends TestCase
     /** @return array<string, int> */
     private function ledgerCounts(): array
     {
-        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines', 'recurring_journals', 'tax_returns', 'projects'])
+        return collect(['journal_entries', 'journal_lines', 'documents', 'document_lines', 'payments', 'payment_allocations', 'audit_log', 'idempotency_keys', 'bank_transactions', 'reconciliations', 'reconciliation_lines', 'recurring_journals', 'tax_returns', 'projects', 'fixed_assets'])
             ->mapWithKeys(fn ($t) => [$t => $this->owner()->table($t)->count()])->all();
     }
 

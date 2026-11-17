@@ -2288,6 +2288,70 @@ DO $$ BEGIN
   DELETE FROM time_entries WHERE id = '00000000-0000-0000-0000-0000000068e2';   -- unbilled hours can go
   RAISE NOTICE 'PASS T68 hours are logged on a project by a member, billed only when billable, and fixed once billed';
 END $$;
+-- T69: fixed assets and depreciation (042). An asset uses the company's fixed asset, accumulated depreciation and
+-- expense accounts; once depreciated, how it wears out stays; one run per month end with its own entry; never below the
+-- residual value. Company A, as user f1.
+DO $$ BEGIN
+  INSERT INTO accounts (id, company_id, code, name, type, subtype) VALUES
+    ('00000000-0000-0000-0000-0000000069a1', app_company_id(), '1569', 'Delivery vans', 'asset', 'fixed_asset'),
+    ('00000000-0000-0000-0000-0000000069a2', app_company_id(), '1599', 'Accumulated depreciation, vans', 'asset', 'contra_asset'),
+    ('00000000-0000-0000-0000-0000000069a3', app_company_id(), '6799', 'Depreciation, vans', 'expense', 'depreciation');
+  BEGIN
+    INSERT INTO fixed_assets (company_id, code, name, asset_account_id, depreciation_account_id, expense_account_id, acquired_on, cost, method, useful_life_months, depreciation_starts_on, created_by) VALUES
+      (app_company_id(), 'VAN-0', 'Van', '00000000-0000-0000-0000-0000000069a3', '00000000-0000-0000-0000-0000000069a2', '00000000-0000-0000-0000-0000000069a3', '2027-07-15', 60000, 'straight_line', 60, '2027-08-01', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T69a: an asset was kept on an expense account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO fixed_assets (company_id, code, name, asset_account_id, depreciation_account_id, expense_account_id, acquired_on, cost, residual_value, opening_depreciation, method, useful_life_months, depreciation_starts_on, created_by) VALUES
+      (app_company_id(), 'VAN-0', 'Van', '00000000-0000-0000-0000-0000000069a1', '00000000-0000-0000-0000-0000000069a2', '00000000-0000-0000-0000-0000000069a3', '2027-07-15', 60000, 50000, 20000, 'straight_line', 60, '2027-08-01', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T69b: residual value and depreciation so far were more than the cost';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO fixed_assets (id, company_id, code, name, asset_account_id, depreciation_account_id, expense_account_id, acquired_on, cost, residual_value, method, useful_life_months, depreciation_starts_on, created_by) VALUES
+    ('00000000-0000-0000-0000-0000000069f1', app_company_id(), 'VAN-1', 'Isuzu van', '00000000-0000-0000-0000-0000000069a1', '00000000-0000-0000-0000-0000000069a2', '00000000-0000-0000-0000-0000000069a3', '2027-07-15', 60000, 6000, 'straight_line', 60, '2027-08-01', '00000000-0000-0000-0000-0000000000f1');
+
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+      ('00000000-0000-0000-0000-00000000e691', app_company_id(), 9691, '2027-08-30', 'ETB', 'depreciation', '00000000-0000-0000-0000-0000000069d1');
+    RAISE EXCEPTION 'FAIL T69c: a depreciation entry was dated before the month end';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    ('00000000-0000-0000-0000-00000000e692', app_company_id(), 9692, '2027-08-31', 'ETB', 'depreciation', '00000000-0000-0000-0000-0000000069d1');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e692', 1, '00000000-0000-0000-0000-0000000069a3', 900, 0, 900),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e692', 2, '00000000-0000-0000-0000-0000000069a2', 0, 900, -900);
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  BEGIN
+    INSERT INTO depreciation_runs (id, company_id, period_end, journal_entry_id, total, created_by) VALUES
+      ('00000000-0000-0000-0000-0000000069d0', app_company_id(), '2027-08-31', '00000000-0000-0000-0000-00000000e692', 900, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T69d: a run named an entry that is not its own';
+  EXCEPTION WHEN check_violation OR foreign_key_violation THEN NULL; END;
+  INSERT INTO depreciation_runs (id, company_id, period_end, journal_entry_id, total, created_by) VALUES
+    ('00000000-0000-0000-0000-0000000069d1', app_company_id(), '2027-08-31', '00000000-0000-0000-0000-00000000e692', 900, '00000000-0000-0000-0000-0000000000f1');
+  BEGIN
+    INSERT INTO asset_depreciation (company_id, run_id, asset_id, amount) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000069d1', '00000000-0000-0000-0000-0000000069f1', 54001);
+    RAISE EXCEPTION 'FAIL T69e: an asset was depreciated below its residual value';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO asset_depreciation (company_id, run_id, asset_id, amount) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-0000000069d1', '00000000-0000-0000-0000-0000000069f1', 900);
+
+  -- Depreciated: how it wears out stays; its name and keeper may change; the run and its charges stay.
+  BEGIN
+    UPDATE fixed_assets SET useful_life_months = 36 WHERE id = '00000000-0000-0000-0000-0000000069f1';
+    RAISE EXCEPTION 'FAIL T69f: a depreciated asset''s life was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE fixed_assets SET name = 'Isuzu NPR van', custodian = 'Dawit (driver)' WHERE id = '00000000-0000-0000-0000-0000000069f1';
+  BEGIN
+    UPDATE depreciation_runs SET total = 1 WHERE id = '00000000-0000-0000-0000-0000000069d1';
+    RAISE EXCEPTION 'FAIL T69g: a depreciation run was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM asset_depreciation WHERE run_id = '00000000-0000-0000-0000-0000000069d1';
+    RAISE EXCEPTION 'FAIL T69h: a depreciation charge was removed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T69 assets use their own accounts, keep how they wear out once depreciated, and runs stay as posted';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

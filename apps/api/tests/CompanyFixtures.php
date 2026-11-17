@@ -121,6 +121,11 @@ trait CompanyFixtures
         // Three billable hours on it, not billed yet.
         $ids['time_entry'] = $this->postJson('/api/v1/time-entries', ['project_id' => $ids['project'], 'work_date' => '2026-11-09', 'hours' => '3',
             'billable' => true, 'rate' => '400', 'note' => 'Site survey'], $h)->assertCreated()->json('id');
+        // A laptop on the fixed asset register, 36 months straight line from December.
+        $byCode = fn (string $code) => $this->owner()->table('accounts')->where(['company_id' => $company, 'code' => $code])->value('id');
+        $ids['fixed_asset'] = $this->postJson('/api/v1/fixed-assets', ['code' => 'IT-001', 'name' => "{$name} laptop", 'asset_account_id' => $byCode('1500'),
+            'depreciation_account_id' => $byCode('1590'), 'expense_account_id' => $byCode('6700'), 'acquired_on' => '2026-11-03', 'cost' => '36000',
+            'method' => 'straight_line', 'useful_life_months' => 36], $h)->assertCreated()->json('id');
         // The VAT return for September, filed on 10 Oct (nothing was posted then, so it is all zero).
         $ids['tax_return'] = $this->postJson('/api/v1/tax-returns', ['kind' => 'vat', 'period_start' => '2026-09-01', 'period_end' => '2026-09-30',
             'filed_on' => '2026-10-10', 'reference' => "{$name} VAT Sep"], $h)->assertCreated()->json('id');
@@ -138,7 +143,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(163, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(169, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -171,6 +176,7 @@ trait CompanyFixtures
             'taxReturn' => $ids['tax_return'],
             'project' => $ids['project'],
             'timeEntry' => $ids['time_entry'],
+            'fixedAsset' => $ids['fixed_asset'],
         ];
         $uri = preg_replace_callback('/\{(\w+)\??\}/', function ($m) use ($params, $route) {
             $this->assertArrayHasKey($m[1], $params, "Route {$route->uri()} has parameter {{$m[1]}}: add a fixture for it in Tests\\CompanyFixtures.");

@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type Project, type ProjectDetail, type TimeEntry, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
@@ -68,6 +68,52 @@ export async function getJournalRequests(status = "pending"): Promise<{ data: Jo
   await connection();
   if (isDemoMode()) return { data: [], pending: 0 };
   return withApi((ctx) => ledgerly.journalRequests(status, ctx));
+}
+
+/** Module 9c: the fixed asset register, and what the next depreciation run would post; null in the demo or for a role that does not see it. */
+export async function getFixedAssets(periodEnd?: string): Promise<{ register: FixedAssetRegister; preview: { period_end: string; lines: { asset_id: string; code: string; name: string; amount: string }[]; total: string } | null } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi(async (ctx) => {
+      const register = await ledgerly.fixedAssets(ctx);
+      const preview = await ledgerly.depreciationPreview(periodEnd ?? register.next_period_end, ctx).catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 422) return null;
+        throw error;
+      });
+      return { register, preview };
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return null;
+    throw error;
+  }
+}
+
+export async function getFixedAsset(id: string): Promise<FixedAssetDetail | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.fixedAsset(id, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && [403, 404].includes(error.status)) return null;
+    throw error;
+  }
+}
+
+/** The accounts and locations an asset form offers. */
+export async function getAssetOptions(): Promise<{ assetAccounts: Account[]; depreciationAccounts: Account[]; expenseAccounts: Account[]; locations: Dimension[] } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi(async (ctx) => {
+    const [accounts, dimensions] = await Promise.all([ledgerly.accounts(ctx), ledgerly.dimensions(ctx)]);
+    const active = accounts.data.filter((a) => a.is_active);
+    return {
+      assetAccounts: active.filter((a) => a.type === "asset" && a.subtype === "fixed_asset"),
+      depreciationAccounts: active.filter((a) => a.type === "asset" && a.subtype === "contra_asset" && a.system_key !== "doubtful_debts_allowance"),
+      expenseAccounts: active.filter((a) => a.type === "expense"),
+      locations: dimensions.data.filter((d) => d.kind === "location" && d.is_active),
+    };
+  });
 }
 
 /** Module 9a: the projects with their profit; null in the demo or for a role that does not see projects. */
