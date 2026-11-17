@@ -33,6 +33,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/people' => 'company.view',
         'GET api/v1/members' => 'users.manage',
         'POST api/v1/members/invitations' => 'users.manage',
+        'GET api/v1/company/export' => 'company.export',
         'PUT api/v1/members/{membership}' => 'users.manage',
         'POST api/v1/members/{membership}/resend' => 'users.manage',
         'POST api/v1/members/{membership}/deactivate' => 'users.manage',
@@ -282,10 +283,10 @@ final class PermissionMatrixTest extends TestCase
                 }
 
                 if ($allowed) {
-                    $this->assertNotSame(403, $response->status(), "{$role} has {$permission} but was refused on {$name}: " . $response->getContent());
-                    $this->assertLessThan(500, $response->status(), "{$name} as {$role}: " . substr((string) $response->getContent(), 0, 300));
+                    $this->assertNotSame(403, $response->getStatusCode(), "{$role} has {$permission} but was refused on {$name}: " . $response->getContent());
+                    $this->assertLessThan(500, $response->getStatusCode(), "{$name} as {$role}: " . substr((string) $response->getContent(), 0, 300));
                 } else {
-                    $this->assertSame(403, $response->status(), "{$role} lacks {$permission} but got {$response->status()} on {$name}");
+                    $this->assertSame(403, $response->getStatusCode(), "{$role} lacks {$permission} but got {$response->getStatusCode()} on {$name}");
                     $this->assertStringContainsString($permission, (string) $response->json('message'));
                 }
                 $checked++;

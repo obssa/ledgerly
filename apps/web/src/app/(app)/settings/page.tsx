@@ -79,6 +79,18 @@ export default async function SettingsPage() {
               Framework: IFRS for SMEs · Country: {settings.country_code}
             </p>
           </Card>
+
+          {!settings.demo && (
+            <Card label="Company data">
+              <h2 className="text-[19px] font-bold">Company data</h2>
+              <p className="mt-1.5 text-sm text-muted">
+                Everything the company keeps in Ledgerly, as CSV files in one ZIP: to keep a copy or take your books
+                elsewhere. Owners and admins.
+              </p>
+              {/* A plain link: the answer is a file, not a page. */}
+              <a href="/settings/export" className="btn mt-4" download>Download all company data</a>
+            </Card>
+          )}
         </div>
       </div>
     </>
