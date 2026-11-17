@@ -52,7 +52,9 @@ final class SaveInvoiceDraft
                 $data['contact_id'] = $original->contact_id;
                 $data['currency'] = $original->currency;
                 $data['fx_rate'] = (string) $original->fx_rate;
+                $data['salesperson_id'] = $original->salesperson_id;   // a credit note takes back the sale of whoever made it
             }
+            $data['salesperson_id'] = in_array($type, ['invoice', 'credit_note'], true) ? $this->salesperson($data, $document, $original) : null;
 
             $calc = $this->calculate($data);
             if ($type === 'bill') {
@@ -83,6 +85,23 @@ final class SaveInvoiceDraft
 
             return $document->refresh()->load('lines'); // refresh: the database bumped lock_version
         });
+    }
+
+    /** The salesperson named: an active member of the company, or the one the document already had (who may have left); not sent, unchanged. */
+    public function salesperson(array $data, ?Document $document, ?Document $original = null): ?string
+    {
+        if (! array_key_exists('salesperson_id', $data)) {
+            return $document?->salesperson_id;   // not sent: unchanged
+        }
+        $id = isset($data['salesperson_id']) && $data['salesperson_id'] !== '' ? (string) $data['salesperson_id'] : null;
+        if ($id === null || $id === $document?->salesperson_id || ($original !== null && $id === $original->salesperson_id)) {
+            return $id;
+        }
+        if (! DB::table('memberships')->where(['company_id' => $this->company->id(), 'user_id' => $id, 'status' => 'active'])->exists()) {
+            throw ValidationException::withMessages(['salesperson_id' => ['Choose a salesperson from the people of this company.']]);
+        }
+
+        return $id;
     }
 
     /**
@@ -207,6 +226,7 @@ final class SaveInvoiceDraft
                 'paid_from_account_id' => $data['paid_from_account_id'] ?? null,
                 'payment_method' => $data['payment_method'] ?? null,
                 'warehouse_id' => $data['warehouse_id'] ?? null,   // where stock lines leave from or arrive in (025)
+                'salesperson_id' => $data['salesperson_id'] ?? null,   // sales documents only (044)
             ],
             'lines' => $lineRows,
             'totals' => [

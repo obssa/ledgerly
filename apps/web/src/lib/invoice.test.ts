@@ -39,9 +39,11 @@ describe("stock lines", () => {
     const f = new FormData();
     f.append("contact_id", "c1");
     f.append("warehouse_id", "w1");
+    f.append("salesperson_id", "u1");
     f.append("lines", JSON.stringify([{ description: "Coffee", quantity: "2", unit_price: "1,150", account_id: "a1", tax_rate_id: null, item_id: "i1" }, { description: "Fee", quantity: "1", unit_price: "10", account_id: "a1", item_id: "" }]));
     const body = invoiceBody(f);
     expect(body.warehouse_id).toBe("w1");
+    expect(body.salesperson_id).toBe("u1");
     expect(body.lines).toEqual([
       { description: "Coffee", quantity: "2", unit_price: "1150", account_id: "a1", tax_rate_id: null, item_id: "i1" },
       { description: "Fee", quantity: "1", unit_price: "10", account_id: "a1", tax_rate_id: null },

@@ -168,6 +168,15 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
                 {options.currencies.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+            {kind === "invoice" && (options.people ?? []).length > 0 && (
+              <div>
+                <label className="field-label" htmlFor="salesperson_id">Salesperson</label>
+                <select className={`field ${bad("salesperson_id") ? "!border-bad" : ""}`} id="salesperson_id" name="salesperson_id" defaultValue="">
+                  <option value="">None</option>
+                  {(options.people ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            )}
             {stockLine && (
               <div>
                 <label className="field-label" htmlFor="warehouse_id">{kind === "bill" ? "Goods arrive in" : "Goods leave from"}</label>

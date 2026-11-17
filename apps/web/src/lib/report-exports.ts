@@ -80,7 +80,8 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
     case "sales":
     case "purchases": {
       const r = await ledgerly.documentAnalysis(report, { group: p.group ?? "contact", from: p.from, to: p.to }, ctx);
-      return { title: `${report}-by-${r.group}`, rows: [[r.group, "Quantity", "Documents", "Amount", "Tax", "Share %"],
+      const heading = ({ contact: report === "sales" ? "Customer" : "Supplier", item: "Item", month: "Month", salesperson: "Salesperson" } as Record<string, string>)[r.group] ?? r.group;
+      return { title: `${report}-by-${r.group}`, rows: [[heading, "Quantity", "Documents", "Amount", "Tax", "Share %"],
         ...r.rows.map((x) => [x.label, x.quantity, x.documents, x.amount, x.tax, x.share]), ["Total", null, null, r.totals.amount, r.totals.tax, null]] };
     }
     case "audit-log": {

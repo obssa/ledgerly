@@ -72,6 +72,8 @@ final class EditPostedInvoice
         }
 
         $company = $this->current->get();
+        // A posted credit note keeps its invoice's salesperson; an invoice's may change to another active member.
+        $data['salesperson_id'] = $invoice->type === 'invoice' ? $this->calculator->salesperson($data, $invoice) : $invoice->salesperson_id;
         $calc = $this->calculator->calculate($data);
         $calc['lock_version'] = $data['lock_version'] ?? null;
 
@@ -165,7 +167,7 @@ final class EditPostedInvoice
     /** The fields compared before and after an edit, lines included. */
     private function summary(array $doc): array
     {
-        $fields = ['contact_id', 'number', 'issue_date', 'due_date', 'currency', 'fx_rate', 'notes', 'subtotal', 'tax_total', 'total', 'amount_due'];
+        $fields = ['contact_id', 'number', 'issue_date', 'due_date', 'currency', 'fx_rate', 'notes', 'salesperson_id', 'subtotal', 'tax_total', 'total', 'amount_due'];
         $out = array_intersect_key($doc, array_flip($fields));
         $out['lines'] = array_map(
             fn (array $l) => array_intersect_key($l, array_flip(['line_no', 'description', 'quantity', 'unit_price', 'discount_rate', 'tax_rate_id', 'account_id', 'line_subtotal', 'line_tax'])),

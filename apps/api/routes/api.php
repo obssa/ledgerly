@@ -10,6 +10,7 @@ use App\Http\Controllers\FiscalYearController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\JournalRequestController;
 use App\Http\Controllers\AnalysisReportController;
+use App\Http\Controllers\PeopleController;
 use App\Http\Controllers\StockReportController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\FinancialStatementController;
@@ -120,6 +121,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware(['company', 'idempotent'])->group(function () {
             Route::get('company', [CompanySettingsController::class, 'show']);
+            Route::get('people', [PeopleController::class, 'index']);
             Route::put('company', [CompanySettingsController::class, 'update']);
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);
             Route::get('close-checklist', [CompanySettingsController::class, 'closeChecklist']);

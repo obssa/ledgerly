@@ -33,6 +33,8 @@ final class InvoiceController extends Controller
 
         return response()->json([
             ...$invoice->toArray(),
+            // The salesperson's name only (044): read directly, not as a User model with its sign-in fields.
+            'salesperson' => $invoice->salesperson_id ? DB::table('users')->where('id', $invoice->salesperson_id)->first(['id', 'name']) : null,
             'warnings' => $invoice->type !== 'invoice' || in_array($invoice->status, ['void', 'paid'], true) ? [] : $this->credit->warnings($this->current->get(), $invoice),
             'can' => [
                 'edit' => (bool) $membership?->can($invoice->isPosted() ? 'transactions.edit' : 'invoices.create'),

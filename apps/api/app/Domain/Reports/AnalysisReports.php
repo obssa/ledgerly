@@ -16,7 +16,7 @@ final class AnalysisReports
 {
     public const DIMENSIONS = ['location' => 'location_id', 'class' => 'class_id', 'project' => 'project_id'];
 
-    public const GROUPS = ['contact', 'item', 'month'];
+    public const GROUPS = ['contact', 'item', 'month', 'salesperson'];   // salesperson: sales only
 
     private const POSTED = ['posted', 'part_paid', 'paid'];
 
@@ -67,10 +67,13 @@ final class AnalysisReports
         [$key, $label] = match ($group) {
             'contact' => ['c.id', 'c.name'],
             'item' => ['i.id', 'i.name'],
+            'salesperson' => ['u.id', 'u.name'],
             default => ["to_char(d.issue_date, 'YYYY-MM')", "to_char(d.issue_date, 'YYYY-MM')"],
         };
         if ($group === 'contact') {
             $query->join('contacts as c', 'c.id', '=', 'd.contact_id')->groupBy('c.id', 'c.name')->orderBy('c.name');
+        } elseif ($group === 'salesperson') {
+            $query->leftJoin('users as u', 'u.id', '=', 'd.salesperson_id')->groupBy('u.id', 'u.name')->orderByRaw('u.name NULLS LAST');
         } elseif ($group === 'item') {
             $query->leftJoin('items as i', 'i.id', '=', 'dl.item_id')->groupBy('i.id', 'i.name')->orderByRaw('i.name NULLS LAST');
         } else {
@@ -82,7 +85,7 @@ final class AnalysisReports
             ->selectRaw('count(DISTINCT d.id) AS documents')
             ->selectRaw($group === 'item' ? 'sum(dl.quantity)::numeric(20,2)::text AS quantity' : 'NULL AS quantity')
             ->limit(2000)->get();
-        $out = $rows->map(fn ($r) => ['key' => $r->key, 'label' => $r->label ?? ($group === 'item' ? 'No item (described lines)' : '—'), 'amount' => $r->amount,
+        $out = $rows->map(fn ($r) => ['key' => $r->key, 'label' => $r->label ?? match ($group) { 'item' => 'No item (described lines)', 'salesperson' => 'No salesperson', default => '—' }, 'amount' => $r->amount,
             'tax' => $r->tax, 'documents' => (int) $r->documents, 'quantity' => $r->quantity])->values()->all();
         $totals = $this->sum($out, ['amount', 'tax']);
         $grand = BigDecimal::of($totals['amount']);

@@ -324,6 +324,8 @@ export interface InvoiceOptions {
   warehouses?: { id: string; name: string }[];
   /** Active projects a line can be tagged with (job costing). */
   projects?: { id: string; code: string; name: string }[];
+  /** The company's active members, for the salesperson on an invoice. */
+  people?: { id: string; name: string }[];
   demo: boolean;
 }
 
@@ -347,11 +349,12 @@ export async function getInvoiceOptions(): Promise<InvoiceOptions> {
   }
   const today = await getCompanyToday();
   return withApi(async (ctx) => {
-    const [customers, accounts, rates, currencies, numbering, items, warehouses] = await Promise.all([
+    const [customers, accounts, rates, currencies, numbering, items, warehouses, people] = await Promise.all([
       ledgerly.customers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
-      ledgerly.items({}, ctx), ledgerly.warehouses(ctx),
+      ledgerly.items({}, ctx), ledgerly.warehouses(ctx), ledgerly.people(ctx),
     ]);
     return {
+      people: people.data,
       customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days })),
       accounts: accounts.data.filter((a) => a.type === "income" && a.is_active).map((a) => ({ id: a.id, code: a.code, name: a.name })),
       taxRates: rates.data

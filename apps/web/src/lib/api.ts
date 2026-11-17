@@ -695,6 +695,9 @@ export interface InvoiceDetail extends Invoice {
   /** A credit note names the invoice it corrects. */
   original_document_id: string | null;
   original?: { id: string; number: string | null } | null;
+  /** The member who made the sale; a credit note keeps its invoice's. */
+  salesperson_id?: string | null;
+  salesperson?: { id: string; name: string } | null;
   fx_rate: string;
   notes: string | null;
   contact: Contact & { email?: string | null };
@@ -1187,6 +1190,7 @@ export const ledgerly = {
   createItem: (body: Record<string, unknown>, ctx: RequestOptions) => api<Item>("items", { ...ctx, method: "POST", body }),
   updateItem: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   warehouses: (ctx: RequestOptions) => api<{ data: Warehouse[] }>("warehouses", ctx),
+  people: (ctx: RequestOptions) => api<{ data: { id: string; name: string }[] }>("people", ctx),
   createWarehouse: (name: string, ctx: RequestOptions) => api<Warehouse>("warehouses", { ...ctx, method: "POST", body: { name } }),
   stock: (ctx: RequestOptions) => api<StockOnHand>("stock", ctx),
   adjustStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
