@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -63,6 +64,7 @@ final class AuthController extends Controller
         $byAddress = 'login-ip:' . ClientAddress::of($request);
 
         if (RateLimiter::tooManyAttempts($byEmail, self::MAX_ATTEMPTS) || RateLimiter::tooManyAttempts($byAddress, self::MAX_ATTEMPTS * 4)) {
+            Log::warning('auth.login_locked', ['email_hash' => hash('sha256', $email), 'address' => ClientAddress::of($request)]);
             throw ValidationException::withMessages([
                 'email' => ['Too many sign-in attempts. Try again in 15 minutes.'],
             ])->status(429);
@@ -75,6 +77,8 @@ final class AuthController extends Controller
         if (! $user || ! $ok) {
             RateLimiter::hit($byEmail, self::LOCK_SECONDS);
             RateLimiter::hit($byAddress, self::LOCK_SECONDS);
+            // Who tried is kept as a hash of the address typed, never the password (SECURITY.md S10).
+            Log::warning('auth.login_failed', ['email_hash' => hash('sha256', $email), 'address' => ClientAddress::of($request), 'known' => $user !== null]);
             throw ValidationException::withMessages(['email' => ['These credentials do not match our records.']]);
         }
 
@@ -86,8 +90,12 @@ final class AuthController extends Controller
             $challenge = Str::random(64);
             Cache::put(self::challengeKey($challenge), $user->getKey(), now()->addMinutes((int) config('security.mfa.challenge_minutes')));
 
+            Log::info('auth.login_password_ok', ['user_id' => $user->getKey(), 'address' => ClientAddress::of($request)]);
+
             return response()->json(['mfa_required' => true, 'challenge' => $challenge]);
         }
+
+        Log::info('auth.login', ['user_id' => $user->getKey(), 'address' => ClientAddress::of($request)]);
 
         return response()->json(['user' => $user, 'token' => $this->issueToken($user)]);
     }
@@ -117,11 +125,13 @@ final class AuthController extends Controller
             : $mfa->acceptRecoveryCode($user, (string) $data['recovery_code']);
         if (! $ok) {
             RateLimiter::hit($attempts, (int) config('security.mfa.lock_seconds'));
+            Log::warning('auth.mfa_failed', ['user_id' => $user->getKey(), 'address' => ClientAddress::of($request)]);
             throw ValidationException::withMessages(['code' => ['That code is not right, or it was already used.']]);
         }
 
         Cache::forget(self::challengeKey($data['challenge'])); // one sign-in per challenge
         RateLimiter::clear($attempts);
+        Log::info('auth.login', ['user_id' => $user->getKey(), 'address' => ClientAddress::of($request), 'with' => isset($data['code']) ? 'authenticator' : 'recovery_code']);
 
         return response()->json(['user' => $user, 'token' => $this->issueToken($user)]);
     }

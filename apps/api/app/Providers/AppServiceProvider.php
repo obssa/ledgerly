@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use App\Support\ProductionChecks;
 use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->isProduction()) {
+            ProductionChecks::assert($this->app);   // S9: no debug, no owner password, an app key
+        }
         Model::shouldBeStrict(! $this->app->isProduction());
 
         // One password rule for sign-up, reset and change. The leaked-password check asks an outside service
