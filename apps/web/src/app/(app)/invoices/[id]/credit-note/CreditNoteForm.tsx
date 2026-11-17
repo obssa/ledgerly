@@ -9,21 +9,27 @@ import { createSupplierCredit } from "../../../bills/actions";
 import { createCreditNote } from "../../actions";
 import { todayIn } from "@/lib/dates";
 
-interface Line { key: number; description: string; quantity: string; unitPrice: string; taxRateId: string; accountId: string }
+interface Line { key: number; description: string; quantity: string; unitPrice: string; taxRateId: string; accountId: string; projectId: string }
 
 const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
 
 /**
  * A credit note starts as a copy of the invoice's lines: keep the items returned (or the price taken off), change the
  * quantities, remove the rest. The customer, currency and rate are the invoice's; the API never lets the credit notes
- * of an invoice add up to more than the invoice.
+ * of an invoice add up to more than the invoice. Each line keeps the invoice line's project (while it is active), so
+ * the credit comes off that project's income; it can be changed or cleared.
  */
-export function CreditNoteForm({ invoice, taxRates }: { invoice: InvoiceDetail | BillDetail; taxRates: { id: string; name: string; rate: string }[] }) {
+export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
+  invoice: InvoiceDetail | BillDetail;
+  taxRates: { id: string; name: string; rate: string }[];
+  projects?: { id: string; code: string; name: string }[];
+}) {
   const bill = invoice.type === "bill";   // a supplier credit: what the supplier gives back on this bill
   const [state, action, pending] = useActionState(bill ? createSupplierCredit : createCreditNote, undefined);
   const today = todayIn();
   const [lines, setLines] = useState<Line[]>(invoice.lines.map((l, i) => ({
     key: i + 1, description: l.description, quantity: l.quantity, unitPrice: l.unit_price, taxRateId: l.tax_rate_id ?? "", accountId: l.account_id,
+    projectId: projects.some((p) => p.id === l.project_id) ? (l.project_id ?? "") : "",
   })));
   const rateOf = (id: string) => taxRates.find((t) => t.id === id)?.rate ?? "0";
   const valid = lines.filter((l) => isDecimal(l.quantity) && isDecimal(l.unitPrice));
@@ -33,7 +39,7 @@ export function CreditNoteForm({ invoice, taxRates }: { invoice: InvoiceDetail |
     [lines],
   );
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const json = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null })));
+  const json = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, project_id: l.projectId || null })));
 
   return (
     <form action={action} noValidate className="flex flex-col gap-4">
@@ -62,13 +68,21 @@ export function CreditNoteForm({ invoice, taxRates }: { invoice: InvoiceDetail |
       <Card className="!p-2" label="Lines credited">
         <div className="overflow-x-auto">
           <table className="tbl">
-            <thead><tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
+            <thead><tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th>{projects.length > 0 && <th scope="col">Project</th>}<th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={l.key}>
                   <td><input aria-label="Description" className="field min-w-[200px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} /></td>
                   <td><input aria-label="Quantity" inputMode="decimal" className="field num w-[80px] text-right" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} /></td>
                   <td><input aria-label="Unit price" inputMode="decimal" className="field num w-[120px] text-right" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} /></td>
+                  {projects.length > 0 && (
+                    <td>
+                      <select aria-label="Project" className="field w-[150px]" value={l.projectId} onChange={(e) => update(l.key, { projectId: e.target.value })}>
+                        <option value="">No project</option>
+                        {projects.map((p) => <option key={p.id} value={p.id}>{p.code} {p.name}</option>)}
+                      </select>
+                    </td>
+                  )}
                   <td className="!pl-0">
                     <button type="button" className="btn !px-3" aria-label={`Remove line ${i + 1}`} onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : ls))}>×</button>
                   </td>
