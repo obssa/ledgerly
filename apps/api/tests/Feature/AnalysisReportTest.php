@@ -66,7 +66,8 @@ final class AnalysisReportTest extends TestCase
         $purchases = $this->getJson('/api/v1/reports/purchases?group=contact&from=2026-11-01&to=2026-11-30', $this->h)->assertOk()->assertJsonPath('side', 'purchases');
         $supplier = collect($purchases->json('rows'))->firstWhere('key', $this->c['supplier']);
         $this->assertSame('475.00', $supplier['amount']);   // 400 bill - 40 credit + 115 expense
-        $this->getJson('/api/v1/reports/sales?group=salesperson', $this->h)->assertUnprocessable()->assertJsonValidationErrors('group');
+        $this->getJson('/api/v1/reports/sales?group=warehouse', $this->h)->assertUnprocessable()->assertJsonValidationErrors('group');
+        $this->getJson('/api/v1/reports/purchases?group=salesperson', $this->h)->assertUnprocessable()->assertJsonValidationErrors('group');
         $this->getJson('/api/v1/reports/sales?from=2026-12-01&to=2026-11-01', $this->h)->assertUnprocessable()->assertJsonValidationErrors('to');
     }
 }

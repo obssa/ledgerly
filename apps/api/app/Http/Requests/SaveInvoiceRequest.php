@@ -62,6 +62,7 @@ final class SaveInvoiceRequest extends FormRequest
             'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')->where('is_active', true)],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
             'warehouse_id' => ['nullable', 'uuid', Rule::exists('warehouses', 'id')->where('is_active', true)],   // for stock lines
+            'salesperson_id' => ['nullable', 'uuid'],   // an active member of the company: checked in SaveInvoiceDraft (044)
         ];
     }
 }

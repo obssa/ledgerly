@@ -2387,6 +2387,31 @@ DO $$ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T70 an asset is disposed of once, by its own entry, and then stays as it was';
 END $$;
+-- T71: the salesperson on a sales document (044). Only sales documents name one; a salesperson named is an active
+-- member of the company. Company A, as user f1 (a member); f2 is not a member of company A; c7 is a supplier.
+DO $$ BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, salesperson_id) VALUES
+    ('00000000-0000-0000-0000-0000000071d1', app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-08-05', 'ETB', '00000000-0000-0000-0000-0000000000f1');
+  BEGIN
+    INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, salesperson_id) VALUES
+      ('00000000-0000-0000-0000-0000000071d2', app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-08-05', 'ETB', '00000000-0000-0000-0000-0000000000f2');
+    RAISE EXCEPTION 'FAIL T71a: an invoice named someone who is not a member as its salesperson';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE documents SET salesperson_id = '00000000-0000-0000-0000-0000000000f2' WHERE id = '00000000-0000-0000-0000-0000000071d1';
+    RAISE EXCEPTION 'FAIL T71b: an invoice''s salesperson was changed to someone who is not a member';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, salesperson_id) VALUES
+      ('00000000-0000-0000-0000-0000000071d3', app_company_id(), 'bill', '00000000-0000-0000-0000-0000000000c7', '2027-08-05', 'ETB', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T71c: a bill named a salesperson';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET notes = 'Kept' WHERE id = '00000000-0000-0000-0000-0000000071d1';
+  IF (SELECT salesperson_id FROM documents WHERE id = '00000000-0000-0000-0000-0000000071d1') IS DISTINCT FROM '00000000-0000-0000-0000-0000000000f1' THEN
+    RAISE EXCEPTION 'FAIL T71d: an invoice lost its salesperson';
+  END IF;
+  RAISE NOTICE 'PASS T71 only sales documents name a salesperson, and only an active member of the company';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

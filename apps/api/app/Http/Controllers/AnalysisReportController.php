@@ -42,7 +42,8 @@ final class AnalysisReportController extends Controller
     private function documents(Request $request, string $side): JsonResponse
     {
         $this->authorizeCompany('reports.view');
-        $group = $request->validate(['group' => ['nullable', Rule::in(AnalysisReports::GROUPS)]])['group'] ?? 'contact';
+        $groups = $side === 'sales' ? AnalysisReports::GROUPS : array_values(array_diff(AnalysisReports::GROUPS, ['salesperson']));
+        $group = $request->validate(['group' => ['nullable', Rule::in($groups)]])['group'] ?? 'contact';
         [$from, $to] = $this->period($request);
 
         return response()->json(['side' => $side, 'group' => $group, 'from' => $from, 'to' => $to, 'currency' => $this->current->get()->base_currency,

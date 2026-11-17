@@ -30,6 +30,7 @@ final class PermissionMatrixTest extends TestCase
     /** "METHOD uri" => the permission its controller asks for first. */
     private const ROUTES = [
         'GET api/v1/company' => 'company.view',
+        'GET api/v1/people' => 'company.view',
         'PUT api/v1/company' => 'company.manage',
         'PUT api/v1/company/period-lock' => 'periods.close',
         'GET api/v1/close-checklist' => 'periods.close',

@@ -64,6 +64,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <div className="text-right">
               <div><span className="text-muted">Issued</span> <span className="num">{invoice.issue_date}</span></div>
               <div><span className="text-muted">Due</span> <span className="num">{invoice.due_date ?? "—"}</span></div>
+              {invoice.salesperson && <div><span className="text-muted">Salesperson</span> {invoice.salesperson.name}</div>}
               {Number(invoice.fx_rate) !== 1 && <div className="text-muted">Rate <span className="num">{invoice.fx_rate}</span></div>}
             </div>
           </div>
