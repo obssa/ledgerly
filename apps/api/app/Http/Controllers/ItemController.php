@@ -56,7 +56,8 @@ final class ItemController extends Controller
         return response()->json([
             'data' => $items->map(fn (Item $i) => [...$i->toArray(),
                 'on_hand' => $onHand[$i->getKey()]->quantity ?? '0.00', 'value' => $onHand[$i->getKey()]->value ?? '0.00',
-                'reserved' => $stock[(string) $i->getKey()]['reserved'] ?? '0.00', 'available' => $stock[(string) $i->getKey()]['available'] ?? null]),
+                'reserved' => $stock[(string) $i->getKey()]['reserved'] ?? '0.00', 'available' => $stock[(string) $i->getKey()]['available'] ?? null,
+                'on_order' => $stock[(string) $i->getKey()]['on_order'] ?? '0.00']),
             'can' => $this->can(),
         ]);
     }

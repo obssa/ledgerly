@@ -20,6 +20,9 @@ use Illuminate\Validation\ValidationException;
  */
 final class QuoteWorkflow
 {
+    /** The documents delivered or billed in parts (067, 068). */
+    public const ORDERS = ['sales_order', 'purchase_order'];
+
     public function __construct(
         private readonly CurrentCompany $current,
         private readonly DocumentNumbers $numbers,
@@ -39,7 +42,7 @@ final class QuoteWorkflow
     public function accept(Document $document, string $userId): Document
     {
         return $this->move($document, (string) $document->type, $document->type === 'quote' ? ['draft', 'sent'] : ['draft'], 'accepted',
-            $document->type === 'quote' ? 'quote_accepted' : 'sales_order_confirmed', $userId);
+            match ($document->type) { 'quote' => 'quote_accepted', 'purchase_order' => 'purchase_order_issued', default => 'sales_order_confirmed' }, $userId);
     }
 
     /**
@@ -74,8 +77,9 @@ final class QuoteWorkflow
 
     public function cancel(Document $document, string $userId, ?string $note = null): Document
     {
-        if ($document->type === 'sales_order' && $this->invoiced($document)) {
-            throw new LedgerException("Sales order {$document->number} has invoices made from it: close it instead, and what was not delivered is dropped.");
+        if (in_array($document->type, self::ORDERS, true) && $this->invoiced($document)) {
+            $made = $document->type === 'purchase_order' ? 'bills' : 'invoices';
+            throw new LedgerException(SaveQuote::noun((string) $document->type) . " {$document->number} has {$made} made from it: close it instead, and what is left is dropped.");
         }
 
         return $this->move($document, (string) $document->type, ['draft', 'sent', 'accepted'], 'void', "{$document->type}_cancelled", $userId, $note);
@@ -102,11 +106,11 @@ final class QuoteWorkflow
      */
     public function close(Document $order, string $userId, ?string $note = null): Document
     {
-        if ($order->type !== 'sales_order' || ! $this->invoiced($order)) {
-            throw new LedgerException('Only a sales order with an invoice made from it is closed; cancel one that has none.');
+        if (! in_array($order->type, self::ORDERS, true) || ! $this->invoiced($order)) {
+            throw new LedgerException('Only an order with an invoice or bill made from it is closed; cancel one that has none.');
         }
 
-        return $this->move($order, 'sales_order', ['accepted'], 'converted', 'sales_order_closed', $userId, $note);
+        return $this->move($order, (string) $order->type, ['accepted'], 'converted', "{$order->type}_closed", $userId, $note);
     }
 
     /**
@@ -142,10 +146,11 @@ final class QuoteWorkflow
      */
     public function convert(Document $source, string $to, string $userId, ?string $number = null, ?array $deliver = null): Document
     {
-        if (! in_array($to, $source->type === 'quote' ? ['invoice', 'sales_order'] : ['invoice'], true)) {
-            throw ValidationException::withMessages(['to' => ['A quote becomes a sales order or an invoice, a sales order an invoice.']]);
+        $targets = match ($source->type) { 'quote' => ['invoice', 'sales_order'], 'purchase_order' => ['bill'], default => ['invoice'] };
+        if (! in_array($to, $targets, true)) {
+            throw ValidationException::withMessages(['to' => ['A quote becomes a sales order or an invoice, a sales order an invoice, a purchase order a bill.']]);
         }
-        if ($deliver !== null && $source->type !== 'sales_order') {
+        if ($deliver !== null && ! in_array($source->type, self::ORDERS, true)) {
             throw ValidationException::withMessages(['lines' => ['Only a sales order is delivered in parts.']]);
         }
 
@@ -160,7 +165,7 @@ final class QuoteWorkflow
 
             $lines = $source->lines->sortBy('line_no')->values();
             $quantities = [];
-            if ($source->type === 'sales_order') {
+            if (in_array($source->type, self::ORDERS, true)) {
                 $left = $this->remaining($source);
                 $want = $deliver ?? array_map(fn (array $r) => $r['remaining'], $left);
                 foreach ($want as $lineId => $quantity) {
@@ -185,7 +190,7 @@ final class QuoteWorkflow
                 'contact_id' => $source->contact_id,
                 'number' => $number,
                 'issue_date' => $today,
-                'due_date' => $to === 'invoice'
+                'due_date' => $to !== 'sales_order'
                     ? (new DateTimeImmutable($today))->modify("+{$terms} days")->format('Y-m-d')
                     : ($source->due_date !== null && $source->due_date->format('Y-m-d') >= $today ? $source->due_date->format('Y-m-d') : null),
                 'currency' => $source->currency,
@@ -194,6 +199,7 @@ final class QuoteWorkflow
                 'notes' => $source->notes,
                 'warehouse_id' => $source->warehouse_id,
                 'salesperson_id' => $source->salesperson_id,
+                'reference' => null,
                 'lines' => $lines->map(fn ($l) => [
                     'description' => (string) $l->description,
                     'quantity' => (string) ($quantities[(string) $l->getKey()] ?? $l->quantity), 'unit_price' => (string) $l->unit_price,
@@ -202,11 +208,11 @@ final class QuoteWorkflow
                 ])->values()->all(),
             ];
 
-            if ($to === 'invoice') {
-                $made = $this->drafts->handle($data, null, $userId);
+            if ($to !== 'sales_order') {
+                $made = $this->drafts->handle($data, null, $userId, newType: $to);
                 $made->forceFill(['source_document_id' => $source->getKey()])->save();   // 056: named once, while a draft
-                if ($source->type === 'sales_order') {
-                    // 067: each invoice line names the order line it delivers, in the order they were made.
+                if (in_array($source->type, self::ORDERS, true)) {
+                    // 067, 068: each invoice or bill line names the order line it delivers or bills, in the order they were made.
                     foreach ($made->lines()->orderBy('line_no')->get() as $i => $line) {
                         $line->forceFill(['source_line_id' => (string) $lines[$i]->getKey()])->save();
                     }
@@ -215,15 +221,15 @@ final class QuoteWorkflow
                 $made = $this->quotes->handle($data, 'sales_order', null, $userId, $source);
             }
 
-            $done = $source->type !== 'sales_order'
+            $done = ! in_array($source->type, self::ORDERS, true)
                 || collect($this->remaining($source))->every(fn (array $r) => bccomp($r['remaining'], '0', 2) === 0);
             if ($done) {
                 $source->status = 'converted';
                 $source->save();
             }
-            $this->audit->record($this->current->id(), $done ? "{$source->type}_converted" : 'sales_order_delivered', (string) $source->type, $source->getKey(),
+            $this->audit->record($this->current->id(), $done ? "{$source->type}_converted" : ($source->type === 'purchase_order' ? 'purchase_order_billed' : 'sales_order_delivered'), (string) $source->type, $source->getKey(),
                 ['status' => 'accepted'], ['status' => $source->status, 'to' => $to, 'document_id' => $made->getKey(),
-                    ...($source->type === 'sales_order' ? ['delivered' => $quantities] : [])], userId: $userId);
+                    ...(in_array($source->type, self::ORDERS, true) ? ['delivered' => $quantities] : [])], userId: $userId);
 
             return $made->refresh()->load('lines');
         });
@@ -266,7 +272,7 @@ final class QuoteWorkflow
     private function verb(string $to, string $type): string
     {
         return match ($to) {
-            'sent' => 'sent', 'accepted' => $type === 'quote' ? 'accepted' : 'confirmed', 'declined' => 'declined', 'void' => 'cancelled', 'converted' => $type === 'quote' ? 'converted' : 'closed', default => $to,
+            'sent' => 'sent', 'accepted' => match ($type) { 'quote' => 'accepted', 'purchase_order' => 'issued', default => 'confirmed' }, 'declined' => 'declined', 'void' => 'cancelled', 'converted' => $type === 'quote' ? 'converted' : 'closed', default => $to,
         };
     }
 }

@@ -3530,6 +3530,62 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T93 a sales order is delivered in parts, never more than was ordered, and is closed rather than cancelled';
 END $$;
+-- T94: purchase orders (068). A purchase order owes nothing; bills made from it are for its supplier, while it is
+-- issued, and bill its lines in parts, never more than was ordered; an invoice is never made from it; partly billed
+-- it is closed, not cancelled; another company never sees it. Company A as its owner f1, supplier c8, item b1.
+DO $$
+DECLARE
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  po constant uuid := '00000000-0000-0000-0000-000000000e99';
+  pl constant uuid := '00000000-0000-0000-0000-000000000e9a';
+  b1 constant uuid := '00000000-0000-0000-0000-000000000e9b';
+  b2 constant uuid := '00000000-0000-0000-0000-000000000e9c';
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total) VALUES (po, app_company_id(), 'purchase_order', c8, '2027-09-01', 'ETB', 500);
+  BEGIN
+    UPDATE documents SET amount_due = 500 WHERE id = po;
+    RAISE EXCEPTION 'FAIL T94a: a purchase order was owed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (pl, app_company_id(), po, 1, 'Beans', 10, 50, acc, 500, item);
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, source_document_id) VALUES (app_company_id(), 'bill', c8, '2027-09-02', 'ETB', po);
+    RAISE EXCEPTION 'FAIL T94b: a bill was made from a purchase order not yet issued';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET status = 'accepted', number = 'PO-T94-1' WHERE id = po;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, source_document_id) VALUES (app_company_id(), 'invoice', c1, '2027-09-02', 'ETB', po);
+    RAISE EXCEPTION 'FAIL T94c: an invoice was made from a purchase order';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id) VALUES
+    (b1, app_company_id(), 'bill', c8, '2027-09-02', 'ETB', po),
+    (b2, app_company_id(), 'bill', c8, '2027-09-03', 'ETB', po);
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (app_company_id(), b1, 1, 'Beans', 6, 50, acc, 300, item, pl);
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+      (app_company_id(), b2, 1, 'Beans', 5, 50, acc, 250, item, pl);
+    RAISE EXCEPTION 'FAIL T94d: more was billed than was ordered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (app_company_id(), b2, 1, 'Beans', 4, 50, acc, 200, item, pl);
+  BEGIN
+    UPDATE documents SET status = 'void' WHERE id = po;
+    RAISE EXCEPTION 'FAIL T94e: a purchase order partly billed was cancelled';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET status = 'converted' WHERE id = po;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM documents WHERE id IN (po, b1, b2)) OR EXISTS (SELECT 1 FROM document_lines WHERE id = pl) THEN
+    RAISE EXCEPTION 'FAIL T94f: company B saw company A''s purchase order';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T94 a purchase order owes nothing, is billed in parts by its supplier, never more than was ordered, and is closed rather than cancelled';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

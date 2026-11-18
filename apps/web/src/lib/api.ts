@@ -587,6 +587,8 @@ export interface Item {
   /** What the confirmed sales orders still want of a stock item, and on hand less that (067; below zero when short). */
   reserved?: string;
   available?: string | null;
+  /** Still to come on issued purchase orders (068). */
+  on_order?: string;
   value?: string;
   balances?: { warehouse: { id: string; name: string }; quantity: string; value: string }[];
   can?: { edit: boolean; adjust: boolean };
@@ -861,6 +863,22 @@ export interface BackOrderLine {
 export interface BackOrders {
   data: BackOrderLine[];
   stock: Record<string, { on_hand: string; reserved: string; available: string }>;
+}
+
+/** A purchase order (068): issued to a supplier, billed in parts as their invoices come in; it posts nothing. */
+export type PurchaseOrderStatus = "draft" | "accepted" | "converted" | "void";
+export interface PurchaseOrderSummary extends Omit<Invoice, "status"> {
+  type: "purchase_order";
+  status: PurchaseOrderStatus;
+}
+export interface PurchaseOrderDetail extends Omit<InvoiceDetail, "type" | "status" | "can" | "warnings" | "original" | "original_document_id" | "retentions" | "reminders"> {
+  type: "purchase_order";
+  status: PurchaseOrderStatus;
+  /** Each order line (by line id): ordered, billed by its live bills, and still to come. */
+  delivery: Record<string, { ordered: string; delivered: string; remaining: string }>;
+  bills: { id: string; number: string | null; reference: string | null; issue_date: string; status: string; total: string }[];
+  versions: number;
+  can: { edit: boolean; issue: boolean; bill: boolean; close: boolean; cancel: boolean };
 }
 
 export const quotePath = (kind: QuoteKind) => (kind === "quote" ? "quotes" : "sales-orders");
@@ -1559,6 +1577,17 @@ export const ledgerly = {
     api<{ id: string; type: "invoice" | "sales_order"; number: string | null; status: string }>(`${quotePath(kind)}/${encodeURIComponent(id)}/convert`,
       { ...ctx, method: "POST", body: { to, ...(number ? { number } : {}), ...(lines ? { lines } : {}) } }),
   backOrders: (ctx: RequestOptions) => api<BackOrders>("sales-orders/back-orders", ctx),
+  purchaseOrders: (ctx: RequestOptions) => api<{ data: PurchaseOrderSummary[] }>("purchase-orders", ctx),
+  purchaseOrder: (id: string, ctx: RequestOptions) => api<PurchaseOrderDetail>(`purchase-orders/${encodeURIComponent(id)}`, ctx),
+  createPurchaseOrder: (body: Record<string, unknown>, ctx: RequestOptions) => api<PurchaseOrderDetail>("purchase-orders", { ...ctx, method: "POST", body }),
+  updatePurchaseOrder: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<PurchaseOrderDetail>(`purchase-orders/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  purchaseOrderStep: (id: string, step: "issue" | "cancel" | "close", body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<PurchaseOrderDetail>(`purchase-orders/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
+  billPurchaseOrder: (id: string, lines: { line_id: string; quantity: string }[] | undefined, ctx: RequestOptions) =>
+    api<{ id: string; type: "bill"; number: string | null; status: string }>(`purchase-orders/${encodeURIComponent(id)}/bill`,
+      { ...ctx, method: "POST", body: lines ? { lines } : {} }),
+  openPurchaseOrders: (ctx: RequestOptions) => api<BackOrders>("purchase-orders/open", ctx),
   updateInvoice: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   approveInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),

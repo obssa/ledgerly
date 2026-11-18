@@ -25,7 +25,7 @@ export default async function BillsPage() {
   return (
     <>
       <PageTitle eyebrow="Money out" title="Bills and purchases"
-        actions={<><Link href="/bills/credits" className="btn">Supplier credits</Link><Link href="/bills/new" className="btn btn-primary">+ New bill</Link></>} />
+        actions={<><Link href="/purchase-orders" className="btn">Purchase orders</Link><Link href="/bills/credits" className="btn">Supplier credits</Link><Link href="/bills/new" className="btn btn-primary">+ New bill</Link></>} />
       <Card className="!p-2" label="Bills">
         <div className="overflow-x-auto">
           <table className="tbl">
