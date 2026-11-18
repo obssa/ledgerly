@@ -3019,6 +3019,34 @@ BEGIN
     VALUES (app_company_id(), b1, a1, '2027-08-13', 'sale_return', 2, 0, cn, 20);
   RAISE NOTICE 'PASS T84 goods come back only on credit notes, never more than their invoice sold';
 END $$;
+-- T85: goods back to the supplier on supplier credits (059). A supplier credit may say its goods went back; what goes
+-- back on a bill's supplier credits is never more, item by item, than the bill brought in, and goods brought in again
+-- when one is voided count. Company A as f1: item b1 in warehouse a1 (T11), posted bill d9 of supplier c8 (T47).
+DO $$
+DECLARE
+  b1  constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  a1  constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  d9  constant uuid := '00000000-0000-0000-0000-0000000000d9';
+  vc  constant uuid := '00000000-0000-0000-0000-000000000c85';
+BEGIN
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id)
+    VALUES (app_company_id(), b1, a1, '2027-08-14', 'purchase', 3, 10, d9);
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, original_document_id, restock)
+    VALUES (vc, app_company_id(), 'vendor_credit', '00000000-0000-0000-0000-0000000000c8', '2027-08-15', 'ETB', d9, true);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id)
+    VALUES (app_company_id(), b1, a1, '2027-08-15', 'purchase_return', -1, 0, vc);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id)
+      VALUES (app_company_id(), b1, a1, '2027-08-15', 'purchase_return', -3, 0, vc);
+    RAISE EXCEPTION 'FAIL T85a: more went back to the supplier than the bill brought in';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- The return brought in again (a voided supplier credit): that quantity may go back once more.
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id, amount)
+    VALUES (app_company_id(), b1, a1, '2027-08-16', 'purchase', 1, 0, vc, 10);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id)
+    VALUES (app_company_id(), b1, a1, '2027-08-16', 'purchase_return', -3, 0, vc);
+  RAISE NOTICE 'PASS T85 goods go back to the supplier only within what their bill brought in';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

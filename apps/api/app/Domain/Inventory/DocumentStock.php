@@ -24,7 +24,9 @@ use Illuminate\Validation\ValidationException;
  *   - an invoice's stock lines leave its warehouse at the weighted average the database decides, and the invoice's entry
  *     gains Dr Cost of goods sold, Cr Inventory for exactly that value.
  *   - a credit note that says the goods came back (058) brings its stock lines back into the warehouse at the cost they
- *     left with on its invoice, and its entry gains Dr Inventory, Cr Cost of goods sold for exactly that value.
+ *     left with on its invoice, and its entry gains Dr Inventory, Cr Cost of goods sold for exactly that value;
+ *   - a supplier credit that says the goods went back (059) takes its stock lines out at the weighted average; its entry
+ *     credits inventory with the line amounts, and the difference from the stock's value goes to inventory adjustment.
  * On void, the moves are undone: goods sold come back at the cost they left with; goods bought (or returned on a credit
  * note) go out at today's average, and any difference from what the entry put on the inventory account is booked as an
  * inventory adjustment, so the inventory account always equals the stock on hand.
@@ -63,7 +65,13 @@ final class DocumentStock
     public function onPosting(Document $doc, JournalDraft $draft, Company $company, ?string $userId): void
     {
         $lines = $this->stockLines($doc);
-        if ($lines === [] || ! in_array($doc->type, ['invoice', 'bill', 'credit_note'], true) || ($doc->type === 'credit_note' && ! $doc->restock)) {
+        if ($lines === [] || ! in_array($doc->type, ['invoice', 'bill', 'credit_note', 'vendor_credit'], true)
+            || (in_array($doc->type, ['credit_note', 'vendor_credit'], true) && ! $doc->restock)) {
+            return;
+        }
+        if ($doc->type === 'vendor_credit') {
+            $this->sentBack($doc, $lines, $draft, $company, $userId);
+
             return;
         }
         if ($doc->type === 'credit_note') {
@@ -116,14 +124,19 @@ final class DocumentStock
     {
         // A credit note's returned goods are undone like goods bought: they go out again at today's average.
         $moves = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $doc->getKey()])
-            ->whereIn('kind', $doc->type === 'credit_note' ? ['sale_return'] : ['sale', 'purchase'])->orderBy('seq')->get();
+            ->whereIn('kind', match ($doc->type) { 'credit_note' => ['sale_return'], 'vendor_credit' => ['purchase_return'], default => ['sale', 'purchase'] })
+            ->orderBy('seq')->get();
         if ($moves->isEmpty()) {
             return;
         }
         $base = $company->base_currency;
         $difference = Money::zero($base);
         foreach ($moves as $m) {
-            if ($m->kind === 'sale') {
+            if ($m->kind === 'purchase_return') {
+                // Goods sent back come in again at the cost they left with: the journal reversal puts back exactly that.
+                $this->stock->move($company->getKey(), $base, $m->item_id, $m->warehouse_id, $date, 'purchase',
+                    ltrim((string) $m->quantity, '-'), '0', "Void of {$doc->number}", $doc->getKey(), $userId, ltrim((string) $m->amount, '-'));
+            } elseif ($m->kind === 'sale') {
                 // Back in at the cost it left with: the journal reversal puts back exactly that.
                 $this->stock->move($company->getKey(), $base, $m->item_id, $m->warehouse_id, $date, 'sale_return',
                     ltrim((string) $m->quantity, '-'), '0', "Void of {$doc->number}", $doc->getKey(), $userId, ltrim((string) $m->amount, '-'));
@@ -187,6 +200,56 @@ final class DocumentStock
             $zero = Money::zero($doc->currency);
             $draft->add(JournalLineDraft::debit(Account::system('inventory')->getKey(), $cost, $zero, "Goods returned, {$doc->number}"));
             $draft->add(JournalLineDraft::credit(Account::system('cogs')->getKey(), $cost, $zero, "Cost of goods returned, {$doc->number}"));
+        }
+    }
+
+    /**
+     * Goods sent back on a supplier credit: each stock line leaves the bill's warehouse at today's average, never more than
+     * the bill brought in (the database checks it too, 059). The entry already credits inventory with the line amounts;
+     * the difference from the value that left goes between inventory and inventory adjustment.
+     *
+     * @param list<array{line: object, item: Item}> $lines
+     */
+    private function sentBack(Document $doc, array $lines, JournalDraft $draft, Company $company, ?string $userId): void
+    {
+        $base = $company->base_currency;
+        $warehouse = $this->warehouseFor($doc);
+        $bill = Document::query()->findOrFail($doc->original_document_id);
+        $received = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $bill->getKey(), 'kind' => 'purchase'])
+            ->get(['item_id', 'quantity'])->groupBy('item_id');
+        $gone = DB::table('stock_moves as m')->join('documents as c', 'c.id', '=', 'm.document_id')
+            ->where(['m.company_id' => $company->getKey(), 'c.type' => 'vendor_credit', 'c.original_document_id' => $bill->getKey()])
+            ->whereIn('m.kind', ['purchase_return', 'purchase'])->get(['m.item_id', 'm.quantity'])->groupBy('item_id');
+        $date = DateTimeImmutable::createFromInterface($doc->issue_date);
+        $out = Money::zero($base);
+        foreach ($lines as ['line' => $line, 'item' => $item]) {
+            $in = ($received[$item->getKey()] ?? collect())->reduce(fn (string $s, $m) => bcadd($s, (string) $m->quantity, 2), '0');
+            $back = ($gone[$item->getKey()] ?? collect())->reduce(fn (string $s, $m) => bcsub($s, (string) $m->quantity, 2), '0');
+            $left = bcsub($in, $back, 2);
+            if (bccomp((string) $line->quantity, $left, 2) > 0) {
+                throw ValidationException::withMessages(['lines' => [bccomp($in, '0', 2) === 0
+                    ? "{$item->name} did not come in on {$bill->label()}: it cannot go back on this credit."
+                    : "Only {$left} {$item->unit} of {$item->name} can still go back from {$bill->label()}."]]);
+            }
+            $move = $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'purchase_return',
+                '-' . $line->quantity, '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId);
+            $out = $out->plus($move['amount']->negated());
+        }
+        $inventory = Account::system('inventory')->getKey();
+        $credited = Money::zero($base);
+        foreach ($draft->lines() as $l) {
+            if ($l->accountId === $inventory && ! $l->isDebit()) {
+                $credited = $credited->plus($l->credit);
+            }
+        }
+        // The stock fell by $out; the entry takes $credited off the inventory account. The rest is an adjustment.
+        $difference = $out->minus($credited);
+        if (! $difference->isZero()) {
+            $zero = Money::zero($doc->currency);
+            $adjustment = Account::system('inventory_adjustment')->getKey();
+            $memo = "Goods back to the supplier at their cost, {$doc->label()}";
+            $draft->add($difference->isNegative() ? JournalLineDraft::debit($inventory, $difference->negated(), $zero, $memo) : JournalLineDraft::credit($inventory, $difference, $zero, $memo));
+            $draft->add($difference->isNegative() ? JournalLineDraft::credit($adjustment, $difference->negated(), $zero, $memo) : JournalLineDraft::debit($adjustment, $difference, $zero, $memo));
         }
     }
 

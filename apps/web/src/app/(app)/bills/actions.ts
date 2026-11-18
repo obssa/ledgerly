@@ -71,7 +71,7 @@ export async function createSupplierCredit(_: FormState | undefined, form: FormD
   const body = invoiceBody(form);
   let id: string;
   try {
-    id = (await ledgerly.createSupplierCredit(billId, { issue_date: body.issue_date, notes: body.notes, reference: body.reference, lines: body.lines }, ctx)).id;
+    id = (await ledgerly.createSupplierCredit(billId, { issue_date: body.issue_date, notes: body.notes, reference: body.reference, lines: body.lines, restock: form.get("restock") === "1" }, ctx)).id;
   } catch (error) {
     return refusal(error);
   }

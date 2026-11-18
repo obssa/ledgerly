@@ -60,8 +60,13 @@ final class SupplierCreditController extends Controller
             'lines.*.quantity' => ['required', 'decimal:0,2', 'gt:0'],
             'lines.*.unit_price' => ['required', 'decimal:0,2', 'gt:0'],
             'lines.*.discount_rate' => ['nullable', 'decimal:0,6', 'between:0,1'],
+            // A bill's stock lines are on the inventory account: their credit goes back to it (goods returned) or to
+            // inventory adjustment (a price correction on goods kept), so the inventory account still equals the stock (059).
             'lines.*.account_id' => ['required', 'uuid', Rule::exists('accounts', 'id')->where(fn (Builder $q) => $q->where('is_active', true)
-                ->where(fn (Builder $w) => $w->where('type', 'expense')->orWhere(fn (Builder $a) => $a->where('type', 'asset')->whereIn('subtype', ['fixed_asset', 'prepayment']))))],
+                ->where(fn (Builder $w) => $w->where('type', 'expense')->orWhere('system_key', 'inventory')
+                    ->orWhere(fn (Builder $a) => $a->where('type', 'asset')->whereIn('subtype', ['fixed_asset', 'prepayment']))))],
+            'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')],   // the company's own (row-level security)
+            'restock' => ['sometimes', 'boolean'],   // the goods went back to the supplier (059)
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')->whereIn('kind', ['vat', 'tot'])],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
         ], ['notes.required' => 'Say why: goods returned, a price corrected.']);

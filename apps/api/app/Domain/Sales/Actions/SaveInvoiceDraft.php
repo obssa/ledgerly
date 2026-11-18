@@ -61,6 +61,9 @@ final class SaveInvoiceDraft
             if ($type === 'bill') {
                 $calc['lines'] = $this->stockLinesToInventory($calc['lines']);
             }
+            if ($type === 'vendor_credit') {
+                $calc['lines'] = $this->creditedStockLines($calc['lines'], (bool) ($data['restock'] ?? $document?->restock ?? false));
+            }
             $calc['header']['number'] = $this->draftNumber($data, $document, $type);
             if ($original !== null) {
                 $this->assertCreditable($original, $calc['totals']['total'], $document);
@@ -76,8 +79,8 @@ final class SaveInvoiceDraft
 
             $document ??= new Document(['type' => $type, 'created_by' => $userId, 'original_document_id' => $original?->getKey()]);
             $document->fill($calc['header']);
-            if ($type === 'credit_note' && array_key_exists('restock', $data)) {
-                $document->restock = (bool) $data['restock'];   // the goods came back into stock (058)
+            if (in_array($type, ['credit_note', 'vendor_credit'], true) && array_key_exists('restock', $data)) {
+                $document->restock = (bool) $data['restock'];   // the goods came back into stock (058), or went back to the supplier (059)
             }
             $document->status = 'draft'; // a change while awaiting approval sends it back to draft
             $document->forceFill($calc['totals']);
@@ -149,6 +152,33 @@ final class SaveInvoiceDraft
         $inventory = Account::system('inventory')->getKey();
 
         return array_map(fn (array $l) => in_array($l['item_id'], $stock, true) ? [...$l, 'account_id' => $inventory] : $l, $lines);
+    }
+
+    /**
+     * A supplier credit's lines on the inventory account (059). Goods that went back to the supplier stay on it: they
+     * leave the stock, and the credit leaves the account. A credit on goods kept (a price correction), or an inventory
+     * line without a stock item, goes to inventory adjustment instead, so the inventory account still equals the stock.
+     *
+     * @param list<array<string, mixed>> $lines
+     * @return list<array<string, mixed>>
+     */
+    private function creditedStockLines(array $lines, bool $returned): array
+    {
+        $inventory = Account::system('inventory')->getKey();
+        if (! in_array($inventory, array_column($lines, 'account_id'), true) && ! $returned) {
+            return $lines;
+        }
+        $stock = Item::query()->whereIn('id', array_filter(array_column($lines, 'item_id')))->where('type', 'inventory')->pluck('id')->all();
+        $adjustment = Account::system('inventory_adjustment')->getKey();
+
+        return array_map(function (array $l) use ($stock, $returned, $inventory, $adjustment) {
+            $goods = $l['item_id'] !== null && in_array($l['item_id'], $stock, true);
+            if ($returned && $goods) {
+                return [...$l, 'account_id' => $inventory];
+            }
+
+            return $l['account_id'] === $inventory ? [...$l, 'account_id' => $adjustment] : $l;
+        }, $lines);
     }
 
     /** The kind of credit that corrects a document: a credit note for an invoice, a supplier credit for a bill. */
