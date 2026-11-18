@@ -72,12 +72,14 @@ function Register({ register, caption, path, who }: { register: TaxWithholdingRe
 
 export function Worksheet({ sheet }: { sheet: TaxWorksheet }) {
   const vat = sheet.kind === "vat";
+  const tot = sheet.kind === "tot";
+  const name = vat ? "VAT" : tot ? "turnover tax" : "withholding";
   const unexplained = sheet.other.output !== "0.00" || sheet.other.input !== "0.00";
   return (
     <>
       <Card className="mb-4" label="Figures">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">
-          <div><dt className="text-muted">{vat ? "Output VAT (sales)" : "Withheld from suppliers"}</dt><dd className="num text-[18px] font-bold">{formatAmount(sheet.output_tax)}</dd></div>
+          <div><dt className="text-muted">{vat ? "Output VAT (sales)" : tot ? "Turnover tax (sales)" : "Withheld from suppliers"}</dt><dd className="num text-[18px] font-bold">{formatAmount(sheet.output_tax)}</dd></div>
           {vat && <div><dt className="text-muted">Input VAT (purchases)</dt><dd className="num text-[18px] font-bold">{formatAmount(sheet.input_tax)}</dd></div>}
           <div>
             <dt className="text-muted">{sheet.net.startsWith("-") ? "Credit carried forward" : "Due to the authority"}</dt>
@@ -85,7 +87,7 @@ export function Worksheet({ sheet }: { sheet: TaxWorksheet }) {
           </div>
         </dl>
         <p className="mt-3 text-[13px] text-muted">
-          What the {vat ? "VAT" : "withholding"} accounts moved from <span className="num">{sheet.from}</span> to <span className="num">{sheet.to}</span> (settlements of earlier returns left out).
+          What the {name} accounts moved from <span className="num">{sheet.from}</span> to <span className="num">{sheet.to}</span> (settlements of earlier returns left out).
         </p>
       </Card>
       {vat && sheet.sales && sheet.purchases && (
@@ -97,8 +99,14 @@ export function Worksheet({ sheet }: { sheet: TaxWorksheet }) {
           <Card className="mb-4 !p-2" label="Purchase documents"><div className="overflow-x-auto"><Documents rows={sheet.purchases.documents} caption="Purchase documents" /></div></Card>
         </>
       )}
-      {!vat && sheet.withheld && <Register register={sheet.withheld} caption="Payments to suppliers with tax withheld" path="payments-made" who="Supplier" />}
-      {!vat && sheet.withheld_by_customers && sheet.withheld_by_customers.payments.length > 0 && (
+      {tot && sheet.sales && (
+        <>
+          <Card className="mb-4 !p-2" label="By rate"><div className="overflow-x-auto"><Rates rows={sheet.sales.rates.filter((r) => r.kind === "tot" || r.tax !== "0.00")} caption="Sales at a turnover tax rate" /></div></Card>
+          <Card className="mb-4 !p-2" label="Sales documents"><div className="overflow-x-auto"><Documents rows={sheet.sales.documents.filter((d) => d.tax !== "0.00")} caption="Sales documents with turnover tax" /></div></Card>
+        </>
+      )}
+      {!vat && !tot && sheet.withheld && <Register register={sheet.withheld} caption="Payments to suppliers with tax withheld" path="payments-made" who="Supplier" />}
+      {!vat && !tot && sheet.withheld_by_customers && sheet.withheld_by_customers.payments.length > 0 && (
         <Register register={sheet.withheld_by_customers} caption="Tax customers withheld from payments to you (a credit against profit tax, not part of this return)" path="payments" who="Customer" />
       )}
       {unexplained && (

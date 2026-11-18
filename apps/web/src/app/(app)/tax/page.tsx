@@ -9,7 +9,7 @@ import type { FilingStatus } from "@/lib/api";
 export const metadata = { title: "Tax centre" };
 
 const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
-const KINDS = [["vat", "VAT"], ["withholding", "Withholding tax"]] as const;
+const KINDS = [["vat", "VAT"], ["withholding", "Withholding tax"], ["tot", "Turnover tax"]] as const;
 const STATUS: Record<FilingStatus, [string, "good" | "warn" | "bad" | "neutral"]> = {
   paid: ["Filed and paid", "good"], filed: ["Filed, not paid", "warn"], overdue: ["Overdue", "bad"], due_soon: ["Due soon", "warn"], due: ["Due", "neutral"], open: ["Period open", "neutral"],
 };
@@ -17,13 +17,17 @@ const STATUS: Record<FilingStatus, [string, "good" | "warn" | "bad" | "neutral"]
 /** Module 7: the VAT and withholding worksheets of any period, built from the ledger, filing a return and the returns filed. */
 export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">) {
   const q = await searchParams;
-  const kind = q.kind === "withholding" ? "withholding" : "vat";
+  const kind = q.kind === "withholding" || q.kind === "tot" ? q.kind : "vat";
   const centre = await getTaxCentre({ kind, from: date(q.from), to: date(q.to) });
 
   return (
     <>
       <PageTitle eyebrow="Compliance" title="Tax centre" />
-      {!centre ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (
+      {!centre ? (
+        <p className="text-[14px] text-muted">
+          {kind === "tot" ? <>This company has no turnover tax: add a TOT rate under Tax rates if your country has one (your tax adviser confirms the rate). <a href="/tax" className="font-semibold text-brand hover:underline">Back to VAT</a></> : "Not available in the demo, or for your role."}
+        </p>
+      ) : (
         <>
           <form className="mb-4 flex flex-wrap items-end gap-2.5">
             <div>

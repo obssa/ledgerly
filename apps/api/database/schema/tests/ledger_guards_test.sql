@@ -2714,6 +2714,39 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T77 retention is held on an owed invoice with its own entry, released once, and kept';
 END $$;
+-- T78: turnover tax returns (052). A TOT return is filed like the others, beside a VAT return of the same days, and its
+-- filed period locks TOT payable. Company A as its owner f1 (a VAT return covers September 2027 from T66; a10 the bank).
+DO $$
+DECLARE
+  tot uuid := '00000000-0000-0000-0000-0000000078a1';
+BEGIN
+  INSERT INTO accounts (id, company_id, code, name, type, subtype, system_key) VALUES
+    (tot, app_company_id(), 'T78', 'Turnover tax payable', 'liability', 'tax_payable', 'tot_payable');
+  BEGIN
+    INSERT INTO tax_returns (company_id, kind, period_start, period_end, filed_on, output_tax, input_tax, net, figures, filed_by) VALUES
+      (app_company_id(), 'sales_tax', '2027-09-01', '2027-09-30', '2027-10-15', 0, 0, 0, '{}', app_user_id());
+    RAISE EXCEPTION 'FAIL T78a: a return of an unknown kind was filed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO tax_returns (company_id, kind, period_start, period_end, filed_on, output_tax, input_tax, net, figures, filed_by) VALUES
+    (app_company_id(), 'tot', '2027-09-01', '2027-09-30', '2027-10-15', 200, 0, 200, '{"sales": {}}', app_user_id());
+
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES
+      ('00000000-0000-0000-0000-00000000e781', app_company_id(), 9781, '2027-09-10', 'ETB', 'manual');
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-00000000e781', 1, tot, 0, 50);
+    RAISE EXCEPTION 'FAIL T78b: TOT payable moved inside a filed TOT period';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES
+    ('00000000-0000-0000-0000-00000000e782', app_company_id(), 9782, '2027-11-10', 'ETB', 'manual');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e782', 1, '00000000-0000-0000-0000-000000000a10', 50, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e782', 2, tot, 0, 50);
+  IF tax_return_kind_of_account('tot_payable') IS DISTINCT FROM 'tot' THEN
+    RAISE EXCEPTION 'FAIL T78c: TOT payable is not a TOT return''s account';
+  END IF;
+  RAISE NOTICE 'PASS T78 a turnover tax return is filed beside VAT and locks TOT payable for its period';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

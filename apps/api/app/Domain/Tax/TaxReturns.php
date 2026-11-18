@@ -30,7 +30,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class TaxReturns
 {
-    public const KINDS = ['vat', 'withholding'];
+    /** tot: turnover tax, where the country pack (or the company) has TOT rates; it posts to its own account (052). */
+    public const KINDS = ['vat', 'withholding', 'tot'];
 
     private const SALES = ['invoice' => 1, 'sales_receipt' => 1, 'credit_note' => -1];
 
@@ -38,7 +39,7 @@ final class TaxReturns
 
     private const POSTED = ['posted', 'part_paid', 'paid'];
 
-    private const ACCOUNTS = ['vat' => ['vat_payable', 'vat_receivable'], 'withholding' => ['withholding_payable', 'withholding_receivable']];
+    private const ACCOUNTS = ['vat' => ['vat_payable', 'vat_receivable'], 'withholding' => ['withholding_payable', 'withholding_receivable'], 'tot' => ['tot_payable', null]];
 
     public function __construct(private readonly PostingService $posting)
     {
@@ -49,8 +50,11 @@ final class TaxReturns
     {
         $id = $company->getKey();
         [$payableKey, $receivableKey] = self::ACCOUNTS[$kind];
+        if ($kind === 'tot' && ! Account::query()->where('system_key', 'tot_payable')->exists()) {
+            throw ValidationException::withMessages(['kind' => ['This company has no turnover tax: add a TOT rate first (its country pack has none).']]);
+        }
         $payable = Account::system($payableKey)->getKey();
-        $receivable = Account::system($receivableKey)->getKey();
+        $receivable = $receivableKey === null ? $payable : Account::system($receivableKey)->getKey();
         $movement = fn (string $account, string $sign) => (string) DB::table('journal_lines as l')
             ->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'l.company_id')->on('e.id', '=', 'l.journal_entry_id'))
             ->where(['l.company_id' => $id, 'l.account_id' => $account])->whereBetween('l.entry_date', [$from, $to])->where('e.source_type', '<>', 'tax_settlement')
@@ -70,6 +74,13 @@ final class TaxReturns
             $sides = ['sales' => $sales, 'purchases' => $purchases];
             $documentsOutput = Money::of($sales['tax'], $base);
             $documentsInput = Money::of($purchases['tax'], $base);
+        } elseif ($kind === 'tot') {
+            // Sales taxed at a TOT rate post their tax to TOT payable (ApproveInvoice); there is nothing to reclaim.
+            $sales = $this->vatSide($id, self::SALES, $from, $to, "r.kind = 'tot'");
+            $explained = $sales['entries'];
+            $sides = ['sales' => $sales];
+            $documentsOutput = Money::of($sales['tax'], $base);
+            $documentsInput = Money::zero($base);
         } else {
             $register = $this->withholdingRegister($id, $from, $to, 'out');
             $explained = $register['entries'];
@@ -150,7 +161,7 @@ final class TaxReturns
                 throw ValidationException::withMessages(['bank_account_id' => ["Choose the bank, wallet or cash account the {$paid->toDecimalString()} was paid from, in {$base}."]]);
             }
         }
-        $label = $return->kind === 'vat' ? 'VAT' : 'Withholding tax';
+        $label = match ($return->kind) { 'vat' => 'VAT', 'tot' => 'Turnover tax', default => 'Withholding tax' };
         $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($date), $base, $base, '1',
             "{$label} return {$return->period_start} to {$return->period_end} settled" . ($return->reference ? " ({$return->reference})" : ''), 'tax_settlement', $return->id);
         $draft->add(JournalLineDraft::debit(Account::system($payableKey)->getKey(), $output, null, "{$label} due for the period"));
@@ -180,7 +191,7 @@ final class TaxReturns
      */
     private function vatSide(string $companyId, array $types, string $from, string $to, string $taxCounts): array
     {
-        $taxCounts = in_array($taxCounts, ["coalesce(r.kind, '') <> 'tot'", "r.kind = 'vat'", 'false'], true) ? $taxCounts : 'false';   // one of the fixed conditions above
+        $taxCounts = in_array($taxCounts, ["coalesce(r.kind, '') <> 'tot'", "r.kind = 'vat'", "r.kind = 'tot'", 'false'], true) ? $taxCounts : 'false';   // one of the fixed conditions above
         $sign = 'CASE d.type ' . implode(' ', array_map(fn ($t, $s) => "WHEN '{$t}' THEN {$s}", array_keys($types), $types)) . ' END';   // fixed names, not input
         $lines = DB::table('document_lines as dl')
             ->join('documents as d', fn ($j) => $j->on('d.company_id', '=', 'dl.company_id')->on('d.id', '=', 'dl.document_id'))
