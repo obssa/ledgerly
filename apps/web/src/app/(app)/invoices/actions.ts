@@ -77,6 +77,17 @@ export async function applyCredit(_: FormState | undefined, form: FormData): Pro
   return { notice: "Credit applied." };
 }
 
+/** Module 2: emails the posted invoice to the customer, with an optional message. */
+export async function emailInvoice(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const { sent_to } = await ledgerly.emailInvoice(text(form, "id") ?? "", text(form, "note") ?? undefined, ctx);
+    return { notice: `Sent to ${sent_to}.` };
+  } catch (error) {
+    return refusal(error);
+  }
+}
+
 /** Module 9a: retention the customer holds back on this invoice, as a share of the total or an amount. */
 export async function holdRetention(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

@@ -723,7 +723,7 @@ export interface InvoiceDetail extends Invoice {
   contact: Contact & { email?: string | null };
   lines: InvoiceLine[];
   warnings: { type: string; message: string }[];
-  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean; refund?: boolean; remind?: boolean; retain?: boolean };
+  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean; refund?: boolean; remind?: boolean; email?: boolean; retain?: boolean };
   /** Retention the customer holds back until the work is complete (050). */
   retentions?: InvoiceRetention[];
   /** Payment reminders sent to the customer, newest first (048). */
@@ -1354,6 +1354,8 @@ export const ledgerly = {
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/retention`, { ...ctx, method: "POST", body }),
   releaseRetention: (id: string, releasedOn: string, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/retention/release`, { ...ctx, method: "POST", body: { released_on: releasedOn } }),
+  emailInvoice: (id: string, note: string | undefined, ctx: RequestOptions) =>
+    api<{ sent_to: string }>(`invoices/${encodeURIComponent(id)}/email`, { ...ctx, method: "POST", body: note ? { note } : {} }),
   remindInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/remind`, { ...ctx, method: "POST", body: {} }),
   applyCredit: (creditNoteId: string, body: { invoice_id: string; amount: string }, ctx: RequestOptions) =>
     api<unknown>(`credit-notes/${encodeURIComponent(creditNoteId)}/apply`, { ...ctx, method: "POST", body }),
