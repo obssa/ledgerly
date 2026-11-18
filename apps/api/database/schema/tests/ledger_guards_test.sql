@@ -3267,6 +3267,57 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T89 attachments are the company''s own kinds of file, at most 20 a document, never changed and removed once';
 END $$;
+-- T90: FIFO (064). A FIFO item's moves out take the oldest layers first at their own cost (not the average), a landed
+-- cost goes onto the layers on hand, it never goes below zero, its costing is fixed once it has moved, only a stock
+-- item is FIFO, layers are written only by the valuation and seen only by their company. Company A as f1, warehouse a1.
+DO $$
+DECLARE
+  a1  constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  f   constant uuid := '00000000-0000-0000-0000-000000000b90';
+  amt numeric;
+BEGIN
+  BEGIN
+    INSERT INTO items (company_id, name, type, costing) VALUES (app_company_id(), 'Delivery', 'service', 'fifo');
+    RAISE EXCEPTION 'FAIL T90a: a service was costed FIFO';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO items (id, company_id, name, type, costing) VALUES (f, app_company_id(), 'Green beans (FIFO)', 'inventory', 'fifo');
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), f, a1, '2027-08-01', 'purchase', 10, 10);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), f, a1, '2027-08-02', 'purchase', 10, 20);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), f, a1, '2027-08-03', 'sale', -15, 0)
+    RETURNING amount INTO amt;
+  IF amt <> -200 THEN   -- 10 x 10.00 + 5 x 20.00; the average would have been 225.00
+    RAISE EXCEPTION 'FAIL T90b: 15 FIFO units left at %, not 200.00 from the oldest layers', -amt;
+  END IF;
+  IF (SELECT value FROM stock_balances WHERE company_id = app_company_id() AND item_id = f AND warehouse_id = a1) <> 100
+     OR (SELECT sum(value_remaining) FROM stock_layers WHERE company_id = app_company_id() AND item_id = f) <> 100 THEN
+    RAISE EXCEPTION 'FAIL T90c: the balance and the layers do not hold the 100.00 left';
+  END IF;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, amount) VALUES (app_company_id(), f, a1, '2027-08-04', 'landed_cost', 0, 0, 10);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), f, a1, '2027-08-05', 'sale', -5, 0)
+    RETURNING amount INTO amt;
+  IF amt <> -110 THEN
+    RAISE EXCEPTION 'FAIL T90d: the last 5 left at %, not 110.00 with the landed cost', -amt;
+  END IF;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), f, a1, '2027-08-06', 'sale', -1, 0);
+    RAISE EXCEPTION 'FAIL T90e: a FIFO item went below zero';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE items SET costing = 'average' WHERE id = f;
+    RAISE EXCEPTION 'FAIL T90f: the costing of an item with moves changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_layers (company_id, item_id, warehouse_id, move_id, received_on, quantity, remaining, value_remaining)
+      VALUES (app_company_id(), f, a1, gen_random_uuid(), '2027-08-06', 1, 1, 0);
+    RAISE EXCEPTION 'FAIL T90g: the application wrote a cost layer';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM stock_layers) THEN
+    RAISE EXCEPTION 'FAIL T90h: company B saw company A''s cost layers';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T90 FIFO items leave from their oldest layers, take landed costs onto what is on hand, never go below zero, and keep their costing';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

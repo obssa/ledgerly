@@ -25,7 +25,7 @@ const amount = (v: string | undefined) => (v ?? "").replace(/[,\s]/g, "");
 
 function itemBody(form: FormData): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  for (const name of ["name", "sku", "type", "unit"]) if (form.has(name)) body[name] = text(form, name) ?? (name === "sku" ? null : "");
+  for (const name of ["name", "sku", "type", "unit", "costing"]) if (form.has(name)) body[name] = text(form, name) ?? (name === "sku" ? null : "");
   for (const name of ["sale_price", "purchase_price", "reorder_point"]) if (form.has(name)) body[name] = amount(text(form, name)) || null;
   return body;
 }
