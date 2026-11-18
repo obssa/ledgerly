@@ -4,12 +4,13 @@ import { Card, PageTitle, Pill } from "@/components/ui";
 import { getExpense } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { VoidExpense } from "./VoidExpense";
+import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
 
 export const metadata = { title: "Expense" };
 
 /** One expense: who was paid, from which account, the lines and totals. */
-export default async function ExpensePage({ params }: PageProps<"/expenses/[id]">) {
-  const { id } = await params;
+export default async function ExpensePage({ params, searchParams }: PageProps<"/expenses/[id]">) {
+  const [{ id }, { attachment }] = await Promise.all([params, searchParams]);
   const expense = await getExpense(id);
   if (!expense) notFound();
   const voided = expense.status === "void";
@@ -55,7 +56,10 @@ export default async function ExpensePage({ params }: PageProps<"/expenses/[id]"
           </dl>
           {expense.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{expense.notes}</p>}
         </Card>
-        {!voided && expense.can?.void && <aside className="min-w-0 flex-[1_1_300px]"><VoidExpense id={expense.id} /></aside>}
+        <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+          {!voided && expense.can?.void && <VoidExpense id={expense.id} />}
+          <AttachmentsPanel kind="expense" documentId={expense.id} flag={typeof attachment === "string" ? attachment : undefined} />
+        </aside>
       </div>
     </>
   );

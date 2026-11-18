@@ -62,3 +62,10 @@ Then:
    schema files grant the application role again; the data is already in place.
 2. Run `ledger_verify` and `audit_log_verify` for each company.
 3. Compare each company's last audit hash with the matching `audit-heads` file from the night of the backup.
+
+## Attached files
+
+The database dump does not hold the files attached to documents (SECURITY.md S7). They live on the server in
+`~/ledgerly/shared/storage/app/private/attachments/<company id>/`, one file per attachment under its random key; the
+`attachments` table says which document each belongs to. When backups go live, copy that folder to the bucket as well
+(for example nightly, files only added, never changed), and restore it next to the database.
