@@ -41,7 +41,11 @@ export function ImportStatement({ accountId }: { accountId: string }) {
 }
 
 /** What to do with one statement line: match it, categorise it, exclude it, or undo what was done. */
-export function ReviewLine({ line, accounts, canReview }: { line: StatementLine; accounts: Account[]; canReview: boolean }) {
+export function ReviewLine({ line, accounts, canReview, foreign }: {
+  line: StatementLine; accounts: Account[]; canReview: boolean;
+  /** A foreign-currency account: its lines are entered in that currency at the day's rate, or the one given. */
+  foreign?: { currency: string; base: string };
+}) {
   const [state, action, pending] = useActionState(reviewStatementLine, undefined);
   const hidden = (step: string) => <><input type="hidden" name="line_id" value={line.id} /><input type="hidden" name="step" value={step} /></>;
 
@@ -105,6 +109,12 @@ export function ReviewLine({ line, accounts, canReview }: { line: StatementLine;
             <label className="field-label" htmlFor={`memo-${line.id}`}>Memo</label>
             <input className="field" id={`memo-${line.id}`} name="memo" defaultValue={line.description} maxLength={255} />
           </div>
+          {foreign && (
+            <div className="w-[150px]">
+              <label className="field-label" htmlFor={`rate-${line.id}`}>{`Rate (${foreign.base} per ${foreign.currency})`}</label>
+              <input className="field num" id={`rate-${line.id}`} name="fx_rate" inputMode="decimal" placeholder="The day's rate" />
+            </div>
+          )}
           <button type="submit" className="btn btn-primary" disabled={pending}>Post</button>
         </form>
       </details>
