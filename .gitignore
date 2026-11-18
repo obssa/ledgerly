@@ -10,4 +10,6 @@ apps/api/.phpunit.cache/
 apps/api/bootstrap/cache/*.php
 apps/api/storage/logs/*.log
 apps/api/storage/framework/
+# Uploaded files (attachments, S7): kept on the server, never in the repository.
+apps/api/storage/app/
 apps/api/phpunit.shared-host.xml
