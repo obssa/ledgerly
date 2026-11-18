@@ -24,6 +24,10 @@ function refusal(error: unknown): FormState {
   if (error instanceof ApiError && error.status === 403) {
     return { error: (error.body as { type?: string } | null)?.type === "DemoAccount" ? "Not available in the demo: reminders are not emailed from the shared demo accounts." : "Your role cannot do this." };
   }
+  // Someone else saved the draft after this form was opened: their changes are not overwritten.
+  if (error instanceof ApiError && error.status === 409) {
+    return { error: "Someone else changed this draft after you opened it. Open it again to see their changes, then make yours." };
+  }
   // A rule of the books (closed period, approval limit, state) arrives as 422 with a message for the person.
   if (error instanceof ApiError && error.status === 422 && (error.body as { type?: string } | null)?.type) {
     return { error: (error.body as { message?: string }).message ?? "Not possible right now." };
@@ -31,12 +35,20 @@ function refusal(error: unknown): FormState {
   return formStateFromError(error);
 }
 
-/** Saves the draft; with intent=approve also posts it. Either way the invoice page opens. */
+/**
+ * Saves the draft (a new one, or the draft being edited: the form then carries its id and the version it was read at, so
+ * a save over someone else's is refused); with intent=approve also posts it. Either way the invoice page opens.
+ */
 export async function createInvoice(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
+  const draft = text(form, "id");
   let id: string;
   try {
-    id = (await ledgerly.createInvoice(invoiceBody(form), ctx)).id;
+    const body = invoiceBody(form);
+    const version = Number(text(form, "lock_version"));
+    id = draft
+      ? (await ledgerly.updateInvoice(draft, { ...body, ...(Number.isInteger(version) && version > 0 ? { lock_version: version } : {}) }, ctx)).id
+      : (await ledgerly.createInvoice(body, ctx)).id;
   } catch (error) {
     return refusal(error);
   }
