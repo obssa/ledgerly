@@ -3360,6 +3360,86 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T91 quote links are made for sent quotes only, answered once outside any company, and seen only by their own';
 END $$;
+-- T92: the staff console (066). The application never reads or makes staff accounts, tokens or sessions directly;
+-- a staff token opens the company list and a support session only while valid; a session needs a reason and lasts at
+-- most two hours; a code works once; a setup link sets a bcrypt password once; the staff log is append-only.
+DO $$ BEGIN
+  BEGIN
+    PERFORM 1 FROM staff_users;
+    RAISE EXCEPTION 'FAIL T92a: the application read staff accounts';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    INSERT INTO staff_users (email, name) VALUES ('mallory@example.test', 'Mallory');
+    RAISE EXCEPTION 'FAIL T92b: the application made a staff account';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+RESET ROLE;
+INSERT INTO staff_users (id, email, name, password, mfa_secret) VALUES
+  ('00000000-0000-0000-0000-0000000005f1', 'support@ledgerly.example', 'Support One', '$2y$12$abcdefghijklmnopqrstuuNw2oSj1lB8rM7i3e6t4mY2wQyQ1rS2u', repeat('x', 40));
+INSERT INTO staff_users (id, email, name, setup_hash, setup_expires_at) VALUES
+  ('00000000-0000-0000-0000-0000000005f2', 'new.staff@ledgerly.example', 'New Staff', repeat('5e', 32), now() + interval '1 day');
+SET ROLE ledgerly_web;
+SELECT set_config('app.user_id', '', false), set_config('app.company_id', '', false) \gset ignore_
+DO $$
+DECLARE
+  s1  constant uuid := '00000000-0000-0000-0000-0000000005f1';
+  tok constant text := repeat('7a', 32);
+  ses uuid;
+BEGIN
+  IF EXISTS (SELECT 1 FROM staff_companies(tok, '')) THEN
+    RAISE EXCEPTION 'FAIL T92c: the company list opened without a staff token';
+  END IF;
+  PERFORM staff_sign_in_complete(s1, 1000, tok, 8, '192.0.2.10');
+  BEGIN
+    PERFORM staff_sign_in_complete(s1, 1000, repeat('7b', 32), 1, '192.0.2.10');
+    RAISE EXCEPTION 'FAIL T92d: an authenticator code was used twice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  IF (SELECT name FROM staff_token_check(tok)) IS DISTINCT FROM 'Support One'
+     OR NOT EXISTS (SELECT 1 FROM staff_companies(tok, 'Company A')) THEN
+    RAISE EXCEPTION 'FAIL T92e: a valid staff token did not open the company list';
+  END IF;
+  BEGIN
+    PERFORM staff_session_start(tok, '00000000-0000-0000-0000-00000000000a', 'short', 30);
+    RAISE EXCEPTION 'FAIL T92f: a support session started without a reason';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    PERFORM staff_session_start(tok, '00000000-0000-0000-0000-00000000000a', 'Customer asked why the trial balance is off', 500);
+    RAISE EXCEPTION 'FAIL T92g: a support session lasted more than two hours';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    PERFORM staff_session_start(repeat('00', 32), '00000000-0000-0000-0000-00000000000a', 'Customer asked why the trial balance is off', 30);
+    RAISE EXCEPTION 'FAIL T92h: a support session started without a valid staff token';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  ses := staff_session_start(tok, '00000000-0000-0000-0000-00000000000a', 'Customer asked why the trial balance is off', 30);
+  IF (SELECT company_id FROM staff_session_check(tok, ses)) IS DISTINCT FROM '00000000-0000-0000-0000-00000000000a'
+     OR EXISTS (SELECT 1 FROM staff_session_check(repeat('00', 32), ses)) THEN
+    RAISE EXCEPTION 'FAIL T92i: a support session was not tied to its staff member';
+  END IF;
+  PERFORM staff_session_end(tok, ses);
+  PERFORM staff_sign_out(tok);
+  IF EXISTS (SELECT 1 FROM staff_session_check(tok, ses)) OR EXISTS (SELECT 1 FROM staff_token_check(tok)) THEN
+    RAISE EXCEPTION 'FAIL T92j: an ended session or a signed-out token still worked';
+  END IF;
+
+  -- Setup: once, with a bcrypt hash and a secret.
+  BEGIN
+    PERFORM staff_setup_complete(repeat('5e', 32), 'plain-password', repeat('y', 40), 5);
+    RAISE EXCEPTION 'FAIL T92k: a staff password was kept as given';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  IF staff_setup_complete(repeat('5e', 32), '$2y$12$zyxwvutsrqponmlkjihgfeuNw2oSj1lB8rM7i3e6t4mY2wQyQ1rS2u', repeat('y', 40), 5) IS NULL
+     OR staff_setup_complete(repeat('5e', 32), '$2y$12$zyxwvutsrqponmlkjihgfeuNw2oSj1lB8rM7i3e6t4mY2wQyQ1rS2u', repeat('y', 40), 6) IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL T92l: a setup link did not work exactly once';
+  END IF;
+
+  INSERT INTO staff_log (staff_id, action, detail) VALUES (s1, 'support_session_started', '{"company":"A"}');
+  BEGIN
+    UPDATE staff_log SET action = 'nothing_happened';
+    RAISE EXCEPTION 'FAIL T92m: the staff log was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE NOTICE 'PASS T92 staff accounts are the owner''s, tokens and support sessions are checked by the database, and the staff log is kept';
+END $$;
+SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
+       set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

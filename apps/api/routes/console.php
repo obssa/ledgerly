@@ -364,3 +364,64 @@ Artisan::command('ledgerly:expire-quotes', function (\App\Domain\Sales\Actions\Q
     }
     $this->info("Quotes expired: {$expired}.");
 })->purpose('Expire quotes past their valid-until date');
+
+/*
+| Staff accounts (066, SECURITY.md S8), by an operator only: run as the owner role (.github/workflows/staff.yml, the
+| owner password given for this one run), never from the API. A new account, or --resend, mails a setup link (48 hours)
+| where the person sets a password and an authenticator; --deactivate switches the account off and ends its sign-ins.
+*/
+Artisan::command('ledgerly:staff {email : the staff member\'s email} {--name= : their name (a new account)} {--resend : a new setup link}
+        {--deactivate : switch the account off} {--by=operator : who is doing this}', function () {
+    $db = DB::connection('owner');
+    $email = mb_strtolower(trim((string) $this->argument('email')));
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        $this->error('Give an email address.');
+
+        return 1;
+    }
+    $staff = $db->table('staff_users')->where('email', $email)->first(['id', 'name', 'active']);
+    if ($this->option('deactivate')) {
+        if ($staff === null) {
+            $this->error('No staff account with that email.');
+
+            return 1;
+        }
+        $db->transaction(function () use ($db, $staff) {
+            $db->table('staff_users')->where('id', $staff->id)->update(['active' => false, 'setup_hash' => null, 'setup_expires_at' => null]);
+            $db->table('staff_tokens')->where('staff_id', $staff->id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            $db->table('staff_sessions')->where('staff_id', $staff->id)->whereNull('ended_at')->update(['ended_at' => now()]);
+            $db->table('staff_log')->insert(['staff_id' => $staff->id, 'action' => 'account_deactivated', 'detail' => json_encode(['by' => (string) $this->option('by')])]);
+        });
+        $this->info('Switched off; its sign-ins and sessions are ended.');
+
+        return 0;
+    }
+    $name = trim((string) ($this->option('name') ?? $staff?->name ?? ''));
+    if ($staff === null && mb_strlen($name) < 2) {
+        $this->error('Give --name for a new staff account.');
+
+        return 1;
+    }
+    $token = bin2hex(random_bytes(32));
+    $hours = (int) config('staff.setup_hours');
+    $fields = ['setup_hash' => hash('sha256', $token), 'setup_expires_at' => now()->addHours($hours)];
+    if ($staff === null) {
+        $id = (string) \Illuminate\Support\Str::uuid7();
+        $db->table('staff_users')->insert(['id' => $id, 'email' => $email, 'name' => $name, ...$fields]);
+        $action = 'account_created';
+    } elseif ($this->option('resend')) {
+        $id = $staff->id;
+        $db->table('staff_users')->where('id', $id)->update(['active' => true, 'password' => null, 'mfa_secret' => null, 'mfa_last_step' => null, ...$fields]);
+        $db->table('staff_tokens')->where('staff_id', $id)->whereNull('revoked_at')->update(['revoked_at' => now()]);
+        $action = 'setup_link_resent';
+    } else {
+        $this->error('That staff account exists: --resend for a new setup link, or --deactivate.');
+
+        return 1;
+    }
+    $db->table('staff_log')->insert(['staff_id' => $id, 'action' => $action, 'detail' => json_encode(['by' => (string) $this->option('by')])]);
+    \Illuminate\Support\Facades\Notification::route('mail', [$email => $name])->notify(new \App\Notifications\StaffSetupLink($name, $token, $hours));
+    $this->info("Setup link mailed to {$email}; it works for {$hours} hours.");
+
+    return 0;
+})->purpose('Make, re-invite or switch off a Ledgerly staff account (owner role)');
