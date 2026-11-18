@@ -251,9 +251,9 @@ final class TenantIsolationTest extends TestCase
         // As the application, working in company A, with no Eloquent model (so no company scope) involved.
         DatabaseTenantContext::run($this->userA->getKey(), $this->a['company'], function () use ($tables, $bRows) {
             foreach ($tables as $t) {
-                // A table the application cannot read at all is out of reach for every company (053's billing events).
+                // A table the application cannot read at all is out of reach for every company (053's billing events, 066's staff tables).
                 if (! DB::selectOne("SELECT has_table_privilege(current_user, ?, 'SELECT') AS p", [$t->name])->p) {
-                    $this->assertContains($t->name, ['subscription_events'], "{$t->name} is closed to the application: say so here if that is meant");
+                    $this->assertContains($t->name, ['subscription_events', 'staff_log', 'staff_sessions', 'staff_tokens', 'staff_users'], "{$t->name} is closed to the application: say so here if that is meant");
                     continue;
                 }
                 $this->assertSame(0, $bRows($t->name, (bool) $t->has_company, DB::connection()), "row-level security on {$t->name} lets company A see company B");

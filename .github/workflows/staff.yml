@@ -1,0 +1,57 @@
+name: staff
+
+# The staff console's accounts (SECURITY.md S8): made, re-invited or switched off by an operator, by hand, as the
+# owner role (whose password lives only in this repository's secrets and is given to this one run). A new account,
+# or a resend, mails the person a setup link for a password and an authenticator. Nothing else can make one.
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: The staff member's email
+        required: true
+      action:
+        description: What to do
+        type: choice
+        options: [add, resend, deactivate]
+        default: add
+      name:
+        description: Their name (add)
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  staff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: live
+    steps:
+      - uses: actions/checkout@v7
+      - name: SSH with a pinned host key
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$HOST" && test -n "$USER" && test -n "$KEY" && test -n "$KNOWN_HOSTS" || { echo "Deploy secrets are incomplete"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host target\n  HostName %s\n  Port %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$HOST" "$PORT" "$USER" > ~/.ssh/config
+          scp scripts/deploy/cpanel/staff.sh target:ledgerly/deploy/staff.sh
+      - name: Change the staff account
+        env:
+          OWNER_PASSWORD: ${{ secrets.DEPLOY_DB_OWNER_PASSWORD }}
+          PHP_BIN: ${{ vars.DEPLOY_PHP_BIN || '/opt/alt/php83/usr/bin/php' }}
+          EMAIL: ${{ inputs.email }}
+          ACTION: ${{ inputs.action }}
+          NAME: ${{ inputs.name }}
+          BY: ${{ github.actor }}
+        run: |
+          # The inputs reach the server as quoted arguments, and staff.sh checks each against a fixed pattern.
+          q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+          printf '%s
+' "$OWNER_PASSWORD" | ssh target "PHP_BIN=$(q "$PHP_BIN") bash ~/ledgerly/deploy/staff.sh $(q "$EMAIL") $(q "$ACTION") $(q "$NAME") $(q "$BY")"

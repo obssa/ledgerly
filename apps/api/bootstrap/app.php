@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'company' => ResolveCompany::class,
             'idempotent' => Idempotency::class,
             'not.demo' => EnsureNotDemo::class,
+            'staff' => \App\Http\Middleware\StaffOnly::class,   // the staff console (S8)
         ]);
         // Order matters: transaction → tenant → idempotency → route-model binding. The tenant must be set
         // before binding runs, or row-level security hides the bound model (404).

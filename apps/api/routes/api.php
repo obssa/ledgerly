@@ -24,6 +24,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\StaffController;
 use App\Http\Controllers\QuoteLinkController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
@@ -113,6 +114,22 @@ Route::prefix('v1')->group(function () {
     Route::post('auth/password/reset', [AccountController::class, 'resetPassword'])->middleware('throttle:auth');
     Route::get('auth/invitation', [InvitationController::class, 'show'])->middleware('throttle:auth');
     Route::post('auth/invitation/accept', [InvitationController::class, 'accept'])->middleware('throttle:auth');
+    // The staff console (066, SECURITY.md S8): allow-listed addresses only; a staff token the database checks.
+    Route::prefix('staff')->group(function () {
+        Route::middleware(['staff:open', 'throttle:auth'])->group(function () {
+            Route::post('login', [StaffController::class, 'signIn']);
+            Route::get('setup', [StaffController::class, 'setupShow']);
+            Route::post('setup', [StaffController::class, 'setupComplete']);
+        });
+        Route::middleware('staff')->group(function () {
+            Route::post('logout', [StaffController::class, 'signOut']);
+            Route::get('me', [StaffController::class, 'me']);
+            Route::get('companies', [StaffController::class, 'companies']);
+            Route::post('sessions', [StaffController::class, 'startSession']);
+            Route::get('sessions/{session}', [StaffController::class, 'session']);
+            Route::post('sessions/{session}/end', [StaffController::class, 'endSession']);
+        });
+    });
     // A quote seen and answered by the customer through its emailed link (065): no account, the token's hash checked.
     Route::get('public/quote', [QuoteLinkController::class, 'show'])->middleware('throttle:auth');
     Route::post('public/quote/answer', [QuoteLinkController::class, 'answer'])->middleware('throttle:auth');
