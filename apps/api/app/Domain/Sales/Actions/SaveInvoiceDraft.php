@@ -239,6 +239,7 @@ final class SaveInvoiceDraft
                 'account_id' => $line['account_id'],
                 'project_id' => $line['project_id'] ?? null,
                 'source_line_id' => $line['source_line_id'] ?? null,
+                'unit_id' => $line['unit_id'] ?? null,   // 072: another unit of the item; quantity and price are in it
                 'line_subtotal' => $result->subtotal->toDecimalString(),
                 'line_tax' => $result->tax->toDecimalString(),
             ];
@@ -285,7 +286,9 @@ final class SaveInvoiceDraft
         try {
             $document->lines()->createMany($lines);
         } catch (QueryException $e) {
-            if ($e->getCode() === '23514' && preg_match('/(More would be delivered than was ordered \([^)]*\)|An invoice line delivers [^\r\n"]*)/', $e->getMessage(), $m)) {
+            // 067 (delivering an order line) and 072 (a line's unit) said in words: a 422 on the lines, not a 500.
+            if ($e->getCode() === '23514' && preg_match('/(More would be delivered than was ordered \([^)]*\)|An invoice line delivers [^\r\n"]*'
+                . '|A line\'s unit is one of its own item\'s units|The unit [^\r\n"]* is archived|A line made from an order line is in the order line\'s unit)/', $e->getMessage(), $m)) {
                 throw ValidationException::withMessages(['lines' => [rtrim($m[1], '. ') . '.']]);
             }
             throw $e;

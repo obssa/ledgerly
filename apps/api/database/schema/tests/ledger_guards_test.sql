@@ -3808,6 +3808,88 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T97 goods are delivered against a confirmed order, never beyond it, invoiced no further than delivered, and kept';
 END $$;
+
+-- T98: units of measure (072). A unit is one of the company's items' own, never the item's own unit, of a size above
+-- zero that never changes; a document line in a unit takes its name and size as they are then, whatever it was given,
+-- only for its own item and only while the unit is active; a line made from an order line is in its unit; a unit is
+-- never deleted; another company never sees one. Company A as f1, customer c1, item b1 (counted 'each').
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  other constant uuid := '00000000-0000-0000-0000-000000000ed0';
+  bag constant uuid := '00000000-0000-0000-0000-000000000ed1';
+  so constant uuid := '00000000-0000-0000-0000-000000000ed2';
+  sl constant uuid := '00000000-0000-0000-0000-000000000ed3';
+  inv constant uuid := '00000000-0000-0000-0000-000000000ed4';
+  il constant uuid := '00000000-0000-0000-0000-000000000ed5';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+  f numeric;
+  n text;
+BEGIN
+  INSERT INTO items (id, company_id, name, type) VALUES (other, app_company_id(), 'T98 cups', 'service');
+  BEGIN
+    INSERT INTO item_units (company_id, item_id, name, factor) VALUES (app_company_id(), item, ' Each ', 12);
+    RAISE EXCEPTION 'FAIL T98a: a unit took the item''s own unit';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_units (company_id, item_id, name, factor) VALUES (app_company_id(), item, 'Box', 0);
+    RAISE EXCEPTION 'FAIL T98b: a unit of size zero was made';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO item_units (id, company_id, item_id, name, factor) VALUES (bag, app_company_id(), item, 'Bag', 25);
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency) VALUES (so, app_company_id(), 'sales_order', c1, '2027-11-01', 'ETB');
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, unit_id) VALUES
+      (app_company_id(), so, 1, 'Cups', 1, 10, acc, 10, other, bag);
+    RAISE EXCEPTION 'FAIL T98c: a line used another item''s unit';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, unit_id, unit_factor, unit_name) VALUES
+    (sl, app_company_id(), so, 1, 'Coffee, bag', 4, 2500, acc, 10000, item, bag, 1, 'Spoon');
+  SELECT unit_factor, unit_name INTO f, n FROM document_lines WHERE id = sl;
+  IF f <> 25 OR n <> 'Bag' THEN
+    RAISE EXCEPTION 'FAIL T98d: a line kept the size it was given (% %), not its unit''s', f, n;
+  END IF;
+  UPDATE document_lines SET unit_factor = 2 WHERE id = sl;
+  IF (SELECT unit_factor FROM document_lines WHERE id = sl) <> 25 THEN
+    RAISE EXCEPTION 'FAIL T98d: a line''s unit size was changed';
+  END IF;
+
+  BEGIN
+    UPDATE item_units SET factor = 50 WHERE id = bag;
+    RAISE EXCEPTION 'FAIL T98e: a unit''s size was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM item_units WHERE id = bag;
+    RAISE EXCEPTION 'FAIL T98f: a unit was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+
+  UPDATE documents SET status = 'accepted', number = 'SO-T98-1' WHERE id = so;
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id) VALUES (inv, app_company_id(), 'invoice', c1, '2027-11-02', 'ETB', so);
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+      (app_company_id(), inv, 1, 'Coffee', 4, 100, acc, 400, item, sl);
+    RAISE EXCEPTION 'FAIL T98g: a line made from an order line was in another unit';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id, unit_id) VALUES
+    (il, app_company_id(), inv, 1, 'Coffee, bag', 4, 2500, acc, 10000, item, sl, bag);
+
+  -- Archived, a unit is no longer chosen; lines already in it keep it.
+  UPDATE item_units SET is_active = false WHERE id = bag;
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, unit_id) VALUES
+      (app_company_id(), so, 2, 'Coffee, bag', 1, 2500, acc, 2500, item, bag);
+    RAISE EXCEPTION 'FAIL T98h: an archived unit was chosen';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE document_lines SET description = 'Coffee, 25 kg bag' WHERE id = il;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM item_units WHERE id = bag) THEN
+    RAISE EXCEPTION 'FAIL T98i: company B saw company A''s unit';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T98 a unit is its item''s own and keeps its size; a line takes its unit as it is and an order line''s unit carries on';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

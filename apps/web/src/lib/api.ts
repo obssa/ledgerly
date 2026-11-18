@@ -591,6 +591,8 @@ export interface Item {
   on_order?: string;
   value?: string;
   balances?: { warehouse: { id: string; name: string }; quantity: string; value: string }[];
+  /** 072: other units it is bought or sold in, each a fixed number of its own (archived ones on the item's own page only). */
+  units?: { id: string; name: string; factor: string; is_active?: boolean }[];
   can?: { edit: boolean; adjust: boolean };
 }
 
@@ -684,6 +686,10 @@ export interface InvoiceLine {
   project_id?: string | null;
   /** On an invoice made from a sales order: the order line it delivers (067). */
   source_line_id?: string | null;
+  /** 072: another unit of the item the line is in (its quantity and price are in it), kept as it was then. */
+  unit_id?: string | null;
+  unit_name?: string | null;
+  unit_factor?: string;
   line_subtotal: string;
   line_tax: string;
 }
@@ -1578,6 +1584,10 @@ export const ledgerly = {
   item: (id: string, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, ctx),
   createItem: (body: Record<string, unknown>, ctx: RequestOptions) => api<Item>("items", { ...ctx, method: "POST", body }),
   updateItem: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  addItemUnit: (id: string, body: { name: string; factor: string }, ctx: RequestOptions) =>
+    api<Item>(`items/${encodeURIComponent(id)}/units`, { ...ctx, method: "POST", body }),
+  archiveItemUnit: (id: string, unitId: string, ctx: RequestOptions) =>
+    api<Item>(`items/${encodeURIComponent(id)}/units/${encodeURIComponent(unitId)}/archive`, { ...ctx, method: "POST", body: {} }),
   warehouses: (ctx: RequestOptions) => api<{ data: Warehouse[] }>("warehouses", ctx),
   people: (ctx: RequestOptions) => api<{ data: { id: string; name: string }[] }>("people", ctx),
   members: (ctx: RequestOptions) => api<{ data: Member[]; roles: string[]; grantable: Grantable[] }>("members", ctx),

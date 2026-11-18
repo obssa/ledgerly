@@ -60,4 +60,13 @@ describe("lines made from a sales order", () => {
     expect(lines[0].source_line_id).toBe("0a1b2c3d-0000-4000-8000-000000000001");
     expect("source_line_id" in lines[1]).toBe(false);
   });
+
+  it("keeps a line's unit (072), and leaves it out when the line is in the item's own unit", () => {
+    const lines = parseLines(JSON.stringify([
+      { description: "Cartons", quantity: "2", unit_price: "600", account_id: "a", tax_rate_id: null, unit_id: " 0a1b2c3d-0000-4000-8000-000000000009 " },
+      { description: "Bags", quantity: "3", unit_price: "50", account_id: "a", tax_rate_id: null, unit_id: "" },
+    ]));
+    expect(lines[0].unit_id).toBe("0a1b2c3d-0000-4000-8000-000000000009");
+    expect("unit_id" in lines[1]).toBe(false);
+  });
 });

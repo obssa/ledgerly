@@ -240,6 +240,7 @@ final class QuoteWorkflow
                     'quantity' => (string) ($quantities[(string) $l->getKey()] ?? $l->quantity), 'unit_price' => (string) $l->unit_price,
                     'discount_rate' => (string) $l->discount_rate, 'account_id' => (string) $l->account_id, 'tax_rate_id' => $l->tax_rate_id,
                     'item_id' => $l->item_id, 'project_id' => $l->project_id,
+                    'unit_id' => $l->unit_id,   // 072: in the order line's unit
                 ])->values()->all(),
             ];
 

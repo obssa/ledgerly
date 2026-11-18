@@ -61,6 +61,7 @@ final class SaveBillRequest extends FormRequest
                 ->where(fn (Builder $w) => $w->where('type', 'expense')->orWhere(fn (Builder $a) => $a->where('type', 'asset')->whereIn('subtype', ['fixed_asset', 'prepayment']))))],
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')->whereIn('kind', ['vat', 'tot'])],
             'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')->where('is_active', true)],
+            'lines.*.unit_id' => ['nullable', 'uuid', Rule::exists('item_units', 'id')->where('is_active', true)],   // 072
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
             // The purchase order line a bill line bills (068): kept through edits; the database checks it is its order's.
             'lines.*.source_line_id' => ['nullable', 'uuid'],

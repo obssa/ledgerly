@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Sales;
 
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Inventory\DocumentStock;
 use App\Domain\Inventory\Models\Item;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Inventory\StockLedger;
@@ -111,7 +112,8 @@ final class Delivering
                     'id' => (string) Str::uuid7(), 'company_id' => $company->getKey(), 'delivery_note_id' => $id, 'order_line_id' => $lineId,
                     'item_id' => $line->item_id, 'quantity' => $quantity,
                 ]);
-                $move = $this->stock->move($company->getKey(), $base, (string) $line->item_id, $warehouse->getKey(), $at, 'sale', '-' . $quantity, '0',
+                $own = DocumentStock::baseQuantity((object) ['quantity' => $quantity, 'unit_factor' => $line->unit_factor]);   // 072
+                $move = $this->stock->move($company->getKey(), $base, (string) $line->item_id, $warehouse->getKey(), $at, 'sale', '-' . $own, '0',
                     $number, null, $userId, deliveryNoteId: $id);
                 $cost = $cost->plus($move['amount']->negated());
             }
