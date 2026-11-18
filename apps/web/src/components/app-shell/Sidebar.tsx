@@ -55,6 +55,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
 const footer: NavItem[] = [
   { href: "/settings", label: "Company settings" },
   { href: "/settings/team", label: "Team" },
+  { href: "/import", label: "Import" },
   { href: "/security", label: "Sign-in security" },
 ];
 

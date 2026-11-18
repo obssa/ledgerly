@@ -1058,6 +1058,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 export type { SignedInSession } from "./sessions";
 export type { Grantable } from "./team";
 export type { Subscription } from "./subscription";
+import type { ImportResult } from "./imports";
 import type { Subscription } from "./subscription";
 import type { Grantable } from "./team";
 import type { SignedInSession } from "./sessions";
@@ -1302,6 +1303,8 @@ export const ledgerly = {
       : api<Member>(`members/${encodeURIComponent(id)}/${action}`, { ...ctx, method: "POST", body: {} }),
   createWarehouse: (name: string, ctx: RequestOptions) => api<Warehouse>("warehouses", { ...ctx, method: "POST", body: { name } }),
   stock: (ctx: RequestOptions) => api<StockOnHand>("stock", ctx),
+  importRows: (kind: string, csv: string, check: boolean, ctx: RequestOptions) =>
+    api<ImportResult>(`imports/${encodeURIComponent(kind)}`, { ...ctx, method: "POST", body: { csv, check } }),
   issueStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ move_id: string; amount: string; unit_cost: string; journal_entry_id: string | null }>("stock/issues", { ...ctx, method: "POST", body }),
   adjustStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
