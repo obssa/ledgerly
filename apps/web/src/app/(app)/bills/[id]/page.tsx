@@ -57,6 +57,10 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
         </p>
       ))}
 
+      {bill.match && bill.match.warnings.map((w) => (
+        <p key={w} role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">Check against the order: {w}</p>
+      ))}
+
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_560px]" label="Bill">
           <div className="flex flex-wrap justify-between gap-4 text-sm">
@@ -100,6 +104,35 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
             <div className="flex justify-between py-1 font-semibold"><dt>{credit ? "Credit left" : "Still to pay"}</dt><dd className="num">{formatMoney(bill.amount_due, bill.currency)}</dd></div>
           </dl>
           {bill.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{bill.notes}</p>}
+        {bill.match && bill.match.lines.length > 0 && (
+          <section className="mt-6 border-t border-line pt-4" aria-label="Three-way match">
+            <h2 className="text-[17px] font-bold">Against purchase order{" "}
+              <Link href={`/purchase-orders/${encodeURIComponent(bill.match.order_id)}`} className="num hover:underline">{bill.match.order_number ?? "draft"}</Link></h2>
+            <p className="mt-1 text-[13px] text-muted">What was ordered, what arrived on goods received notes, and what this bill charges. A difference is a warning, not a block.</p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="tbl">
+                <thead>
+                  <tr><th scope="col">Line</th><th scope="col" className="!text-right">Ordered</th><th scope="col" className="!text-right">Received</th>
+                    <th scope="col" className="!text-right">Billed before</th><th scope="col" className="!text-right">This bill</th>
+                    <th scope="col" className="!text-right">Order price</th><th scope="col" className="!text-right">Bill price</th></tr>
+                </thead>
+                <tbody>
+                  {bill.match.lines.map((m) => (
+                    <tr key={m.line_id}>
+                      <td>{m.description}</td>
+                      <td className="num text-right">{m.ordered}</td>
+                      <td className="num text-right">{m.received ?? "—"}</td>
+                      <td className="num text-right">{m.billed_elsewhere}</td>
+                      <td className={`num text-right ${m.over ? "font-semibold text-bad" : ""}`}>{m.quantity}</td>
+                      <td className="num text-right">{formatAmount(m.order_price)}</td>
+                      <td className={`num text-right ${m.price_differs ? "font-semibold text-warn" : ""}`}>{formatAmount(m.bill_price)}{m.price_change && m.price_differs ? ` (${m.price_change}%)` : ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
         </Card>
 
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">

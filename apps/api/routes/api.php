@@ -29,6 +29,7 @@ use App\Http\Controllers\QuoteLinkController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
+use App\Http\Controllers\GoodsReceiptController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RecurringJournalController;
@@ -336,6 +337,11 @@ Route::prefix('v1')->group(function () {
             Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel']);
             Route::post('purchase-orders/{purchaseOrder}/bill', [PurchaseOrderController::class, 'bill']);
             Route::post('purchase-orders/{purchaseOrder}/close', [PurchaseOrderController::class, 'close']);
+            Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive']);
+            Route::get('goods-receipts', [GoodsReceiptController::class, 'index']);
+            Route::get('goods-receipts/unbilled', [GoodsReceiptController::class, 'unbilled']);   // before {goodsReceipt}
+            Route::get('goods-receipts/{goodsReceipt}', [GoodsReceiptController::class, 'show'])->whereUuid('goodsReceipt');
+            Route::post('goods-receipts/{goodsReceipt}/void', [GoodsReceiptController::class, 'void'])->whereUuid('goodsReceipt');
             Route::get('purchase-orders/{purchaseOrder}/history', [PurchaseOrderController::class, 'history']);
             Route::get('bills', [BillController::class, 'index']);
             Route::post('bills', [BillController::class, 'store']);

@@ -3586,6 +3586,99 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T94 a purchase order owes nothing, is billed in parts by its supplier, never more than was ordered, and is closed rather than cancelled';
 END $$;
+
+-- T95: goods received notes (069). Goods are received against an issued purchase order only, never more than was
+-- ordered; the order's bills match no more than was received; an item received is not brought in again by a bill;
+-- a note whose goods are billed is not voided, and its lines and matches are kept; an order with goods received is
+-- not cancelled; a price adjustment changes value only and never below zero; another company sees none of it.
+-- Company A as its owner f1, supplier c8, item b1 in warehouse a1.
+DO $$
+DECLARE
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  po constant uuid := '00000000-0000-0000-0000-000000000ea0';
+  pl constant uuid := '00000000-0000-0000-0000-000000000ea1';
+  b1 constant uuid := '00000000-0000-0000-0000-000000000ea2';
+  bl constant uuid := '00000000-0000-0000-0000-000000000ea3';
+  r1 constant uuid := '00000000-0000-0000-0000-000000000ea4';
+  b2 constant uuid := '00000000-0000-0000-0000-000000000ea5';
+  bl2 constant uuid := '00000000-0000-0000-0000-000000000ea6';
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total) VALUES (po, app_company_id(), 'purchase_order', c8, '2027-10-01', 'ETB', 500);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (pl, app_company_id(), po, 1, 'Beans', 10, 50, acc, 500, item);
+  BEGIN
+    INSERT INTO goods_receipts (company_id, purchase_order_id, number, received_on, warehouse_id, created_by) VALUES (app_company_id(), po, 'GRN-T95-0', '2027-10-02', wh, f1);
+    RAISE EXCEPTION 'FAIL T95a: goods were received against a purchase order not yet issued';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET status = 'accepted', number = 'PO-T95-1' WHERE id = po;
+
+  INSERT INTO goods_receipts (id, company_id, purchase_order_id, number, received_on, warehouse_id, created_by) VALUES (r1, app_company_id(), po, 'GRN-T95-1', '2027-10-02', wh, f1);
+  INSERT INTO goods_receipt_lines (company_id, goods_receipt_id, order_line_id, item_id, quantity, amount) VALUES (app_company_id(), r1, pl, item, 6, 300);
+  BEGIN
+    INSERT INTO goods_receipt_lines (company_id, goods_receipt_id, order_line_id, item_id, quantity, amount) VALUES (app_company_id(), r1, pl, item, 5, 250);
+    RAISE EXCEPTION 'FAIL T95b: more was received than was ordered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id) VALUES
+    (b1, app_company_id(), 'bill', c8, '2027-10-03', 'ETB', po), (b2, app_company_id(), 'bill', c8, '2027-10-04', 'ETB', po);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (bl, app_company_id(), b1, 1, 'Beans', 6, 50, acc, 300, item, pl), (bl2, app_company_id(), b2, 1, 'Beans', 1, 50, acc, 50, item, pl);
+  INSERT INTO bill_receipt_matches (company_id, bill_id, bill_line_id, order_line_id, quantity, amount) VALUES (app_company_id(), b1, bl, pl, 6, 300);
+  BEGIN
+    INSERT INTO bill_receipt_matches (company_id, bill_id, bill_line_id, order_line_id, quantity, amount) VALUES (app_company_id(), b2, bl2, pl, 1, 50);
+    RAISE EXCEPTION 'FAIL T95c: more was billed than was received';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), item, wh, '2027-10-03', 'purchase', 6, 50, b1);
+    RAISE EXCEPTION 'FAIL T95d: a bill brought in goods its order had received';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE goods_receipts SET status = 'void', voided_at = now() WHERE id = r1;
+    RAISE EXCEPTION 'FAIL T95e: a goods received note whose goods are billed was voided';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE goods_receipts SET received_on = '2027-10-05' WHERE id = r1;
+    RAISE EXCEPTION 'FAIL T95f: a goods received note was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE goods_receipt_lines SET quantity = 1 WHERE goods_receipt_id = r1;
+    RAISE EXCEPTION 'FAIL T95g: a goods received note''s line was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM bill_receipt_matches WHERE bill_id = b1;
+    RAISE EXCEPTION 'FAIL T95h: a bill''s match to goods received was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE documents SET status = 'void' WHERE id = po;
+    RAISE EXCEPTION 'FAIL T95i: a purchase order with goods received was cancelled';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, amount) VALUES (app_company_id(), item, wh, '2027-10-03', 'price_adjustment', 0, 0, -999999999);
+    RAISE EXCEPTION 'FAIL T95j: a price adjustment took the stock''s value below zero';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, amount) VALUES (app_company_id(), item, wh, '2027-10-03', 'price_adjustment', 1, 0, 10);
+    RAISE EXCEPTION 'FAIL T95k: a price adjustment moved a quantity';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, amount) VALUES (app_company_id(), item, wh, '2027-10-03', 'price_adjustment', 0, 0, -10);
+
+  -- The bill voided gives its quantity back: the note can then be voided.
+  UPDATE documents SET status = 'void' WHERE id = b1;
+  UPDATE goods_receipts SET status = 'void', voided_at = now(), voided_by = f1, void_reason = 'T95' WHERE id = r1;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM goods_receipts WHERE id = r1) OR EXISTS (SELECT 1 FROM goods_receipt_lines WHERE goods_receipt_id = r1)
+     OR EXISTS (SELECT 1 FROM bill_receipt_matches WHERE bill_id = b1) THEN
+    RAISE EXCEPTION 'FAIL T95l: company B saw company A''s goods received';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T95 goods are received against an issued order, never beyond it, billed no further than received, kept, and value-only price adjustments stay above zero';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -11,10 +11,12 @@ use App\Domain\Ledger\JournalLineDraft;
 use App\Domain\Ledger\Models\Account;
 use App\Domain\Ledger\Money;
 use App\Domain\Ledger\PostingService;
+use App\Domain\Purchases\ReceivedGoods;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Tenancy\Models\Company;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -33,7 +35,7 @@ use Illuminate\Validation\ValidationException;
  */
 final class DocumentStock
 {
-    public function __construct(private readonly StockLedger $stock, private readonly PostingService $posting)
+    public function __construct(private readonly StockLedger $stock, private readonly PostingService $posting, private readonly ReceivedGoods $received)
     {
     }
 
@@ -109,13 +111,105 @@ final class DocumentStock
         }
         $txnTotal = array_reduce($lines, fn (Money $s, array $l) => $s->plus($this->lineCost($l['line'], $doc, $company)), Money::zero($doc->currency));
         $left = $debit;
+        // 069: the items its order's goods received notes brought in are not brought in again; the bill clears them.
+        $receivedItems = $doc->source_document_id !== null ? $this->received->items((string) $doc->source_document_id) : [];
+        $cleared = [];
         foreach (array_values($lines) as $i => ['line' => $line, 'item' => $item]) {
             $share = $i === count($lines) - 1 || $txnTotal->isZero()
                 ? $left
                 : $debit->multipliedBy($this->lineCost($line, $doc, $company)->amount)->dividedBy($txnTotal->amount)->roundToCurrency();
             $left = $left->minus($share);
+            if (in_array((string) $item->getKey(), $receivedItems, true)) {
+                $cleared[] = ['line' => $line, 'item' => $item, 'share' => $share];
+
+                continue;
+            }
             $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'purchase',
                 (string) $line->quantity, '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId, $share->toDecimalString());
+        }
+        if ($cleared !== []) {
+            $this->clearReceived($doc, $cleared, $draft, $company, $date, $userId);
+        }
+    }
+
+    /**
+     * A bill's stock lines for goods its order's notes received (069). Each is matched to what was received and not yet
+     * billed, never more, and takes its received value off goods received not invoiced (the bill that completes a line
+     * takes all that is left of its value). The bill's price may differ from the order's: the difference goes onto the
+     * goods still on hand (a price adjustment, up or down) and the rest to cost of goods sold, as a landed cost does.
+     * The entry's inventory debit for these lines is taken back, so the inventory account still equals the stock.
+     *
+     * @param list<array{line: object, item: Item, share: Money}> $cleared
+     */
+    private function clearReceived(Document $doc, array $cleared, JournalDraft $draft, Company $company, DateTimeImmutable $date, ?string $userId): void
+    {
+        $base = $company->base_currency;
+        $done = $this->received->byLine((string) $doc->source_document_id);
+        $billed = Money::zero($base);
+        $grni = Money::zero($base);
+        $toStock = Money::zero($base);
+        $toSales = Money::zero($base);
+        foreach ($cleared as ['line' => $line, 'item' => $item, 'share' => $share]) {
+            $orderLine = $line->source_line_id !== null ? (string) $line->source_line_id : null;
+            $r = $orderLine !== null ? ($done[$orderLine] ?? null) : null;
+            if ($r === null) {
+                throw ValidationException::withMessages(['lines' => ["Line {$line->line_no}: {$item->name} of this order comes in on goods received notes; bill it from the order's line."]]);
+            }
+            $quantity = (string) $line->quantity;
+            $open = bcsub($r['received'], $r['matched'], 2);
+            if (bccomp($quantity, $open, 2) > 0) {
+                throw ValidationException::withMessages(['lines' => ["Line {$line->line_no}: only {$open} {$item->unit} of {$item->name} was received and not yet billed. Record the goods received note first."]]);
+            }
+            $value = bccomp(bcadd($r['matched'], $quantity, 2), $r['received'], 2) === 0
+                ? Money::of($r['received_value'], $base)->minus(Money::of($r['matched_value'], $base))
+                : Money::of($r['received_value'], $base)->multipliedBy($quantity)->dividedBy($r['received'])->roundToCurrency();
+            $value = $value->isNegative() ? Money::zero($base) : $value;
+            DB::table('bill_receipt_matches')->insert([
+                'id' => (string) Str::uuid7(), 'company_id' => $company->getKey(), 'bill_id' => $doc->getKey(), 'bill_line_id' => $line->getKey(),
+                'order_line_id' => $orderLine, 'quantity' => $quantity, 'amount' => $value->toDecimalString(),
+            ]);
+            $done[$orderLine]['matched'] = bcadd($r['matched'], $quantity, 2);
+            $done[$orderLine]['matched_value'] = bcadd($r['matched_value'], $value->toDecimalString(), 2);
+
+            // The price difference: onto what is still on hand of these goods, the rest to cost of goods sold.
+            $difference = $share->minus($value);
+            $kept = Money::zero($base);
+            if (! $difference->isZero()) {
+                $balance = DB::table('stock_balances')->where(['company_id' => $company->getKey(), 'item_id' => $item->getKey(), 'warehouse_id' => $r['warehouse_id']])
+                    ->first(['quantity', 'value']);
+                $onHand = (string) ($balance->quantity ?? '0');
+                $have = bccomp($onHand, '0', 2) <= 0 ? '0' : (bccomp($onHand, $quantity, 2) >= 0 ? $quantity : $onHand);
+                $kept = bccomp($have, $quantity, 2) === 0 ? $difference : $difference->multipliedBy($have)->dividedBy($quantity)->roundToCurrency();
+                $worth = Money::of((string) ($balance->value ?? '0'), $base);
+                if ($kept->isNegative() && $worth->plus($kept)->isNegative()) {
+                    $kept = $worth->negated();   // never below zero: the rest to cost of goods sold
+                }
+                if (! $kept->isZero()) {
+                    $this->stock->move($company->getKey(), $base, $item->getKey(), (string) $r['warehouse_id'], $date, 'price_adjustment', '0', '0',
+                        $doc->reference ?? $doc->number, $doc->getKey(), $userId, $kept->toDecimalString());
+                }
+            }
+            $billed = $billed->plus($share);
+            $grni = $grni->plus($value);
+            $toStock = $toStock->plus($kept);
+            $toSales = $toSales->plus($difference->minus($kept));
+        }
+
+        $zero = Money::zero($doc->currency);
+        $label = $doc->reference ?? $doc->number;
+        $inventory = Account::system('inventory')->getKey();
+        $back = $billed->minus($toStock);   // the bill's inventory debit for these lines, less the difference kept on the goods
+        if (! $back->isZero()) {
+            $draft->add($back->isNegative() ? JournalLineDraft::debit($inventory, $back->negated(), $zero, "Price difference on goods received, {$label}")
+                : JournalLineDraft::credit($inventory, $back, $zero, "Goods received earlier, {$label}"));
+        }
+        if (! $grni->isZero()) {
+            $draft->add(JournalLineDraft::debit(Account::system('grni')->getKey(), $grni, $zero, "Goods received now billed, {$label}", (string) $doc->contact_id));
+        }
+        if (! $toSales->isZero()) {
+            $cogs = Account::system('cogs')->getKey();
+            $draft->add($toSales->isNegative() ? JournalLineDraft::credit($cogs, $toSales->negated(), $zero, "Price difference on goods sold, {$label}")
+                : JournalLineDraft::debit($cogs, $toSales, $zero, "Price difference on goods sold, {$label}"));
         }
     }
 
@@ -124,7 +218,7 @@ final class DocumentStock
     {
         // A credit note's returned goods are undone like goods bought: they go out again at today's average.
         $moves = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $doc->getKey()])
-            ->whereIn('kind', match ($doc->type) { 'credit_note' => ['sale_return'], 'vendor_credit' => ['purchase_return'], default => ['sale', 'purchase'] })
+            ->whereIn('kind', match ($doc->type) { 'credit_note' => ['sale_return'], 'vendor_credit' => ['purchase_return'], default => ['sale', 'purchase', 'price_adjustment'] })
             ->orderBy('seq')->get();
         if ($moves->isEmpty()) {
             return;
@@ -132,7 +226,19 @@ final class DocumentStock
         $base = $company->base_currency;
         $difference = Money::zero($base);
         foreach ($moves as $m) {
-            if ($m->kind === 'purchase_return') {
+            if ($m->kind === 'price_adjustment') {
+                // 069: the price difference comes off the goods again, when they are still there to take it.
+                $back = Money::of((string) $m->amount, $base)->negated();
+                $balance = DB::table('stock_balances')->where(['company_id' => $company->getKey(), 'item_id' => $m->item_id, 'warehouse_id' => $m->warehouse_id])->first(['quantity', 'value']);
+                $possible = $balance !== null && bccomp((string) $balance->quantity, '0', 2) > 0
+                    && ! Money::of((string) $balance->value, $base)->plus($back)->isNegative();
+                if ($possible) {
+                    $this->stock->move($company->getKey(), $base, $m->item_id, $m->warehouse_id, $date, 'price_adjustment', '0', '0',
+                        "Void of {$doc->number}", $doc->getKey(), $userId, $back->toDecimalString());
+                }
+                // The reversal takes the difference off the inventory account; what the stock could not give back is an adjustment.
+                $difference = $difference->plus($possible ? Money::zero($base) : Money::of((string) $m->amount, $base));
+            } elseif ($m->kind === 'purchase_return') {
                 // Goods sent back come in again at the cost they left with: the journal reversal puts back exactly that.
                 $this->stock->move($company->getKey(), $base, $m->item_id, $m->warehouse_id, $date, 'purchase',
                     ltrim((string) $m->quantity, '-'), '0', "Void of {$doc->number}", $doc->getKey(), $userId, ltrim((string) $m->amount, '-'));
@@ -253,8 +359,8 @@ final class DocumentStock
         }
     }
 
-    /** A bill line's cost in the document currency: its amount, with the tax when the company cannot reclaim it. */
-    private function lineCost(object $line, Document $doc, Company $company): Money
+    /** A bill or purchase order line's cost in the document currency: its amount, with the tax when the company cannot reclaim it. */
+    public function lineCost(object $line, Document $doc, Company $company): Money
     {
         $cost = Money::of((string) $line->line_subtotal, $doc->currency);
         $reclaimable = $company->vat_registered && $line->tax_rate_id !== null
