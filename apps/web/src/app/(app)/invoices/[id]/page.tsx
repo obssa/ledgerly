@@ -80,6 +80,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
               {creditNote && invoice.original && (
                 <div className="mt-1 text-[13px]">Corrects <Link href={`/invoices/${encodeURIComponent(invoice.original.id)}`} className="num font-semibold hover:underline">{invoice.original.number}</Link></div>
               )}
+              {creditNote && invoice.restock && <div className="mt-1 text-[13px]">The goods came back into stock</div>}
             </div>
             <div className="text-right">
               <div><span className="text-muted">Issued</span> <span className="num">{invoice.issue_date}</span></div>

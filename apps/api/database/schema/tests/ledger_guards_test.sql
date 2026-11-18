@@ -2983,6 +2983,42 @@ BEGIN
   RAISE NOTICE 'PASS T83 invoices and bills from the old books are dated by the conversion date, stay so, and are never sent to the tax authority';
 END $$;
 SET ROLE ledgerly_web;
+-- T84: goods back on credit notes (058). Only a credit note says its goods came back; what comes back on an invoice's
+-- credit notes is never more, item by item, than the invoice sold, and goods sent out again when one is voided count.
+-- Company A as its owner f1: item b1 in warehouse a1 (T11), customer c1 and posted invoice d1 (T9).
+DO $$
+DECLARE
+  b1  constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  a1  constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  c1  constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  inv constant uuid := '00000000-0000-0000-0000-0000000000d1';   -- posted (T9): only a posted invoice is credited
+  cn  constant uuid := '00000000-0000-0000-0000-000000000c84';
+BEGIN
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost)
+    VALUES (app_company_id(), b1, a1, '2027-08-11', 'adjustment', 5, 10);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id)
+    VALUES (app_company_id(), b1, a1, '2027-08-11', 'sale', -2, 0, inv);
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, original_document_id, restock)
+    VALUES (cn, app_company_id(), 'credit_note', c1, '2027-08-12', 'ETB', inv, true);
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, restock) VALUES (app_company_id(), 'invoice', c1, '2027-08-12', 'ETB', true);
+    RAISE EXCEPTION 'FAIL T84a: an invoice said its goods came back';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id, amount)
+    VALUES (app_company_id(), b1, a1, '2027-08-12', 'sale_return', 1, 0, cn, 10);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id, amount)
+      VALUES (app_company_id(), b1, a1, '2027-08-12', 'sale_return', 2, 0, cn, 20);
+    RAISE EXCEPTION 'FAIL T84b: more came back than the invoice sold';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- The return sent out again (a voided credit note): that quantity may come back once more.
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id)
+    VALUES (app_company_id(), b1, a1, '2027-08-13', 'sale', -1, 0, cn);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id, amount)
+    VALUES (app_company_id(), b1, a1, '2027-08-13', 'sale_return', 2, 0, cn, 20);
+  RAISE NOTICE 'PASS T84 goods come back only on credit notes, never more than their invoice sold';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
