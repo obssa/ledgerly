@@ -32,6 +32,7 @@ class Document extends Model
             'prices_include_tax' => 'boolean',
             'custom_fields' => 'array',
             'lock_version' => 'integer',
+            'opening' => 'boolean',
         ];
     }
 

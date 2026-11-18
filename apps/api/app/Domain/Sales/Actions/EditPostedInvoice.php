@@ -48,6 +48,9 @@ final class EditPostedInvoice
         if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill'], true) || ! $invoice->isPosted()) {
             throw new LedgerException("Only posted invoices, credit notes and bills are edited this way ({$invoice->number} is {$invoice->status}).");
         }
+        if ($invoice->opening) {
+            throw new LedgerException("{$invoice->number} was brought in from the old books: void it and enter it again with the right amount.");
+        }
         if (DB::table('stock_moves')->where(['company_id' => $invoice->company_id, 'document_id' => $invoice->getKey()])->exists()) {
             throw new LedgerException("{$invoice->number} moved stock: void it and enter it again, so the bin card stays exact.");
         }

@@ -2940,6 +2940,49 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T82 quotes owe nothing, convert once into a document of the same customer, and expire only through the scheduler';
 END $$;
+-- T83: open invoices and bills from the old books (057). Only an invoice or a bill is one, dated on or before the
+-- company's conversion date (none without one), and it stays one; it is never sent to the tax authority. Company A
+-- (no conversion date) as f1, then a company of its own with a conversion date, as the owner role.
+DO $$ BEGIN
+  BEGIN
+    INSERT INTO documents (company_id, type, number, contact_id, issue_date, currency, total, amount_due, opening)
+      VALUES (app_company_id(), 'invoice', 'OLD-T83-1', '00000000-0000-0000-0000-0000000000c1', '2026-06-01', 'ETB', 100, 100, true);
+    RAISE EXCEPTION 'FAIL T83a: an invoice from the old books came in without a conversion date';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+END $$;
+RESET ROLE;
+DO $$
+DECLARE
+  e  constant uuid := '00000000-0000-0000-0000-000000000e83';
+  k  constant uuid := '00000000-0000-0000-0000-000000000c83';
+  d  constant uuid := '00000000-0000-0000-0000-000000000d83';
+BEGIN
+  INSERT INTO companies (id, organisation_id, legal_name, country_code, base_currency, conversion_date)
+    VALUES (e, '00000000-0000-0000-0000-0000000000a0', 'Company E83', 'ET', 'ETB', '2027-06-30');
+  INSERT INTO contacts (id, company_id, name, is_customer) VALUES (k, e, 'Old customer', true);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, due_date, currency, total, amount_due, opening)
+    VALUES (d, e, 'invoice', 'OLD-T83-2', k, '2027-05-01', '2027-05-31', 'ETB', 100, 100, true);
+  BEGIN
+    INSERT INTO documents (company_id, type, number, contact_id, issue_date, currency, total, amount_due, opening)
+      VALUES (e, 'invoice', 'OLD-T83-3', k, '2027-07-01', 'ETB', 100, 100, true);
+    RAISE EXCEPTION 'FAIL T83b: an invoice dated after the conversion date came in from the old books';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, opening)
+      VALUES (e, 'quote', k, '2027-05-01', 'ETB', true);
+    RAISE EXCEPTION 'FAIL T83c: a quote came in from the old books';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE documents SET opening = false WHERE id = d;
+    RAISE EXCEPTION 'FAIL T83d: an invoice from the old books became an ordinary one';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO einvoice_submissions (company_id, document_id, authority) VALUES (e, d, 'SANDBOX');
+    RAISE EXCEPTION 'FAIL T83e: an invoice from the old books was sent to the tax authority';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T83 invoices and bills from the old books are dated by the conversion date, stay so, and are never sent to the tax authority';
+END $$;
+SET ROLE ledgerly_web;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

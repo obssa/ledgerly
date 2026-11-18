@@ -27,6 +27,18 @@ export const IMPORT_KINDS = {
     example: "Code,Name,Debit,Credit\n1110,Main bank account,250000,\n2210,VAT payable,,18000",
     required: "Your trial balance at the conversion date, one line per account. It replaces the opening balances entered before; any difference goes to opening balance equity. Receivables, payables and stock come from their open invoices, bills and stock counts.",
   },
+  "open-invoices": {
+    label: "Open invoices",
+    columns: ["Customer (as named in Ledgerly)", "Invoice number (from the old books)", "Date", "Due date", "Amount (still open)", "Currency", "Rate"],
+    example: "Customer,Invoice number,Date,Due date,Amount\nKaldi Cafe,OLD-0042,15/06/2026,15/07/2026,11500",
+    required: "Customer, Invoice number, Date and Amount are required: what each customer still owed on the conversion date. Dates as 2026-06-15 or 15/06/2026.",
+  },
+  "open-bills": {
+    label: "Open bills",
+    columns: ["Supplier (as named in Ledgerly)", "Supplier invoice number", "Date", "Due date", "Amount (still open)", "Currency", "Rate", "Number (ours, if numbered by hand)"],
+    example: "Supplier,Supplier invoice number,Date,Amount\nAddis Packaging,AP-55,20/06/2026,4000",
+    required: "Supplier, Supplier invoice number, Date and Amount are required: what was still owed to each supplier on the conversion date.",
+  },
 } as const;
 
 export type ImportKind = keyof typeof IMPORT_KINDS;
@@ -58,6 +70,10 @@ export function importSummary(r: ImportResult): string {
   const what = r.kind === "accounts" ? "accounts" : IMPORT_KINDS[r.kind].label.toLowerCase();
   if (r.errors.length > 0) {
     return `${r.errors.length} of ${r.rows} rows need a fix; nothing was ${r.checked ? "kept (this was a check)" : "added"}. Correct the file and try again.`;
+  }
+  if (r.kind === "open-invoices" || r.kind === "open-bills") {
+    const noun = r.kind === "open-bills" ? "bills" : "invoices";
+    return r.checked ? `All ${r.rows} rows are fine. Import them to bring in the open ${noun}.` : `${r.added} open ${noun} brought in.`;
   }
   if (r.kind === "opening-balances") {
     return r.checked ? `All ${r.rows} lines are fine. Import them to enter the opening balances.` : `Opening balances entered: ${r.added} accounts.`;

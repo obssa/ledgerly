@@ -11,11 +11,15 @@ use App\Domain\Ledger\Models\Account;
 use App\Domain\Ledger\Models\JournalEntry;
 use App\Domain\Ledger\Money;
 use App\Domain\Ledger\PostingService;
+use App\Domain\Sales\Actions\EnterOpeningDocument;
+use App\Domain\Sales\Models\Document;
+use App\Domain\Ledger\Currency;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -123,6 +127,38 @@ final class OpeningBalanceController extends Controller
         return response()->json($this->present($date, $base));
     }
 
+    /** An invoice a customer still owed on the conversion date, from the old books (057). */
+    public function invoice(Request $request, EnterOpeningDocument $enter): JsonResponse
+    {
+        return $this->openDocument($request, $enter, 'invoice');
+    }
+
+    /** A bill the company still owed a supplier on the conversion date, from the old books (057). */
+    public function bill(Request $request, EnterOpeningDocument $enter): JsonResponse
+    {
+        return $this->openDocument($request, $enter, 'bill');
+    }
+
+    private function openDocument(Request $request, EnterOpeningDocument $enter, string $type): JsonResponse
+    {
+        $this->authorizeCompany('accounting.opening');
+        $data = $request->validate([
+            // The company's own customer or supplier: the exists rule reads through row-level security.
+            'contact_id' => ['required', 'uuid', Rule::exists('contacts', 'id')->where($type === 'bill' ? 'is_vendor' : 'is_customer', true)],
+            'number' => [$type === 'invoice' ? 'required' : 'nullable', 'string', 'max:40'],
+            'reference' => [$type === 'bill' ? 'required' : 'prohibited', 'string', 'max:60'],   // the supplier's invoice number
+            'issue_date' => ['required', 'date_format:Y-m-d'],
+            'due_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:issue_date'],
+            'currency' => ['required', Rule::in(Currency::all())],
+            'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            'amount' => ['required', 'decimal:0,2', 'gt:0', 'max:999999999999999999'],   // what was still owed
+        ]);
+        $document = $enter->handle($type, $data, $request->user()->getKey());
+
+        return response()->json(['id' => $document->getKey(), 'type' => $document->type, 'number' => $document->number, 'reference' => $document->reference,
+            'total' => $document->total, 'amount_due' => $document->amount_due, 'journal_entry_id' => $document->journal_entry_id], 201);
+    }
+
     private function openingEntry(): ?JournalEntry
     {
         return JournalEntry::query()->where(['source_type' => 'opening', 'status' => 'posted'])->orderByDesc('number')->first();
@@ -151,6 +187,12 @@ final class OpeningBalanceController extends Controller
             // Debits minus credits of the lines entered; booked to Opening balance equity so the books still balance.
             'difference' => $difference->toDecimalString(),
             'from_detail' => self::FROM_DETAIL,
+            // Open invoices and bills brought in at conversion (057), oldest first; voided ones are left out.
+            'documents' => Document::query()->where('opening', true)->where('status', '<>', 'void')->with('contact:id,name')
+                ->orderBy('type')->orderBy('issue_date')->orderBy('id')->limit(500)
+                ->get(['id', 'type', 'number', 'reference', 'contact_id', 'issue_date', 'due_date', 'currency', 'total', 'amount_due', 'status'])
+                ->map(fn (Document $d) => [...$d->only(['id', 'type', 'number', 'reference', 'issue_date', 'due_date', 'currency', 'total', 'amount_due', 'status']),
+                    'contact' => $d->contact?->only(['id', 'name'])])->values(),
             // Whether the signed-in member may enter them; the API checks again on save.
             'can' => ['enter' => (bool) app(CurrentCompany::class)->membership()?->can('accounting.opening')],
         ];
