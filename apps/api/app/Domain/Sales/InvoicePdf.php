@@ -45,6 +45,9 @@ final class InvoicePdf
         $contactLine = implode(' · ', array_filter([$company->phone ?? null, $company->email ?? null]));
         $clearance = $invoice->einvoiceSubmissions->firstWhere('status', 'cleared')?->clearance_number;
         $original = $invoice->original_document_id ? DB::table('documents')->where(['company_id' => $company->getKey(), 'id' => $invoice->original_document_id])->value('number') : null;
+        // The company's invoice template: its accent colour (validated as #RRGGBB when saved), how to pay, a footer line.
+        $template = \App\Http\Controllers\CompanySettingsController::template($company->settings['invoice_template'] ?? []);
+        $accent = $template['accent'] ?? '#111111';
 
         $rows = '';
         foreach ($invoice->lines as $l) {
@@ -57,7 +60,8 @@ final class InvoicePdf
         return '<!doctype html><html><head><meta charset="utf-8"><style>'
             . 'body{font-family:Helvetica,sans-serif;font-size:10.5pt;color:#111}h1{font-size:18pt;margin:0 0 4pt}.muted{color:#555}'
             . 'table{width:100%;border-collapse:collapse;margin-top:12pt}th,td{padding:4pt 3pt;border-bottom:0.5pt solid #ccc;text-align:left}'
-            . 'th{font-size:9pt;color:#555}.n{text-align:right}.totals{width:45%;margin-left:55%}.totals td{border:none}.total td{font-weight:bold;border-top:1pt solid #111}'
+            . 'th{font-size:9pt;color:#555}.n{text-align:right}.totals{width:45%;margin-left:55%}.totals td{border:none}.total td{font-weight:bold;border-top:1pt solid ' . $accent . '}'
+            . 'h1{color:' . $accent . '}thead th{border-bottom:1pt solid ' . $accent . '}.footer{margin-top:18pt;font-size:9pt;color:#555;text-align:center}'
             . '</style></head><body>'
             . '<table style="margin:0"><tr><td style="border:none;vertical-align:top">'
             . '<h1>' . $e((string) ($company->trading_name ?: $company->legal_name)) . '</h1>'
@@ -80,6 +84,8 @@ final class InvoicePdf
             . '<tr class="total"><td>Total</td><td class="n">' . $e($invoice->currency) . ' ' . $money($invoice->total) . '</td></tr>' . $due . '</table>'
             . ($clearance ? '<p>Registered with the tax authority: ' . $e((string) $clearance) . '</p>' : '')
             . ($invoice->notes ? '<p class="muted">' . nl2br($e($invoice->notes)) . '</p>' : '')
+            . ($template['payment_details'] && $invoice->type === 'invoice' ? '<p><strong>How to pay</strong><br>' . nl2br($e($template['payment_details'])) . '</p>' : '')
+            . ($template['footer'] ? '<p class="footer">' . $e($template['footer']) . '</p>' : '')
             . '</body></html>';
     }
 }

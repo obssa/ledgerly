@@ -17,6 +17,8 @@ export const APPROVAL_LIMITS = ["invoice_above", "bill_above", "journal_above"] 
 export const VAT_SHOWN = "vat_registered_shown";
 export const REMINDERS_SHOWN = "reminders_shown";
 export const TAX_REMINDERS_SHOWN = "tax_reminders_shown";
+/** Marks that the invoice template fields were on the form (so empty texts clear them). */
+export const TEMPLATE_SHOWN = "invoice_template_shown";
 
 /** "7, 30" → [7, 30]: whole days after the due date, at most three. Anything else is left for the API to refuse. */
 export function reminderDays(text: string): number[] {
@@ -44,6 +46,14 @@ export function settingsBody(form: FormData): Record<string, unknown> {
   }
 
   if (form.has(TAX_REMINDERS_SHOWN)) body.tax_reminders = form.get("tax_reminders") === "on";
+  if (form.has(TEMPLATE_SHOWN)) {
+    const value = (n: string) => (typeof form.get(n) === "string" ? String(form.get(n)).trim() : "");
+    body.invoice_template = {
+      accent: /^#[0-9A-Fa-f]{6}$/.test(value("invoice_template.accent")) ? value("invoice_template.accent") : null,
+      payment_details: value("invoice_template.payment_details") || null,
+      footer: value("invoice_template.footer") || null,
+    };
+  }
   if (form.has(REMINDERS_SHOWN)) body.reminders = { enabled: form.get("reminders.enabled") === "on", days: reminderDays(value("reminders.days")) };
 
   return body;

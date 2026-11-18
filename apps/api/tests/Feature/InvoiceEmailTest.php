@@ -77,6 +77,21 @@ final class InvoiceEmailTest extends TestCase
         $this->assertStringContainsString('&lt;img src=&quot;http://evil.example/x.png&quot;&gt; Kaldi &amp; Sons', $html);
         $this->assertStringNotContainsString('<img', $html);
 
+        // The company's template: an accent colour (only #RRGGBB is taken), how to pay and a footer, escaped as well.
+        $version = fn () => $this->getJson('/api/v1/company', $h)->json('version');
+        $this->putJson('/api/v1/company', ['version' => $version(), 'invoice_template' => ['accent' => 'red;}body{display:none']], $h)
+            ->assertUnprocessable()->assertJsonValidationErrors('invoice_template.accent');
+        $this->putJson('/api/v1/company', ['version' => $version(), 'invoice_template' => ['accent' => '#0c7c59',
+            'payment_details' => "CBE 1000123456789\nAbyssinia Coffee PLC", 'footer' => 'Thank you <script>x</script>']], $h)->assertOk()
+            ->assertJsonPath('invoice_template.accent', '#0C7C59')->assertJsonPath('invoice_template.footer', 'Thank you <script>x</script>');
+        $html = \App\Domain\Tenancy\Support\DatabaseTenantContext::run($c['user'], $c['company'], fn () => app(\App\Domain\Sales\InvoicePdf::class)->html(
+            \App\Domain\Tenancy\Models\Company::query()->findOrFail($c['company']), \App\Domain\Sales\Models\Document::query()->findOrFail($c['invoice'])));
+        $this->assertStringContainsString('color:#0C7C59', $html);
+        $this->assertStringContainsString('CBE 1000123456789<br />', $html);
+        $this->assertStringContainsString('Thank you &lt;script&gt;x&lt;/script&gt;', $html);
+        $this->assertStringNotContainsString('<script', $html);
+        $this->assertStringStartsWith('%PDF-', (string) $this->get("/api/v1/invoices/{$c['invoice']}/pdf", $h)->assertOk()->getContent());
+
         $this->actingAs(\App\Models\User::query()->findOrFail($b['user']), 'sanctum');
         $this->get("/api/v1/invoices/{$c['invoice']}/pdf", ['X-Company-Id' => $b['company'], 'Accept' => 'application/json'])->assertNotFound();
     }

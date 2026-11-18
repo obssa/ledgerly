@@ -5,7 +5,7 @@ import type { CompanySettings, Currencies, Dimension, Numbering } from "@/lib/ap
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
-import { VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN } from "@/lib/settings";
+import { VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN, TEMPLATE_SHOWN } from "@/lib/settings";
 import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock, toggleDimension } from "./actions";
 import { todayIn } from "@/lib/dates";
 
@@ -131,6 +131,26 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
           <input type="checkbox" id="tax-reminders" name="tax_reminders" defaultChecked={settings.tax_reminders ?? true} />
           Email the people who file tax when a return is due within ten days, and when it is overdue
         </label>
+      </fieldset>
+
+      <h3 className="mb-1 mt-7 text-[15px] font-bold">Invoices on paper and as PDF files</h3>
+      <p className="mb-3 text-[13px] text-muted">An accent colour for the headings, how customers pay you (printed on invoices), and a line at the foot of the page.</p>
+      <fieldset disabled={!editable} className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[18px]">
+        <legend className="sr-only">Invoice template</legend>
+        <input type="hidden" name={TEMPLATE_SHOWN} value="1" />
+        <div>
+          <label className="field-label" htmlFor="template-accent">Accent colour</label>
+          <input className="field h-[42px] w-[90px] p-1" id="template-accent" name="invoice_template.accent" type="color" defaultValue={settings.invoice_template?.accent ?? "#111111"} />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="field-label" htmlFor="template-payment">How to pay (bank, account, reference)</label>
+          <textarea className="field min-h-[72px]" id="template-payment" name="invoice_template.payment_details" maxLength={600}
+            defaultValue={settings.invoice_template?.payment_details ?? ""} placeholder="CBE 1000123456789, Abyssinia Coffee PLC. Quote the invoice number." />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="field-label" htmlFor="template-footer">Footer line</label>
+          <input className="field" id="template-footer" name="invoice_template.footer" maxLength={300} defaultValue={settings.invoice_template?.footer ?? ""} placeholder="Thank you for your business" />
+        </div>
       </fieldset>
 
       {editable && (

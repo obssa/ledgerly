@@ -93,7 +93,12 @@ final class CompanySettingsController extends Controller
             'reminders.days.*' => ['integer', 'between:1,365', 'distinct'],
             // Reminders of tax returns due (054): on unless turned off.
             'tax_reminders' => ['sometimes', 'boolean'],
-        ]);
+            // How invoices look on paper and as PDF files: an accent colour, how to pay, a footer line.
+            'invoice_template' => ['sometimes', 'array:accent,payment_details,footer'],
+            'invoice_template.accent' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'invoice_template.payment_details' => ['nullable', 'string', 'max:600'],
+            'invoice_template.footer' => ['nullable', 'string', 'max:300'],
+        ], ['invoice_template.accent.regex' => 'A colour such as #0C7C59.']);
 
         if ($data['version'] !== $this->version($company)) {
             return response()->json(['message' => 'Someone else changed these settings after you opened them. Reload and try again.', 'type' => 'StaleSettings'], 409);
@@ -114,6 +119,10 @@ final class CompanySettingsController extends Controller
             sort($days);
             $company->settings = [...($company->settings ?? []), 'reminders' => ['enabled' => (bool) $data['reminders']['enabled'], 'days' => $days]];
             unset($data['reminders']);
+        }
+        if (array_key_exists('invoice_template', $data)) {
+            $company->settings = [...($company->settings ?? []), 'invoice_template' => self::template([...self::template($company->settings['invoice_template'] ?? []), ...$data['invoice_template']])];
+            unset($data['invoice_template']);
         }
         if (array_key_exists('tax_reminders', $data)) {
             $company->settings = [...($company->settings ?? []), 'tax_reminders' => (bool) $data['tax_reminders']];
@@ -249,8 +258,23 @@ final class CompanySettingsController extends Controller
         $fields['approval'] = array_intersect_key($company->settings['approval'] ?? [], array_flip(self::APPROVAL_LIMITS));
         $fields['reminders'] = \App\Domain\Sales\InvoiceReminders::settingsOf($company);
         $fields['tax_reminders'] = (bool) ($company->settings['tax_reminders'] ?? true);
+        $fields['invoice_template'] = self::template($company->settings['invoice_template'] ?? []);
 
         return $fields;
+    }
+
+    /**
+     * The invoice template as kept: an accent colour (#RRGGBB) and two texts, trimmed, empty as null.
+     *
+     * @param array<string, mixed> $t
+     * @return array{accent: ?string, payment_details: ?string, footer: ?string}
+     */
+    public static function template(array $t): array
+    {
+        $text = fn ($v) => is_string($v) && trim($v) !== '' ? trim($v) : null;
+        $accent = is_string($t['accent'] ?? null) && preg_match('/^#[0-9A-Fa-f]{6}$/', $t['accent']) ? strtoupper($t['accent']) : null;
+
+        return ['accent' => $accent, 'payment_details' => $text($t['payment_details'] ?? null), 'footer' => $text($t['footer'] ?? null)];
     }
 
     private function version(Company $company): string
