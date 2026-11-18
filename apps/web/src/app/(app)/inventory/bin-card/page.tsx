@@ -8,7 +8,8 @@ import { formatAmount } from "@/lib/format";
 export const metadata = { title: "Bin card" };
 
 const KIND: Record<string, string> = { opening: "Opening", purchase: "Received", sale: "Sold", sale_return: "Returned in", purchase_return: "Returned out",
-  transfer_in: "Transfer in", transfer_out: "Transfer out", adjustment: "Adjustment", production: "Production" };
+  transfer_in: "Transfer in", transfer_out: "Transfer out", adjustment: "Adjustment", production: "Production", project_issue: "Issued to a project",
+  landed_cost: "Landed cost" };
 const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const uuid = (v: unknown) => (typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v) ? v : undefined);
 

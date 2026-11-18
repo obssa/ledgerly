@@ -24,6 +24,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\LandedCostController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RecurringJournalController;
 use App\Http\Controllers\ReportExportController;
@@ -298,6 +299,8 @@ Route::prefix('v1')->group(function () {
             Route::get('bills/{bill}/history', [BillController::class, 'history']);
 
             Route::post('bills/{bill}/credits', [SupplierCreditController::class, 'store']);
+            Route::get('bills/{bill}/landed-costs', [LandedCostController::class, 'index']);
+            Route::post('bills/{bill}/landed-costs', [LandedCostController::class, 'store']);
             Route::get('supplier-credits', [SupplierCreditController::class, 'index']);
             Route::post('supplier-credits/{supplierCredit}/apply', [SupplierCreditController::class, 'apply']);
 

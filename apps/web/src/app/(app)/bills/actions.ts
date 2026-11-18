@@ -88,3 +88,20 @@ export async function applySupplierCredit(_: FormState | undefined, form: FormDa
   refresh();
   return { notice: "Credit applied." };
 }
+
+/** Module 4: a freight, duty or clearing bill added to the cost of the goods another bill brought in (060). */
+export async function applyLandedCost(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const amount = (text(form, "amount") ?? "").replace(/[\s,]/g, "");
+  let done: { amount: string; inventory: string; cost_of_sales: string };
+  try {
+    done = await ledgerly.applyLandedCost(text(form, "id") ?? "", {
+      goods_bill_id: text(form, "goods_bill_id") ?? "", method: form.get("method") === "quantity" ? "quantity" : "value",
+      ...(amount ? { amount } : {}), ...(text(form, "date") ? { date: text(form, "date") } : {}),
+    }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: `${done.amount} added: ${done.inventory} onto the goods on hand, ${done.cost_of_sales} to cost of goods sold.` };
+}

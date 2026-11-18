@@ -756,6 +756,28 @@ export interface InvoiceDetail extends Invoice {
   reminders?: InvoiceReminderSent[];
 }
 
+/** GET bills/{bill}/landed-costs (060): what a cost bill was spread onto, what a goods bill received, and where it can go. */
+export interface LandedCosts {
+  spread: LandedCostRow[];
+  received: LandedCostRow[];
+  /** What is left of the cost bill to spread, in the base currency. */
+  left: string;
+  candidates: { id: string; number: string; reference: string | null; issue_date: string; total: string; currency: string; supplier: string | null }[];
+  can: { apply: boolean };
+}
+
+export interface LandedCostRow {
+  id: string;
+  amount: string;
+  method: "value" | "quantity";
+  applied_on: string;
+  journal_entry_id: string;
+  cost_bill_id: string;
+  cost_bill_number: string;
+  goods_bill_id: string;
+  goods_bill_number: string;
+}
+
 /** Quotes and sales orders (056): sales documents that post nothing, converted into a sales order or an invoice. */
 export type QuoteKind = "quote" | "sales_order";
 export type QuoteStatus = "draft" | "sent" | "accepted" | "declined" | "expired" | "converted" | "void";
@@ -1398,6 +1420,9 @@ export const ledgerly = {
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
+  landedCosts: (billId: string, ctx: RequestOptions) => api<LandedCosts>(`bills/${encodeURIComponent(billId)}/landed-costs`, ctx),
+  applyLandedCost: (billId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ amount: string; inventory: string; cost_of_sales: string }>(`bills/${encodeURIComponent(billId)}/landed-costs`, { ...ctx, method: "POST", body }),
   quotes: (kind: QuoteKind, ctx: RequestOptions) => api<{ data: QuoteSummary[] }>(quotePath(kind), ctx),
   quote: (kind: QuoteKind, id: string, ctx: RequestOptions) => api<QuoteDetail>(`${quotePath(kind)}/${encodeURIComponent(id)}`, ctx),
   createQuote: (kind: QuoteKind, body: Record<string, unknown>, ctx: RequestOptions) => api<QuoteDetail>(quotePath(kind), { ...ctx, method: "POST", body }),
