@@ -162,6 +162,78 @@ final class StockController extends Controller
         });
     }
 
+    /**
+     * Module 4: a stock count of one warehouse. Each item counted differently from the books is adjusted to the count:
+     * a shortage leaves at the average cost, a surplus comes in at the item's average cost in that warehouse (or its
+     * purchase price when none is on hand). The net value posts in one entry against inventory adjustment. A count is of
+     * the stock as it stands: dated today, or a day after which nothing moved in that warehouse.
+     */
+    public function count(Request $request, StockLedger $stock, PostingService $posting, AuditLogger $audit): JsonResponse
+    {
+        $this->authorizeCompany('inventory.adjust');
+        $data = $request->validate([
+            'warehouse_id' => ['required', 'uuid'],
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
+            'counted' => ['required', 'array', 'min:1', 'max:1000'],
+            'counted.*.item_id' => ['required', 'uuid', 'distinct'],
+            'counted.*.quantity' => ['required', 'decimal:0,2', 'min:0'],
+            'note' => ['nullable', 'string', 'max:300'],
+        ]);
+
+        return DB::transaction(function () use ($data, $stock, $posting, $audit, $request) {
+            $company = $this->current->get();
+            $warehouse = Warehouse::query()->where('is_active', true)->find($data['warehouse_id'])
+                ?? throw ValidationException::withMessages(['warehouse_id' => ['Choose an active warehouse of this company.']]);
+            if (DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'warehouse_id' => $warehouse->getKey()])->where('moved_on', '>', $data['date'])->exists()) {
+                throw ValidationException::withMessages(['date' => ['Stock moved in this warehouse after that day: count it as it stands today.']]);
+            }
+            $date = new DateTimeImmutable($data['date']);
+            $reference = mb_substr('Count ' . $data['date'] . ($data['note'] ? ": {$data['note']}" : ''), 0, 255);
+            $base = $company->base_currency;
+            $net = \App\Domain\Ledger\Money::zero($base);
+            $lines = [];
+            foreach ($data['counted'] as $i => $c) {
+                $item = Item::query()->find($c['item_id']);
+                if ($item === null || ! $item->isStock()) {
+                    throw ValidationException::withMessages(["counted.{$i}.item_id" => ['Each line is a stock item of this company.']]);
+                }
+                $balance = DB::table('stock_balances')->where(['company_id' => $company->getKey(), 'item_id' => $item->getKey(), 'warehouse_id' => $warehouse->getKey()])
+                    ->first(['quantity', 'value']);   // kept by the database's own triggers (the app cannot lock it); a count is taken with the warehouse still
+                $books = (string) ($balance->quantity ?? '0');
+                $diff = bcsub((string) $c['quantity'], $books, 2);
+                if (bccomp($diff, '0', 2) === 0) {
+                    continue;
+                }
+                $amount = null;
+                if (bccomp($diff, '0', 2) > 0) {
+                    $unit = bccomp($books, '0', 2) > 0 ? bcdiv((string) $balance->value, $books, 6) : (string) ($item->purchase_price ?? '0');
+                    $amount = bcadd(bcmul($unit, $diff, 6), '0.005', 2);   // half up to the cent (never negative here)
+                }
+                $move = $stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'adjustment', $diff, '0', $reference, null,
+                    $request->user()->getKey(), $amount);
+                $net = $net->plus($move['amount']);
+                $lines[] = ['item' => $item->name, 'books' => $books, 'counted' => (string) $c['quantity'], 'difference' => $diff, 'value' => $move['amount']->toDecimalString()];
+            }
+
+            $entry = null;
+            if (! $net->isZero()) {
+                $draft = new JournalDraft($company->getKey(), $date, $base, $base, '1', "Stock count of {$warehouse->name} on {$data['date']}", 'stock_count', null);
+                $inventory = Account::system('inventory')->getKey();
+                $adjustment = Account::system('inventory_adjustment')->getKey();
+                $value = $net->isNegative() ? $net->negated() : $net;
+                $draft->add($net->isNegative() ? JournalLineDraft::credit($inventory, $value) : JournalLineDraft::debit($inventory, $value));
+                $draft->add($net->isNegative() ? JournalLineDraft::debit($adjustment, $value) : JournalLineDraft::credit($adjustment, $value));
+                $entry = $posting->post($draft, $request->user()->getKey());
+            }
+            $audit->record($company->getKey(), 'stock_counted', 'warehouse', $warehouse->getKey(), null, [
+                'date' => $data['date'], 'items' => count($data['counted']), 'differences' => $lines, 'net' => $net->toDecimalString(), 'journal_entry' => $entry?->number,
+            ], $data['note'] ?? null, $request->user()->getKey());
+
+            return response()->json(['counted' => count($data['counted']), 'differences' => $lines, 'net' => $net->toDecimalString(),
+                'journal_entry_id' => $entry?->getKey()], 201);
+        });
+    }
+
     public function adjust(Request $request, StockLedger $stock, PostingService $posting, AuditLogger $audit): JsonResponse
     {
         $this->authorizeCompany('inventory.adjust');

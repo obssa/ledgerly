@@ -111,3 +111,22 @@ export async function issueStock(_: FormState | undefined, form: FormData): Prom
   refresh();
   return { notice: `Issued. Cost ${result.amount}, charged to the project.` };
 }
+
+/** Module 4: a stock count of one warehouse; only the lines filled in are counted. */
+export async function countStock(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const counted: { item_id: string; quantity: string }[] = [];
+  for (const [key, value] of form.entries()) {
+    if (typeof value === "string" && key.startsWith("count_") && value.trim() !== "") counted.push({ item_id: key.slice(6), quantity: amount(value) });
+  }
+  if (counted.length === 0) return { error: "Enter the quantity counted for at least one item." };
+  let result: { differences: unknown[]; net: string };
+  try {
+    result = await ledgerly.countStock({ warehouse_id: text(form, "warehouse_id") ?? "", date: text(form, "date") ?? "", counted,
+      ...(text(form, "note") ? { note: text(form, "note") } : {}) }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: result.differences.length === 0 ? "Counted: everything agrees with the books." : `Counted: ${result.differences.length} item${result.differences.length === 1 ? "" : "s"} adjusted, ${result.net} net, posted.` };
+}

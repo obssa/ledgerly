@@ -1305,6 +1305,8 @@ export const ledgerly = {
   stock: (ctx: RequestOptions) => api<StockOnHand>("stock", ctx),
   importRows: (kind: string, csv: string, check: boolean, ctx: RequestOptions) =>
     api<ImportResult>(`imports/${encodeURIComponent(kind)}`, { ...ctx, method: "POST", body: { csv, check } }),
+  countStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ counted: number; differences: { item: string; books: string; counted: string; difference: string; value: string }[]; net: string }>("stock/counts", { ...ctx, method: "POST", body }),
   issueStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ move_id: string; amount: string; unit_cost: string; journal_entry_id: string | null }>("stock/issues", { ...ctx, method: "POST", body }),
   adjustStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
