@@ -8,6 +8,12 @@ describe("imports", () => {
     expect(importKind("items")).toBe("items");
     expect(importKind("users")).toBe("customers");
   });
+  it("names the chart and opening balances", () => {
+    expect(importKind("accounts")).toBe("accounts");
+    expect(importKind("opening-balances")).toBe("opening-balances");
+    expect(importSummary(result({ kind: "accounts", checked: false, added: 2, skipped: ["1110"] }))).toBe("2 accounts added. 1 already in the chart, left as they are (1110).");
+    expect(importSummary(result({ kind: "opening-balances", checked: false, added: 2 }))).toBe("Opening balances entered: 2 accounts.");
+  });
   it("says what happened", () => {
     expect(importSummary(result({}))).toBe("All 3 rows are fine. Import them to add the customers.");
     expect(importSummary(result({ checked: false, added: 3 }))).toBe("3 customers added.");

@@ -15,9 +15,27 @@ export const IMPORT_KINDS = {
     columns: ["Name", "Code (SKU)", "Type (inventory, non inventory or service)", "Unit", "Price", "Cost", "Reorder point"],
     example: "Name,Code,Type,Unit,Price,Cost\nGreen beans 60 kg,GB-60,inventory,bag,12500,9800\nRoasting service,RS-1,service,hour,800,",
   },
+  accounts: {
+    label: "Chart of accounts",
+    columns: ["Code", "Name", "Type (asset, liability, equity, income or expense)", "Kind (optional, e.g. operating, cogs, loan)", "Parent (its code)"],
+    example: "Code,Name,Type,Kind,Parent\n6200,Marketing,expense,operating,\n6210,Social media ads,expense,operating,6200",
+    required: "Code, Name and Type are required. A parent is listed above its accounts; codes already in the chart are skipped.",
+  },
+  "opening-balances": {
+    label: "Opening balances",
+    columns: ["Code (of the account)", "Debit", "Credit", "or Balance (debit positive, credit negative)", "Name (only to read the file)"],
+    example: "Code,Name,Debit,Credit\n1110,Main bank account,250000,\n2210,VAT payable,,18000",
+    required: "Your trial balance at the conversion date, one line per account. It replaces the opening balances entered before; any difference goes to opening balance equity. Receivables, payables and stock come from their open invoices, bills and stock counts.",
+  },
 } as const;
 
 export type ImportKind = keyof typeof IMPORT_KINDS;
+
+/** What a kind needs, in a sentence. */
+export function importRequires(kind: ImportKind): string {
+  const k = IMPORT_KINDS[kind];
+  return "required" in k ? k.required : "Only Name is required.";
+}
 
 export function importKind(v: unknown): ImportKind {
   return typeof v === "string" && v in IMPORT_KINDS ? (v as ImportKind) : "customers";
@@ -31,13 +49,19 @@ export interface ImportResult {
   errors: { row: number; name: string | null; messages: string[] }[];
   columns: string[];
   ignored_columns: string[];
+  /** Account codes already in the chart, left as they are. */
+  skipped?: string[];
 }
 
 /** What the result says, in a sentence. */
 export function importSummary(r: ImportResult): string {
-  const what = IMPORT_KINDS[r.kind].label.toLowerCase();
+  const what = r.kind === "accounts" ? "accounts" : IMPORT_KINDS[r.kind].label.toLowerCase();
   if (r.errors.length > 0) {
     return `${r.errors.length} of ${r.rows} rows need a fix; nothing was ${r.checked ? "kept (this was a check)" : "added"}. Correct the file and try again.`;
   }
-  return r.checked ? `All ${r.rows} rows are fine. Import them to add the ${what}.` : `${r.added} ${what} added.`;
+  if (r.kind === "opening-balances") {
+    return r.checked ? `All ${r.rows} lines are fine. Import them to enter the opening balances.` : `Opening balances entered: ${r.added} accounts.`;
+  }
+  const skipped = r.skipped && r.skipped.length > 0 ? ` ${r.skipped.length} already in the chart, left as they are (${r.skipped.join(", ")}).` : "";
+  return (r.checked ? `All ${r.rows} rows are fine. Import them to add the ${what}.` : `${r.added} ${what} added.`) + skipped;
 }

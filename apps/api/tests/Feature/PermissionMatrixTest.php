@@ -136,6 +136,8 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/imports/customers' => 'contacts.create',
         'POST api/v1/imports/suppliers' => 'contacts.create',
         'POST api/v1/imports/items' => 'inventory.items',
+        'POST api/v1/imports/accounts' => 'accounting.chart',
+        'POST api/v1/imports/opening-balances' => 'accounting.opening',
         'POST api/v1/invoices/{invoice}/retention' => 'payments.receive',
         'POST api/v1/invoices/{invoice}/retention/release' => 'payments.receive',
         'POST api/v1/invoices/{invoice}/void' => 'transactions.edit',
