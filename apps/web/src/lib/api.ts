@@ -442,7 +442,8 @@ export interface TimeEntry {
 }
 
 /** Module 7: a tax worksheet, built from the ledger (VAT: output and input; withholding: what was withheld). */
-export type TaxKind = "vat" | "withholding";
+/** tot: turnover tax, where the company has TOT rates (052). */
+export type TaxKind = "vat" | "withholding" | "tot";
 
 export interface TaxRateRow { code: string; name: string; rate: string | null; kind: string | null; taxable: string; tax: string }
 export interface TaxDocumentRow { id: string; type: string; number: string | null; date: string; contact: string; tax_id: string | null; taxable: string; tax: string }

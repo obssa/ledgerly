@@ -44,7 +44,22 @@ final class TaxRateController extends Controller
         $company = $current->get();
         $id = (string) Str::uuid7();
         DB::table('tax_rates')->insert([...$data, 'id' => $id, 'company_id' => $company->getKey(), 'country_code' => $company->country_code]);
+        if ($data['kind'] === 'tot') {
+            $this->totAccount($company);   // turnover tax posts to its own account (ApproveInvoice, 052)
+        }
 
         return response()->json(['id' => $id, ...$data], 201);
+    }
+
+    /** The company's TOT payable account, made with its first TOT rate: a liability next to VAT payable in the chart. */
+    private function totAccount(\App\Domain\Tenancy\Models\Company $company): void
+    {
+        if (DB::table('accounts')->where(['company_id' => $company->getKey(), 'system_key' => 'tot_payable'])->exists()) {
+            return;
+        }
+        $taken = DB::table('accounts')->where('company_id', $company->getKey())->pluck('code')->all();
+        $code = collect(array_map(fn ($n) => (string) $n, range(2320, 2399)))->first(fn ($c) => ! in_array($c, $taken, true)) ?? 'TOT-' . Str::upper(Str::random(4));
+        DB::table('accounts')->insert(['id' => (string) Str::uuid(), 'company_id' => $company->getKey(), 'code' => $code, 'name' => 'Turnover tax payable',
+            'type' => 'liability', 'subtype' => 'tax_payable', 'system_key' => 'tot_payable']);
     }
 }
