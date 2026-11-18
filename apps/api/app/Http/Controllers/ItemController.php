@@ -34,7 +34,7 @@ final class ItemController extends Controller
         $this->authorizeCompany('inventory.view');
         $q = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
-            'type' => ['nullable', Rule::in(['inventory', 'non_inventory', 'service'])],
+            'type' => ['nullable', Rule::in(['inventory', 'non_inventory', 'service', 'bundle'])],
             'include_archived' => ['nullable', 'boolean'],
         ]);
 
@@ -117,7 +117,7 @@ final class ItemController extends Controller
         $data = $request->validate([
             'name' => [$req, 'string', 'max:200'],
             'sku' => ['sometimes', 'nullable', 'string', 'max:60', Rule::unique('items', 'sku')->where('company_id', $this->current->id())->ignore($item?->getKey())],
-            'type' => [$req, Rule::in(['inventory', 'non_inventory', 'service'])],
+            'type' => [$req, Rule::in(['inventory', 'non_inventory', 'service', 'bundle'])],   // a bundle: sold as one, made of other items (073)
             'unit' => ['sometimes', 'string', 'max:20'],
             'sale_price' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0'],
             'purchase_price' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0'],
@@ -146,7 +146,51 @@ final class ItemController extends Controller
         $units = DB::table('item_units')->where('item_id', $item->getKey())->orderByDesc('is_active')->orderBy('factor')
             ->get(['id', 'name', 'factor', 'is_active', 'created_at']);
 
-        return [...$item->toArray(), 'balances' => $balances, 'units' => $units, 'can' => $this->can()];
+        // 073: a bundle's parts, and whether they can still change (not once the bundle is on a document).
+        $components = $item->type === 'bundle'
+            ? DB::table('item_components as c')->join('items as i', 'i.id', '=', 'c.component_id')->where('c.bundle_id', $item->getKey())
+                ->orderBy('i.name')->get(['c.component_id as item_id', 'i.name', 'i.type', 'i.unit', 'c.quantity'])
+            : null;
+        $used = $item->type === 'bundle' && DB::table('document_lines')->where('item_id', $item->getKey())->exists();
+
+        return [...$item->toArray(), 'balances' => $balances, 'units' => $units, 'components' => $components,
+            'can' => [...$this->can(), 'components' => $item->type === 'bundle' && ! $used && (bool) $this->current->membership()?->can('inventory.items')]];
+    }
+
+    /**
+     * 073: sets a bundle's parts, the whole list at once: other items of the company (never a bundle), each with its
+     * quantity per bundle in its own unit. Refused once the bundle is on a document: archive it and make a new one.
+     */
+    public function setComponents(Request $request, Item $item): JsonResponse
+    {
+        $this->authorizeCompany('inventory.items');
+        $data = $request->validate([
+            'components' => ['present', 'array', 'max:50'],
+            'components.*.item_id' => ['required', 'uuid', 'distinct', Rule::exists('items', 'id')->where(fn (Builder $q) => $q->where('type', '<>', 'bundle'))],
+            'components.*.quantity' => ['required', 'decimal:0,2', 'gt:0'],
+        ], ['components.*.item_id.exists' => 'A part is another of the company\'s items, not a bundle.']);
+        if ($item->type !== 'bundle') {
+            throw ValidationException::withMessages(['components' => ["{$item->name} is not a bundle: only a bundle is made of parts."]]);
+        }
+        if (in_array($item->getKey(), array_column($data['components'], 'item_id'), true)) {
+            throw ValidationException::withMessages(['components' => ['A bundle is not a part of itself.']]);
+        }
+        if (DB::table('document_lines')->where('item_id', $item->getKey())->exists()) {
+            throw ValidationException::withMessages(['components' => ["{$item->name} is on documents already: its parts stay as they were. Archive it and make a new bundle."]]);
+        }
+        $before = DB::table('item_components')->where('bundle_id', $item->getKey())->pluck('quantity', 'component_id')->map(fn ($q) => (string) $q)->all();
+        DB::transaction(function () use ($item, $data) {
+            DB::table('item_components')->where('bundle_id', $item->getKey())->delete();
+            foreach ($data['components'] as $c) {
+                DB::table('item_components')->insert(['id' => (string) \Illuminate\Support\Str::uuid7(), 'company_id' => $item->company_id,
+                    'bundle_id' => $item->getKey(), 'component_id' => $c['item_id'], 'quantity' => (string) $c['quantity']]);
+            }
+        });
+        $after = collect($data['components'])->mapWithKeys(fn (array $c) => [$c['item_id'] => (string) $c['quantity']])->all();
+        $this->audit->record($this->current->id(), 'components_set', 'item', $item->getKey(), ['components' => $before], ['components' => $after],
+            userId: $request->user()->getKey());
+
+        return response()->json($this->present($item->refresh()));
     }
 
     /**

@@ -3890,6 +3890,64 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T98 a unit is its item''s own and keeps its size; a line takes its unit as it is and an order line''s unit carries on';
 END $$;
+
+-- T99: bundles (073). A bundle's parts are other items of the company, never a bundle, once each, above zero; they are
+-- fixed once the bundle is on a document; a bundle with parts stays a bundle and holds no stock; another company
+-- never sees its parts. Company A as f1, customer c1, item b1 (stock), warehouse a1.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+  box constant uuid := '00000000-0000-0000-0000-000000000ee0';
+  box2 constant uuid := '00000000-0000-0000-0000-000000000ee1';
+  plain constant uuid := '00000000-0000-0000-0000-000000000ee2';
+  inv constant uuid := '00000000-0000-0000-0000-000000000ee3';
+BEGIN
+  INSERT INTO items (id, company_id, name, type) VALUES (box, app_company_id(), 'T99 gift box', 'bundle'), (box2, app_company_id(), 'T99 big box', 'bundle'),
+    (plain, app_company_id(), 'T99 wrapping', 'non_inventory');
+  BEGIN
+    INSERT INTO item_components (company_id, bundle_id, component_id, quantity) VALUES (app_company_id(), plain, item, 1);
+    RAISE EXCEPTION 'FAIL T99a: an item that is not a bundle was given parts';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_components (company_id, bundle_id, component_id, quantity) VALUES (app_company_id(), box2, box, 1);
+    RAISE EXCEPTION 'FAIL T99b: a bundle was made a part of another bundle';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_components (company_id, bundle_id, component_id, quantity) VALUES (app_company_id(), box, item, 0);
+    RAISE EXCEPTION 'FAIL T99c: a part of quantity zero was added';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO item_components (company_id, bundle_id, component_id, quantity) VALUES (app_company_id(), box, item, 2), (app_company_id(), box, plain, 1);
+  BEGIN
+    UPDATE items SET type = 'inventory' WHERE id = box;
+    RAISE EXCEPTION 'FAIL T99d: a bundle with parts stopped being a bundle';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), box, wh, '2027-11-01', 'purchase', 1, 10);
+    RAISE EXCEPTION 'FAIL T99e: a bundle had a stock move of its own';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency) VALUES (inv, app_company_id(), 'invoice', c1, '2027-11-01', 'ETB');
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (app_company_id(), inv, 1, 'Gift box', 1, 500, acc, 500, box);
+  BEGIN
+    UPDATE item_components SET quantity = 3 WHERE bundle_id = box AND component_id = item;
+    RAISE EXCEPTION 'FAIL T99f: a used bundle''s parts were changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM item_components WHERE bundle_id = box AND component_id = plain;
+    RAISE EXCEPTION 'FAIL T99g: a used bundle lost a part';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM item_components WHERE bundle_id = box) THEN
+    RAISE EXCEPTION 'FAIL T99h: company B saw company A''s bundle parts';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T99 a bundle''s parts are other items, fixed once it is used, and it holds no stock of its own';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -62,6 +62,41 @@ final class DocumentStock
             ->map(fn ($l) => ['line' => $l, 'item' => $items[$l->item_id]])->values()->all();
     }
 
+    /** @return list<object> the document's lines selling a bundle (073) */
+    private function bundleLines(Document $doc): array
+    {
+        $lines = $doc->relationLoaded('lines') ? $doc->lines : $doc->lines()->get();
+        $bundles = Item::query()->whereIn('id', $lines->pluck('item_id')->filter())->where('type', 'bundle')->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+        return $lines->filter(fn ($l) => $l->item_id !== null && in_array((string) $l->item_id, $bundles, true))->values()->all();
+    }
+
+    /**
+     * 073: the stock parts a bundle line takes out, as lines of their own: each part's quantity per bundle times the
+     * bundles sold (in the bundle's own unit, 072), in the part's own unit. Non-stock parts move nothing.
+     *
+     * @param list<object> $bundles
+     * @return list<array{line: object, item: Item}>
+     */
+    private function bundleParts(array $bundles): array
+    {
+        $parts = DB::table('item_components')->whereIn('bundle_id', array_map(fn ($l) => $l->item_id, $bundles))->get()->groupBy('bundle_id');
+        $items = Item::query()->whereIn('id', $parts->flatten()->pluck('component_id'))->where('type', 'inventory')->get()->keyBy('id');
+        $out = [];
+        foreach ($bundles as $line) {
+            $sold = self::baseQuantity($line);
+            foreach ($parts[$line->item_id] ?? [] as $p) {
+                if (! isset($items[$p->component_id])) {
+                    continue;
+                }
+                $out[] = ['line' => (object) ['line_no' => $line->line_no, 'quantity' => bcmul($sold, (string) $p->quantity, 2), 'unit_factor' => '1',
+                    'source_line_id' => null, 'id' => null], 'item' => $items[$p->component_id]];
+            }
+        }
+
+        return $out;
+    }
+
     /** The warehouse a document's stock lines use; refuses a document with stock lines and no warehouse. */
     public function warehouseFor(Document $doc): Warehouse
     {
@@ -80,6 +115,19 @@ final class DocumentStock
     public function onPosting(Document $doc, JournalDraft $draft, Company $company, ?string $userId): void
     {
         $lines = $this->stockLines($doc);
+        // 073: a bundle sold takes its stock parts out; a bundle is never bought, nor brought back on a credit note yet.
+        $bundles = $this->bundleLines($doc);
+        if ($bundles !== []) {
+            if (in_array($doc->type, ['bill', 'vendor_credit'], true)) {
+                throw ValidationException::withMessages(['lines' => ["Line {$bundles[0]->line_no}: a bundle is sold, not bought. Buy its parts instead."]]);
+            }
+            if ($doc->type === 'credit_note' && $doc->restock) {
+                throw ValidationException::withMessages(['lines' => ["Line {$bundles[0]->line_no}: a bundle's parts are not brought back on a credit note yet. Credit it without taking the goods back, and adjust the stock."]]);
+            }
+            if (in_array($doc->type, ['invoice', 'sales_receipt'], true)) {
+                $lines = [...$lines, ...$this->bundleParts($bundles)];
+            }
+        }
         if ($lines === [] || ! in_array($doc->type, ['invoice', 'sales_receipt', 'bill', 'credit_note', 'vendor_credit'], true)
             || (in_array($doc->type, ['credit_note', 'vendor_credit'], true) && ! $doc->restock)) {
             return;

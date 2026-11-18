@@ -58,6 +58,7 @@ final class SaveInvoiceDraft
             }
             $data['salesperson_id'] = in_array($type, ['invoice', 'credit_note', 'sales_receipt'], true) ? $this->salesperson($data, $document, $original) : null;
 
+            self::refuseBundlesBought($type, $data['lines'] ?? []);
             $calc = $this->calculate($data);
             if ($type === 'bill') {
                 $calc['lines'] = $this->stockLinesToInventory($calc['lines']);
@@ -280,6 +281,24 @@ final class SaveInvoiceDraft
      *
      * @param list<array<string, mixed>> $lines
      */
+    /**
+     * 073: a bundle is sold, not bought; a bill, supplier credit, expense or purchase order names its parts instead.
+     *
+     * @param list<array<string, mixed>> $lines
+     */
+    public static function refuseBundlesBought(string $type, array $lines): void
+    {
+        if (! in_array($type, ['bill', 'vendor_credit', 'expense', 'purchase_order'], true)) {
+            return;
+        }
+        $bundles = \App\Domain\Inventory\Models\Item::query()->whereIn('id', array_filter(array_column($lines, 'item_id')))->where('type', 'bundle')->pluck('id')->all();
+        foreach (array_values($lines) as $i => $l) {
+            if (in_array($l['item_id'] ?? null, $bundles, true)) {
+                throw ValidationException::withMessages(["lines.{$i}.item_id" => ['A bundle is sold, not bought: buy its parts instead.']]);
+            }
+        }
+    }
+
     public static function writeLines(Document $document, array $lines): void
     {
         $document->lines()->delete();
