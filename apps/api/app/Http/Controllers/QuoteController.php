@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Inventory\Reservations;
 use App\Domain\Sales\Actions\QuoteWorkflow;
 use App\Domain\Sales\Actions\SaveQuote;
 use App\Domain\Sales\Models\Document;
@@ -111,17 +112,43 @@ final class QuoteController extends Controller
         return $this->present($this->workflow->cancel($document, $request->user()->getKey(), $note));
     }
 
-    /** Makes the draft invoice or sales order; answers with it (its type says which). */
+    /**
+     * Makes the draft invoice or sales order; answers with it (its type says which). An order's invoice takes what is
+     * given in lines (order line and quantity; a line left out or at 0 is not delivered now), or all that is left.
+     */
     public function convert(Request $request, Document $document): JsonResponse
     {
         $this->authorizeCompany('invoices.create');
         $data = $request->validate([
             'to' => ['required', 'in:invoice,sales_order'],
             'number' => ['nullable', 'string', 'max:40'],   // manual numbering only
+            'lines' => ['nullable', 'array', 'min:1', 'max:500'],
+            'lines.*.line_id' => ['required', 'uuid', 'distinct'],
+            'lines.*.quantity' => ['required', 'decimal:0,2', 'min:0'],
         ]);
-        $made = $this->workflow->convert($document, $data['to'], $request->user()->getKey(), $data['number'] ?? null);
+        $deliver = isset($data['lines']) ? collect($data['lines'])->mapWithKeys(fn (array $l) => [$l['line_id'] => (string) $l['quantity']])->all() : null;
+        $made = $this->workflow->convert($document, $data['to'], $request->user()->getKey(), $data['number'] ?? null, $deliver);
 
         return response()->json(['id' => $made->getKey(), 'type' => $made->type, 'number' => $made->number, 'status' => $made->status], 201);
+    }
+
+    /** A sales order partly delivered is closed: the rest is dropped from its back-order. */
+    public function close(Request $request, Document $document): JsonResponse
+    {
+        $this->authorizeCompany('invoices.create');
+        $note = $request->validate(['note' => ['nullable', 'string', 'max:500']])['note'] ?? null;
+
+        return $this->present($this->workflow->close($document, $request->user()->getKey(), $note));
+    }
+
+    /** What the confirmed orders still owe, line by line, and for the stock items in them what is on hand and reserved. */
+    public function backOrders(Reservations $reservations): JsonResponse
+    {
+        $this->authorizeCompany('invoices.view');
+        $lines = $reservations->backOrders();
+        $items = array_values(array_unique(array_filter(array_map(fn (array $l) => $l['item_type'] === 'inventory' ? $l['item_id'] : null, $lines))));
+
+        return response()->json(['data' => $lines, 'stock' => $items === [] ? (object) [] : $reservations->byItem($items)]);
     }
 
     /** Every earlier version (what the customer saw before a revision) and the audit trail, newest first. */
@@ -194,6 +221,11 @@ final class QuoteController extends Controller
         $quote = $document->type === 'quote';
         $s = $document->status;
         $made = Document::query()->where('source_document_id', $document->getKey())->where('status', '<>', 'void')->first(['id', 'type', 'number', 'status']);
+        $order = $document->type === 'sales_order';
+        $delivery = $order ? $this->workflow->remaining($document) : null;
+        $invoices = $order ? Document::query()->where('source_document_id', $document->getKey())->orderBy('issue_date')->orderBy('id')
+            ->get(['id', 'number', 'issue_date', 'status', 'total']) : null;
+        $left = $order && collect($delivery)->contains(fn (array $r) => bccomp($r['remaining'], '0', 2) > 0);
         $source = $document->source_document_id ? Document::query()->find($document->source_document_id, ['id', 'type', 'number']) : null;
 
         return response()->json([
@@ -202,14 +234,18 @@ final class QuoteController extends Controller
             'source' => $source?->only(['id', 'type', 'number']),
             'made' => $made?->only(['id', 'type', 'number', 'status']),
             'versions' => DocumentVersion::query()->where('document_id', $document->getKey())->count(),
+            // 067: each order line's ordered, delivered and remaining quantities (by line id), and the invoices made.
+            'delivery' => $delivery,
+            'invoices' => $invoices,
             'can' => [
-                'edit' => $write && in_array($s, SaveQuote::EDITABLE[$document->type], true),
+                'edit' => $write && in_array($s, SaveQuote::EDITABLE[$document->type], true) && ! ($order && $invoices->isNotEmpty()),
                 'send' => $write && $quote && $s === 'draft',
                 'accept' => $write && ($quote ? in_array($s, ['draft', 'sent'], true) : $s === 'draft'),
                 'decline' => $write && $quote && $s === 'sent',
                 'extend' => $write && $quote && $s === 'expired',
-                'cancel' => $write && in_array($s, ['draft', 'sent', 'accepted'], true),
-                'convert' => $write && in_array($s, $quote ? ['draft', 'sent', 'accepted'] : ['draft', 'accepted'], true),
+                'cancel' => $write && in_array($s, ['draft', 'sent', 'accepted'], true) && ! ($order && $made !== null),
+                'convert' => $write && in_array($s, $quote ? ['draft', 'sent', 'accepted'] : ['draft', 'accepted'], true) && ($quote || $left),
+                'close' => $write && $order && $s === 'accepted' && $made !== null,
                 'email' => $write && ($quote ? in_array($s, ['draft', 'sent', 'accepted'], true) : $s === 'accepted'),
             ],
         ], $status);

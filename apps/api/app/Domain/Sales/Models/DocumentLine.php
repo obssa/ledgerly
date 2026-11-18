@@ -18,7 +18,7 @@ class DocumentLine extends Model
 
     protected $fillable = [
         'document_id', 'line_no', 'item_id', 'description', 'quantity', 'unit_price', 'discount_rate',
-        'tax_rate_id', 'account_id', 'line_subtotal', 'line_tax', 'project_id',
+        'tax_rate_id', 'account_id', 'line_subtotal', 'line_tax', 'project_id', 'source_line_id',
     ];
 
     public function document(): BelongsTo

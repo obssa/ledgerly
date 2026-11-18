@@ -74,6 +74,10 @@ final class QuoteWorkflow
 
     public function cancel(Document $document, string $userId, ?string $note = null): Document
     {
+        if ($document->type === 'sales_order' && $this->invoiced($document)) {
+            throw new LedgerException("Sales order {$document->number} has invoices made from it: close it instead, and what was not delivered is dropped.");
+        }
+
         return $this->move($document, (string) $document->type, ['draft', 'sent', 'accepted'], 'void', "{$document->type}_cancelled", $userId, $note);
     }
 
@@ -94,23 +98,85 @@ final class QuoteWorkflow
     }
 
     /**
-     * Makes a draft invoice (from a quote or an order) or a draft sales order (from a quote) with the same customer,
-     * currency, prices and lines, dated today; the quote or order is accepted first if it was not yet, and is then
-     * converted. With manual numbering the new document's number is given here.
+     * A confirmed order partly delivered is closed: what is left is no longer owed to the customer (nor reserved).
      */
-    public function convert(Document $source, string $to, string $userId, ?string $number = null): Document
+    public function close(Document $order, string $userId, ?string $note = null): Document
+    {
+        if ($order->type !== 'sales_order' || ! $this->invoiced($order)) {
+            throw new LedgerException('Only a sales order with an invoice made from it is closed; cancel one that has none.');
+        }
+
+        return $this->move($order, 'sales_order', ['accepted'], 'converted', 'sales_order_closed', $userId, $note);
+    }
+
+    /**
+     * What is left to deliver of each line of a sales order: ordered less what its live invoices deliver (067).
+     *
+     * @return array<string, array{ordered: string, delivered: string, remaining: string}> by order line id
+     */
+    public function remaining(Document $order): array
+    {
+        $delivered = DB::table('document_lines as l')->join('documents as d', 'd.id', '=', 'l.document_id')
+            ->where('d.source_document_id', $order->getKey())->where('d.status', '<>', 'void')->whereNotNull('l.source_line_id')
+            ->groupBy('l.source_line_id')->selectRaw('l.source_line_id, sum(l.quantity)::numeric(18,2)::text AS quantity')
+            ->pluck('quantity', 'source_line_id');
+        $out = [];
+        foreach ($order->lines()->orderBy('line_no')->get(['id', 'quantity']) as $line) {
+            $done = (string) ($delivered[$line->getKey()] ?? '0.00');
+            $left = bcsub((string) $line->quantity, $done, 2);
+            $out[(string) $line->getKey()] = ['ordered' => (string) $line->quantity, 'delivered' => $done,
+                'remaining' => bccomp($left, '0', 2) > 0 ? $left : '0.00'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Makes a draft invoice (from a quote or an order) or a draft sales order (from a quote) with the same customer,
+     * currency, prices and lines, dated today; the quote or order is accepted first if it was not yet. A quote is then
+     * converted. An order is invoiced for what is given in $deliver (order line id => quantity), or for all that is
+     * left, and is converted once nothing is left: the rest is its back-order (067). With manual numbering the new
+     * document's number is given here.
+     *
+     * @param array<string, string>|null $deliver
+     */
+    public function convert(Document $source, string $to, string $userId, ?string $number = null, ?array $deliver = null): Document
     {
         if (! in_array($to, $source->type === 'quote' ? ['invoice', 'sales_order'] : ['invoice'], true)) {
             throw ValidationException::withMessages(['to' => ['A quote becomes a sales order or an invoice, a sales order an invoice.']]);
         }
+        if ($deliver !== null && $source->type !== 'sales_order') {
+            throw ValidationException::withMessages(['lines' => ['Only a sales order is delivered in parts.']]);
+        }
 
-        return DB::transaction(function () use ($source, $to, $userId, $number) {
+        return DB::transaction(function () use ($source, $to, $userId, $number, $deliver) {
             $source = Document::query()->lockForUpdate()->with('lines')->findOrFail($source->getKey());
             if (in_array($source->status, ['draft', 'sent'], true)) {
                 $source = $this->accept($source, $userId)->load('lines');
             }
             if ($source->status !== 'accepted') {
                 throw new LedgerException(SaveQuote::noun((string) $source->type) . " {$source->number} is {$source->status}; it cannot be converted.");
+            }
+
+            $lines = $source->lines->sortBy('line_no')->values();
+            $quantities = [];
+            if ($source->type === 'sales_order') {
+                $left = $this->remaining($source);
+                $want = $deliver ?? array_map(fn (array $r) => $r['remaining'], $left);
+                foreach ($want as $lineId => $quantity) {
+                    if (! isset($left[$lineId])) {
+                        throw ValidationException::withMessages(['lines' => ['A line given is not a line of this order.']]);
+                    }
+                    if (bccomp((string) $quantity, $left[$lineId]['remaining'], 2) > 0) {
+                        $no = $lines->firstWhere('id', $lineId)?->line_no;
+                        throw ValidationException::withMessages(['lines' => ["Line {$no}: only {$left[$lineId]['remaining']} is left to deliver."]]);
+                    }
+                }
+                $quantities = array_filter($want, fn ($q) => bccomp((string) $q, '0', 2) > 0);
+                if ($quantities === []) {
+                    throw ValidationException::withMessages(['lines' => ['Nothing is left to deliver on this order.']]);
+                }
+                $lines = $lines->filter(fn ($l) => isset($quantities[(string) $l->getKey()]))->values();
             }
 
             $today = $this->current->today();
@@ -128,8 +194,9 @@ final class QuoteWorkflow
                 'notes' => $source->notes,
                 'warehouse_id' => $source->warehouse_id,
                 'salesperson_id' => $source->salesperson_id,
-                'lines' => $source->lines->map(fn ($l) => [
-                    'description' => (string) $l->description, 'quantity' => (string) $l->quantity, 'unit_price' => (string) $l->unit_price,
+                'lines' => $lines->map(fn ($l) => [
+                    'description' => (string) $l->description,
+                    'quantity' => (string) ($quantities[(string) $l->getKey()] ?? $l->quantity), 'unit_price' => (string) $l->unit_price,
                     'discount_rate' => (string) $l->discount_rate, 'account_id' => (string) $l->account_id, 'tax_rate_id' => $l->tax_rate_id,
                     'item_id' => $l->item_id, 'project_id' => $l->project_id,
                 ])->values()->all(),
@@ -138,14 +205,25 @@ final class QuoteWorkflow
             if ($to === 'invoice') {
                 $made = $this->drafts->handle($data, null, $userId);
                 $made->forceFill(['source_document_id' => $source->getKey()])->save();   // 056: named once, while a draft
+                if ($source->type === 'sales_order') {
+                    // 067: each invoice line names the order line it delivers, in the order they were made.
+                    foreach ($made->lines()->orderBy('line_no')->get() as $i => $line) {
+                        $line->forceFill(['source_line_id' => (string) $lines[$i]->getKey()])->save();
+                    }
+                }
             } else {
                 $made = $this->quotes->handle($data, 'sales_order', null, $userId, $source);
             }
 
-            $source->status = 'converted';
-            $source->save();
-            $this->audit->record($this->current->id(), "{$source->type}_converted", (string) $source->type, $source->getKey(),
-                ['status' => 'accepted'], ['status' => 'converted', 'to' => $to, 'document_id' => $made->getKey()], userId: $userId);
+            $done = $source->type !== 'sales_order'
+                || collect($this->remaining($source))->every(fn (array $r) => bccomp($r['remaining'], '0', 2) === 0);
+            if ($done) {
+                $source->status = 'converted';
+                $source->save();
+            }
+            $this->audit->record($this->current->id(), $done ? "{$source->type}_converted" : 'sales_order_delivered', (string) $source->type, $source->getKey(),
+                ['status' => 'accepted'], ['status' => $source->status, 'to' => $to, 'document_id' => $made->getKey(),
+                    ...($source->type === 'sales_order' ? ['delivered' => $quantities] : [])], userId: $userId);
 
             return $made->refresh()->load('lines');
         });
@@ -179,10 +257,16 @@ final class QuoteWorkflow
         });
     }
 
+    /** Whether a live invoice was made from the order. */
+    private function invoiced(Document $order): bool
+    {
+        return Document::query()->where('source_document_id', $order->getKey())->where('status', '<>', 'void')->exists();
+    }
+
     private function verb(string $to, string $type): string
     {
         return match ($to) {
-            'sent' => 'sent', 'accepted' => $type === 'quote' ? 'accepted' : 'confirmed', 'declined' => 'declined', 'void' => 'cancelled', default => $to,
+            'sent' => 'sent', 'accepted' => $type === 'quote' ? 'accepted' : 'confirmed', 'declined' => 'declined', 'void' => 'cancelled', 'converted' => $type === 'quote' ? 'converted' : 'closed', default => $to,
         };
     }
 }

@@ -3440,6 +3440,96 @@ BEGIN
 END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', false) \gset ignore_
+
+-- T93: sales orders delivered in parts (067). An order makes several invoices; each invoice line names a line of the
+-- order its invoice was made from, the same item, a positive quantity, and the live invoices never deliver more than
+-- was ordered (a void invoice gives its quantity back); an order partly delivered is closed, not cancelled, and once
+-- converted makes nothing more. Company A as its owner f1, customer c1, item b1, sales account a40.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  so constant uuid := '00000000-0000-0000-0000-000000000e93';
+  l1 constant uuid := '00000000-0000-0000-0000-000000000e94';
+  l2 constant uuid := '00000000-0000-0000-0000-000000000e95';
+  i1 constant uuid := '00000000-0000-0000-0000-000000000e96';
+  i2 constant uuid := '00000000-0000-0000-0000-000000000e97';
+  i3 constant uuid := '00000000-0000-0000-0000-000000000e98';
+  b1 constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  a40 constant uuid := '00000000-0000-0000-0000-000000000a40';
+  line_id uuid;
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency) VALUES (so, app_company_id(), 'sales_order', c1, '2027-09-01', 'ETB');
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (l1, app_company_id(), so, 1, 'Goods', 5, 10, a40, 50, b1),
+    (l2, app_company_id(), so, 2, 'Fitting', 2, 100, a40, 200, NULL);
+  UPDATE documents SET status = 'accepted', number = 'SO-T93-1' WHERE id = so;
+
+  -- Two invoices from one order, the second delivering the rest.
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id) VALUES
+    (i1, app_company_id(), 'invoice', c1, '2027-09-02', 'ETB', so),
+    (i2, app_company_id(), 'invoice', c1, '2027-09-03', 'ETB', so),
+    (i3, app_company_id(), 'invoice', c1, '2027-09-03', 'ETB', NULL);
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (app_company_id(), i1, 1, 'Goods', 3, 10, a40, 30, b1, l1);
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+      (app_company_id(), i2, 1, 'Goods', 3, 10, a40, 30, b1, l1);
+    RAISE EXCEPTION 'FAIL T93a: more was delivered than was ordered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+      (app_company_id(), i2, 1, 'Goods', 1, 10, a40, 10, NULL, l1);
+    RAISE EXCEPTION 'FAIL T93b: an invoice line delivered another item than its order line';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+      (app_company_id(), i3, 1, 'Fitting', 1, 100, a40, 100, NULL, l2);
+    RAISE EXCEPTION 'FAIL T93c: an invoice not made from the order delivered its line';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+      (app_company_id(), i2, 1, 'Fitting', -1, 100, a40, -100, NULL, l2);
+    RAISE EXCEPTION 'FAIL T93d: a negative quantity was delivered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+      (app_company_id(), i2, 1, 'Line of an invoice', 1, 10, a40, 10, b1, (SELECT id FROM document_lines WHERE document_id = i1));
+    RAISE EXCEPTION 'FAIL T93e: an invoice line named a line that is not an order''s';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (app_company_id(), i2, 1, 'Goods', 2, 10, a40, 20, b1, l1)
+    RETURNING id INTO line_id;
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (app_company_id(), i2, 2, 'Fitting', 2, 100, a40, 200, NULL, l2);
+  BEGIN
+    UPDATE document_lines SET quantity = 3 WHERE id = line_id;
+    RAISE EXCEPTION 'FAIL T93f: a line was raised past what was ordered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  BEGIN
+    UPDATE documents SET status = 'void' WHERE id = so;
+    RAISE EXCEPTION 'FAIL T93g: an order partly delivered was cancelled';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- A void invoice gives its quantity back.
+  UPDATE documents SET status = 'void' WHERE id = i1;
+  INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (app_company_id(), i2, 3, 'Goods', 3, 10, a40, 30, b1, l1);
+
+  UPDATE documents SET status = 'converted' WHERE id = so;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, source_document_id) VALUES
+      (app_company_id(), 'invoice', c1, '2027-09-04', 'ETB', so);
+    RAISE EXCEPTION 'FAIL T93h: a closed order made another invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM document_lines WHERE id IN (l1, l2) OR source_line_id IN (l1, l2)) THEN
+    RAISE EXCEPTION 'FAIL T93i: company B saw company A''s order lines';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T93 a sales order is delivered in parts, never more than was ordered, and is closed rather than cancelled';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

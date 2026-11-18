@@ -41,7 +41,13 @@ final class SaveQuote
                 if (! in_array($document->status, self::EDITABLE[$type], true)) {
                     throw new LedgerException(self::noun($type) . ' ' . ($document->number ?? '') . " is {$document->status}; it can no longer be changed.");
                 }
+                // 067: the lines its invoices deliver stay as they were ordered.
+                if ($type === 'sales_order' && Document::query()->where('source_document_id', $document->getKey())->exists()) {
+                    throw new LedgerException("Sales order {$document->number} has invoices made from it; it can no longer be changed. Close it and make a new order for the rest.");
+                }
             }
+            // A quote's or an order's own lines deliver nothing.
+            $data['lines'] = array_map(fn (array $l) => array_diff_key($l, ['source_line_id' => true]), $data['lines']);
 
             $data['salesperson_id'] = $this->drafts->salesperson($data, $document);
             $calc = $this->drafts->calculate($data);
