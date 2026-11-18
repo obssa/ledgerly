@@ -7,6 +7,7 @@ import { ApplyCredit } from "../../invoices/[id]/ApplyCredit";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { InvoiceActions } from "../../invoices/[id]/InvoiceActions";
 import { LandedCostPanel } from "./LandedCostPanel";
+import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
 
 export const metadata = { title: "Bill" };
 
@@ -22,7 +23,7 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "good" | "warn" 
 /** One bill: the supplier and where they are paid, the lines and totals, possible duplicates, and what can be done next. */
 export default async function BillPage({ params, searchParams }: PageProps<"/bills/[id]">) {
   const { id } = await params;
-  const { posted } = await searchParams;
+  const { posted, attachment } = await searchParams;
   const bill = await getBill(id);
   if (!bill) notFound();
   const credit = bill.type === "vendor_credit";
@@ -112,6 +113,7 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
           {landed && company && (landed.spread.length > 0 || landed.received.length > 0 || (landed.can.apply && Number(landed.left) > 0)) && (
             <LandedCostPanel billId={bill.id} landed={landed} base={company.base_currency} />
           )}
+          <AttachmentsPanel kind="bill" documentId={bill.id} flag={typeof attachment === "string" ? attachment : undefined} demo={bill.demo} />
           {canApply && <ApplyCredit creditNoteId={bill.id} left={bill.amount_due} invoices={openBills} bills />}
           {canRefund && <RefundPanel side="supplier" contactId={bill.contact.id} currency={bill.currency} left={bill.amount_due} creditId={bill.id} accounts={moneyAccounts} />}
           <Card label="Pay to">

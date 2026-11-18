@@ -9,6 +9,7 @@ import { Reminders } from "./Reminders";
 import { RetentionPanel } from "./RetentionPanel";
 import { InvoiceActions } from "./InvoiceActions";
 import { PrintInvoice, SendInvoice } from "./SendInvoice";
+import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
 
 export const metadata = { title: "Invoice" };
 
@@ -24,7 +25,7 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "good" | "warn" 
 /** One invoice: lines, totals, e-invoice state, warnings (credit limit) and what can be done next. */
 export default async function InvoicePage({ params, searchParams }: PageProps<"/invoices/[id]">) {
   const { id } = await params;
-  const { posted } = await searchParams;
+  const { posted, attachment } = await searchParams;
   const [invoice, company] = await Promise.all([getInvoice(id), getCompanySettings()]);
   if (!invoice) notFound();
   const creditNote = invoice.type === "credit_note";
@@ -131,6 +132,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <RetentionPanel invoiceId={invoice.id} retentions={invoice.retentions ?? []} canManage={Boolean(invoice.can.retain)}
               canHold={["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0} />
           )}
+          <AttachmentsPanel kind="invoice" documentId={invoice.id} flag={typeof attachment === "string" ? attachment : undefined} demo={invoice.demo} />
           {canApply && <ApplyCredit creditNoteId={invoice.id} left={invoice.amount_due} invoices={openInvoices} />}
           {canRefund && <RefundPanel side="customer" contactId={invoice.contact.id} currency={invoice.currency} left={invoice.amount_due} creditId={invoice.id} accounts={moneyAccounts} />}
           <Card label="E-invoice">

@@ -3212,6 +3212,61 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T88 post-dated cheques are held apart from the books, numbered once, and presented once as their payment';
 END $$;
+-- T89: files attached to documents (063). One of the company's own documents, a PDF, PNG, JPEG or WebP of at most
+-- 10 MB under a random key, at most 20 a document; never changed or deleted, removed once; another company never sees
+-- them. Company A as f1, invoice d1 (T9).
+DO $$
+DECLARE
+  d1 constant uuid := '00000000-0000-0000-0000-0000000000d1';
+  a  constant uuid := '00000000-0000-0000-0000-000000000a89';
+  i  integer;
+BEGIN
+  BEGIN
+    INSERT INTO attachments (company_id, document_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), d1, 'run.html', 'text/html', 10, repeat('a', 64), repeat('b', 40), app_user_id());
+    RAISE EXCEPTION 'FAIL T89a: an HTML file was kept';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO attachments (company_id, document_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), d1, 'big.pdf', 'application/pdf', 10485761, repeat('a', 64), repeat('b', 40), app_user_id());
+    RAISE EXCEPTION 'FAIL T89b: a file over 10 MB was kept';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO attachments (company_id, document_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), d1, 'x.pdf', 'application/pdf', 10, repeat('a', 64), '../../etc/passwd', app_user_id());
+    RAISE EXCEPTION 'FAIL T89c: a file was stored under a path of its own';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO attachments (id, company_id, document_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+    VALUES (a, app_company_id(), d1, 'receipt.pdf', 'application/pdf', 1200, repeat('a', 64), repeat('c', 40), app_user_id());
+  FOR i IN 1..19 LOOP
+    INSERT INTO attachments (company_id, document_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), d1, 'page-' || i || '.png', 'image/png', 100, repeat('a', 64), lpad(i::text, 40, 'd'), app_user_id());
+  END LOOP;
+  BEGIN
+    INSERT INTO attachments (company_id, document_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), d1, 'page-21.png', 'image/png', 100, repeat('a', 64), repeat('e', 40), app_user_id());
+    RAISE EXCEPTION 'FAIL T89d: a document kept a 21st attachment';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE attachments SET file_name = 'other.pdf' WHERE id = a;
+    RAISE EXCEPTION 'FAIL T89e: an attachment was renamed';
+  EXCEPTION WHEN insufficient_privilege OR check_violation THEN NULL; END;
+  UPDATE attachments SET removed_at = now(), removed_by = app_user_id() WHERE id = a;
+  BEGIN
+    UPDATE attachments SET removed_at = now() + interval '1 day' WHERE id = a;
+    RAISE EXCEPTION 'FAIL T89f: an attachment was removed twice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM attachments WHERE id = a;
+    RAISE EXCEPTION 'FAIL T89g: an attachment was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM attachments) THEN
+    RAISE EXCEPTION 'FAIL T89h: company B saw company A''s attachments';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T89 attachments are the company''s own kinds of file, at most 20 a document, never changed and removed once';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

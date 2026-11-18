@@ -1176,6 +1176,36 @@ export async function apiFile(path: string, opts: { token: string; companyId: st
   return res;
 }
 
+/**
+ * A file sent to the API as multipart (attachments, 063), under the user's own session. The API decides the file's
+ * type by its content and checks the permission again.
+ */
+export async function apiUpload(path: string, form: FormData, opts: { token: string; companyId: string }): Promise<unknown> {
+  const base = apiBaseUrl();
+  if (!base) throw new ApiError(0, "LEDGERLY_API_URL is not set (demo mode)");
+  const visitor = await import("./visitor").then((m) => m.visitorHeaders()).catch(() => ({}));
+  const res = await fetch(new URL(`/api/v1/${path.replace(/^\//, "")}`, base), {
+    method: "POST", body: form, cache: "no-store",
+    headers: { Accept: "application/json", ...visitor, Authorization: `Bearer ${opts.token}`, "X-Company-Id": opts.companyId },
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, (body as { message?: string } | null)?.message ?? res.statusText, body);
+  return body;
+}
+
+/** A file kept with a document (063). */
+export interface Attachment {
+  id: string;
+  file_name: string;
+  content_type: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
+  size_bytes: number;
+  created_at: string;
+  added_by: string;
+}
+
+export type AttachmentKind = "invoice" | "bill" | "expense";
+export const attachmentPath = (kind: AttachmentKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses" })[kind];
+
 export interface User {
   id: string;
   name: string;
@@ -1448,6 +1478,9 @@ export const ledgerly = {
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
+  attachments: (kind: AttachmentKind, id: string, ctx: RequestOptions) =>
+    api<{ data: Attachment[]; can: { add: boolean } }>(`${attachmentPath(kind)}/${encodeURIComponent(id)}/attachments`, ctx),
+  removeAttachment: (id: string, ctx: RequestOptions) => api<unknown>(`attachments/${encodeURIComponent(id)}/remove`, { ...ctx, method: "POST", body: {} }),
   postDatedCheques: (ctx: RequestOptions) => api<PostDatedCheques>("post-dated-cheques", ctx),
   recordPostDatedCheque: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ id: string }>("post-dated-cheques", { ...ctx, method: "POST", body }),
   presentPostDatedCheque: (id: string, ctx: RequestOptions) =>

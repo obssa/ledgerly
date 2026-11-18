@@ -24,6 +24,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
 use App\Http\Controllers\QuoteController;
@@ -152,6 +153,10 @@ Route::prefix('v1')->group(function () {
                 Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind']);
                 Route::post('invoices/{invoice}/email', [InvoiceController::class, 'email']);
                 Route::post('quotes/{quote}/email', [QuoteController::class, 'email']);
+                // Files attached to documents (063): not stored for the shared demo accounts.
+                foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense']] as $path => [$param, $kind]) {
+                    Route::post("{$path}/{{$param}}/attachments", [AttachmentController::class, 'store'])->defaults('kind', $kind);
+                }
                 Route::post('sales-orders/{salesOrder}/email', [QuoteController::class, 'email']);
             });
             Route::put('company', [CompanySettingsController::class, 'update']);
@@ -277,6 +282,11 @@ Route::prefix('v1')->group(function () {
                 Route::get("{$path}/{{$param}}/history", [QuoteController::class, 'history']);
             }
             Route::post('quotes/{quote}/send', [QuoteController::class, 'send']);
+            foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense']] as $path => [$param, $kind]) {
+                Route::get("{$path}/{{$param}}/attachments", [AttachmentController::class, 'index'])->defaults('kind', $kind);
+            }
+            Route::get('attachments/{attachment}', [AttachmentController::class, 'download'])->whereUuid('attachment');
+            Route::post('attachments/{attachment}/remove', [AttachmentController::class, 'remove'])->whereUuid('attachment');
             Route::post('quotes/{quote}/decline', [QuoteController::class, 'decline']);
             Route::post('quotes/{quote}/extend', [QuoteController::class, 'extend']);
 
