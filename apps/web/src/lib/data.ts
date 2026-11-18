@@ -156,6 +156,23 @@ export async function getTimeEntries(q: { project_id?: string; from?: string; to
   }
 }
 
+/** Active projects to issue stock to, and the cost accounts to charge it to; null in the demo or without the projects. */
+export async function getIssueOptions(): Promise<{ projects: { id: string; code: string; name: string }[]; costAccounts: { id: string; code: string; name: string }[] } | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi(async (ctx) => {
+      const [dimensions, accounts] = await Promise.all([ledgerly.dimensions(ctx), ledgerly.accounts(ctx)]);
+      return {
+        projects: dimensions.data.filter((d) => d.kind === "project" && d.is_active).map((d) => ({ id: d.id, code: d.code, name: d.name })),
+        costAccounts: accounts.data.filter((a) => a.is_active && a.type === "expense").map((a) => ({ id: a.id, code: a.code, name: a.name })),
+      };
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Active projects to log hours against, and income accounts to bill them to. */
 export async function getTimeOptions(): Promise<{ projects: { id: string; code: string; name: string }[]; incomeAccounts: { id: string; code: string; name: string }[] } | null> {
   await connection();

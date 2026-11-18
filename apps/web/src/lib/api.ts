@@ -1302,6 +1302,8 @@ export const ledgerly = {
       : api<Member>(`members/${encodeURIComponent(id)}/${action}`, { ...ctx, method: "POST", body: {} }),
   createWarehouse: (name: string, ctx: RequestOptions) => api<Warehouse>("warehouses", { ...ctx, method: "POST", body: { name } }),
   stock: (ctx: RequestOptions) => api<StockOnHand>("stock", ctx),
+  issueStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ move_id: string; amount: string; unit_cost: string; journal_entry_id: string | null }>("stock/issues", { ...ctx, method: "POST", body }),
   adjustStock: (body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ move_id: string; amount: string; unit_cost: string }>("stock/adjustments", { ...ctx, method: "POST", body }),
   binCard: (q: { item_id: string; warehouse_id: string; from: string; to: string }, ctx: RequestOptions) => api<BinCard>("reports/bin-card", { ...ctx, query: q }),

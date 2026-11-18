@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
-import { getReorder, getStock, getWarehouses } from "@/lib/data";
+import { getIssueOptions, getReorder, getStock, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { NewWarehouse, TransferStock } from "../products/ItemForms";
+import { IssueToProject, NewWarehouse, TransferStock } from "../products/ItemForms";
 
 export const metadata = { title: "Stock on hand" };
 
 /** Module 4: what is on hand in each warehouse, valued at weighted average cost. The total is the inventory account. */
 export default async function InventoryPage() {
-  const [stock, warehouses, low] = await Promise.all([getStock(), getWarehouses(), getReorder()]);
+  const [stock, warehouses, low, issue] = await Promise.all([getStock(), getWarehouses(), getReorder(), getIssueOptions()]);
   const active = warehouses.filter((w) => w.is_active);
   const stockItems = stock ? [...new Map(stock.data.map((r) => [r.item.id, { id: r.item.id, name: r.item.name }])).values()] : [];
 
@@ -56,6 +56,13 @@ export default async function InventoryPage() {
             <Card className="mt-4" label="Move stock">
               <h2 className="mb-2 text-[15px] font-bold">Move stock between warehouses</h2>
               <TransferStock items={stockItems} warehouses={active} />
+            </Card>
+          )}
+          {stockItems.length > 0 && active.length > 0 && issue && issue.projects.length > 0 && issue.costAccounts.length > 0 && (
+            <Card className="mt-4" label="Issue to a project">
+              <h2 className="mb-1 text-[15px] font-bold">Issue materials to a project</h2>
+              <p className="mb-3 text-[13px] text-muted">They leave the warehouse at its average cost and post to the cost account, tagged with the project, so they count in its profit.</p>
+              <IssueToProject items={stockItems} warehouses={active} projects={issue.projects} costAccounts={issue.costAccounts} />
             </Card>
           )}
           <Card className="mt-4 max-w-[620px]" label="Warehouses">

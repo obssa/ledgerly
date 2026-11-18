@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import type { Item } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
-import { adjustStock, createItem, createWarehouse, saveItem, transferStock } from "./actions";
+import { adjustStock, createItem, createWarehouse, saveItem, transferStock, issueStock } from "./actions";
 import { todayIn } from "@/lib/dates";
 
 function Message({ state }: { state: FormState | undefined }) {
@@ -104,6 +104,40 @@ export function TransferStock({ items, warehouses }: { items: { id: string; name
       <Field name="quantity" label="Quantity" invalid={bad("quantity")} />
       <Field name="date" label="Date" type="date" defaultValue={today} />
       <button type="submit" className="btn" disabled={pending}>{pending ? "Moving…" : "Move stock"}</button>
+    </form>
+  );
+}
+
+/** Module 9a: materials from a warehouse for a project; they leave at the warehouse's cost and count in its profit. */
+export function IssueToProject({ items, warehouses, projects, costAccounts }: {
+  items: { id: string; name: string }[]; warehouses: { id: string; name: string }[];
+  projects: { id: string; code: string; name: string }[]; costAccounts: { id: string; code: string; name: string }[];
+}) {
+  const [state, action, pending] = useActionState(issueStock, undefined);
+  const today = todayIn();
+  const bad = (n: string) => Boolean(state?.fields?.[n]);
+  return (
+    <form action={action} noValidate className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] items-end gap-3">
+      <div className="col-span-full"><Message state={state} /></div>
+      <div>
+        <label className="field-label" htmlFor="i_item">Item</label>
+        <select className="field" id="i_item" name="item_id">{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
+      </div>
+      <div>
+        <label className="field-label" htmlFor="i_from">From</label>
+        <select className={`field ${bad("warehouse_id") ? "!border-bad" : ""}`} id="i_from" name="warehouse_id">{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select>
+      </div>
+      <div>
+        <label className="field-label" htmlFor="i_project">Project</label>
+        <select className={`field ${bad("project_id") ? "!border-bad" : ""}`} id="i_project" name="project_id">{projects.map((p) => <option key={p.id} value={p.id}>{p.code} {p.name}</option>)}</select>
+      </div>
+      <div>
+        <label className="field-label" htmlFor="i_account">Cost account</label>
+        <select className={`field ${bad("account_id") ? "!border-bad" : ""}`} id="i_account" name="account_id">{costAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}</select>
+      </div>
+      <Field name="quantity" label="Quantity" invalid={bad("quantity")} />
+      <Field name="date" label="Date" type="date" defaultValue={today} />
+      <button type="submit" className="btn" disabled={pending}>{pending ? "Issuing…" : "Issue to project"}</button>
     </form>
   );
 }

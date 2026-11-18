@@ -304,6 +304,7 @@ Route::prefix('v1')->group(function () {
             Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update']);
             Route::get('stock', [StockController::class, 'index']);
             Route::post('stock/adjustments', [StockController::class, 'adjust']);
+            Route::post('stock/issues', [StockController::class, 'issue']);
             Route::post('stock/transfers', [StockController::class, 'transfer']);
             Route::get('stock/reorder', [StockController::class, 'reorder']);
 
