@@ -24,6 +24,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RecurringJournalController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\ReviewQueueController;
@@ -82,6 +83,8 @@ Route::bind('invoice', $documentOf(['invoice', 'credit_note']));
 Route::bind('bill', $documentOf(['bill', 'vendor_credit']));
 Route::bind('expense', $documentOf(['expense']));
 Route::bind('supplierCredit', $documentOf(['vendor_credit']));
+Route::bind('quote', $documentOf(['quote']));
+Route::bind('salesOrder', $documentOf(['sales_order']));
 // Payments received and payments made share one table too.
 $paymentOf = fn (array $where) => fn (string $id) => Str::isUuid($id)
     ? Payment::query()->where($where)->findOrFail($id)
@@ -146,6 +149,8 @@ Route::prefix('v1')->group(function () {
                 Route::get('company/export', [CompanyExportController::class, 'download']);
                 Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind']);
                 Route::post('invoices/{invoice}/email', [InvoiceController::class, 'email']);
+                Route::post('quotes/{quote}/email', [QuoteController::class, 'email']);
+                Route::post('sales-orders/{salesOrder}/email', [QuoteController::class, 'email']);
             });
             Route::put('company', [CompanySettingsController::class, 'update']);
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);
@@ -250,6 +255,21 @@ Route::prefix('v1')->group(function () {
             Route::post('invoices/{invoice}/retention', [InvoiceController::class, 'retain']);
             Route::post('invoices/{invoice}/retention/release', [InvoiceController::class, 'releaseRetention']);
             Route::get('invoices/{invoice}/history', [InvoiceController::class, 'history']);
+
+            // Quotes and sales orders (056): the same controller, each route finding only its own kind.
+            foreach (['quotes' => ['quote', 'quote'], 'sales-orders' => ['sales_order', 'salesOrder']] as $path => [$kind, $param]) {
+                Route::get($path, [QuoteController::class, 'index'])->defaults('kind', $kind);
+                Route::post($path, [QuoteController::class, 'store'])->defaults('kind', $kind);
+                Route::get("{$path}/{{$param}}", [QuoteController::class, 'show']);
+                Route::put("{$path}/{{$param}}", [QuoteController::class, 'update']);
+                Route::post("{$path}/{{$param}}/accept", [QuoteController::class, 'accept']);
+                Route::post("{$path}/{{$param}}/cancel", [QuoteController::class, 'cancel']);
+                Route::post("{$path}/{{$param}}/convert", [QuoteController::class, 'convert']);
+                Route::get("{$path}/{{$param}}/history", [QuoteController::class, 'history']);
+            }
+            Route::post('quotes/{quote}/send', [QuoteController::class, 'send']);
+            Route::post('quotes/{quote}/decline', [QuoteController::class, 'decline']);
+            Route::post('quotes/{quote}/extend', [QuoteController::class, 'extend']);
 
             Route::post('invoices/{invoice}/credit-notes', [CreditNoteController::class, 'store']);
             Route::get('credit-notes', [CreditNoteController::class, 'index']);

@@ -42,19 +42,20 @@ final class InvoiceSent extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $label = $this->kind === 'credit_note' ? 'Credit note' : 'Invoice';
+        $label = match ($this->kind) { 'credit_note' => 'Credit note', 'quote' => 'Quote', 'sales_order' => 'Sales order', default => 'Invoice' };
+        $until = match ($this->kind) { 'quote' => 'valid until', 'sales_order' => 'for delivery by', default => 'due on' };   // 056
         $mail = (new MailMessage)
             ->subject("{$label} {$this->number} from {$this->company}")
             ->greeting("Dear {$this->customer},");
         if ($this->note) {
             $mail->line($this->note);
         }
-        $mail->line("{$label} {$this->number} of {$this->issueDate}" . ($this->dueDate ? ", due on {$this->dueDate}" : '') . '.');
+        $mail->line("{$label} {$this->number} of {$this->issueDate}" . ($this->dueDate ? ", {$until} {$this->dueDate}" : '') . '.');
         foreach ($this->lines as $l) {
             $mail->line("{$l['description']}: {$l['quantity']} × {$l['unit_price']} = {$this->currency} {$l['amount']}");
         }
         $mail->line("Subtotal {$this->currency} {$this->subtotal}; tax {$this->currency} {$this->tax}; total {$this->currency} {$this->total}.");
-        if ($this->kind !== 'credit_note' && $this->amountDue !== $this->total) {
+        if (in_array($this->kind, ['invoice', 'sales_receipt'], true) && $this->amountDue !== $this->total) {
             $mail->line("Still due: {$this->currency} {$this->amountDue}.");
         }
         if ($this->clearance) {

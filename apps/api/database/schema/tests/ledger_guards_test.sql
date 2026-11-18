@@ -347,7 +347,7 @@ DO $$ BEGIN
   EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
 
   INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, total, amount_due)
-    VALUES ('00000000-0000-0000-0000-0000000000d3', app_company_id(), 'quote', 'QUO-0001', '00000000-0000-0000-0000-0000000000c1', '2026-11-02', 'ETB', 1000, 1000);
+    VALUES ('00000000-0000-0000-0000-0000000000d3', app_company_id(), 'quote', 'QUO-0001', '00000000-0000-0000-0000-0000000000c1', '2026-11-02', 'ETB', 1000, 0);   -- a quote owes nothing (056)
   UPDATE documents SET status = 'sent' WHERE id = '00000000-0000-0000-0000-0000000000d3';
   BEGIN
     UPDATE documents SET status = 'posted' WHERE id = '00000000-0000-0000-0000-0000000000d3';
@@ -2856,6 +2856,89 @@ BEGIN
   INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, project_id)
     VALUES (app_company_id(), b1, a1, '2027-08-10', 'project_issue', -1, 0, '00000000-0000-0000-0000-000000000d71');
   RAISE NOTICE 'PASS T81 stock is issued out of a warehouse to a project of the company, and only an issue names a project';
+END $$;
+-- T82: quotes and sales orders (056). A quote owes nothing; a document made from one names an accepted quote or a
+-- confirmed order of the same company and customer, one live document each; the quote is converted only once it
+-- exists, and the link never changes; an accepted quote can still be cancelled; quotes past their date are listed only
+-- to the scheduler, and another company never sees them. Company A as its owner f1, customers c1 and c4, invoice d1 (T9).
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  c4 constant uuid := '00000000-0000-0000-0000-0000000000c4';
+  q  constant uuid := '00000000-0000-0000-0000-000000000e82';
+  so constant uuid := '00000000-0000-0000-0000-000000000e83';
+  q2 constant uuid := '00000000-0000-0000-0000-000000000e84';
+  q3 constant uuid := '00000000-0000-0000-0000-000000000e85';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, due_date, currency, total)
+    VALUES (q, app_company_id(), 'quote', c1, '2027-08-01', '2027-08-15', 'ETB', 1000);
+  BEGIN
+    UPDATE documents SET amount_due = 1000 WHERE id = q;
+    RAISE EXCEPTION 'FAIL T82a: a quote was owed money';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, source_document_id)
+      VALUES (app_company_id(), 'invoice', c1, '2027-08-02', 'ETB', q);
+    RAISE EXCEPTION 'FAIL T82b: an invoice was made from a quote nobody accepted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  UPDATE documents SET status = 'accepted', number = 'QT-T82-1' WHERE id = q;
+  BEGIN
+    UPDATE documents SET status = 'converted' WHERE id = q;
+    RAISE EXCEPTION 'FAIL T82c: a quote was converted with nothing made from it';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, source_document_id)
+      VALUES (app_company_id(), 'sales_order', c4, '2027-08-02', 'ETB', q);
+    RAISE EXCEPTION 'FAIL T82d: an order was made from another customer''s quote';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, source_document_id)
+      VALUES (app_company_id(), 'invoice', c1, '2027-08-02', 'ETB', '00000000-0000-0000-0000-0000000000d1');
+    RAISE EXCEPTION 'FAIL T82e: an invoice was made from an invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id)
+    VALUES (so, app_company_id(), 'sales_order', c1, '2027-08-02', 'ETB', q);
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, source_document_id)
+      VALUES (app_company_id(), 'invoice', c1, '2027-08-02', 'ETB', q);
+    RAISE EXCEPTION 'FAIL T82f: a second document was made from one quote';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  UPDATE documents SET status = 'converted' WHERE id = q;
+  BEGIN
+    UPDATE documents SET source_document_id = NULL WHERE id = so;
+    RAISE EXCEPTION 'FAIL T82g: the quote an order was made from was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE documents SET status = 'void' WHERE id = q;
+    RAISE EXCEPTION 'FAIL T82h: a converted quote was cancelled';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- An accepted quote, and a confirmed order, can still be cancelled.
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency) VALUES (q2, app_company_id(), 'quote', c1, '2027-08-01', 'ETB');
+  UPDATE documents SET status = 'accepted', number = 'QT-T82-2' WHERE id = q2;
+  UPDATE documents SET status = 'void' WHERE id = q2;
+
+  -- Expiry: a sent quote past its date is listed to the scheduler only.
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, due_date, currency, status)
+    VALUES (q3, app_company_id(), 'quote', 'QT-T82-3', c1, '2027-08-01', '2027-08-15', 'ETB', 'draft');
+  UPDATE documents SET status = 'sent' WHERE id = q3;
+  IF EXISTS (SELECT 1 FROM quotes_expiring('2099-01-01')) THEN
+    RAISE EXCEPTION 'FAIL T82i: the quotes expiring were read inside a company';
+  END IF;
+  PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+  IF NOT EXISTS (SELECT 1 FROM quotes_expiring('2027-08-16') WHERE document_id = q3)
+     OR EXISTS (SELECT 1 FROM quotes_expiring('2027-08-15') WHERE document_id = q3)
+     OR EXISTS (SELECT 1 FROM quotes_expiring('2099-01-01') WHERE document_id IN (q, q2)) THEN
+    RAISE EXCEPTION 'FAIL T82j: the scheduler did not list exactly the sent quotes past their date';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM documents WHERE id IN (q, so, q2, q3)) THEN
+    RAISE EXCEPTION 'FAIL T82k: company B saw company A''s quotes';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T82 quotes owe nothing, convert once into a document of the same customer, and expire only through the scheduler';
 END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_

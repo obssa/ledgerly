@@ -17,7 +17,14 @@ final class StateMachineTest extends TestCase
 
     public function test_the_api_and_the_database_hold_the_same_transitions(): void
     {
-        $sql = (string) file_get_contents(dirname(__DIR__, 2) . '/database/schema/006_state_machines.sql');
+        $schema = dirname(__DIR__, 2) . '/database/schema';
+        $sql = (string) file_get_contents($schema . '/006_state_machines.sql');
+        // Later files add transitions with their own INSERT INTO state_transitions (056: a confirmed order is cancelled).
+        foreach (glob($schema . '/0*.sql') as $file) {
+            if (basename($file) !== '006_state_machines.sql' && preg_match_all('/INSERT INTO state_transitions\b[^;]*;/', (string) file_get_contents($file), $more)) {
+                $sql .= "\n" . implode("\n", $more[0]);
+            }
+        }
         preg_match_all("/\\('(\\w+)',\\s*'(\\w*)',\\s*'(\\w+)',\\s*'\\w+'\\)/", $sql, $rows, PREG_SET_ORDER);
         $database = array_map(fn (array $r) => [$r[1], $r[2], $r[3]], $rows);
         sort($database);

@@ -108,14 +108,15 @@ final class SaveInvoiceDraft
      * Automatic numbering: a draft has no number; it gets one when posted. Manual numbering (pre-printed books):
      * the number typed on the draft, unique per company and type (database constraint).
      */
-    private function draftNumber(array $data, ?Document $document, string $type = 'invoice'): ?string
+    public function draftNumber(array $data, ?Document $document, string $type = 'invoice'): ?string
     {
         $number = isset($data['number']) && trim((string) $data['number']) !== '' ? trim((string) $data['number']) : null;
         $automatic = $this->numbers->isAutomatic($this->company->id(), $type);
 
-        $noun = match ($type) { 'bill', 'expense' => $type, 'vendor_credit' => 'supplier credit', default => 'invoice' };
+        $noun = match ($type) { 'bill', 'expense', 'quote' => $type, 'vendor_credit' => 'supplier credit', 'sales_order' => 'sales order', default => 'invoice' };
         if ($automatic && $number !== null) {
-            throw ValidationException::withMessages(['number' => [ucfirst($noun) . 's are numbered when they are posted. Leave the number empty.']]);
+            $when = in_array($type, ['quote', 'sales_order'], true) ? ($type === 'quote' ? 'sent' : 'confirmed') : 'posted';
+            throw ValidationException::withMessages(['number' => [ucfirst($noun) . "s are numbered when they are {$when}. Leave the number empty."]]);
         }
         if (! $automatic && $number === null) {
             throw ValidationException::withMessages(['number' => ["Type the {$noun} number."]]);

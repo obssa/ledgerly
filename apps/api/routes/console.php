@@ -15,6 +15,7 @@ Schedule::command('ledgerly:send-saved-reports')->hourly();
 Schedule::command('ledgerly:send-invoice-reminders')->hourly();
 Schedule::command('ledgerly:subscriptions-tick')->dailyAt('01:00');
 Schedule::command('ledgerly:send-tax-reminders')->dailyAt('05:00');
+Schedule::command('ledgerly:expire-quotes')->dailyAt('00:30');
 
 /*
 | Posts recurring journals that have come due (App\Domain\Ledger\RecurringJournals), each in its own company's
@@ -338,3 +339,28 @@ Artisan::command('ledgerly:demo-setup', function (\App\Domain\Identity\DemoSetup
 
     return 0;
 })->purpose('Set up the demo company and its shared sign-in accounts (DEMO_LOGINS=true)');
+
+/*
+| Quotes sent and unanswered past their valid-until date expire (056), each in its own company's context and checked
+| against that company's today. Which quotes comes from quotes_expiring() (ids only); one that fails is reported.
+*/
+Artisan::command('ledgerly:expire-quotes', function (\App\Domain\Sales\Actions\QuoteWorkflow $workflow, \App\Domain\Tenancy\Support\CurrentCompany $current) {
+    $due = DB::select('SELECT company_id, document_id FROM quotes_expiring(?)', [now('UTC')->addDay()->format('Y-m-d')]);
+    $expired = 0;
+    foreach ($due as $row) {
+        try {
+            $expired += \App\Domain\Tenancy\Support\DatabaseTenantContext::run(null, $row->company_id, function () use ($workflow, $current, $row) {
+                $current->set(\App\Domain\Tenancy\Models\Company::query()->findOrFail($row->company_id));
+                $quote = \App\Domain\Sales\Models\Document::query()->where('company_id', $row->company_id)->find($row->document_id);
+
+                return $quote !== null && $workflow->expire($quote) ? 1 : 0;
+            });
+        } catch (\Throwable $e) {
+            report($e);
+            $this->error("Quote {$row->document_id} failed: " . $e::class);
+        } finally {
+            $current->forget();
+        }
+    }
+    $this->info("Quotes expired: {$expired}.");
+})->purpose('Expire quotes past their valid-until date');
