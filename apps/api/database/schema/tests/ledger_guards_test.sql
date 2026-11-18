@@ -2644,6 +2644,76 @@ BEGIN
   DELETE FROM project_milestones WHERE id = m;
   RAISE NOTICE 'PASS T76 a milestone is billed once to the project''s customer, then kept as billed until its invoice is voided';
 END $$;
+-- T77: retention held and released (050). Held on a posted invoice of the company, never more than it owes, with the
+-- company's own retention entry; it lowers what the invoice owes and a release puts it back, once; kept, never removed;
+-- the invoice is not voided or re-posted meanwhile. Company A as its owner f1; invoice d4 (posted, owed) from T40.
+DO $$
+DECLARE
+  inv constant uuid := '00000000-0000-0000-0000-0000000000d4';
+  r constant uuid := '00000000-0000-0000-0000-0000000077a1';
+  owed numeric;
+BEGIN
+  SELECT amount_due INTO owed FROM documents WHERE id = inv;
+  IF owed IS NULL OR owed < 10 THEN
+    RAISE EXCEPTION 'FAIL T77: fixture invoice d4 no longer owes at least 10';
+  END IF;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id)
+    VALUES ('00000000-0000-0000-0000-00000000e771', app_company_id(), 9771, '2027-07-15', 'ETB', 'retention', r);
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e771', 1, '00000000-0000-0000-0000-000000000a11', 10, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e771', 2, '00000000-0000-0000-0000-000000000a40', 0, 10);
+
+  BEGIN
+    INSERT INTO invoice_retentions (id, company_id, document_id, amount, held_on, held_entry_id, held_by)
+      VALUES (r, app_company_id(), inv, owed + 1, '2027-07-15', '00000000-0000-0000-0000-00000000e771', app_user_id());
+    RAISE EXCEPTION 'FAIL T77a: more retention was held than the invoice owes';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO invoice_retentions (id, company_id, document_id, amount, held_on, held_entry_id, held_by)
+      VALUES (r, app_company_id(), inv, 10, '2027-07-15', '00000000-0000-0000-0000-00000000e041', app_user_id());
+    RAISE EXCEPTION 'FAIL T77b: retention was held with an entry that is not its own';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO invoice_retentions (id, company_id, document_id, amount, held_on, held_entry_id, held_by)
+    VALUES (r, app_company_id(), inv, 10, '2027-07-15', '00000000-0000-0000-0000-00000000e771', app_user_id());
+  IF (SELECT amount_due FROM documents WHERE id = inv) <> owed - 10 THEN
+    RAISE EXCEPTION 'FAIL T77c: holding retention did not lower what the invoice owes';
+  END IF;
+  BEGIN
+    UPDATE documents SET status = 'void' WHERE id = inv;
+    RAISE EXCEPTION 'FAIL T77d: an invoice holding retention was voided';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE invoice_retentions SET amount = 5 WHERE id = r;
+    RAISE EXCEPTION 'FAIL T77e: held retention was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM invoice_retentions WHERE id = r;
+    RAISE EXCEPTION 'FAIL T77f: held retention was removed';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;   -- the app may not delete at all
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM invoice_retentions) THEN
+    RAISE EXCEPTION 'FAIL T77g: company B saw company A''s retention';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+
+  -- Released with its own entry: owed again, once.
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id)
+    VALUES ('00000000-0000-0000-0000-00000000e772', app_company_id(), 9772, '2027-09-30', 'ETB', 'retention', r);
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), '00000000-0000-0000-0000-00000000e772', 1, '00000000-0000-0000-0000-000000000a40', 10, 0),
+    (app_company_id(), '00000000-0000-0000-0000-00000000e772', 2, '00000000-0000-0000-0000-000000000a11', 0, 10);
+  UPDATE invoice_retentions SET released_on = '2027-09-30', released_entry_id = '00000000-0000-0000-0000-00000000e772', released_by = app_user_id() WHERE id = r;
+  IF (SELECT amount_due FROM documents WHERE id = inv) <> owed THEN
+    RAISE EXCEPTION 'FAIL T77h: releasing retention did not make it owed again';
+  END IF;
+  BEGIN
+    UPDATE invoice_retentions SET released_on = '2027-10-01' WHERE id = r;
+    RAISE EXCEPTION 'FAIL T77i: retention was released twice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T77 retention is held on an owed invoice with its own entry, released once, and kept';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

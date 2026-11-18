@@ -44,7 +44,9 @@ final class InvoiceController extends Controller
                 'apply' => (bool) $membership?->can('payments.receive'),
                 'refund' => (bool) $membership?->can('payments.pay'),   // paying a customer's credit back
                 'remind' => (bool) $membership?->can('invoices.create'),
+                'retain' => (bool) $membership?->can('payments.receive'),
             ],
+            'retentions' => $invoice->type === 'invoice' ? app(\App\Domain\Sales\Retention::class)->of($invoice->getKey()) : [],
             'reminders' => $invoice->type === 'invoice' ? app(\App\Domain\Sales\InvoiceReminders::class)->sentFor($invoice->getKey()) : [],
         ], $status);
     }
@@ -143,6 +145,37 @@ final class InvoiceController extends Controller
     }
 
     /** Void a posted, unpaid invoice: its entry is reversed, the number is kept, the reason is audited. */
+    /** Module 9a: retention the customer holds back on this invoice (050): an amount, or a share of the invoice total. */
+    public function retain(Request $request, Document $invoice, \App\Domain\Sales\Retention $retention): JsonResponse
+    {
+        $this->authorizeCompany('payments.receive');
+        abort_unless($invoice->type === 'invoice', 404);
+        $data = $request->validate([
+            'amount' => ['required_without:percent', 'nullable', 'decimal:0,2', 'gt:0'],
+            'percent' => ['required_without:amount', 'nullable', 'decimal:0,2', 'gt:0', 'max:100'],
+            'held_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
+        ]);
+        // A share of the invoice total, rounded half up to the cent.
+        $amount = $data['amount'] ?? bcadd(bcdiv(bcmul((string) $invoice->total, (string) $data['percent'], 6), '100', 6), '0.005', 2);
+        if (bccomp($amount, (string) $invoice->amount_due, 2) > 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['amount' => ["The invoice still owes {$invoice->amount_due}: retention cannot be more."]]);
+        }
+        $retention->hold($this->current->get(), $invoice, $amount, $data['held_on'], $request->user()->getKey());
+
+        return $this->present($invoice->refresh(), 201);
+    }
+
+    /** Releases the retention held on this invoice: the customer owes it again. */
+    public function releaseRetention(Request $request, Document $invoice, \App\Domain\Sales\Retention $retention): JsonResponse
+    {
+        $this->authorizeCompany('payments.receive');
+        abort_unless($invoice->type === 'invoice', 404);
+        $data = $request->validate(['released_on' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()]]);
+        $retention->release($this->current->get(), $invoice, $data['released_on'], $request->user()->getKey());
+
+        return $this->present($invoice->refresh());
+    }
+
     /** Module 2: a payment reminder by email to the customer, sent by hand (048). */
     public function remind(Request $request, Document $invoice, \App\Domain\Sales\InvoiceReminders $reminders): JsonResponse
     {
