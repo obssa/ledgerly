@@ -6,6 +6,19 @@ import { CompanyBadge, PrintedCompany, UserMenu } from "@/components/app-shell/S
 import Link from "next/link";
 import { isDemoMode } from "@/lib/api";
 import { getSession } from "@/lib/session";
+import { getSubscription } from "@/lib/data";
+import { subscriptionNotice } from "@/lib/subscription";
+
+/** The subscription's notice: read-only books, an overdue payment, a trial ending soon (src/lib/subscription.ts). */
+async function SubscriptionBanner() {
+  const notice = subscriptionNotice(await getSubscription());
+  if (!notice) return null;
+  return (
+    <p role="status" className={`mb-4 rounded-lg px-3 py-2 text-[13px] font-semibold ${notice.tone === "bad" ? "bg-bad-tint text-bad" : "bg-warn-tint text-warn"}`}>
+      {notice.text}
+    </p>
+  );
+}
 
 /** Decided per request, so one built image can run in demo mode or against an API. */
 async function DemoBanner() {
@@ -41,6 +54,9 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         <div className="print:hidden">
           <Suspense fallback={null}>
             <DemoBanner />
+          </Suspense>
+          <Suspense fallback={null}>
+            <SubscriptionBanner />
           </Suspense>
         </div>
         <Suspense fallback={null}>

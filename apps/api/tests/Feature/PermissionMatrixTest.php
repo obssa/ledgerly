@@ -32,6 +32,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/company' => 'company.view',
         'GET api/v1/people' => 'company.view',
         'GET api/v1/members' => 'users.manage',
+        'GET api/v1/subscription' => 'company.view',
         'POST api/v1/members/invitations' => 'users.manage',
         'GET api/v1/company/export' => 'company.export',
         'PUT api/v1/members/{membership}' => 'users.manage',

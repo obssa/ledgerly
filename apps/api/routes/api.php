@@ -14,6 +14,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\CompanyExportController;
+use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\ProjectMilestoneController;
 use App\Http\Controllers\SavedReportController;
 use App\Http\Controllers\PeopleController;
@@ -131,6 +132,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware(['company', 'idempotent'])->group(function () {
             Route::get('company', [CompanySettingsController::class, 'show']);
+            Route::get('subscription', [SubscriptionController::class, 'show']);
             Route::get('people', [PeopleController::class, 'index']);
             Route::get('members', [TeamController::class, 'index']);
             // Every visitor shares the demo accounts: none of them sends invitations or changes who works in the demo.

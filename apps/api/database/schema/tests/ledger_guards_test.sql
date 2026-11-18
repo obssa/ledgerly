@@ -2747,6 +2747,55 @@ BEGIN
   END IF;
   RAISE NOTICE 'PASS T78 a turnover tax return is filed beside VAT and locks TOT payable for its period';
 END $$;
+-- T79: subscriptions (053). The application changes no plan or status and reads no billing events; time moves a
+-- subscription only towards less, outside any company: a trial past its end is suspended, a paid one past its date is
+-- past due, then suspended after the grace days. Two organisations of their own (a7, a8), so no other check is touched.
+RESET ROLE;
+SELECT set_config('t79.a0_status', (SELECT status || '|' || coalesce(trial_ends_at::text, '') FROM organisations WHERE id = '00000000-0000-0000-0000-0000000000a0'), false) \gset ignore_
+INSERT INTO organisations (id, name, status, trial_ends_at) VALUES ('00000000-0000-0000-0000-0000000000a7', 'Trial over Org', 'trial', '2027-01-10');
+INSERT INTO organisations (id, name) VALUES ('00000000-0000-0000-0000-0000000000a8', 'Paid Org');
+UPDATE organisations SET status = 'active', paid_until = '2027-01-31' WHERE id = '00000000-0000-0000-0000-0000000000a8';
+SET ROLE ledgerly_web;
+DO $$
+BEGIN
+  BEGIN
+    UPDATE organisations SET status = 'active' WHERE id = '00000000-0000-0000-0000-0000000000a0';
+    RAISE EXCEPTION 'FAIL T79a: the application changed a subscription''s status';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    PERFORM 1 FROM subscription_events;
+    RAISE EXCEPTION 'FAIL T79b: the application read the billing events';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    PERFORM subscriptions_tick('2027-02-15', 14);
+    RAISE EXCEPTION 'FAIL T79c: subscriptions moved inside a company''s context';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+
+  PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+  PERFORM subscriptions_tick('2027-02-05', 14);   -- the trial ended on 10 Jan; paid to 31 Jan: now past due
+  PERFORM subscriptions_tick('2027-02-05', 14);   -- nothing more on the same day
+  PERFORM subscriptions_tick('2027-02-20', 14);   -- 31 Jan + 14 days grace is over: suspended
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+END $$;
+RESET ROLE;
+DO $$
+BEGIN
+  IF (SELECT status FROM organisations WHERE id = '00000000-0000-0000-0000-0000000000a7') <> 'suspended' THEN
+    RAISE EXCEPTION 'FAIL T79d: a trial past its end was not suspended';
+  END IF;
+  IF (SELECT status FROM organisations WHERE id = '00000000-0000-0000-0000-0000000000a8') <> 'suspended' THEN
+    RAISE EXCEPTION 'FAIL T79e: an unpaid subscription was not suspended after the grace days';
+  END IF;
+  IF (SELECT string_agg(action, ',' ORDER BY id) FROM subscription_events WHERE organisation_id IN ('00000000-0000-0000-0000-0000000000a7', '00000000-0000-0000-0000-0000000000a8'))
+     <> 'trial_ended,payment_overdue,suspended_for_non_payment' THEN
+    RAISE EXCEPTION 'FAIL T79f: the billing events do not tell what happened';
+  END IF;
+  IF (SELECT status || '|' || coalesce(trial_ends_at::text, '') FROM organisations WHERE id = '00000000-0000-0000-0000-0000000000a0') <> current_setting('t79.a0_status') THEN
+    RAISE EXCEPTION 'FAIL T79g: an organisation with nothing due was moved';
+  END IF;
+  RAISE NOTICE 'PASS T79 subscriptions change only through billing, and time moves them only towards less, outside any company';
+END $$;
+SET ROLE ledgerly_web;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
