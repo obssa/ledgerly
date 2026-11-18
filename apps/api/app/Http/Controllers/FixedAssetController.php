@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Assets\FixedAssets;
+use App\Domain\Assets\TaxDepreciation;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use Brick\Math\BigDecimal;
@@ -175,7 +176,13 @@ final class FixedAssetController extends Controller
             'depreciation_starts_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:acquired_on'],
             'opening_depreciation' => ['nullable', 'decimal:0,2', 'min:0'],
             'source_document_id' => ['nullable', 'uuid', Rule::exists('documents', 'id')->whereIn('type', ['bill', 'expense'])],
-        ], ['asset_account_id.exists' => 'Choose a fixed asset account.', 'depreciation_account_id.exists' => 'Choose an accumulated depreciation (contra asset) account.',
+            // The tax law's depreciation, when it differs from the books (061): a schedule only, nothing posts.
+            'tax_method' => ['nullable', Rule::in(['straight_line', 'reducing_balance'])],
+            'tax_useful_life_months' => ['required_if:tax_method,straight_line', 'nullable', 'integer', 'between:1,1200'],
+            'tax_annual_rate' => ['required_if:tax_method,reducing_balance', 'nullable', 'decimal:0,6', 'gt:0', 'lt:1'],
+            'tax_opening_depreciation' => ['nullable', 'decimal:0,2', 'min:0', 'lte:cost'],
+        ], ['tax_useful_life_months.required_if' => 'Give the months tax depreciates it over.', 'tax_annual_rate.required_if' => 'Give the tax rate, such as 0.25 for 25%.',
+            'tax_opening_depreciation.lte' => 'Tax depreciation before Ledgerly is never more than the cost.','asset_account_id.exists' => 'Choose a fixed asset account.', 'depreciation_account_id.exists' => 'Choose an accumulated depreciation (contra asset) account.',
             'useful_life_months.required_if' => 'Give the useful life in months.', 'annual_rate.required_if' => 'Give the annual rate, such as 0.25 for 25%.']);
         $companyId = $this->current->id();
         if (DB::table('fixed_assets')->where(['company_id' => $companyId, 'code' => $data['code']])->when($before, fn ($q) => $q->where('id', '<>', $before->id))->exists()) {
@@ -197,7 +204,31 @@ final class FixedAssetController extends Controller
             // By default an asset is depreciated from the month after it is acquired.
             'depreciation_starts_on' => $data['depreciation_starts_on'] ?? (new \DateTimeImmutable($data['acquired_on']))->modify('first day of next month')->format('Y-m-d'),
             'opening_depreciation' => (string) $opening, 'source_document_id' => $data['source_document_id'] ?? null,
+            'tax_method' => $data['tax_method'] ?? null,
+            'tax_useful_life_months' => ($data['tax_method'] ?? null) === 'straight_line' ? (int) $data['tax_useful_life_months'] : null,
+            'tax_annual_rate' => ($data['tax_method'] ?? null) === 'reducing_balance' ? $data['tax_annual_rate'] : null,
+            'tax_opening_depreciation' => ($data['tax_method'] ?? null) === null ? '0' : (string) ($data['tax_opening_depreciation'] ?? '0'),
         ];
+    }
+
+    /** Module 9c: the tax depreciation schedule of a fiscal year, beside the books (061). Nothing posts. */
+    public function taxSchedule(Request $request, TaxDepreciation $tax): JsonResponse
+    {
+        $this->authorizeCompany('assets.view');
+        $data = $request->validate(['year_end' => ['nullable', 'date_format:Y-m-d']]);
+        $company = $this->current->get();
+        $yearEnd = $data['year_end'] ?? (string) (DB::table('fiscal_years')->where('company_id', $company->getKey())
+            ->where('starts_on', '<=', $this->current->today())->orderByDesc('starts_on')->value('ends_on') ?? self::monthEndOf($this->current->today()));
+        if ($yearEnd !== self::monthEndOf($yearEnd)) {
+            throw ValidationException::withMessages(['year_end' => ['A year ends on the last day of a month.']]);
+        }
+
+        return response()->json($tax->year($company, $yearEnd));
+    }
+
+    private static function monthEndOf(string $date): string
+    {
+        return (new \DateTimeImmutable($date))->modify('last day of this month')->format('Y-m-d');
     }
 
     private function guarded(callable $write): void
@@ -242,6 +273,8 @@ final class FixedAssetController extends Controller
             'useful_life_months' => $a->useful_life_months === null ? null : (int) $a->useful_life_months,
             'annual_rate' => $a->annual_rate === null ? null : (string) $a->annual_rate, 'depreciation_starts_on' => $a->depreciation_starts_on,
             'opening_depreciation' => (string) $a->opening_depreciation, 'source_document_id' => $a->source_document_id,
+            'tax' => ['method' => $a->tax_method, 'useful_life_months' => $a->tax_useful_life_months === null ? null : (int) $a->tax_useful_life_months,
+                'annual_rate' => $a->tax_annual_rate === null ? null : (string) $a->tax_annual_rate, 'opening_depreciation' => (string) $a->tax_opening_depreciation],
             'disposal' => $a->status === 'disposed' ? ['date' => $a->disposed_on, 'proceeds' => (string) $a->proceeds, 'entry_id' => $a->disposal_entry_id] : null];
     }
 }

@@ -15,7 +15,7 @@ export default async function FixedAssetsPage({ searchParams }: PageProps<"/fixe
 
   return (
     <>
-      <PageTitle eyebrow="Books" title="Fixed assets" actions={fa?.register.can.manage ? <Link href="/fixed-assets/new" className="btn btn-primary">Register an asset</Link> : undefined} />
+      <PageTitle eyebrow="Books" title="Fixed assets" actions={<><Link href="/fixed-assets/tax" className="btn">Tax depreciation</Link>{fa?.register.can.manage && <Link href="/fixed-assets/new" className="btn btn-primary">Register an asset</Link>}</>} />
       {!fa ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (
         <>
           {fa.register.can.depreciate && fa.preview && (

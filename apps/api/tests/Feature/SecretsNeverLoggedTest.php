@@ -58,7 +58,9 @@ final class SecretsNeverLoggedTest extends TestCase
 
         $this->signedOut();
         $secrets[] = $challenge = $this->postJson('/api/v1/auth/login', ['email' => 'hana@example.test', 'password' => $first])->assertOk()->json('challenge');
-        $this->postJson('/api/v1/auth/login/mfa', ['challenge' => $challenge, 'code' => '000000'])->assertUnprocessable();
+        $near = array_map(fn (int $s) => Totp::codeAt($secret, $s), range(Totp::stepAt(time()) - 2, Totp::stepAt(time()) + 2));
+        $wrong = collect(['000000', '111111', '222222', '333333'])->first(fn (string $c) => ! in_array($c, $near, true));   // never right by chance
+        $this->postJson('/api/v1/auth/login/mfa', ['challenge' => $challenge, 'code' => $wrong])->assertUnprocessable();
         $secrets[] = $token = $this->postJson('/api/v1/auth/login/mfa', ['challenge' => $challenge, 'recovery_code' => $recovery[0]])->assertOk()->json('token');
 
         // A reset link, a new password, then a changed one.

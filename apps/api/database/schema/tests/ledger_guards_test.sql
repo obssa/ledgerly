@@ -3124,6 +3124,36 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T86 landed costs add value onto stock on hand, join two posted bills, stay within the cost bill and are kept';
 END $$;
+-- T87: a fixed asset's tax depreciation (061). Straight line names its months, a reducing balance its rate, never both;
+-- what tax allowed before Ledgerly is never more than the cost; no tax method, no tax figures. Company A as f1, the
+-- accounts of T69.
+DO $$
+DECLARE
+  a constant uuid := '00000000-0000-0000-0000-0000000087f1';
+BEGIN
+  INSERT INTO fixed_assets (id, company_id, code, name, asset_account_id, depreciation_account_id, expense_account_id, acquired_on, cost, method,
+                            useful_life_months, depreciation_starts_on, created_by) VALUES
+    (a, app_company_id(), 'VAN-87', 'Tax van', '00000000-0000-0000-0000-0000000069a1', '00000000-0000-0000-0000-0000000069a2',
+     '00000000-0000-0000-0000-0000000069a3', '2027-07-15', 60000, 'straight_line', 60, '2027-08-01', '00000000-0000-0000-0000-0000000000f1');
+  BEGIN
+    UPDATE fixed_assets SET tax_method = 'straight_line' WHERE id = a;
+    RAISE EXCEPTION 'FAIL T87a: a straight-line tax method had no number of months';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE fixed_assets SET tax_method = 'reducing_balance', tax_annual_rate = 0.25, tax_useful_life_months = 48 WHERE id = a;
+    RAISE EXCEPTION 'FAIL T87b: a reducing-balance tax method also named months';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE fixed_assets SET tax_opening_depreciation = 100 WHERE id = a;
+    RAISE EXCEPTION 'FAIL T87c: tax depreciation before Ledgerly without a tax method';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE fixed_assets SET tax_method = 'reducing_balance', tax_annual_rate = 0.25, tax_opening_depreciation = 60001 WHERE id = a;
+    RAISE EXCEPTION 'FAIL T87d: tax depreciation before Ledgerly was more than the cost';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE fixed_assets SET tax_method = 'reducing_balance', tax_annual_rate = 0.25, tax_opening_depreciation = 1000 WHERE id = a;
+  RAISE NOTICE 'PASS T87 an asset''s tax depreciation names one rule, and never more than its cost before Ledgerly';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -22,5 +22,20 @@ export function assetBody(form: FormData): Record<string, unknown> {
     useful_life_months: method === "straight_line" ? (value("useful_life_months") || null) : null,
     annual_rate: method === "reducing_balance" ? rateFromPercent(value("annual_rate")) : null,
     depreciation_starts_on: value("depreciation_starts_on") || null, opening_depreciation: clean(value("opening_depreciation")) || null,
+    ...taxRule(value),
+  };
+}
+
+/** The tax rule (061): none (as the books), or straight line over months, or a reducing balance at a rate. */
+function taxRule(value: (n: string) => string): Record<string, unknown> {
+  const method = value("tax_method");
+  if (method !== "straight_line" && method !== "reducing_balance") {
+    return { tax_method: null, tax_useful_life_months: null, tax_annual_rate: null, tax_opening_depreciation: null };
+  }
+  return {
+    tax_method: method,
+    tax_useful_life_months: method === "straight_line" ? (value("tax_useful_life_months") || null) : null,
+    tax_annual_rate: method === "reducing_balance" ? rateFromPercent(value("tax_annual_rate")) : null,
+    tax_opening_depreciation: clean(value("tax_opening_depreciation")) || null,
   };
 }

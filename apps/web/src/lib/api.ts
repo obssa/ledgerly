@@ -383,9 +383,24 @@ export interface FixedAsset {
   annual_rate: string | null;
   depreciation_starts_on: string;
   opening_depreciation: string;
+  /** How tax depreciates it, when the tax law differs from the books (061); method null: as the books. */
+  tax?: { method: "straight_line" | "reducing_balance" | null; useful_life_months: number | null; annual_rate: string | null; opening_depreciation: string };
   disposal: { date: string; proceeds: string; entry_id: string } | null;
   depreciated?: string;
   book_value?: string;
+}
+
+/** GET fixed-assets/tax-depreciation (061): a fiscal year's tax schedule beside the books. */
+export interface TaxDepreciationYear {
+  from: string;
+  to: string;
+  rows: {
+    id: string; code: string; name: string; category: string | null; acquired_on: string; cost: string; disposed_on: string | null;
+    tax_rule: { own: boolean; method: string; useful_life_months: number | null; annual_rate: string | null };
+    tax_opening: string; tax_additions: string; tax_depreciation: string; tax_closing: string;
+    book_opening: string; book_depreciation: string; book_closing: string; difference: string;
+  }[];
+  totals: Record<"tax_opening" | "tax_additions" | "tax_depreciation" | "tax_closing" | "book_opening" | "book_depreciation" | "book_closing" | "difference", string>;
 }
 
 export interface FixedAssetDetail extends FixedAsset {
@@ -1232,6 +1247,8 @@ export const ledgerly = {
   postDueRecurring: (ctx: RequestOptions) =>
     api<{ data: { id: string; name: string; posted: number[]; error: string | null }[]; posted: number }>("recurring-journals/post-due", { ...ctx, method: "POST", body: {} }),
   fixedAssets: (ctx: RequestOptions) => api<FixedAssetRegister>("fixed-assets", ctx),
+  taxDepreciation: (yearEnd: string | undefined, ctx: RequestOptions) =>
+    api<TaxDepreciationYear>("fixed-assets/tax-depreciation", { ...ctx, query: yearEnd ? { year_end: yearEnd } : {} }),
   fixedAsset: (id: string, ctx: RequestOptions) => api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}`, ctx),
   saveFixedAsset: (id: string | null, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<FixedAssetDetail>(id ? `fixed-assets/${encodeURIComponent(id)}` : "fixed-assets", { ...ctx, method: id ? "PUT" : "POST", body }),
