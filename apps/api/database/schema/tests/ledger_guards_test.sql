@@ -3726,6 +3726,88 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T96 a sales receipt names the money account it went into, is for a customer and leaves nothing to pay';
 END $$;
+
+-- T97: delivery notes (071). Goods are delivered against a confirmed sales order only, never more than was ordered;
+-- the order's invoices match no more than was delivered; an item delivered is not taken out again by an invoice; a note
+-- whose goods are invoiced is not voided, and its lines and matches are kept; an order with goods delivered is not
+-- cancelled; another company sees none of it. Company A as f1, customer c1, item b1 in warehouse a1.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  so constant uuid := '00000000-0000-0000-0000-000000000ec0';
+  sl constant uuid := '00000000-0000-0000-0000-000000000ec1';
+  i1 constant uuid := '00000000-0000-0000-0000-000000000ec2';
+  il constant uuid := '00000000-0000-0000-0000-000000000ec3';
+  d1 constant uuid := '00000000-0000-0000-0000-000000000ec4';
+  i2 constant uuid := '00000000-0000-0000-0000-000000000ec5';
+  il2 constant uuid := '00000000-0000-0000-0000-000000000ec6';
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total) VALUES (so, app_company_id(), 'sales_order', c1, '2027-10-01', 'ETB', 1000);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (sl, app_company_id(), so, 1, 'Coffee', 10, 100, acc, 1000, item);
+  BEGIN
+    INSERT INTO delivery_notes (company_id, sales_order_id, number, delivered_on, warehouse_id, created_by) VALUES (app_company_id(), so, 'DN-T97-0', '2027-10-02', wh, f1);
+    RAISE EXCEPTION 'FAIL T97a: goods were delivered against a sales order not yet confirmed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET status = 'accepted', number = 'SO-T97-1' WHERE id = so;
+
+  INSERT INTO delivery_notes (id, company_id, sales_order_id, number, delivered_on, warehouse_id, created_by) VALUES (d1, app_company_id(), so, 'DN-T97-1', '2027-10-02', wh, f1);
+  INSERT INTO delivery_note_lines (company_id, delivery_note_id, order_line_id, item_id, quantity) VALUES (app_company_id(), d1, sl, item, 6);
+  BEGIN
+    INSERT INTO delivery_note_lines (company_id, delivery_note_id, order_line_id, item_id, quantity) VALUES (app_company_id(), d1, sl, item, 5);
+    RAISE EXCEPTION 'FAIL T97b: more was delivered than was ordered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id) VALUES
+    (i1, app_company_id(), 'invoice', c1, '2027-10-03', 'ETB', so), (i2, app_company_id(), 'invoice', c1, '2027-10-04', 'ETB', so);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (il, app_company_id(), i1, 1, 'Coffee', 6, 100, acc, 600, item, sl), (il2, app_company_id(), i2, 1, 'Coffee', 1, 100, acc, 100, item, sl);
+  INSERT INTO invoice_delivery_matches (company_id, invoice_id, invoice_line_id, order_line_id, quantity) VALUES (app_company_id(), i1, il, sl, 6);
+  BEGIN
+    INSERT INTO invoice_delivery_matches (company_id, invoice_id, invoice_line_id, order_line_id, quantity) VALUES (app_company_id(), i2, il2, sl, 1);
+    RAISE EXCEPTION 'FAIL T97c: more was invoiced than was delivered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), item, wh, '2027-10-03', 'sale', -6, 0, i1);
+    RAISE EXCEPTION 'FAIL T97d: an invoice took out goods its order had delivered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE delivery_notes SET status = 'void', voided_at = now() WHERE id = d1;
+    RAISE EXCEPTION 'FAIL T97e: a delivery note whose goods are invoiced was voided';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE delivery_notes SET delivered_on = '2027-10-05' WHERE id = d1;
+    RAISE EXCEPTION 'FAIL T97f: a delivery note was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE delivery_note_lines SET quantity = 1 WHERE delivery_note_id = d1;
+    RAISE EXCEPTION 'FAIL T97g: a delivery note''s line was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM invoice_delivery_matches WHERE invoice_id = i1;
+    RAISE EXCEPTION 'FAIL T97h: an invoice''s match to goods delivered was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE documents SET status = 'void' WHERE id = so;
+    RAISE EXCEPTION 'FAIL T97i: a sales order with goods delivered was cancelled';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- The invoice voided gives its quantity back: the note can then be voided.
+  UPDATE documents SET status = 'void' WHERE id = i1;
+  UPDATE delivery_notes SET status = 'void', voided_at = now(), voided_by = f1, void_reason = 'T97' WHERE id = d1;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM delivery_notes WHERE id = d1) OR EXISTS (SELECT 1 FROM delivery_note_lines WHERE delivery_note_id = d1)
+     OR EXISTS (SELECT 1 FROM invoice_delivery_matches WHERE invoice_id = i1) THEN
+    RAISE EXCEPTION 'FAIL T97j: company B saw company A''s deliveries';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T97 goods are delivered against a confirmed order, never beyond it, invoiced no further than delivered, and kept';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Inventory\Reservations;
+use App\Domain\Sales\DeliveredGoods;
 use App\Domain\Sales\Actions\QuoteWorkflow;
 use App\Domain\Sales\Actions\SaveQuote;
 use App\Domain\Sales\Models\Document;
@@ -226,6 +227,34 @@ final class QuoteController extends Controller
         $invoices = $order ? Document::query()->where('source_document_id', $document->getKey())->orderBy('issue_date')->orderBy('id')
             ->get(['id', 'number', 'issue_date', 'status', 'total']) : null;
         $left = $order && collect($delivery)->contains(fn (array $r) => bccomp($r['remaining'], '0', 2) > 0);
+        // 071: what left on delivery notes, what can be invoiced now, the notes, and the stock lines that can still leave.
+        $notes = collect();
+        $leaving = [];
+        $uninvoiced = false;
+        if ($order) {
+            $byNote = app(DeliveredGoods::class)->byLine((string) $document->getKey());
+            $billable = $this->workflow->billable($document, $delivery);
+            $notes = DB::table('delivery_notes as d')->join('warehouses as w', 'w.id', '=', 'd.warehouse_id')
+                ->where('d.sales_order_id', $document->getKey())->orderBy('d.delivered_on')->orderBy('d.number')
+                ->get(['d.id', 'd.number', 'd.delivered_on', 'd.reference', 'd.status', 'w.name as warehouse']);
+            $stock = DB::table('items')->whereIn('id', $document->lines->pluck('item_id')->filter())->where('type', 'inventory')->pluck('id')->map(fn ($id) => (string) $id)->all();
+            $invoicedOut = DB::table('stock_moves as m')->join('documents as i', 'i.id', '=', 'm.document_id')
+                ->where(['m.kind' => 'sale', 'i.type' => 'invoice', 'i.source_document_id' => $document->getKey()])->where('i.status', '<>', 'void')
+                ->distinct()->pluck('m.item_id')->map(fn ($id) => (string) $id)->all();
+            foreach ($document->lines as $line) {
+                $id = (string) $line->getKey();
+                $shipped = $byNote[$id]['delivered'] ?? '0.00';
+                if (in_array((string) $line->item_id, $stock, true) && ! in_array((string) $line->item_id, $invoicedOut, true)) {
+                    $toGo = bcsub((string) $line->quantity, $shipped, 2);
+                    if (bccomp($toGo, '0', 2) > 0) {
+                        $leaving[$id] = $toGo;
+                    }
+                }
+                $uninvoiced = $uninvoiced || bccomp($shipped, $delivery[$id]['delivered'] ?? '0', 2) > 0;
+                $delivery[$id] = [...$delivery[$id], 'shipped' => $shipped, 'billable' => $billable[$id]['remaining']];
+            }
+            $left = collect($billable)->contains(fn (array $r) => bccomp($r['remaining'], '0', 2) > 0);
+        }
         $source = $document->source_document_id ? Document::query()->find($document->source_document_id, ['id', 'type', 'number']) : null;
 
         return response()->json([
@@ -237,15 +266,19 @@ final class QuoteController extends Controller
             // 067: each order line's ordered, delivered and remaining quantities (by line id), and the invoices made.
             'delivery' => $delivery,
             'invoices' => $invoices,
+            // 071: the order's delivery notes, and its stock lines that can still leave (by line id).
+            'delivery_notes' => $order ? $notes : null,
+            'leaving' => $order ? (object) $leaving : null,
             'can' => [
-                'edit' => $write && in_array($s, SaveQuote::EDITABLE[$document->type], true) && ! ($order && $invoices->isNotEmpty()),
+                'edit' => $write && in_array($s, SaveQuote::EDITABLE[$document->type], true) && ! ($order && ($invoices->isNotEmpty() || $notes->isNotEmpty())),
                 'send' => $write && $quote && $s === 'draft',
                 'accept' => $write && ($quote ? in_array($s, ['draft', 'sent'], true) : $s === 'draft'),
                 'decline' => $write && $quote && $s === 'sent',
                 'extend' => $write && $quote && $s === 'expired',
-                'cancel' => $write && in_array($s, ['draft', 'sent', 'accepted'], true) && ! ($order && $made !== null),
+                'cancel' => $write && in_array($s, ['draft', 'sent', 'accepted'], true) && ! ($order && ($made !== null || $notes->contains(fn ($n) => $n->status === 'posted'))),
+                'deliver' => $order && $s === 'accepted' && $leaving !== [] && (bool) $this->current->membership()?->can('inventory.deliver'),
                 'convert' => $write && in_array($s, $quote ? ['draft', 'sent', 'accepted'] : ['draft', 'accepted'], true) && ($quote || $left),
-                'close' => $write && $order && $s === 'accepted' && $made !== null,
+                'close' => $write && $order && $s === 'accepted' && $made !== null && ! $uninvoiced,
                 'email' => $write && ($quote ? in_array($s, ['draft', 'sent', 'accepted'], true) : $s === 'accepted'),
             ],
         ], $status);

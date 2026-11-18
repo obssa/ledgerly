@@ -52,7 +52,8 @@ final class EditPostedInvoice
             throw new LedgerException("{$invoice->number} was brought in from the old books: void it and enter it again with the right amount.");
         }
         if (DB::table('stock_moves')->where(['company_id' => $invoice->company_id, 'document_id' => $invoice->getKey()])->exists()
-            || DB::table('bill_receipt_matches')->where(['company_id' => $invoice->company_id, 'bill_id' => $invoice->getKey()])->exists()) {
+            || DB::table('bill_receipt_matches')->where(['company_id' => $invoice->company_id, 'bill_id' => $invoice->getKey()])->exists()
+            || DB::table('invoice_delivery_matches')->where(['company_id' => $invoice->company_id, 'invoice_id' => $invoice->getKey()])->exists()) {
             throw new LedgerException("{$invoice->number} moved stock: void it and enter it again, so the bin card stays exact.");
         }
         if ($invoice->status !== 'posted') {

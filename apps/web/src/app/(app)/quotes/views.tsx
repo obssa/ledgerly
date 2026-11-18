@@ -152,6 +152,19 @@ export async function QuoteView({ kind, id, saved }: { kind: QuoteKind; id: stri
               )}
             </Card>
           )}
+          {doc.delivery_notes && doc.delivery_notes.length > 0 && (
+            <Card label="Delivery notes">
+              <ul className="text-sm">
+                {doc.delivery_notes.map((n) => (
+                  <li key={n.id} className="flex justify-between gap-2 border-t border-line py-1.5 first:border-t-0">
+                    <span><Link href={`/delivery-notes/${encodeURIComponent(n.id)}`} className="num font-semibold hover:underline">{n.number}</Link>
+                      {n.status === "void" && <span className="ml-1 text-muted">(void)</span>}</span>
+                    <span className="num text-muted">{n.delivered_on}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           <QuoteActions doc={doc} />
           {doc.versions > 0 && <p className="text-[13px] text-muted">Revised {doc.versions} {doc.versions === 1 ? "time" : "times"}; every earlier version is kept.</p>}
         </aside>
@@ -164,6 +177,7 @@ function QuoteBody({ doc }: { doc: QuoteDetail }) {
   const w = WORDS[doc.type];
   // 067: a sales order shows, line by line, what its invoices delivered and what is left (its back-order).
   const delivery = doc.type === "sales_order" && doc.status !== "draft" ? doc.delivery : null;
+  const notes = (doc.delivery_notes ?? []).length > 0;   // 071: what left on delivery notes, line by line
   const left = delivery ? Object.values(delivery).some((d) => Number(d.remaining) > 0) : false;
   return (
     <Card className="min-w-0 flex-[2_1_560px]" label={w.one}>
@@ -184,7 +198,7 @@ function QuoteBody({ doc }: { doc: QuoteDetail }) {
         <table className="tbl">
           <thead>
             <tr><th scope="col">Description</th><th scope="col" className="!text-right">Qty</th>
-              {delivery && <><th scope="col" className="!text-right">Delivered</th><th scope="col" className="!text-right">Left</th></>}
+              {delivery && <>{notes && <th scope="col" className="!text-right">On notes</th>}<th scope="col" className="!text-right">{notes ? "Invoiced" : "Delivered"}</th><th scope="col" className="!text-right">Left</th></>}
               <th scope="col" className="!text-right">Unit price</th><th scope="col" className="!text-right">Tax</th><th scope="col" className="!text-right">Amount</th></tr>
           </thead>
           <tbody>
@@ -193,6 +207,7 @@ function QuoteBody({ doc }: { doc: QuoteDetail }) {
                 <td>{l.description}</td>
                 <td className="num text-right">{l.quantity}</td>
                 {delivery && <>
+                  {notes && <td className="num text-right">{delivery[l.id ?? ""]?.shipped ?? "—"}</td>}
                   <td className="num text-right">{delivery[l.id ?? ""]?.delivered ?? "—"}</td>
                   <td className={`num text-right ${Number(delivery[l.id ?? ""]?.remaining ?? 0) > 0 ? "font-semibold text-warn" : ""}`}>{delivery[l.id ?? ""]?.remaining ?? "—"}</td>
                 </>}

@@ -101,6 +101,14 @@ trait CompanyFixtures
         $ids['sales_receipt'] = (string) Str::uuid7();
         $this->owner()->table('documents')->insert(['id' => $ids['sales_receipt'], 'company_id' => $company, 'type' => 'sales_receipt',
             'contact_id' => $ids['contact'], 'issue_date' => '2026-11-05', 'currency' => 'ETB', 'paid_from_account_id' => $ids['bank'], 'payment_method' => 'cash']);
+        // A confirmed sales order with a delivery note of no lines (071), for the same reason as the goods received note below.
+        $confirmed = (string) Str::uuid7();
+        $this->owner()->table('documents')->insert(['id' => $confirmed, 'company_id' => $company, 'type' => 'sales_order',
+            'number' => 'SO-FIXTURE-1', 'contact_id' => $ids['contact'], 'issue_date' => '2026-11-05', 'currency' => 'ETB', 'warehouse_id' => $ids['store']]);
+        $this->owner()->table('documents')->where('id', $confirmed)->update(['status' => 'accepted']);
+        $ids['delivery_note'] = (string) Str::uuid7();
+        $this->owner()->table('delivery_notes')->insert(['id' => $ids['delivery_note'], 'company_id' => $company, 'sales_order_id' => $confirmed,
+            'number' => 'DN-FIXTURE-1', 'delivered_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
         $ids['goods_receipt'] = (string) Str::uuid7();
         $this->owner()->table('goods_receipts')->insert(['id' => $ids['goods_receipt'], 'company_id' => $company, 'purchase_order_id' => $issued,
             'number' => 'GRN-FIXTURE-1', 'received_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
@@ -176,7 +184,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(273, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(278, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -217,6 +225,7 @@ trait CompanyFixtures
             'purchaseOrder' => $ids['purchase_order'],
             'goodsReceipt' => $ids['goods_receipt'],
             'salesReceipt' => $ids['sales_receipt'],
+            'deliveryNote' => $ids['delivery_note'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

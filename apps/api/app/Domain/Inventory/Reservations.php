@@ -76,16 +76,24 @@ final class Reservations
         $received = DB::table('goods_receipt_lines as gl')->join('goods_receipts as g', 'g.id', '=', 'gl.goods_receipt_id')
             ->where('g.status', 'posted')->groupBy('gl.order_line_id')->selectRaw('gl.order_line_id, sum(gl.quantity) AS quantity');
 
+        // 071: goods that left on a delivery note are no longer reserved, invoiced or not.
+        $shipped = DB::table('delivery_note_lines as dl')->join('delivery_notes as d', 'd.id', '=', 'dl.delivery_note_id')
+            ->where('d.status', 'posted')->groupBy('dl.order_line_id')->selectRaw('dl.order_line_id, sum(dl.quantity) AS quantity');
+
         return DB::table('document_lines as l')->join('documents as o', 'o.id', '=', 'l.document_id')
             ->leftJoinSub($delivered, 'x', 'x.source_line_id', '=', 'l.id')
             ->when($type === 'purchase_order', fn (Builder $q) => $q->leftJoinSub($received, 'r', 'r.order_line_id', '=', 'l.id'))
+            ->when($type === 'sales_order', fn (Builder $q) => $q->leftJoinSub($shipped, 'r', 'r.order_line_id', '=', 'l.id'))
             ->where('o.type', $type)->where('o.status', 'accepted')
             ->whereRaw('l.quantity > ' . self::done($type));
     }
 
-    /** What of an order line is done, as fixed SQL: delivered (invoiced) for a sales order, billed or received for a purchase order. */
+    /**
+     * What of an order line is done, as fixed SQL: invoiced or delivered on a note for a sales order, billed or received
+     * for a purchase order (r is the notes' quantity).
+     */
     private static function done(string $type): string
     {
-        return $type === 'purchase_order' ? 'greatest(coalesce(x.quantity, 0), coalesce(r.quantity, 0))' : 'coalesce(x.quantity, 0)';
+        return in_array($type, ['purchase_order', 'sales_order'], true) ? 'greatest(coalesce(x.quantity, 0), coalesce(r.quantity, 0))' : 'coalesce(x.quantity, 0)';
     }
 }

@@ -101,6 +101,36 @@ export async function emailQuote(_: FormState | undefined, form: FormData): Prom
   }
 }
 
+/** Records the goods that left (receive_<line id>, the delivery fields of the note form) on a delivery note, and opens it (071). */
+export async function deliverGoods(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let made: { id: string };
+  try {
+    const reference = text(form, "reference");
+    const note = text(form, "note");
+    made = await ledgerly.deliverSalesOrder(text(form, "id") ?? "", {
+      delivered_on: text(form, "delivered_on") ?? "", lines: deliveries(form, "receive") ?? [],
+      ...(reference ? { reference } : {}), ...(note ? { note } : {}),
+    }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(`/delivery-notes/${encodeURIComponent(made.id)}`);
+}
+
+/** Voids a delivery note: its goods come back into stock and its entry is reversed (071). */
+export async function voidDeliveryNote(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const reason = text(form, "reason");
+    await ledgerly.voidDeliveryNote(text(form, "id") ?? "", reason ? { reason } : {}, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Voided: its goods are back in stock and its entry was reversed." };
+}
+
 /** Makes the sales order or the draft invoice, and opens it. */
 export async function convertQuote(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
