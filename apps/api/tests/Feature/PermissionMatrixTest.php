@@ -199,6 +199,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/stock' => 'inventory.view',
         'POST api/v1/stock/adjustments' => 'inventory.adjust',
         'POST api/v1/stock/issues' => 'inventory.adjust',
+        'POST api/v1/stock/counts' => 'inventory.adjust',
         'POST api/v1/stock/transfers' => 'inventory.transfer',
         'GET api/v1/stock/reorder' => 'inventory.view',
         'GET api/v1/reports/inventory-valuation' => 'reports.view',

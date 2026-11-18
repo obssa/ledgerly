@@ -58,6 +58,9 @@ export default async function InventoryPage() {
               <TransferStock items={stockItems} warehouses={active} />
             </Card>
           )}
+          {active.length > 0 && (
+            <p className="mt-3 text-[13px]"><Link href="/inventory/count" className="font-semibold text-brand hover:underline">Count stock</Link> <span className="text-muted">: enter what was counted in a warehouse; differences are adjusted at cost.</span></p>
+          )}
           {stockItems.length > 0 && active.length > 0 && issue && issue.projects.length > 0 && issue.costAccounts.length > 0 && (
             <Card className="mt-4" label="Issue to a project">
               <h2 className="mb-1 text-[15px] font-bold">Issue materials to a project</h2>

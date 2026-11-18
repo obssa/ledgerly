@@ -310,6 +310,7 @@ Route::prefix('v1')->group(function () {
             Route::get('stock', [StockController::class, 'index']);
             Route::post('stock/adjustments', [StockController::class, 'adjust']);
             Route::post('stock/issues', [StockController::class, 'issue']);
+            Route::post('stock/counts', [StockController::class, 'count']);
             Route::post('stock/transfers', [StockController::class, 'transfer']);
             Route::get('stock/reorder', [StockController::class, 'reorder']);
 
