@@ -68,6 +68,9 @@ final class CompanyExport
                      WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped) AS columns
               FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
              WHERE n.nspname = current_schema() AND c.relkind IN ('r', 'p') AND NOT c.relispartition AND c.relrowsecurity
+               -- Tables closed to the application (billing events, the staff console's own) are not the company's records;
+               -- TenantIsolationTest names each one, so none is left out by accident.
+               AND has_table_privilege(c.oid, 'SELECT')
                AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'company_id' AND NOT a.attisdropped)
              ORDER BY c.relname
             SQL);
