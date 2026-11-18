@@ -76,6 +76,36 @@ export async function purchaseOrderStep(_: FormState | undefined, form: FormData
   return { notice: NOTICE[step] };
 }
 
+/** Records the goods that arrived (receive_<line id>) on a goods received note, and opens it (069). */
+export async function receiveGoods(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let made: { id: string };
+  try {
+    const reference = text(form, "reference");
+    const note = text(form, "note");
+    made = await ledgerly.receivePurchaseOrder(text(form, "id") ?? "", {
+      received_on: text(form, "received_on") ?? "", lines: deliveries(form, "receive") ?? [],
+      ...(reference ? { reference } : {}), ...(note ? { note } : {}),
+    }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(`/goods-received/${encodeURIComponent(made.id)}`);
+}
+
+/** Voids a goods received note: its goods go out again and its entry is reversed (069). */
+export async function voidGoodsReceipt(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const reason = text(form, "reason");
+    await ledgerly.voidGoodsReceipt(text(form, "id") ?? "", reason ? { reason } : {}, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Voided: its goods went out of stock again and its entry was reversed." };
+}
+
 /** Makes the draft bill for the quantities typed (deliver_<line id>), or for all that is left, and opens it. */
 export async function billPurchaseOrder(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

@@ -2,13 +2,16 @@
 
 import { useActionState } from "react";
 import type { PurchaseOrderDetail } from "@/lib/api";
-import { billPurchaseOrder, purchaseOrderStep } from "./actions";
+import { billPurchaseOrder, purchaseOrderStep, receiveGoods } from "./actions";
 
 /** What can be done with this purchase order now, for this role. The API checks again on every call. */
-export function PurchaseOrderActions({ doc }: { doc: PurchaseOrderDetail }) {
+export function PurchaseOrderActions({ doc, today }: { doc: PurchaseOrderDetail; today: string }) {
   const [state, action, pending] = useActionState(purchaseOrderStep, undefined);
   const [billed, bill, billing] = useActionState(billPurchaseOrder, undefined);
-  const open = doc.lines.filter((l) => l.id && Number(doc.delivery[l.id]?.remaining ?? 0) > 0);
+  const [received, receive, receiving] = useActionState(receiveGoods, undefined);
+  // 069: a line whose goods come in on goods received notes is billed for what arrived and is not billed yet.
+  const open = doc.lines.filter((l) => l.id && Number(doc.delivery[l.id]?.billable ?? 0) > 0);
+  const arriving = doc.lines.filter((l) => l.id && doc.arriving[l.id]);
   const hidden = (step?: string) => (
     <>
       <input type="hidden" name="id" value={doc.id} />
@@ -26,6 +29,41 @@ export function PurchaseOrderActions({ doc }: { doc: PurchaseOrderDetail }) {
     <div className="flex flex-col gap-3">
       {flash(state)}
       {flash(billed)}
+      {flash(received)}
+
+      {doc.can.receive && (
+        <form action={receive} className="rounded-xl border border-line p-3">
+          {hidden()}
+          <h2 className="text-[15px] font-bold">Goods arrived?</h2>
+          <p className="mt-1 text-[13px] text-muted">
+            Record what came: it goes into stock at the order&apos;s price, as goods received not yet billed. The supplier&apos;s bill then clears it.
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <label className="field-label" htmlFor="received-on">Arrived on</label>
+              <input className="field num" id="received-on" name="received_on" type="date" defaultValue={today} max={today} required />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="received-ref">Their delivery note</label>
+              <input className="field" id="received-ref" name="reference" maxLength={100} />
+            </div>
+          </div>
+          <fieldset className="mt-2">
+            <legend className="sr-only">Quantities that arrived</legend>
+            {arriving.map((l) => (
+              <div key={l.id} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]">
+                <label htmlFor={`receive-${l.id}`} className="min-w-0 flex-1">{l.description} <span className="text-muted">({doc.arriving[l.id ?? ""]} to come)</span></label>
+                <input className="field num !w-[96px] text-right" id={`receive-${l.id}`} name={`receive_${l.id}`} defaultValue={doc.arriving[l.id ?? ""]}
+                  inputMode="decimal" pattern="\d+(\.\d{1,2})?" aria-describedby="receive-help" />
+              </div>
+            ))}
+            <p id="receive-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that did not come. Only stock items are received.</p>
+          </fieldset>
+          <label className="field-label mt-2" htmlFor="received-note">Note (optional)</label>
+          <input className="field" id="received-note" name="note" maxLength={500} />
+          <button type="submit" className="btn btn-primary mt-2" disabled={receiving}>{receiving ? "Recording…" : "Record the goods received"}</button>
+        </form>
+      )}
 
       {doc.can.issue && (
         <form action={action}>
@@ -46,10 +84,11 @@ export function PurchaseOrderActions({ doc }: { doc: PurchaseOrderDetail }) {
             <legend className="sr-only">Quantities on this bill</legend>
             {open.map((l) => {
               const d = doc.delivery[l.id ?? ""];
+              const received = Number(d?.received ?? 0) > 0;
               return (
                 <div key={l.id} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]">
-                  <label htmlFor={`deliver-${l.id}`} className="min-w-0 flex-1">{l.description} <span className="text-muted">({d?.remaining} to come)</span></label>
-                  <input className="field num !w-[96px] text-right" id={`deliver-${l.id}`} name={`deliver_${l.id}`} defaultValue={d?.remaining}
+                  <label htmlFor={`deliver-${l.id}`} className="min-w-0 flex-1">{l.description} <span className="text-muted">({d?.billable} {received ? "received, not billed" : "to come"})</span></label>
+                  <input className="field num !w-[96px] text-right" id={`deliver-${l.id}`} name={`deliver_${l.id}`} defaultValue={d?.billable}
                     inputMode="decimal" pattern="\d+(\.\d{1,2})?" aria-describedby="bill-help" />
                 </div>
               );

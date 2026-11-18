@@ -90,6 +90,15 @@ trait CompanyFixtures
         $ids['bill'] = $this->postJson('/api/v1/bills', $bill('R-101'), $h)->assertCreated()->json('id');
         // A draft purchase order to the supplier (068).
         $ids['purchase_order'] = $this->postJson('/api/v1/purchase-orders', $bill('PO-REF'), $h)->assertCreated()->json('id');
+        // An issued purchase order with a goods received note of no lines (069): a real note for the routes to find, that
+        // moves no stock and posts nothing, so every other test sees the fixture's stock and ledger as they were.
+        $issued = (string) Str::uuid7();
+        $this->owner()->table('documents')->insert(['id' => $issued, 'company_id' => $company, 'type' => 'purchase_order',
+            'number' => 'PO-FIXTURE-1', 'contact_id' => $ids['supplier'], 'issue_date' => '2026-11-05', 'currency' => 'ETB', 'warehouse_id' => $ids['store']]);
+        $this->owner()->table('documents')->where('id', $issued)->update(['status' => 'accepted']);   // issued, as the state machine allows
+        $ids['goods_receipt'] = (string) Str::uuid7();
+        $this->owner()->table('goods_receipts')->insert(['id' => $ids['goods_receipt'], 'company_id' => $company, 'purchase_order_id' => $issued,
+            'number' => 'GRN-FIXTURE-1', 'received_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
         $ids['supplier_credit'] = $this->postJson("/api/v1/bills/{$ids['posted_bill']}/credits", ['issue_date' => '2026-11-06', 'reference' => 'RC-1',
             'notes' => 'Rent overcharged', 'lines' => [['description' => 'Rent correction', 'quantity' => '1', 'unit_price' => '40', 'account_id' => $ids['rent']]]], $h)
             ->assertCreated()->json('id');
@@ -162,7 +171,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(264, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(269, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -201,6 +210,7 @@ trait CompanyFixtures
             'quote' => $ids['quote'],
             'salesOrder' => $ids['sales_order'],
             'purchaseOrder' => $ids['purchase_order'],
+            'goodsReceipt' => $ids['goods_receipt'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

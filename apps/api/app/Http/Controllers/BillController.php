@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Purchases\DuplicateBills;
+use App\Domain\Purchases\ThreeWayMatch;
 use App\Domain\Sales\Actions\ApproveInvoice;
 use App\Domain\Sales\Actions\EditPostedInvoice;
 use App\Domain\Sales\Actions\InvoiceWorkflow;
@@ -26,7 +27,7 @@ use Illuminate\Validation\ValidationException;
  */
 final class BillController extends Controller
 {
-    public function __construct(private readonly DuplicateBills $duplicates, private readonly CurrentCompany $current)
+    public function __construct(private readonly DuplicateBills $duplicates, private readonly CurrentCompany $current, private readonly ThreeWayMatch $match)
     {
     }
 
@@ -37,6 +38,8 @@ final class BillController extends Controller
         return response()->json([
             ...$bill->toArray(),
             'warnings' => $bill->type === 'bill' ? $this->duplicates->warnings($bill) : [],
+            // 069: against its purchase order and the goods received, line by line (warnings only).
+            'match' => $this->match->forBill($bill),
             'can' => [
                 'edit' => (bool) $membership?->can($bill->isPosted() ? 'transactions.edit' : 'bills.create'),
                 'approve' => (bool) $membership?->can('bills.approve'),

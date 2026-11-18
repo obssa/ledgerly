@@ -13,6 +13,14 @@ describe("deliveries", () => {
     expect(deliveries(form)).toEqual([{ line_id: a, quantity: "1200.50" }, { line_id: b, quantity: "0" }]);
   });
 
+  it("reads the receive_ fields of a goods received note, and only those", () => {
+    const form = new FormData();
+    form.set(`receive_${a}`, "4");
+    form.set(`deliver_${b}`, "2");
+    expect(deliveries(form, "receive")).toEqual([{ line_id: a, quantity: "4" }]);
+    expect(deliveries(form)).toEqual([{ line_id: b, quantity: "2" }]);
+  });
+
   it("is undefined without any line, so the API delivers all that is left", () => {
     const form = new FormData();
     form.set("deliver_not-a-line", "3");

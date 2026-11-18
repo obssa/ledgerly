@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { PurchaseOrderStatus } from "@/lib/api";
-import { getBillOptions, getPurchaseOrder, getPurchaseOrders } from "@/lib/data";
+import { getBillOptions, getCompanyToday, getPurchaseOrder, getPurchaseOrders } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { InvoiceForm } from "../invoices/new/InvoiceForm";
 import { PurchaseOrderActions } from "./PurchaseOrderActions";
@@ -28,6 +28,7 @@ export async function PurchaseOrderList() {
     <>
       <PageTitle eyebrow={eyebrow()} title="Purchase orders" actions={<>
         <Link href="/purchase-orders/open" className="btn">Still to come</Link>
+        <Link href="/goods-received" className="btn">Goods received</Link>
         <Link href="/purchase-orders/new" className="btn btn-primary">+ New purchase order</Link>
       </>} />
       <Card className="!p-2" label="Purchase orders">
@@ -91,10 +92,12 @@ export async function EditPurchaseOrder({ id }: { id: string }) {
 }
 
 export async function PurchaseOrderView({ id, saved }: { id: string; saved?: boolean }) {
-  const doc = await getPurchaseOrder(id);
+  const [doc, today] = await Promise.all([getPurchaseOrder(id), getCompanyToday()]);
   if (!doc) notFound();
   const s = statusOf(doc.status);
   const shown = doc.status !== "draft";
+  const receipts = doc.receipts ?? [];
+  const byReceipt = receipts.length > 0;
   const left = Object.values(doc.delivery).some((d) => Number(d.remaining) > 0);
 
   return (
@@ -125,7 +128,7 @@ export async function PurchaseOrderView({ id, saved }: { id: string; saved?: boo
             <table className="tbl">
               <thead>
                 <tr><th scope="col">Description</th><th scope="col" className="!text-right">Qty</th>
-                  {shown && <><th scope="col" className="!text-right">Billed</th><th scope="col" className="!text-right">To come</th></>}
+                  {shown && <>{byReceipt && <th scope="col" className="!text-right">Received</th>}<th scope="col" className="!text-right">Billed</th><th scope="col" className="!text-right">To come</th></>}
                   <th scope="col" className="!text-right">Unit price</th><th scope="col" className="!text-right">Tax</th><th scope="col" className="!text-right">Amount</th></tr>
               </thead>
               <tbody>
@@ -136,6 +139,7 @@ export async function PurchaseOrderView({ id, saved }: { id: string; saved?: boo
                       <td>{l.description}</td>
                       <td className="num text-right">{l.quantity}</td>
                       {shown && <>
+                        {byReceipt && <td className="num text-right">{d?.received ?? "—"}</td>}
                         <td className="num text-right">{d?.delivered ?? "—"}</td>
                         <td className={`num text-right ${Number(d?.remaining ?? 0) > 0 ? "font-semibold text-warn" : ""}`}>{d?.remaining ?? "—"}</td>
                       </>}
@@ -171,7 +175,21 @@ export async function PurchaseOrderView({ id, saved }: { id: string; saved?: boo
               </ul>
             </Card>
           )}
-          <PurchaseOrderActions doc={doc} />
+          {byReceipt && (
+            <Card label="Goods received">
+              <ul className="text-sm">
+                {receipts.map((r) => (
+                  <li key={r.id} className="flex justify-between gap-2 border-t border-line py-1.5 first:border-t-0">
+                    <span><Link href={`/goods-received/${encodeURIComponent(r.id)}`} className="num font-semibold hover:underline">{r.number}</Link>
+                      <span className="num ml-1 text-muted">{r.received_on}</span>
+                      {r.status === "void" && <span className="ml-1 text-muted">(void)</span>}</span>
+                    <span className="num">{formatAmount(r.value ?? "0")}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          <PurchaseOrderActions doc={doc} today={today} />
           {doc.versions > 0 && <p className="text-[13px] text-muted">Revised {doc.versions} {doc.versions === 1 ? "time" : "times"}; every earlier version is kept.</p>}
         </aside>
       </div>

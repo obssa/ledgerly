@@ -742,6 +742,8 @@ export interface BillDetail extends Bill {
   lines: InvoiceLine[];
   original?: { id: string; number: string | null; reference: string | null } | null;
   warnings: { type: string; message: string; bill_id?: string }[];
+  /** 069: against its purchase order and the goods received, when it was made from an order. */
+  match?: ThreeWayMatch | null;
   can: { edit: boolean; approve: boolean; void: boolean; credit?: boolean; apply?: boolean; refund?: boolean };
 }
 
@@ -874,11 +876,44 @@ export interface PurchaseOrderSummary extends Omit<Invoice, "status"> {
 export interface PurchaseOrderDetail extends Omit<InvoiceDetail, "type" | "status" | "can" | "warnings" | "original" | "original_document_id" | "retentions" | "reminders"> {
   type: "purchase_order";
   status: PurchaseOrderStatus;
-  /** Each order line (by line id): ordered, billed by its live bills, and still to come. */
-  delivery: Record<string, { ordered: string; delivered: string; remaining: string }>;
+  /** Each order line (by line id): ordered, billed by its live bills, still to come; received on goods received notes and what can be billed now (069). */
+  delivery: Record<string, { ordered: string; delivered: string; remaining: string; received: string; billable: string }>;
   bills: { id: string; number: string | null; reference: string | null; issue_date: string; status: string; total: string }[];
+  /** 069: the goods received notes of the order, and the stock lines that can still arrive (by line id). */
+  receipts: { id: string; number: string; received_on: string; reference: string | null; status: "posted" | "void"; warehouse: string; value: string | null }[];
+  arriving: Record<string, string>;
   versions: number;
-  can: { edit: boolean; issue: boolean; bill: boolean; close: boolean; cancel: boolean };
+  can: { edit: boolean; issue: boolean; bill: boolean; receive: boolean; close: boolean; cancel: boolean };
+}
+
+/** A goods received note (069): what of an issued purchase order arrived, into stock at the order's cost against goods received not invoiced. */
+export interface GoodsReceiptLine {
+  id: string; order_line_id: string; line_no: number; description: string; item_id: string; item_name: string; unit: string | null; quantity: string; amount: string;
+}
+export interface GoodsReceipt {
+  id: string; number: string; received_on: string; reference: string | null; note: string | null; status: "posted" | "void";
+  journal_entry_id: string | null; void_reason: string | null; voided_at: string | null; created_at: string;
+  purchase_order_id: string; order_number: string | null; contact_id: string; supplier: string; warehouse_id: string; warehouse: string;
+  lines: GoodsReceiptLine[];
+  can: { void: boolean };
+}
+export interface GoodsReceiptSummary {
+  id: string; number: string; received_on: string; reference: string | null; status: "posted" | "void";
+  purchase_order_id: string; order_number: string | null; supplier: string; warehouse: string; value: string | null;
+}
+/** GET /goods-receipts/unbilled: goods received not invoiced, line by line; the values add up to the GRNI account. */
+export interface UnbilledGoods {
+  data: { order_id: string; number: string | null; contact_id: string; supplier: string; line_id: string; line_no: number; description: string;
+    item_id: string | null; item_name: string | null; unit: string | null; last_received: string; received: string; billed: string; open: string; value: string }[];
+  total: string;
+}
+/** A bill made from a purchase order, line by line against the order and the goods received (069): warnings, never a block. */
+export interface ThreeWayMatch {
+  order_id: string;
+  order_number: string | null;
+  lines: { line_id: string; line_no: number; description: string; ordered: string; received: string | null; billed_elsewhere: string; quantity: string;
+    order_price: string; bill_price: string; price_change: string | null; by_receipt: boolean; price_differs: boolean; over: boolean }[];
+  warnings: string[];
 }
 
 export const quotePath = (kind: QuoteKind) => (kind === "quote" ? "quotes" : "sales-orders");
@@ -1588,6 +1623,13 @@ export const ledgerly = {
     api<{ id: string; type: "bill"; number: string | null; status: string }>(`purchase-orders/${encodeURIComponent(id)}/bill`,
       { ...ctx, method: "POST", body: lines ? { lines } : {} }),
   openPurchaseOrders: (ctx: RequestOptions) => api<BackOrders>("purchase-orders/open", ctx),
+  receivePurchaseOrder: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<GoodsReceipt>(`purchase-orders/${encodeURIComponent(id)}/receive`, { ...ctx, method: "POST", body }),
+  goodsReceipts: (ctx: RequestOptions) => api<{ data: GoodsReceiptSummary[] }>("goods-receipts", ctx),
+  goodsReceipt: (id: string, ctx: RequestOptions) => api<GoodsReceipt>(`goods-receipts/${encodeURIComponent(id)}`, ctx),
+  voidGoodsReceipt: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<GoodsReceipt>(`goods-receipts/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body }),
+  unbilledGoods: (ctx: RequestOptions) => api<UnbilledGoods>("goods-receipts/unbilled", ctx),
   updateInvoice: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   approveInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),
