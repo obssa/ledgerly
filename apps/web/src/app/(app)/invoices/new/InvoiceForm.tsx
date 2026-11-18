@@ -10,6 +10,7 @@ import { formatAmount, formatMoney } from "@/lib/format";
 import { createBill } from "../../bills/actions";
 import { createExpense } from "../../expenses/actions";
 import { createInvoice } from "../actions";
+import { saveQuote } from "../../quotes/actions";
 import { todayIn } from "@/lib/dates";
 
 /** The words and postings that differ between a sales invoice and a supplier's bill; the form is the same. */
@@ -26,7 +27,20 @@ const KIND = {
     party: "Paid to", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
     notes: "Notes (optional)", noun: "expense", posting: [["Dr Expense or asset", "subtotal"], ["Dr VAT receivable", "tax"], ["Cr Paid from", "total"]],
   },
+  // Quotes and sales orders post nothing (056): no posting preview.
+  quote: {
+    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Number (from your quote book)",
+    notes: "Notes for the customer (optional)", noun: "quote", posting: [],
+  },
+  sales_order: {
+    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Order number",
+    notes: "Notes for the customer (optional)", noun: "sales order", posting: [],
+  },
 } as const;
+
+/** What the form needs from a saved document to edit it: an invoice draft, or a quote or sales order. */
+type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
+  | "warehouse_id" | "number" | "notes" | "lines" | "lock_version"> & { status: string };
 
 const METHODS: Record<string, string> = {
   cash: "Cash", card: "Card", bank_transfer: "Bank transfer", mobile_money: "Mobile money (telebirr, M-PESA …)", cheque: "Cheque", other: "Other",
@@ -64,9 +78,12 @@ const addDays = (date: string, days: number) => {
  * the same exact-decimal rules as the API (src/lib/decimal.ts mirrors TaxCalculator); the API recalculates on save,
  * and its numbers are the ones that post.
  */
-export function InvoiceForm({ options, kind = "invoice", draft }: { options: InvoiceOptions; kind?: keyof typeof KIND; draft?: InvoiceDetail }) {
+export function InvoiceForm({ options, kind = "invoice", draft }: { options: InvoiceOptions; kind?: keyof typeof KIND; draft?: Draft }) {
   const words = KIND[kind];
-  const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : createInvoice, undefined);
+  const quote = kind === "quote" || kind === "sales_order";
+  // A quote already sent, or an order already confirmed, is revised: its earlier version is kept, with what changed.
+  const revision = quote && draft !== undefined && draft.status !== "draft";
+  const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : quote ? saveQuote : createInvoice, undefined);
   const today = todayIn();
   const firstRate = options.taxRates[0]?.id ?? "";
   const firstAccount = options.accounts[0]?.id ?? "";
@@ -120,6 +137,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
       <input type="hidden" name="lines" value={linesJson} />
       {draft && <input type="hidden" name="id" value={draft.id} />}
       {draft?.lock_version && <input type="hidden" name="lock_version" value={String(draft.lock_version)} />}
+      {quote && <input type="hidden" name="doc_kind" value={kind} />}
       <div className="flex min-w-0 flex-[2_1_560px] flex-col gap-4">
         {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
         <Card label={`${words.party} and terms`}>
@@ -160,14 +178,15 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 </div>
               </>
             )}
-            {options.manualNumbers && <Field name="number" label={words.numberLabel} defaultValue={draft?.number ?? ""} invalid={bad("number")} />}
+            {options.manualNumbers && !revision && <Field name="number" label={words.numberLabel} defaultValue={draft?.number ?? ""} invalid={bad("number")} />}
             <div>
               <label className="field-label" htmlFor="issue_date">Issue date</label>
               <input className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </div>
             {kind !== "expense" && (
-              <Field key={`${customerId}-${issueDate}`} name="due_date" label="Due date" type="date"
-                defaultValue={draft?.due_date && customerId === draft.contact.id && issueDate === draft.issue_date ? draft.due_date : customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
+              <Field key={`${customerId}-${issueDate}`} name="due_date" label={kind === "quote" ? "Valid until" : kind === "sales_order" ? "Deliver by" : "Due date"} type="date"
+                defaultValue={draft?.due_date && customerId === draft.contact.id && issueDate === draft.issue_date ? draft.due_date
+                  : kind === "quote" ? addDays(issueDate, 30) : kind === "sales_order" ? "" : customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
             )}
             <div>
               <label className="field-label" htmlFor="currency">Currency</label>
@@ -175,7 +194,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 {options.currencies.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            {kind === "invoice" && (options.people ?? []).length > 0 && (
+            {(kind === "invoice" || quote) && (options.people ?? []).length > 0 && (
               <div>
                 <label className="field-label" htmlFor="salesperson_id">Salesperson</label>
                 <select className={`field ${bad("salesperson_id") ? "!border-bad" : ""}`} id="salesperson_id" name="salesperson_id" defaultValue={draft?.salesperson_id ?? ""}>
@@ -270,6 +289,22 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
       </div>
 
       <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+        {quote ? (
+          <Card label="What happens next">
+            <h2 className="text-[17px] font-bold">{kind === "quote" ? "A quote posts nothing" : "An order posts nothing"}</h2>
+            <p className="mt-1.5 text-[13px] text-muted">
+              {kind === "quote"
+                ? "Send it to the customer (it is numbered then). When they accept, turn it into a sales order or an invoice. Unanswered after its date, it expires."
+                : "Confirm it (it is numbered then), and turn it into an invoice when the goods or the work are delivered."}
+            </p>
+            {revision && (
+              <div className="mt-3">
+                <label className="field-label" htmlFor="reason">What changed (kept with the earlier version)</label>
+                <input className="field" id="reason" name="reason" maxLength={500} placeholder="Customer asked for 12 bags" />
+              </div>
+            )}
+          </Card>
+        ) : (
         <Card label="Posting preview">
           <h2 className="text-[17px] font-bold">On approval this posts</h2>
           <dl className="num mt-2 text-[13px]">
@@ -284,12 +319,22 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               : "VAT is reclaimable only when the company is VAT-registered; otherwise it is part of the cost."}
           </p>
         </Card>
+        )}
         {options.demo ? (
           <p className="text-sm text-muted">Saving is not available in the demo.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {kind === "expense" ? (
               <button type="submit" className="btn btn-primary" disabled={pending || (options.moneyAccounts ?? []).length === 0}>{pending ? "Recording…" : "Record expense"}</button>
+            ) : revision ? (
+              <button type="submit" name="intent" value="draft" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save the revision"}</button>
+            ) : quote ? (
+              <>
+                <button type="submit" name="intent" value="draft" className="btn" disabled={pending}>Save draft</button>
+                <button type="submit" name="intent" value={kind === "quote" ? "send" : "accept"} className="btn btn-primary" disabled={pending}>
+                  {pending ? "Saving…" : kind === "quote" ? "Save and mark as sent" : "Save and confirm"}
+                </button>
+              </>
             ) : (
               <>
                 <button type="submit" name="intent" value="draft" className="btn" disabled={pending}>Save draft</button>

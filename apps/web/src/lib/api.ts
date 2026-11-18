@@ -723,6 +723,8 @@ export interface InvoiceDetail extends Invoice {
   /** The member who made the sale; a credit note keeps its invoice's. */
   salesperson_id?: string | null;
   salesperson?: { id: string; name: string } | null;
+  /** The quote or sales order it was made from (056). */
+  source?: { id: string; type: string; number: string | null } | null;
   fx_rate: string;
   notes: string | null;
   contact: Contact & { email?: string | null };
@@ -734,6 +736,29 @@ export interface InvoiceDetail extends Invoice {
   /** Payment reminders sent to the customer, newest first (048). */
   reminders?: InvoiceReminderSent[];
 }
+
+/** Quotes and sales orders (056): sales documents that post nothing, converted into a sales order or an invoice. */
+export type QuoteKind = "quote" | "sales_order";
+export type QuoteStatus = "draft" | "sent" | "accepted" | "declined" | "expired" | "converted" | "void";
+
+export interface QuoteSummary extends Omit<Invoice, "status"> {
+  type: QuoteKind;
+  status: QuoteStatus;
+}
+
+export interface QuoteDetail extends Omit<InvoiceDetail, "type" | "status" | "can" | "warnings" | "original" | "original_document_id" | "retentions" | "reminders"> {
+  type: QuoteKind;
+  status: QuoteStatus;
+  /** The quote a sales order was made from. */
+  source?: { id: string; type: string; number: string | null } | null;
+  /** The sales order or invoice made from it. */
+  made?: { id: string; type: string; number: string | null; status: string } | null;
+  /** Earlier versions kept when it was revised after it went to the customer (or was confirmed). */
+  versions: number;
+  can: { edit: boolean; send: boolean; accept: boolean; decline: boolean; extend: boolean; cancel: boolean; convert: boolean; email: boolean };
+}
+
+export const quotePath = (kind: QuoteKind) => (kind === "quote" ? "quotes" : "sales-orders");
 
 /** GET /payments-made/withholding/{supplier}: what the country pack says about withholding on a payment to them. */
 export interface WithholdingAdvice {
@@ -1352,6 +1377,18 @@ export const ledgerly = {
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
+  quotes: (kind: QuoteKind, ctx: RequestOptions) => api<{ data: QuoteSummary[] }>(quotePath(kind), ctx),
+  quote: (kind: QuoteKind, id: string, ctx: RequestOptions) => api<QuoteDetail>(`${quotePath(kind)}/${encodeURIComponent(id)}`, ctx),
+  createQuote: (kind: QuoteKind, body: Record<string, unknown>, ctx: RequestOptions) => api<QuoteDetail>(quotePath(kind), { ...ctx, method: "POST", body }),
+  updateQuote: (kind: QuoteKind, id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<QuoteDetail>(`${quotePath(kind)}/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  quoteStep: (kind: QuoteKind, id: string, step: "send" | "accept" | "decline" | "extend" | "cancel", body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<QuoteDetail>(`${quotePath(kind)}/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
+  emailQuote: (kind: QuoteKind, id: string, note: string | undefined, ctx: RequestOptions) =>
+    api<{ sent_to: string; status: QuoteStatus; number: string | null }>(`${quotePath(kind)}/${encodeURIComponent(id)}/email`, { ...ctx, method: "POST", body: note ? { note } : {} }),
+  convertQuote: (kind: QuoteKind, id: string, to: "invoice" | "sales_order", number: string | undefined, ctx: RequestOptions) =>
+    api<{ id: string; type: "invoice" | "sales_order"; number: string | null; status: string }>(`${quotePath(kind)}/${encodeURIComponent(id)}/convert`,
+      { ...ctx, method: "POST", body: { to, ...(number ? { number } : {}) } }),
   updateInvoice: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   approveInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),

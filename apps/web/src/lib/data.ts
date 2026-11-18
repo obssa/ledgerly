@@ -1,7 +1,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type QuoteKind, type QuoteSummary, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
@@ -366,7 +366,8 @@ const activeProjects = async (ctx: { token: string; companyId: string }) =>
   (await ledgerly.dimensions(ctx)).data.filter((d) => d.kind === "project" && d.is_active).map((d) => ({ id: d.id, code: d.code, name: d.name }));
 
 /** What the new-invoice screen offers: active customers, income accounts, sales tax rates in force, currencies. */
-export async function getInvoiceOptions(): Promise<InvoiceOptions> {
+/** What the invoice form offers; a quote or sales order uses the same, with its own numbering mode. */
+export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales_order" = "invoice"): Promise<InvoiceOptions> {
   await connection();
   if (isDemoMode()) {
     return {
@@ -394,7 +395,7 @@ export async function getInvoiceOptions(): Promise<InvoiceOptions> {
         .map((r) => ({ id: r.id, code: r.code, name: r.name, rate: r.rate })),
       currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
       baseCurrency: currencies.base_currency,
-      manualNumbers: numbering.data.find((n) => n.doc_type === "invoice")?.mode === "manual",
+      manualNumbers: numbering.data.find((n) => n.doc_type === numberedAs)?.mode === "manual",
       items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       projects: await activeProjects(ctx),
@@ -854,6 +855,24 @@ export async function getCustomerStatement(id: string, q: { from?: string; to?: 
     return await withApi((ctx) => ledgerly.customerStatement(id, q, ctx));
   } catch (error) {
     if (error instanceof ApiError && (error.status === 404 || error.status === 422)) return null;
+    throw error;
+  }
+}
+
+/** Quotes or sales orders, newest first; none in the demo without an API. */
+export async function getQuotes(kind: QuoteKind): Promise<QuoteSummary[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return (await withApi((ctx) => ledgerly.quotes(kind, ctx))).data;
+}
+
+export async function getQuote(kind: QuoteKind, id: string): Promise<QuoteDetail | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.quote(kind, id, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   }
 }

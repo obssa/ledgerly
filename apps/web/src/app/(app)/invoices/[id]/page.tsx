@@ -71,6 +71,12 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
               <div className="text-[13px] text-muted">Customer</div>
               <Link href={`/customers/${encodeURIComponent(invoice.contact.id)}`} className="font-bold hover:underline">{invoice.contact.name}</Link>
               {invoice.contact.tax_id && <div className="num text-[13px] text-muted">TIN {invoice.contact.tax_id}</div>}
+              {invoice.source && (
+                <div className="mt-1 text-[13px]">
+                  Made from {invoice.source.type === "quote" ? "quote" : "sales order"}{" "}
+                  <Link href={`/${invoice.source.type === "quote" ? "quotes" : "sales-orders"}/${encodeURIComponent(invoice.source.id)}`} className="num font-semibold hover:underline">{invoice.source.number}</Link>
+                </div>
+              )}
               {creditNote && invoice.original && (
                 <div className="mt-1 text-[13px]">Corrects <Link href={`/invoices/${encodeURIComponent(invoice.original.id)}`} className="num font-semibold hover:underline">{invoice.original.number}</Link></div>
               )}

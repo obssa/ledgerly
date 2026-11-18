@@ -65,7 +65,7 @@ return [
         'draft' => ['sent', 'accepted', 'void'],
         'sent' => ['accepted', 'declined', 'expired', 'void'],
         'expired' => ['sent'],
-        'accepted' => ['converted'],
+        'accepted' => ['converted', 'void'],   // a confirmed order or an accepted quote can still be cancelled (056)
     ],
 
     // Payment
