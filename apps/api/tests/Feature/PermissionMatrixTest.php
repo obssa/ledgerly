@@ -187,6 +187,8 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/bills/{bill}/void' => 'transactions.edit',
         'GET api/v1/bills/{bill}/history' => 'bills.view',
         'POST api/v1/bills/{bill}/credits' => 'bills.create',
+        'GET api/v1/bills/{bill}/landed-costs' => 'bills.view',
+        'POST api/v1/bills/{bill}/landed-costs' => 'inventory.adjust',
         'GET api/v1/supplier-credits' => 'bills.view',
         'POST api/v1/supplier-credits/{supplierCredit}/apply' => 'payments.pay',
 

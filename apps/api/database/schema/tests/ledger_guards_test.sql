@@ -3047,6 +3047,83 @@ BEGIN
     VALUES (app_company_id(), b1, a1, '2027-08-16', 'purchase_return', -3, 0, vc);
   RAISE NOTICE 'PASS T85 goods go back to the supplier only within what their bill brought in';
 END $$;
+-- T86: landed costs (060). A landed-cost move adds value only, onto stock on hand; a landed cost joins two posted bills
+-- of the company in an entry of its own, never spreads a cost bill beyond its amount before tax, and is never changed;
+-- another company does not see it. Company A as f1: item b1 in warehouse a1 (T11), posted bill d9 (T47), accounts a40, a22.
+DO $$
+DECLARE
+  b1  constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  a1  constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  d9  constant uuid := '00000000-0000-0000-0000-0000000000d9';
+  cb  constant uuid := '00000000-0000-0000-0000-000000000d86';
+  e1  constant uuid := '00000000-0000-0000-0000-00000000e861';
+  e2  constant uuid := '00000000-0000-0000-0000-00000000e862';
+  b86 constant uuid := '00000000-0000-0000-0000-000000000b86';
+  before numeric;
+BEGIN
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES (e1, app_company_id(), 9861, '2027-08-17', 'ETB', 'bill');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), e1, 1, '00000000-0000-0000-0000-000000000a40', 300, 0), (app_company_id(), e1, 2, '00000000-0000-0000-0000-000000000a22', 0, 300);
+  INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, subtotal, total, amount_due)
+    VALUES (cb, app_company_id(), 'bill', 'BILL-T86', '00000000-0000-0000-0000-0000000000c8', '2027-08-17', 'ETB', 300, 300, 300);
+  UPDATE documents SET status = 'posted', journal_entry_id = e1 WHERE id = cb;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES (e2, app_company_id(), 9862, '2027-08-17', 'ETB', 'landed_cost');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+    (app_company_id(), e2, 1, '00000000-0000-0000-0000-000000000a40', 200, 0), (app_company_id(), e2, 2, '00000000-0000-0000-0000-000000000a22', 0, 200);
+
+  -- The moves: value only, above zero, onto stock on hand.
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id, amount)
+      VALUES (app_company_id(), b1, a1, '2027-08-17', 'landed_cost', 1, 0, cb, 5);
+    RAISE EXCEPTION 'FAIL T86a: a landed cost moved a quantity';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id, amount)
+      VALUES (app_company_id(), b1, a1, '2027-08-17', 'landed_cost', 0, 0, cb, 0);
+    RAISE EXCEPTION 'FAIL T86b: a landed cost added no value';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO items (id, company_id, name, type) VALUES (b86, app_company_id(), 'Nothing on hand', 'inventory');
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id, amount)
+      VALUES (app_company_id(), b86, a1, '2027-08-17', 'landed_cost', 0, 0, cb, 5);
+    RAISE EXCEPTION 'FAIL T86c: a landed cost went onto stock not on hand';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  SELECT value INTO before FROM stock_balances WHERE company_id = app_company_id() AND item_id = b1 AND warehouse_id = a1;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id, amount)
+    VALUES (app_company_id(), b1, a1, '2027-08-17', 'landed_cost', 0, 0, cb, 5);
+  IF (SELECT value FROM stock_balances WHERE company_id = app_company_id() AND item_id = b1 AND warehouse_id = a1) <> before + 5 THEN
+    RAISE EXCEPTION 'FAIL T86d: a landed cost did not raise the stock value';
+  END IF;
+
+  -- The record: two posted bills, an entry of its own, no further than the cost bill before tax, kept.
+  BEGIN
+    INSERT INTO landed_costs (company_id, cost_bill_id, goods_bill_id, amount, method, applied_on, journal_entry_id, created_by)
+      VALUES (app_company_id(), cb, d9, 200, 'value', '2027-08-17', e1, app_user_id());
+    RAISE EXCEPTION 'FAIL T86e: a landed cost was posted in a bill''s entry';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO landed_costs (company_id, cost_bill_id, goods_bill_id, amount, method, applied_on, journal_entry_id, created_by)
+    VALUES (app_company_id(), cb, d9, 200, 'value', '2027-08-17', e2, app_user_id());
+  BEGIN
+    INSERT INTO landed_costs (company_id, cost_bill_id, goods_bill_id, amount, method, applied_on, journal_entry_id, created_by)
+      VALUES (app_company_id(), cb, d9, 150, 'quantity', '2027-08-17', e2, app_user_id());
+    RAISE EXCEPTION 'FAIL T86f: a cost bill was spread beyond its amount';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO landed_costs (company_id, cost_bill_id, goods_bill_id, amount, method, applied_on, journal_entry_id, created_by)
+      VALUES (app_company_id(), cb, cb, 50, 'value', '2027-08-17', e2, app_user_id());
+    RAISE EXCEPTION 'FAIL T86g: a bill was spread onto itself';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE landed_costs SET amount = 1 WHERE cost_bill_id = cb;
+    RAISE EXCEPTION 'FAIL T86h: a landed cost was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM landed_costs) THEN
+    RAISE EXCEPTION 'FAIL T86i: company B saw company A''s landed costs';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T86 landed costs add value onto stock on hand, join two posted bills, stay within the cost bill and are kept';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
