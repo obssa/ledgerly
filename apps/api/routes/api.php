@@ -211,6 +211,7 @@ Route::prefix('v1')->group(function () {
             Route::get('tax-rates', [TaxRateController::class, 'index']);
             Route::get('fixed-assets', [FixedAssetController::class, 'index']);
             Route::post('fixed-assets', [FixedAssetController::class, 'store']);
+            Route::get('fixed-assets/tax-depreciation', [FixedAssetController::class, 'taxSchedule']);
             Route::get('fixed-assets/{fixedAsset}', [FixedAssetController::class, 'show'])->whereUuid('fixedAsset');
             Route::put('fixed-assets/{fixedAsset}', [FixedAssetController::class, 'update'])->whereUuid('fixedAsset');
             Route::post('fixed-assets/{fixedAsset}/dispose', [FixedAssetController::class, 'dispose'])->whereUuid('fixedAsset');

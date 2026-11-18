@@ -31,7 +31,7 @@ final class MfaTest extends TestCase
         $this->assertStringStartsWith('otpauth://totp/', $setup['otpauth_uri']);
         $this->getJson('/api/v1/auth/me')->assertOk()->assertJsonPath('user.mfa_enabled', false);
 
-        $this->postJson('/api/v1/auth/mfa/confirm', ['code' => '000000'])->assertStatus(422);
+        $this->postJson('/api/v1/auth/mfa/confirm', ['code' => $this->wrongCodeFor($user)])->assertStatus(422);
         $this->getJson('/api/v1/auth/me')->assertJsonPath('user.mfa_enabled', false);
 
         $codes = $this->postJson('/api/v1/auth/mfa/confirm', ['code' => $this->codeFor($user)])->assertOk()->json('recovery_codes');
@@ -110,7 +110,7 @@ final class MfaTest extends TestCase
         $challenge = $this->challenge();
 
         for ($i = 0; $i < 5; $i++) {
-            $this->postJson('/api/v1/auth/login/mfa', ['challenge' => $challenge, 'code' => '000000'])->assertStatus(422);
+            $this->postJson('/api/v1/auth/login/mfa', ['challenge' => $challenge, 'code' => $this->wrongCodeFor($user)])->assertStatus(422);
         }
         // Locked: even the right code is refused now, and so is a recovery-code guess.
         $this->postJson('/api/v1/auth/login/mfa', ['challenge' => $challenge, 'code' => $this->codeFor($user)])->assertStatus(429);
@@ -175,7 +175,7 @@ final class MfaTest extends TestCase
         $this->travel(Totp::PERIOD)->seconds();
         $this->postJson('/api/v1/auth/mfa/recovery-codes', ['password' => 'wrong-password', 'code' => $this->codeFor($user)])
             ->assertStatus(422)->assertJsonValidationErrors('password');
-        $this->postJson('/api/v1/auth/mfa/recovery-codes', ['password' => self::PASSWORD, 'code' => '000000'])
+        $this->postJson('/api/v1/auth/mfa/recovery-codes', ['password' => self::PASSWORD, 'code' => $this->wrongCodeFor($user)])
             ->assertStatus(422)->assertJsonValidationErrors('code');
         $this->deleteJson('/api/v1/auth/mfa', ['password' => self::PASSWORD])->assertStatus(422);
 
@@ -226,5 +226,15 @@ final class MfaTest extends TestCase
     private function codeFor(User $user): string
     {
         return Totp::codeAt($user->fresh()->mfa_secret, Totp::stepAt(now()->getTimestamp()));
+    }
+
+    /** A code valid in no step near now: a fixed one like 000000 is right once in a while and made the test flaky. */
+    private function wrongCodeFor(User $user): string
+    {
+        $secret = $user->fresh()->mfa_secret;
+        $step = Totp::stepAt(now()->getTimestamp());
+        $near = array_map(fn (int $s) => Totp::codeAt($secret, $s), range($step - 2, $step + 2));
+
+        return (string) collect(['000000', '111111', '222222', '333333', '444444', '555555'])->first(fn (string $c) => ! in_array($c, $near, true));
     }
 }

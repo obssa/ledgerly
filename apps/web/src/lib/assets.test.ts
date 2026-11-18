@@ -19,5 +19,8 @@ describe("assetBody", () => {
     expect(assetBody(f)).toMatchObject({ code: "VAN-1", cost: "1250000.00", method: "reducing_balance", useful_life_months: null, annual_rate: "0.2", residual_value: null, location_id: null });
     f.set("method", "straight_line");
     expect(assetBody(f)).toMatchObject({ useful_life_months: "60", annual_rate: null });
+    expect(assetBody(f)).toMatchObject({ tax_method: null, tax_annual_rate: null });
+    f.set("tax_method", "reducing_balance"); f.set("tax_annual_rate", "25"); f.set("tax_useful_life_months", "48");
+    expect(assetBody(f)).toMatchObject({ tax_method: "reducing_balance", tax_annual_rate: "0.25", tax_useful_life_months: null });
   });
 });

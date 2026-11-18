@@ -93,6 +93,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/tax-rates' => 'company.view',
         'POST api/v1/tax-rates' => 'tax.manage',
         'GET api/v1/fixed-assets' => 'assets.view',
+        'GET api/v1/fixed-assets/tax-depreciation' => 'assets.view',
         'POST api/v1/fixed-assets' => 'assets.manage',
         'GET api/v1/fixed-assets/{fixedAsset}' => 'assets.view',
         'PUT api/v1/fixed-assets/{fixedAsset}' => 'assets.manage',
