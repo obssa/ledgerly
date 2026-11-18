@@ -29,6 +29,35 @@ final class AnalysisReportController extends Controller
             ...$this->reports->profitByDimension($this->current->id(), $kind, $from, $to)]);
     }
 
+    /** The report put together by the reader (CustomReport): rows, columns, figure and filters from fixed lists. */
+    public function custom(Request $request, \App\Domain\Reports\CustomReport $report): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $o = $request->validate([
+            'rows' => ['nullable', Rule::in(\App\Domain\Reports\CustomReport::ROWS)],
+            'columns' => ['nullable', Rule::in(\App\Domain\Reports\CustomReport::COLUMNS)],
+            'measure' => ['nullable', Rule::in(\App\Domain\Reports\CustomReport::MEASURES)],
+            'account_type' => ['nullable', Rule::in(\App\Domain\Reports\CustomReport::ACCOUNT_TYPES)],
+            'project_id' => ['nullable', 'uuid'],
+            'location_id' => ['nullable', 'uuid'],
+            'class_id' => ['nullable', 'uuid'],
+        ]);
+        [$from, $to] = $this->period($request);
+        $options = ['rows' => $o['rows'] ?? 'account', 'columns' => $o['columns'] ?? 'total', 'measure' => $o['measure'] ?? 'natural',
+            'account_type' => $o['account_type'] ?? null];
+        // A dimension is the company's own, or the filter finds nothing: a request cannot read another company's.
+        foreach (['project' => 'project', 'location' => 'location', 'class' => 'class'] as $name => $kind) {
+            $id = $o["{$name}_id"] ?? null;
+            if ($id !== null && ! DB::table('dimensions')->where(['company_id' => $this->current->id(), 'id' => $id, 'kind' => $kind])->exists()) {
+                throw ValidationException::withMessages(["{$name}_id" => ["No such {$kind} in this company."]]);
+            }
+            $options["{$name}_id"] = $id;
+        }
+
+        return response()->json(['from' => $from, 'to' => $to, 'currency' => $this->current->get()->base_currency, 'options' => $options,
+            ...$report->run($this->current->id(), $from, $to, $options)]);
+    }
+
     public function sales(Request $request): JsonResponse
     {
         return $this->documents($request, 'sales');

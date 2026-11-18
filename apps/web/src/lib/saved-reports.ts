@@ -9,6 +9,7 @@ export const SAVEABLE: Record<string, { label: string; path: string; atADate?: b
   "changes-in-equity": { label: "Changes in equity", path: "/reports/changes-in-equity" },
   "financial-health": { label: "Financial health", path: "/reports/financial-health" },
   "profit-by-dimension": { label: "Profit by location, class or project", path: "/reports/profit-by-dimension" },
+  custom: { label: "Custom report", path: "/reports/custom" },
   sales: { label: "Sales analysis", path: "/reports/sales" },
   purchases: { label: "Purchases analysis", path: "/reports/purchases" },
   "ar-ageing": { label: "AR ageing", path: "/reports/ar-ageing", atADate: true },
@@ -25,7 +26,8 @@ export const PERIODS: [string, string][] = [
 
 export const SCHEDULES: [string, string][] = [["none", "Not sent"], ["weekly", "Every Monday"], ["monthly", "On the 1st of each month"]];
 
-const OPTION_KEYS = ["group", "kind", "account_id", "warehouse_id"] as const;
+/** The report options a saved report keeps (each report takes some of them; the API checks which). */
+export const OPTION_KEYS = ["group", "kind", "account_id", "warehouse_id", "rows", "columns", "measure", "account_type", "project_id", "location_id", "class_id"] as const;
 
 /** The report page for a saved report, for the dates its period covers today, with its options. */
 export function savedReportUrl(r: { report: string; covers: { from?: string; to?: string; as_of?: string }; options: Record<string, string> }): string {

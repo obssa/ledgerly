@@ -8,11 +8,12 @@ import type { Cell } from "./csv";
  */
 
 type Ctx = { token: string; companyId: string };
-type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string };
+type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
+  rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
-  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing"] as const;
+  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing", "custom"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 const ageing = (title: string, r: Awaited<ReturnType<typeof ledgerly.arAgeing>>): Export => ({
@@ -76,6 +77,13 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: `profit-by-${r.kind}`, rows: [["Code", r.kind, "Income", "Cost of sales", "Expenses", "Profit", "Margin %"],
         ...r.rows.map((x) => [x.code, x.name, x.income, x.cost_of_sales, x.expenses, x.profit, x.margin]),
         [null, "Total", r.totals.income, r.totals.cost_of_sales, r.totals.expenses, r.totals.profit, null]] };
+    }
+    case "custom": {
+      const r = await ledgerly.customReport({ from: p.from, to: p.to, rows: p.rows, columns: p.columns, measure: p.measure, account_type: p.account_type,
+        project_id: p.project_id, location_id: p.location_id, class_id: p.class_id }, ctx);
+      const many = r.columns.length > 1;
+      return { title: `custom-by-${p.rows ?? "account"}`, rows: [["Code", "Name", ...(many ? r.columns : []), "Total"],
+        ...r.rows.map((x) => [x.code, x.label, ...(many ? x.values : []), x.total]), [null, "Total", ...(many ? r.totals : []), r.total]] };
     }
     case "sales":
     case "purchases": {

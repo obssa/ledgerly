@@ -25,3 +25,13 @@ describe("savedReportBody", () => {
     expect(savedReportBody(f)).toMatchObject({ period: "custom", from: "2026-01-01", to: "2026-03-31" });
   });
 });
+
+describe("a saved custom report", () => {
+  it("keeps its rows, columns, figure and filters", () => {
+    const f = new FormData();
+    for (const [k, v] of [["name", "Costs by project"], ["report", "custom"], ["period", "this_quarter"], ["rows", "project"], ["columns", "month"],
+      ["measure", "natural"], ["account_type", "expense"]]) f.set(k, v);
+    expect(savedReportBody(f)).toEqual({ name: "Costs by project", report: "custom", period: "this_quarter", schedule: "none",
+      options: { rows: "project", columns: "month", measure: "natural", account_type: "expense" } });
+  });
+});

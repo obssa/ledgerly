@@ -38,3 +38,39 @@ export const STOCK_BANDS: Record<string, { label: string; note?: string }> = {
 export function showRatio(v: string | null, unit: "" | "%" | " days" | " months" = ""): string {
   return v === null ? "—" : `${v}${unit}`;
 }
+
+/** Module 10, custom report: the choices, as the API lists them (CustomReport). */
+export const CUSTOM_ROWS = [["account", "Account"], ["account_type", "Account type"], ["contact", "Customer or supplier"], ["project", "Project"], ["location", "Location"], ["class", "Class"]] as const;
+export const CUSTOM_COLUMNS = [["total", "The whole period"], ["month", "Each month"], ["quarter", "Each quarter"]] as const;
+export const CUSTOM_MEASURES = [["natural", "By its own side"], ["debit", "Debits"], ["credit", "Credits"], ["net", "Debits less credits"]] as const;
+export const CUSTOM_TYPES = [["asset", "Assets"], ["liability", "Liabilities"], ["equity", "Equity"], ["income", "Income"], ["expense", "Expenses"]] as const;
+
+export interface CustomOptions {
+  rows: string; columns: string; measure: string;
+  account_type?: string; project_id?: string; location_id?: string; class_id?: string;
+}
+
+const pick = (list: readonly (readonly [string, string])[], v: unknown, fallback?: string) =>
+  typeof v === "string" && list.some(([k]) => k === v) ? v : fallback;
+const id = (v: unknown) => (typeof v === "string" && /^[0-9a-f-]{36}$/.test(v) ? v : undefined);
+
+/** The custom report's choices from the address: only known values, anything else falls back. */
+export function customOptions(q: Record<string, string | string[] | undefined>): CustomOptions {
+  return {
+    rows: pick(CUSTOM_ROWS, q.rows, "account") as string,
+    columns: pick(CUSTOM_COLUMNS, q.columns, "total") as string,
+    measure: pick(CUSTOM_MEASURES, q.measure, "natural") as string,
+    account_type: pick(CUSTOM_TYPES, q.account_type),
+    project_id: id(q.project_id), location_id: id(q.location_id), class_id: id(q.class_id),
+  };
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-11" → "Nov 2026"; "2026-Q4" → "Q4 2026"; anything else as it is. */
+export function columnLabel(c: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(c);
+  if (m) return `${MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[1]}`;
+  const q = /^(\d{4})-(Q[1-4])$/.exec(c);
+  return q ? `${q[2]} ${q[1]}` : c;
+}
