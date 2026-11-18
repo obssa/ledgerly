@@ -44,7 +44,8 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
       <PageTitle
         eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / {kind}</>}
         title={<>{kind} {invoice.number ? <span className="num">{invoice.number}</span> : "(draft)"} <span className="print:hidden"><Pill tone={status.tone}>{status.label}</Pill></span></>}
-        actions={["posted", "part_paid", "paid"].includes(invoice.status) ? <PrintInvoice />
+        actions={["posted", "part_paid", "paid"].includes(invoice.status)
+          ? <><a href={`/invoices/${encodeURIComponent(invoice.id)}/pdf`} className="btn print:hidden">Download PDF</a><PrintInvoice /></>
           : !creditNote && invoice.can.edit && !invoice.demo && ["draft", "awaiting_approval"].includes(invoice.status)
             ? <Link href={`/invoices/${encodeURIComponent(invoice.id)}/edit`} className="btn print:hidden">Edit draft</Link> : undefined}
       />

@@ -214,11 +214,29 @@ final class InvoiceController extends Controller
                 'unit_price' => $money($l->unit_price), 'amount' => $money(bcadd((string) $l->line_subtotal, (string) $l->line_tax, 2))])->values()->all(),
             subtotal: $money($invoice->subtotal), tax: $money($invoice->tax_total), total: $money($invoice->total), amountDue: $money($invoice->amount_due),
             clearance: $clearance ? (string) $clearance : null, note: $data['note'] ?? null,
+            pdf: app(\App\Domain\Sales\InvoicePdf::class)->render($company, $invoice),   // the invoice itself, attached
         ));
         app(\App\Domain\Audit\AuditLogger::class)->record($company->getKey(), 'invoice_emailed', $invoice->type, $invoice->getKey(), null,
             ['sent_to' => $to, 'number' => $invoice->number], userId: $request->user()->getKey());
 
         return response()->json(['sent_to' => $to]);
+    }
+
+    /** Module 2: a posted invoice or credit note as a PDF file, as printed (InvoicePdf). */
+    public function pdf(Document $invoice, \App\Domain\Sales\InvoicePdf $pdf): \Illuminate\Http\Response
+    {
+        $this->authorizeCompany('invoices.view');
+        if (! in_array($invoice->status, ['posted', 'part_paid', 'paid'], true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['invoice' => ['Only a posted document has a PDF: post it first.']]);
+        }
+        $name = preg_replace('/[^A-Za-z0-9._-]+/', '-', (string) $invoice->number) . '.pdf';
+
+        return response($pdf->render($this->current->get(), $invoice), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $name . '"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ]);
     }
 
     /** Module 2: a payment reminder by email to the customer, sent by hand (048). */

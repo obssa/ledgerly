@@ -32,6 +32,7 @@ final class InvoiceSent extends Notification
         public readonly ?string $clearance,
         public readonly ?string $note,
         public readonly ?string $link = null,   // a quote's link to see it and answer it online (065)
+        public readonly ?string $pdf = null,    // the document as a PDF file, attached
     ) {
     }
 
@@ -61,6 +62,9 @@ final class InvoiceSent extends Notification
         }
         if ($this->clearance) {
             $mail->line("Registered with the tax authority: {$this->clearance}.");
+        }
+        if ($this->pdf !== null) {
+            $mail->attachData($this->pdf, preg_replace('/[^A-Za-z0-9._-]+/', '-', $this->number) . '.pdf', ['mime' => 'application/pdf']);
         }
         if ($this->link !== null) {
             $mail->action('See the quote and accept or decline it', $this->link);
