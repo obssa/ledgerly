@@ -2826,6 +2826,37 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T80 a tax return is reminded once per stage, kept, seen by its company, and listed only to the scheduler';
 END $$;
+-- T81: stock issued to a project (055). An issue takes stock out and names a project of the company; no other move
+-- names a project. Company A as its owner f1: item b1 in warehouse a1 (T11), project d71 (T67), d43 company B's.
+DO $$
+DECLARE
+  b1 constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  a1 constant uuid := '00000000-0000-0000-0000-0000000000a1';
+BEGIN
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, project_id)
+      VALUES (app_company_id(), b1, a1, '2027-08-10', 'project_issue', 1, 0, '00000000-0000-0000-0000-000000000d71');
+    RAISE EXCEPTION 'FAIL T81a: an issue to a project brought stock in';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost)
+      VALUES (app_company_id(), b1, a1, '2027-08-10', 'project_issue', -1, 0);
+    RAISE EXCEPTION 'FAIL T81b: stock was issued to no project';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, project_id)
+      VALUES (app_company_id(), b1, a1, '2027-08-10', 'project_issue', -1, 0, '00000000-0000-0000-0000-000000000d43');
+    RAISE EXCEPTION 'FAIL T81c: stock was issued to another company''s dimension';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, project_id)
+      VALUES (app_company_id(), b1, a1, '2027-08-10', 'adjustment', -1, 0, '00000000-0000-0000-0000-000000000d71');
+    RAISE EXCEPTION 'FAIL T81d: an adjustment named a project';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, project_id)
+    VALUES (app_company_id(), b1, a1, '2027-08-10', 'project_issue', -1, 0, '00000000-0000-0000-0000-000000000d71');
+  RAISE NOTICE 'PASS T81 stock is issued out of a warehouse to a project of the company, and only an issue names a project';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -94,3 +94,20 @@ export async function transferStock(_: FormState | undefined, form: FormData): P
   refresh();
   return { notice: `Moved, at a cost of ${value}.` };
 }
+
+/** Module 9a: materials issued from a warehouse to a project, at cost, charged to the cost account chosen. */
+export async function issueStock(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let result: { amount: string };
+  try {
+    result = await ledgerly.issueStock({
+      item_id: text(form, "item_id") ?? "", warehouse_id: text(form, "warehouse_id") ?? "", project_id: text(form, "project_id") ?? "",
+      account_id: text(form, "account_id") ?? "", date: text(form, "date") ?? "", quantity: amount(text(form, "quantity")),
+      ...(text(form, "note") ? { note: text(form, "note") } : {}),
+    }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: `Issued. Cost ${result.amount}, charged to the project.` };
+}

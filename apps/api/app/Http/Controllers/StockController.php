@@ -108,6 +108,60 @@ final class StockController extends Controller
             ->map(fn (Item $i) => ['item' => $i->only(['id', 'sku', 'name', 'unit', 'reorder_point', 'purchase_price']), 'on_hand' => (string) ($onHand[$i->getKey()] ?? '0.00')])->values()]);
     }
 
+    /**
+     * Module 9a: materials issued from a warehouse to a project (055). They leave stock at the warehouse's cost and post
+     * to the cost account chosen, tagged with the project, so the project's profit counts them.
+     */
+    public function issue(Request $request, StockLedger $stock, PostingService $posting, AuditLogger $audit): JsonResponse
+    {
+        $this->authorizeCompany('inventory.adjust');
+        $data = $request->validate([
+            'item_id' => ['required', 'uuid'],
+            'warehouse_id' => ['required', 'uuid'],
+            'project_id' => ['required', 'uuid'],
+            'account_id' => ['required', 'uuid'],
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
+            'quantity' => ['required', 'decimal:0,2', 'gt:0'],
+            'note' => ['nullable', 'string', 'max:300'],
+        ]);
+
+        return DB::transaction(function () use ($data, $stock, $posting, $audit, $request) {
+            $company = $this->current->get();
+            // Loaded through the company-scoped models and the company's own rows (CLAUDE.md rule 4).
+            $item = Item::query()->where('is_active', true)->find($data['item_id']);
+            if ($item === null || ! $item->isStock()) {
+                throw ValidationException::withMessages(['item_id' => ['Choose an active stock item of this company.']]);
+            }
+            $warehouse = Warehouse::query()->where('is_active', true)->find($data['warehouse_id'])
+                ?? throw ValidationException::withMessages(['warehouse_id' => ['Choose an active warehouse of this company.']]);
+            $project = DB::table('dimensions')->where(['company_id' => $company->getKey(), 'id' => $data['project_id'], 'kind' => 'project', 'is_active' => true])
+                ->first(['id', 'code', 'name']) ?? throw ValidationException::withMessages(['project_id' => ['Choose an active project of this company.']]);
+            $account = Account::query()->whereKey($data['account_id'])->where('type', 'expense')->where('is_active', true)->first()
+                ?? throw ValidationException::withMessages(['account_id' => ['Choose an active cost account of this company.']]);
+            $date = new DateTimeImmutable($data['date']);
+            $reference = mb_substr($data['note'] ?? "Issued to {$project->code} {$project->name}", 0, 255);
+
+            $move = $stock->move($company->getKey(), $company->base_currency, $item->getKey(), $warehouse->getKey(), $date, 'project_issue',
+                '-' . $data['quantity'], '0', $reference, null, $request->user()->getKey(), null, null, $project->id);
+            $value = $move['amount']->negated();   // a move out is valued negative
+            $entry = null;
+            if (! $value->isZero()) {
+                $draft = new JournalDraft($company->getKey(), $date, $company->base_currency, $company->base_currency, '1',
+                    "Issued to {$project->code}: {$item->name} from {$warehouse->name}", 'stock_issue', $move['id']);
+                $draft->add(JournalLineDraft::debit($account->getKey(), $value, null, "{$item->name} for {$project->code}", null, ['project_id' => $project->id]));
+                $draft->add(JournalLineDraft::credit(Account::system('inventory')->getKey(), $value, null, "{$item->name} for {$project->code}"));
+                $entry = $posting->post($draft, $request->user()->getKey());
+            }
+            $audit->record($company->getKey(), 'stock_issued_to_project', 'item', $item->getKey(), null, [
+                'warehouse' => $warehouse->name, 'project' => $project->code, 'quantity' => (string) $data['quantity'],
+                'value' => $value->toDecimalString(), 'journal_entry' => $entry?->number,
+            ], null, $request->user()->getKey());
+
+            return response()->json(['move_id' => $move['id'], 'amount' => $value->toDecimalString(), 'unit_cost' => $move['unit_cost'],
+                'journal_entry_id' => $entry?->getKey()], 201);
+        });
+    }
+
     public function adjust(Request $request, StockLedger $stock, PostingService $posting, AuditLogger $audit): JsonResponse
     {
         $this->authorizeCompany('inventory.adjust');
