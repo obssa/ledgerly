@@ -31,6 +31,7 @@ final class InvoiceSent extends Notification
         public readonly string $amountDue,
         public readonly ?string $clearance,
         public readonly ?string $note,
+        public readonly ?string $link = null,   // a quote's link to see it and answer it online (065)
     ) {
     }
 
@@ -60,6 +61,9 @@ final class InvoiceSent extends Notification
         }
         if ($this->clearance) {
             $mail->line("Registered with the tax authority: {$this->clearance}.");
+        }
+        if ($this->link !== null) {
+            $mail->action('See the quote and accept or decline it', $this->link);
         }
         $mail->salutation("Kind regards,\n{$this->company}" . ($this->companyTin ? "\nTIN {$this->companyTin}" : ''));
 

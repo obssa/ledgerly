@@ -1208,6 +1208,20 @@ export interface Attachment {
 export type AttachmentKind = "invoice" | "bill" | "expense";
 export const attachmentPath = (kind: AttachmentKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses" })[kind];
 
+/** GET public/quote (065): a quote as its customer sees it through the emailed link. */
+export interface PublicQuote {
+  company: { name: string; tin: string | null; email: string | null; phone: string | null };
+  customer: string | null;
+  quote: {
+    number: string; issue_date: string; valid_until: string | null; currency: string; subtotal: string; tax_total: string; total: string;
+    notes: string | null; status: string; lines: { description: string; quantity: string; unit_price: string; amount: string }[];
+  };
+  answer: "accepted" | "declined" | null;
+  answered_at: string | null;
+  expires_at: string;
+  can_answer: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -1253,6 +1267,9 @@ export const ledgerly = {
   resendVerification: (token: string) => api<{ message: string }>("auth/email/resend", { method: "POST", token }),
   forgotPassword: (email: string) => api<{ message: string }>("auth/password/forgot", { method: "POST", body: { email } }),
   invitation: (token: string) => api<Invitation>("auth/invitation", { query: { token } }),
+  publicQuote: (token: string) => api<PublicQuote>("public/quote", { query: { token } }),
+  answerPublicQuote: (body: { token: string; answer: "accepted" | "declined"; name: string; note?: string }) =>
+    api<{ answer: string; status: string }>("public/quote/answer", { method: "POST", body }),
   acceptInvitation: (body: { token: string; name?: string; password?: string }) =>
     api<{ accepted: boolean; company: string; email: string }>("auth/invitation/accept", { method: "POST", body }),
   resetPassword: (body: { token: string; password: string }) => api<{ message: string }>("auth/password/reset", { method: "POST", body }),

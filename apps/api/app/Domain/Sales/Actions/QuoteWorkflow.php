@@ -42,6 +42,21 @@ final class QuoteWorkflow
             $document->type === 'quote' ? 'quote_accepted' : 'sales_order_confirmed', $userId);
     }
 
+    /**
+     * The customer's own answer through the quote's link (065): accepted or declined while it is sent and not past its
+     * date, recorded with their name (no member of the company did it).
+     */
+    public function answerOnline(Document $quote, bool $accept, string $name, ?string $note = null): Document
+    {
+        if ($quote->due_date !== null && $quote->due_date->format('Y-m-d') < $this->current->today()) {
+            throw new LedgerException('This quote was valid until ' . $quote->due_date->format('j M Y') . ': ask the company for a new one.');
+        }
+        $reason = ($accept ? 'Accepted' : 'Declined') . " online by {$name}" . ($note !== null && trim($note) !== '' ? ': ' . trim($note) : '');
+
+        return $this->move($quote, 'quote', ['sent'], $accept ? 'accepted' : 'declined', $accept ? 'quote_accepted_online' : 'quote_declined_online',
+            null, mb_substr($reason, 0, 500), [], 'system');
+    }
+
     public function decline(Document $quote, string $userId, ?string $note = null): Document
     {
         return $this->move($quote, 'quote', ['sent'], 'declined', 'quote_declined', $userId, $note);
@@ -140,9 +155,9 @@ final class QuoteWorkflow
      * @param list<string> $from
      * @param array<string, mixed> $set
      */
-    private function move(Document $document, string $type, array $from, string $to, string $action, string $userId, ?string $note = null, array $set = []): Document
+    private function move(Document $document, string $type, array $from, string $to, string $action, ?string $userId, ?string $note = null, array $set = [], string $actor = 'user'): Document
     {
-        return DB::transaction(function () use ($document, $type, $from, $to, $action, $userId, $note, $set) {
+        return DB::transaction(function () use ($document, $type, $from, $to, $action, $userId, $note, $set, $actor) {
             $document = Document::query()->lockForUpdate()->findOrFail($document->getKey());
             if ($document->type !== $type || ! in_array($document->status, $from, true)) {
                 throw new LedgerException(SaveQuote::noun((string) $document->type) . ' ' . ($document->number ?? '(draft)') . " is {$document->status}; it cannot be {$this->verb($to, (string) $document->type)}.");
@@ -158,7 +173,7 @@ final class QuoteWorkflow
             $document->status = $to;
             $document->save();
             $this->audit->record($this->current->id(), $action, $type, $document->getKey(), $before,
-                $document->only(['number', 'status', 'due_date']), reason: $note, userId: $userId);
+                $document->only(['number', 'status', 'due_date']), reason: $note, userId: $userId, actorType: $actor);
 
             return $document->refresh()->load('lines');
         });

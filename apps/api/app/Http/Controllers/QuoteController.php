@@ -162,6 +162,15 @@ final class QuoteController extends Controller
         }
         $document->load('lines');
         $money = fn ($v) => number_format((float) $v, 2);
+        // A sent quote carries a link to see it and answer it online (065); a new email replaces the last link.
+        $link = null;
+        if ($document->type === 'quote' && $document->status === 'sent') {
+            $token = bin2hex(random_bytes(32));
+            $until = $document->due_date !== null ? \Illuminate\Support\Carbon::parse($document->due_date->format('Y-m-d') . ' 23:59:59', $company->timezone ?: 'UTC') : now()->addDays(30);
+            $expires = $until->max(now()->addDay())->min(now()->addDays(90));
+            DB::select('SELECT quote_link_issue(?, ?, ?)', [$document->getKey(), hash('sha256', $token), $expires->toIso8601String()]);
+            $link = rtrim((string) config('security.frontend_url'), '/') . '/quote?token=' . $token;
+        }
         Notification::route('mail', [$to => (string) $contact->name])->notify(new InvoiceSent(
             company: (string) ($company->trading_name ?: $company->legal_name), companyTin: $company->tin ? (string) $company->tin : null,
             replyTo: $company->email ? (string) $company->email : null, customer: (string) $contact->name, number: (string) $document->number,
@@ -169,7 +178,7 @@ final class QuoteController extends Controller
             lines: $document->lines->map(fn ($l) => ['description' => (string) $l->description, 'quantity' => rtrim(rtrim((string) $l->quantity, '0'), '.'),
                 'unit_price' => $money($l->unit_price), 'amount' => $money(bcadd((string) $l->line_subtotal, (string) $l->line_tax, 2))])->values()->all(),
             subtotal: $money($document->subtotal), tax: $money($document->tax_total), total: $money($document->total), amountDue: $money($document->total),
-            clearance: null, note: $data['note'] ?? null,
+            clearance: null, note: $data['note'] ?? null, link: $link,
         ));
         app(AuditLogger::class)->record($company->getKey(), "{$document->type}_emailed", (string) $document->type, $document->getKey(), null,
             ['sent_to' => $to, 'number' => $document->number], userId: $request->user()->getKey());

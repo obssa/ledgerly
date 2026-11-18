@@ -3318,6 +3318,48 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T90 FIFO items leave from their oldest layers, take landed costs onto what is on hand, never go below zero, and keep their costing';
 END $$;
+-- T91: quote links (065). Made only for a sent quote of the company, for up to 90 days, never written by the
+-- application directly; looked up and answered only outside a company, once; another company never sees them.
+-- Company A as f1: the converted quote e82 and the sent quote e85 (T82).
+DO $$
+DECLARE
+  converted constant uuid := '00000000-0000-0000-0000-000000000e82';
+  sent      constant uuid := '00000000-0000-0000-0000-000000000e85';
+  h         constant text := repeat('ab', 32);
+  got       record;
+BEGIN
+  BEGIN
+    PERFORM quote_link_issue(converted, h, now() + interval '10 days');
+    RAISE EXCEPTION 'FAIL T91a: a link was made for a quote that is not waiting for an answer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    PERFORM quote_link_issue(sent, h, now() + interval '91 days');
+    RAISE EXCEPTION 'FAIL T91b: a link lasted more than 90 days';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO quote_links (company_id, document_id, token_hash, expires_at, created_by) VALUES (app_company_id(), sent, h, now() + interval '1 day', app_user_id());
+    RAISE EXCEPTION 'FAIL T91c: the application wrote a quote link itself';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM quote_link_issue(sent, h, now() + interval '10 days');
+  IF EXISTS (SELECT 1 FROM quote_link_lookup(h)) THEN
+    RAISE EXCEPTION 'FAIL T91d: a quote link was looked up inside a company';
+  END IF;
+
+  PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+  SELECT * INTO got FROM quote_link_lookup(h);
+  IF got.document_id IS DISTINCT FROM sent THEN
+    RAISE EXCEPTION 'FAIL T91e: the link did not lead to its quote';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM quote_link_answer(h, 'accepted', 'Abebe Kebede')) OR EXISTS (SELECT 1 FROM quote_link_answer(h, 'declined', 'Someone else')) THEN
+    RAISE EXCEPTION 'FAIL T91f: a link was not answered exactly once';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM quote_links) THEN
+    RAISE EXCEPTION 'FAIL T91g: company B saw company A''s quote links';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T91 quote links are made for sent quotes only, answered once outside any company, and seen only by their own';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
