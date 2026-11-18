@@ -67,7 +67,7 @@ final class DocumentStock
     public function onPosting(Document $doc, JournalDraft $draft, Company $company, ?string $userId): void
     {
         $lines = $this->stockLines($doc);
-        if ($lines === [] || ! in_array($doc->type, ['invoice', 'bill', 'credit_note', 'vendor_credit'], true)
+        if ($lines === [] || ! in_array($doc->type, ['invoice', 'sales_receipt', 'bill', 'credit_note', 'vendor_credit'], true)
             || (in_array($doc->type, ['credit_note', 'vendor_credit'], true) && ! $doc->restock)) {
             return;
         }
@@ -85,7 +85,7 @@ final class DocumentStock
         $base = $company->base_currency;
         $date = DateTimeImmutable::createFromInterface($doc->issue_date);
 
-        if ($doc->type === 'invoice') {
+        if (in_array($doc->type, ['invoice', 'sales_receipt'], true)) {   // a cash sale's goods leave like an invoice's (070)
             $cost = Money::zero($base);
             foreach ($lines as ['line' => $line, 'item' => $item]) {
                 $move = $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'sale',

@@ -31,6 +31,7 @@ use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
 use App\Http\Controllers\GoodsReceiptController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\SalesReceiptController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RecurringJournalController;
 use App\Http\Controllers\ReportExportController;
@@ -89,6 +90,7 @@ $documentOf = fn (array $types) => fn (string $id) => Str::isUuid($id)
 Route::bind('invoice', $documentOf(['invoice', 'credit_note']));
 Route::bind('bill', $documentOf(['bill', 'vendor_credit']));
 Route::bind('expense', $documentOf(['expense']));
+Route::bind('salesReceipt', $documentOf(['sales_receipt']));
 Route::bind('supplierCredit', $documentOf(['vendor_credit']));
 Route::bind('quote', $documentOf(['quote']));
 Route::bind('salesOrder', $documentOf(['sales_order']));
@@ -358,6 +360,11 @@ Route::prefix('v1')->group(function () {
             Route::post('bills/{bill}/landed-costs', [LandedCostController::class, 'store']);
             Route::get('supplier-credits', [SupplierCreditController::class, 'index']);
             Route::post('supplier-credits/{supplierCredit}/apply', [SupplierCreditController::class, 'apply']);
+
+            Route::get('sales-receipts', [SalesReceiptController::class, 'index']);
+            Route::post('sales-receipts', [SalesReceiptController::class, 'store']);
+            Route::get('sales-receipts/{salesReceipt}', [SalesReceiptController::class, 'show']);
+            Route::post('sales-receipts/{salesReceipt}/void', [SalesReceiptController::class, 'void']);
 
             Route::get('expenses', [ExpenseController::class, 'index']);
             Route::post('expenses', [ExpenseController::class, 'store']);

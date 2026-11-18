@@ -9,6 +9,7 @@ import { documentAmounts, lineAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { createBill } from "../../bills/actions";
 import { createExpense } from "../../expenses/actions";
+import { createSalesReceipt } from "../../sales-receipts/actions";
 import { createInvoice } from "../actions";
 import { saveQuote } from "../../quotes/actions";
 import { savePurchaseOrder } from "../../purchase-orders/actions";
@@ -23,6 +24,11 @@ const KIND = {
   bill: {
     party: "Supplier", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
     notes: "Notes (optional)", noun: "bill", posting: [["Dr Expense or asset", "subtotal"], ["Dr VAT receivable", "tax"], ["Cr Accounts payable", "total"]],
+  },
+  // A cash sale (070): paid at once, posted at once into the money account it went into.
+  sales_receipt: {
+    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Our number",
+    notes: "Notes for the customer (optional)", noun: "cash sale", posting: [["Dr Received into", "total"], ["Cr Income", "subtotal"], ["Cr Tax payable", "tax"]],
   },
   expense: {
     party: "Paid to", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
@@ -92,7 +98,9 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const quote = kind === "quote" || kind === "sales_order" || purchase;
   // A quote already sent, or an order already confirmed, is revised: its earlier version is kept, with what changed.
   const revision = quote && draft !== undefined && draft.status !== "draft";
-  const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : purchase ? savePurchaseOrder : quote ? saveQuote : createInvoice, undefined);
+  const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : kind === "sales_receipt" ? createSalesReceipt
+    : purchase ? savePurchaseOrder : quote ? saveQuote : createInvoice, undefined);
+  const onTheSpot = kind === "expense" || kind === "sales_receipt";   // paid at once, from or into a money account
   const today = todayIn();
   const firstRate = options.taxRates[0]?.id ?? "";
   const firstAccount = options.accounts[0]?.id ?? "";
@@ -170,17 +178,19 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               {customer && <p className="mt-1.5 text-[13px] text-muted">{customer.tax_id ? <>TIN <span className="num">{customer.tax_id}</span> · </> : "No TIN · "}Terms {customer.payment_terms_days} days</p>}
             </div>
             {kind === "bill" && <Field name="reference" label="Supplier's invoice number" hint="As printed on their invoice" invalid={bad("reference")} />}
-            {kind === "expense" && (
+            {onTheSpot && (
               <>
-                <Field name="reference" label="Receipt number" hint="As printed on the receipt" invalid={bad("reference")} />
+                {kind === "expense"
+                  ? <Field name="reference" label="Receipt number" hint="As printed on the receipt" invalid={bad("reference")} />
+                  : <Field name="reference" label="Till slip or transaction number" hint="Optional: the card or wallet transaction" invalid={bad("reference")} />}
                 <div>
-                  <label className="field-label" htmlFor="paid_from_account_id">Paid from</label>
+                  <label className="field-label" htmlFor="paid_from_account_id">{kind === "expense" ? "Paid from" : "Received into"}</label>
                   <select className={`field ${bad("paid_from_account_id") ? "!border-bad" : ""}`} id="paid_from_account_id" name="paid_from_account_id">
                     {(options.moneyAccounts ?? []).filter((a) => (a.currency ?? options.baseCurrency) === currency).map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="field-label" htmlFor="payment_method">Paid by</label>
+                  <label className="field-label" htmlFor="payment_method">{kind === "expense" ? "Paid by" : "Paid by the customer"}</label>
                   <select className="field" id="payment_method" name="payment_method" defaultValue="cash">
                     {Object.entries(METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
@@ -192,7 +202,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               <label className="field-label" htmlFor="issue_date">Issue date</label>
               <input className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </div>
-            {kind !== "expense" && (
+            {!onTheSpot && (
               <Field key={`${customerId}-${issueDate}`} name="due_date" label={kind === "quote" ? "Valid until" : kind === "sales_order" ? "Deliver by" : purchase ? "Expected by" : "Due date"} type="date"
                 defaultValue={draft?.due_date && customerId === draft.contact.id && issueDate === draft.issue_date ? draft.due_date
                   : kind === "quote" ? addDays(issueDate, 30) : kind === "sales_order" || purchase ? "" : customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
@@ -203,7 +213,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 {options.currencies.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            {(kind === "invoice" || (quote && !purchase)) && (options.people ?? []).length > 0 && (
+            {(kind === "invoice" || kind === "sales_receipt" || (quote && !purchase)) && (options.people ?? []).length > 0 && (
               <div>
                 <label className="field-label" htmlFor="salesperson_id">Salesperson</label>
                 <select className={`field ${bad("salesperson_id") ? "!border-bad" : ""}`} id="salesperson_id" name="salesperson_id" defaultValue={draft?.salesperson_id ?? ""}>
@@ -327,7 +337,9 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             {options.manualNumbers ? "The number is the one you type." : `The ${words.noun} gets its number when it is posted.`}{" "}
             {kind === "invoice"
               ? "Where e-invoicing applies, posting also sends it to the tax authority."
-              : "VAT is reclaimable only when the company is VAT-registered; otherwise it is part of the cost."}
+              : kind === "sales_receipt"
+                ? "Recorded and posted at once: the money is already in. Stock items leave at their cost."
+                : "VAT is reclaimable only when the company is VAT-registered; otherwise it is part of the cost."}
           </p>
         </Card>
         )}
@@ -335,8 +347,10 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
           <p className="text-sm text-muted">Saving is not available in the demo.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {kind === "expense" ? (
-              <button type="submit" className="btn btn-primary" disabled={pending || (options.moneyAccounts ?? []).length === 0}>{pending ? "Recording…" : "Record expense"}</button>
+            {onTheSpot ? (
+              <button type="submit" className="btn btn-primary" disabled={pending || (options.moneyAccounts ?? []).length === 0}>
+                {pending ? "Recording…" : kind === "expense" ? "Record expense" : "Record cash sale"}
+              </button>
             ) : revision ? (
               <button type="submit" name="intent" value="draft" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save the revision"}</button>
             ) : quote ? (

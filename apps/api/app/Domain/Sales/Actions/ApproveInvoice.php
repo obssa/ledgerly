@@ -48,8 +48,8 @@ final class ApproveInvoice
 
     public function handle(Document $invoice, ?string $userId = null, ?int $lockVersion = null): Document
     {
-        if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill', 'expense', 'vendor_credit'], true)) {
-            throw new LedgerException("Document {$invoice->label()} is not an invoice, bill, expense or credit.");
+        if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill', 'expense', 'vendor_credit', 'sales_receipt'], true)) {
+            throw new LedgerException("Document {$invoice->label()} is not an invoice, cash sale, bill, expense or credit.");
         }
 
         $company = $this->current->get();
@@ -61,7 +61,8 @@ final class ApproveInvoice
             $this->states->assert('invoice', $invoice->status, 'posted', $invoice->label());
 
             $limit = $company->settings['approval'][in_array($invoice->type, ['bill', 'vendor_credit'], true) ? 'bill_above' : 'invoice_above'] ?? null;
-            if ($limit !== null && $userId !== null && $invoice->created_by === $userId) {
+            // A cash sale (070) records money already received, as an expense records money already spent.
+            if ($limit !== null && $userId !== null && $invoice->created_by === $userId && $invoice->type !== 'sales_receipt') {
                 $totalBase = Money::of($invoice->total, $invoice->currency)->convertTo($company->base_currency, (string) $invoice->fx_rate);
                 if (Money::of((string) $limit, $company->base_currency)->minus($totalBase)->isNegative()) {
                     throw new LedgerException("{$invoice->label()} is above the approval limit; someone other than its creator must approve it.");
@@ -90,8 +91,8 @@ final class ApproveInvoice
 
             $invoice->status = 'posted';
             $invoice->journal_entry_id = $entry->getKey();
-            if ($invoice->type === 'expense') {
-                $invoice->amount_due = '0.00'; // paid on the spot (021)
+            if (in_array($invoice->type, ['expense', 'sales_receipt'], true)) {
+                $invoice->amount_due = '0.00'; // paid on the spot (021, 070)
             }
             $invoice->save();
 
@@ -154,9 +155,13 @@ final class ApproveInvoice
             currency: $invoice->currency,
             fxRate: (string) $invoice->fx_rate,
             customerId: $invoice->contact_id,
-            receivableAccountId: Account::system('accounts_receivable')->getKey(),
+            // A cash sale (070): the money account it went into, never accounts receivable.
+            receivableAccountId: $invoice->type === 'sales_receipt'
+                ? Account::query()->findOrFail($invoice->paid_from_account_id)->getKey()   // company-scoped: one of its own accounts
+                : Account::system('accounts_receivable')->getKey(),
             lines: $lines,
             isCreditNote: $invoice->type === 'credit_note',
+            sourceType: $invoice->type === 'sales_receipt' ? 'sales_receipt' : null,
         );
     }
 

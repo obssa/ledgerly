@@ -26,7 +26,7 @@ export default async function InvoicesPage() {
       <PageTitle
         eyebrow="Money in"
         title="Sales and invoices"
-        actions={<><Link href="/quotes" className="btn">Quotes</Link><Link href="/credit-notes" className="btn">Credit notes</Link><Link href="/invoices/new" className="btn btn-primary">+ New invoice</Link></>}
+        actions={<><Link href="/quotes" className="btn">Quotes</Link><Link href="/sales-receipts" className="btn">Cash sales</Link><Link href="/credit-notes" className="btn">Credit notes</Link><Link href="/invoices/new" className="btn btn-primary">+ New invoice</Link></>}
       />
       <Card className="!p-2" label="Invoices">
         <div className="overflow-x-auto">

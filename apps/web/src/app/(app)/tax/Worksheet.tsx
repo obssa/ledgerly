@@ -5,7 +5,7 @@ import { formatAmount } from "@/lib/format";
 
 /* A tax worksheet, live or as it was filed: the figures, rate by rate, document by document, and what no document explains. */
 
-const DOC_PATH: Record<string, string> = { invoice: "invoices", credit_note: "invoices", sales_receipt: "invoices", bill: "bills", vendor_credit: "bills", expense: "expenses" };
+const DOC_PATH: Record<string, string> = { invoice: "invoices", credit_note: "invoices", sales_receipt: "sales-receipts", bill: "bills", vendor_credit: "bills", expense: "expenses" };
 const DOC_LABEL: Record<string, string> = { invoice: "Invoice", credit_note: "Credit note", sales_receipt: "Cash sale", bill: "Bill", vendor_credit: "Supplier credit", expense: "Expense" };
 
 function Rates({ rows, caption }: { rows: TaxRateRow[]; caption: string }) {

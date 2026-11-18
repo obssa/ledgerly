@@ -12,7 +12,7 @@ export const metadata = { title: "Journal entry" };
 function sourceHref(e: JournalDetail): string | null {
   const d = e.document;
   if (d) {
-    const base = { invoice: "/invoices", credit_note: "/invoices", bill: "/bills", vendor_credit: "/bills", expense: "/expenses" }[d.type];
+    const base = { invoice: "/invoices", credit_note: "/invoices", bill: "/bills", vendor_credit: "/bills", expense: "/expenses", sales_receipt: "/sales-receipts" }[d.type];
     return base ? `${base}/${encodeURIComponent(d.id)}` : null;
   }
   const p = e.payment;

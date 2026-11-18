@@ -14,7 +14,7 @@ const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.tes
 const STATUS = Object.fromEntries(PROJECT_STATUSES) as Record<string, string>;
 const BILLING = Object.fromEntries(PROJECT_BILLING) as Record<string, string>;
 const DOC: Record<string, [string, string]> = {
-  invoice: ["Invoice", "invoices"], credit_note: ["Credit note", "invoices"], sales_receipt: ["Cash sale", "invoices"],
+  invoice: ["Invoice", "invoices"], credit_note: ["Credit note", "invoices"], sales_receipt: ["Cash sale", "sales-receipts"],
   bill: ["Bill", "bills"], vendor_credit: ["Supplier credit", "bills"], expense: ["Expense", "expenses"],
 };
 

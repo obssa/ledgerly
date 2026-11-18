@@ -758,6 +758,19 @@ export interface Expense extends Bill {
   can?: { void: boolean };
 }
 
+/** A cash sale (070): a sale paid at once, posted at once into the money account it went into; nothing is owed. */
+export interface SalesReceipt extends Invoice {
+  type: "sales_receipt";
+  journal_entry_id: string | null;
+  reference: string | null;
+  payment_method: string;
+  paid_from?: { id: string; code: string; name: string };
+  fx_rate: string;
+  notes: string | null;
+  lines?: InvoiceLine[];
+  can?: { void: boolean };
+}
+
 export interface InvoiceDetail extends Invoice {
   type: "invoice" | "credit_note";
   prices_include_tax?: boolean;
@@ -1521,6 +1534,11 @@ export const ledgerly = {
   submitBill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
   voidBill: (id: string, reason: string, ctx: RequestOptions) =>
     api<BillDetail>(`bills/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
+  salesReceipts: (ctx: RequestOptions) => api<{ data: SalesReceipt[] }>("sales-receipts", ctx),
+  salesReceipt: (id: string, ctx: RequestOptions) => api<SalesReceipt>(`sales-receipts/${encodeURIComponent(id)}`, ctx),
+  createSalesReceipt: (body: Record<string, unknown>, ctx: RequestOptions) => api<SalesReceipt>("sales-receipts", { ...ctx, method: "POST", body }),
+  voidSalesReceipt: (id: string, reason: string, ctx: RequestOptions) =>
+    api<SalesReceipt>(`sales-receipts/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
   expenses: (ctx: RequestOptions) => api<{ data: Expense[] }>("expenses", ctx),
   expense: (id: string, ctx: RequestOptions) => api<Expense>(`expenses/${encodeURIComponent(id)}`, ctx),
   createExpense: (body: Record<string, unknown>, ctx: RequestOptions) => api<Expense>("expenses", { ...ctx, method: "POST", body }),
