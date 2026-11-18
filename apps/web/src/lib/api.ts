@@ -771,6 +771,17 @@ export interface InvoiceDetail extends Invoice {
   reminders?: InvoiceReminderSent[];
 }
 
+/** GET post-dated-cheques (062): the register, what is held by side and currency, and what the member may do. */
+export interface PostDatedCheques {
+  data: {
+    id: string; direction: "in" | "out"; contact: { id: string; name: string }; account: { id: string; code: string; name: string };
+    cheque_number: string; drawn_on: string | null; cheque_date: string; handed_on: string; currency: string; amount: string; note: string | null;
+    status: "held" | "presented" | "cancelled"; payment_id: string | null; closed_on: string | null; due: boolean;
+  }[];
+  held: { direction: "in" | "out"; currency: string; cheques: number; amount: string }[];
+  can: { receive: boolean; pay: boolean };
+}
+
 /** GET bills/{bill}/landed-costs (060): what a cost bill was spread onto, what a goods bill received, and where it can go. */
 export interface LandedCosts {
   spread: LandedCostRow[];
@@ -1437,6 +1448,12 @@ export const ledgerly = {
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
+  postDatedCheques: (ctx: RequestOptions) => api<PostDatedCheques>("post-dated-cheques", ctx),
+  recordPostDatedCheque: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ id: string }>("post-dated-cheques", { ...ctx, method: "POST", body }),
+  presentPostDatedCheque: (id: string, ctx: RequestOptions) =>
+    api<{ payment_id: string }>(`post-dated-cheques/${encodeURIComponent(id)}/present`, { ...ctx, method: "POST", body: {} }),
+  cancelPostDatedCheque: (id: string, reason: string, ctx: RequestOptions) =>
+    api<unknown>(`post-dated-cheques/${encodeURIComponent(id)}/cancel`, { ...ctx, method: "POST", body: { reason } }),
   landedCosts: (billId: string, ctx: RequestOptions) => api<LandedCosts>(`bills/${encodeURIComponent(billId)}/landed-costs`, ctx),
   applyLandedCost: (billId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ amount: string; inventory: string; cost_of_sales: string }>(`bills/${encodeURIComponent(billId)}/landed-costs`, { ...ctx, method: "POST", body }),

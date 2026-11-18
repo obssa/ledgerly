@@ -24,6 +24,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RecurringJournalController;
@@ -350,6 +351,11 @@ Route::prefix('v1')->group(function () {
             Route::put('bank-accounts/{bankAccount}', [BankAccountController::class, 'update']);
             Route::get('bank-accounts/{bankAccount}/register', [BankAccountController::class, 'register']);
             Route::get('bank-accounts/{bankAccount}/cheques', [ChequeController::class, 'index']);
+            // Post-dated cheques (062): held, then presented as a payment, or cancelled.
+            Route::get('post-dated-cheques', [PostDatedChequeController::class, 'index']);
+            Route::post('post-dated-cheques', [PostDatedChequeController::class, 'store']);
+            Route::post('post-dated-cheques/{cheque}/present', [PostDatedChequeController::class, 'present']);
+            Route::post('post-dated-cheques/{cheque}/cancel', [PostDatedChequeController::class, 'cancel']);
             Route::get('bank-accounts/{bankAccount}/cash-counts', [CashCountController::class, 'index']);
             Route::post('bank-accounts/{bankAccount}/cash-counts', [CashCountController::class, 'store']);
             Route::get('bank-accounts/{bankAccount}/statement-lines', [StatementController::class, 'index']);

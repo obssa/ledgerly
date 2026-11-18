@@ -242,6 +242,10 @@ final class PermissionMatrixTest extends TestCase
         'PUT api/v1/bank-accounts/{bankAccount}' => 'banking.manage',
         'GET api/v1/bank-accounts/{bankAccount}/register' => 'banking.view',
         'GET api/v1/bank-accounts/{bankAccount}/cheques' => 'banking.view',
+        'GET api/v1/post-dated-cheques' => 'banking.view',
+        'POST api/v1/post-dated-cheques' => 'payments.receive',   // direction in, as the control call sends it; out asks for payments.pay
+        'POST api/v1/post-dated-cheques/{cheque}/present' => 'payments.receive',   // the fixture's cheque is one received
+        'POST api/v1/post-dated-cheques/{cheque}/cancel' => 'payments.receive',
         'GET api/v1/bank-accounts/{bankAccount}/cash-counts' => 'banking.view',
         'POST api/v1/bank-accounts/{bankAccount}/cash-counts' => 'banking.count',
         'GET api/v1/bank-accounts/{bankAccount}/statement-lines' => 'banking.view',

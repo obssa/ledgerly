@@ -16,7 +16,7 @@ export default async function BankingPage() {
 
   return (
     <>
-      <PageTitle eyebrow="Operations" title="Banking and cash" />
+      <PageTitle eyebrow="Operations" title="Banking and cash" actions={<Link href="/banking/post-dated" className="btn">Post-dated cheques</Link>} />
       <Card className="!p-2" label="Accounts">
         <div className="overflow-x-auto">
           <table className="tbl">
