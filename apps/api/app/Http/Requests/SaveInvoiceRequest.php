@@ -61,6 +61,8 @@ final class SaveInvoiceRequest extends FormRequest
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')],
             'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')->where('is_active', true)],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
+            // The sales order line an invoice line delivers (067): kept through edits; the database checks it is its order's.
+            'lines.*.source_line_id' => ['nullable', 'uuid'],
             'warehouse_id' => ['nullable', 'uuid', Rule::exists('warehouses', 'id')->where('is_active', true)],   // for stock lines
             'salesperson_id' => ['nullable', 'uuid'],   // an active member of the company: checked in SaveInvoiceDraft (044)
         ];

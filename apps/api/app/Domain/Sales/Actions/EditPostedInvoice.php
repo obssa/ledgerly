@@ -128,8 +128,7 @@ final class EditPostedInvoice
             $reversal = $this->posting->reverse($oldEntryId, DateTimeImmutable::createFromInterface($invoice->issue_date), $userId);
 
             // 3. Apply the corrected lines and post the corrected entry.
-            $invoice->lines()->delete();
-            $invoice->lines()->createMany($calc['lines']);
+            SaveInvoiceDraft::writeLines($invoice, $calc['lines']);
             $invoice->fill($calc['header']);
             $invoice->setRelation('lines', $invoice->lines()->get());
             $corrected = $this->posting->post($this->approver->journalDraftFor($invoice), $userId);

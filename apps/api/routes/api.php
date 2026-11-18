@@ -293,6 +293,7 @@ Route::prefix('v1')->group(function () {
             Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf']);
 
             // Quotes and sales orders (056): the same controller, each route finding only its own kind.
+            Route::get('sales-orders/back-orders', [QuoteController::class, 'backOrders']);   // 067, before {salesOrder}
             foreach (['quotes' => ['quote', 'quote'], 'sales-orders' => ['sales_order', 'salesOrder']] as $path => [$kind, $param]) {
                 Route::get($path, [QuoteController::class, 'index'])->defaults('kind', $kind);
                 Route::post($path, [QuoteController::class, 'store'])->defaults('kind', $kind);
@@ -304,6 +305,7 @@ Route::prefix('v1')->group(function () {
                 Route::get("{$path}/{{$param}}/history", [QuoteController::class, 'history']);
             }
             Route::post('quotes/{quote}/send', [QuoteController::class, 'send']);
+            Route::post('sales-orders/{salesOrder}/close', [QuoteController::class, 'close']);
             foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense']] as $path => [$param, $kind]) {
                 Route::get("{$path}/{{$param}}/attachments", [AttachmentController::class, 'index'])->defaults('kind', $kind);
             }

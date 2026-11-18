@@ -63,6 +63,8 @@ interface Line {
   taxRateId: string;
   accountId: string;
   projectId?: string;
+  /** The sales order line this invoice line delivers (067): kept through edits. */
+  sourceLineId?: string;
 }
 
 const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
@@ -95,7 +97,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const projects = options.projects ?? [];
   const [lines, setLines] = useState<Line[]>(draft && draft.lines.length > 0
     ? draft.lines.map((l, i) => ({ key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
-        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "" }))
+        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", sourceLineId: l.source_line_id ?? undefined }))
     : [{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const items = options.items ?? [];
   const stockLine = lines.some((l) => items.find((i) => i.id === l.itemId)?.type === "inventory");
@@ -120,7 +122,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
-  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null })));
+  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}) })));
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
   const bad = (name: string) => Boolean(state?.fields?.[name]);
 

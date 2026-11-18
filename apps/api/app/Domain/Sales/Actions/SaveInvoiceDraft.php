@@ -13,6 +13,7 @@ use App\Domain\Ledger\Money;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Tax\TaxCalculator;
 use App\Domain\Tenancy\Support\CurrentCompany;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -87,8 +88,7 @@ final class SaveInvoiceDraft
             $document->amount_due = $calc['totals']['total'];
             $document->save();
 
-            $document->lines()->delete();
-            $document->lines()->createMany($calc['lines']);
+            self::writeLines($document, $calc['lines']);
 
             return $document->refresh()->load('lines'); // refresh: the database bumped lock_version
         });
@@ -238,6 +238,7 @@ final class SaveInvoiceDraft
                 'tax_rate_id' => $line['tax_rate_id'] ?? null,
                 'account_id' => $line['account_id'],
                 'project_id' => $line['project_id'] ?? null,
+                'source_line_id' => $line['source_line_id'] ?? null,
                 'line_subtotal' => $result->subtotal->toDecimalString(),
                 'line_tax' => $result->tax->toDecimalString(),
             ];
@@ -270,5 +271,24 @@ final class SaveInvoiceDraft
                 'total' => $totals->total->toDecimalString(),
             ],
         ];
+    }
+
+    /**
+     * Replaces a document's lines. A line delivering a sales order line (067) that the database refuses (more than was
+     * ordered, or another order's line) is a validation error, not a failure.
+     *
+     * @param list<array<string, mixed>> $lines
+     */
+    public static function writeLines(Document $document, array $lines): void
+    {
+        $document->lines()->delete();
+        try {
+            $document->lines()->createMany($lines);
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23514' && preg_match('/(More would be delivered than was ordered \([^)]*\)|An invoice line delivers [^\r\n"]*)/', $e->getMessage(), $m)) {
+                throw ValidationException::withMessages(['lines' => [rtrim($m[1], '. ') . '.']]);
+            }
+            throw $e;
+        }
     }
 }

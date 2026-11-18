@@ -50,3 +50,14 @@ describe("stock lines", () => {
     ]);
   });
 });
+
+describe("lines made from a sales order", () => {
+  it("keep the order line they deliver, and a line without one sends none", () => {
+    const lines = parseLines(JSON.stringify([
+      { description: "Bags", quantity: "3", unit_price: "100", account_id: "a", tax_rate_id: null, source_line_id: "0a1b2c3d-0000-4000-8000-000000000001" },
+      { description: "Extra", quantity: "1", unit_price: "5", account_id: "a", tax_rate_id: null, source_line_id: "" },
+    ]));
+    expect(lines[0].source_line_id).toBe("0a1b2c3d-0000-4000-8000-000000000001");
+    expect("source_line_id" in lines[1]).toBe(false);
+  });
+});

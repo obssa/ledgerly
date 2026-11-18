@@ -11,6 +11,9 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
   const [mailed, mail, mailing] = useActionState(emailQuote, undefined);
   const [converted, convert, converting] = useActionState(convertQuote, undefined);
   const quote = doc.type === "quote";
+  // 067: a confirmed order is invoiced for what goes out now; each line starts at what is left of it.
+  const open = !quote && doc.status === "accepted" && doc.delivery
+    ? doc.lines.filter((l) => l.id && Number(doc.delivery?.[l.id]?.remaining ?? 0) > 0) : [];
   const hidden = (step?: string) => (
     <>
       <input type="hidden" name="id" value={doc.id} />
@@ -37,8 +40,26 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
           <p className="mt-1 text-[13px] text-muted">
             {quote
               ? "Make a sales order to deliver against, or bill it straight away. The new document is a draft with the same lines and prices."
-              : "Make the invoice: a draft with the same lines and prices, dated today, to approve as usual."}
+              : open.length > 0 && doc.invoices && doc.invoices.length > 0
+                ? "Invoice what goes out now: a draft dated today for the quantities below. What stays is the back-order."
+                : "Invoice what goes out now: a draft with the same prices, dated today, to approve as usual. Lower a quantity to deliver part of it; the rest stays on order."}
           </p>
+          {open.length > 0 && (
+            <fieldset className="mt-2">
+              <legend className="sr-only">Quantities to deliver now</legend>
+              {open.map((l) => {
+                const d = doc.delivery?.[l.id ?? ""];
+                return (
+                  <div key={l.id} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]">
+                    <label htmlFor={`deliver-${l.id}`} className="min-w-0 flex-1">{l.description} <span className="text-muted">({d?.remaining} left)</span></label>
+                    <input className="field num !w-[96px] text-right" id={`deliver-${l.id}`} name={`deliver_${l.id}`} defaultValue={d?.remaining}
+                      inputMode="decimal" pattern="\d+(\.\d{1,2})?" aria-describedby="deliver-help" />
+                  </div>
+                );
+              })}
+              <p id="deliver-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that does not go out now.</p>
+            </fieldset>
+          )}
           <details className="mt-2 text-[13px]">
             <summary className="cursor-pointer text-muted">Numbering by hand?</summary>
             <label className="field-label mt-2" htmlFor="convert-number">Number of the new document</label>
@@ -93,6 +114,16 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
           <label className="field-label" htmlFor="decline-note">The customer declined: why (optional)</label>
           <input className="field" id="decline-note" name="note" maxLength={500} />
           <button type="submit" className="btn mt-2" disabled={pending}>Mark as declined</button>
+        </form>
+      )}
+      {doc.can.close && (
+        <form action={action} className="rounded-xl border border-line p-3">
+          {hidden("close")}
+          <h2 className="text-[15px] font-bold">Nothing more to deliver?</h2>
+          <p className="mt-1 text-[13px] text-muted">Close the order: what is left is no longer owed to the customer, nor reserved in stock.</p>
+          <label className="field-label mt-2" htmlFor="close-note">Reason (optional)</label>
+          <input className="field" id="close-note" name="note" maxLength={500} />
+          <button type="submit" className="btn mt-2" disabled={pending}>Close the order</button>
         </form>
       )}
       {doc.can.cancel && (

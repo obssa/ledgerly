@@ -40,7 +40,10 @@ export async function QuoteList({ kind }: { kind: QuoteKind }) {
 
   return (
     <>
-      <PageTitle eyebrow={eyebrow(kind)} title={w.title} actions={<Link href={`${w.path}/new`} className="btn btn-primary">{w.newLabel}</Link>} />
+      <PageTitle eyebrow={eyebrow(kind)} title={w.title} actions={<>
+        {kind === "sales_order" && <Link href="/sales-orders/back-orders" className="btn">Back-orders</Link>}
+        <Link href={`${w.path}/new`} className="btn btn-primary">{w.newLabel}</Link>
+      </>} />
       <Card className="!p-2" label={w.title}>
         {rows.length === 0 ? (
           <p className="p-3 text-sm text-muted">
@@ -126,10 +129,20 @@ export async function QuoteView({ kind, id, saved }: { kind: QuoteKind; id: stri
       <div className="flex flex-wrap items-start gap-4">
         <QuoteBody doc={doc} />
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
-          {(doc.source || doc.made) && (
+          {(doc.source || doc.made || (doc.invoices && doc.invoices.length > 0)) && (
             <Card label="Linked documents">
               {doc.source && <p className="text-sm">Made from quote <Link href={`/quotes/${encodeURIComponent(doc.source.id)}`} className="num font-semibold hover:underline">{doc.source.number}</Link></p>}
-              {doc.made && (
+              {doc.invoices && doc.invoices.length > 0 ? (
+                <ul className="text-sm">
+                  {doc.invoices.map((i) => (
+                    <li key={i.id} className="flex justify-between gap-2 border-t border-line py-1.5 first:border-t-0">
+                      <span>Invoice <Link href={`/invoices/${encodeURIComponent(i.id)}`} className="num font-semibold hover:underline">{i.number ?? "draft"}</Link>
+                        {i.status === "void" && <span className="ml-1 text-muted">(void)</span>}</span>
+                      <span className="num">{formatAmount(i.total)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : doc.made && (
                 <p className="text-sm">
                   {doc.made.type === "invoice" ? "Invoiced as " : "Became sales order "}
                   <Link href={doc.made.type === "invoice" ? `/invoices/${encodeURIComponent(doc.made.id)}` : `/sales-orders/${encodeURIComponent(doc.made.id)}`} className="num font-semibold hover:underline">
@@ -149,6 +162,9 @@ export async function QuoteView({ kind, id, saved }: { kind: QuoteKind; id: stri
 
 function QuoteBody({ doc }: { doc: QuoteDetail }) {
   const w = WORDS[doc.type];
+  // 067: a sales order shows, line by line, what its invoices delivered and what is left (its back-order).
+  const delivery = doc.type === "sales_order" && doc.status !== "draft" ? doc.delivery : null;
+  const left = delivery ? Object.values(delivery).some((d) => Number(d.remaining) > 0) : false;
   return (
     <Card className="min-w-0 flex-[2_1_560px]" label={w.one}>
       <div className="flex flex-wrap justify-between gap-4 text-sm">
@@ -167,13 +183,19 @@ function QuoteBody({ doc }: { doc: QuoteDetail }) {
       <div className="mt-5 overflow-x-auto">
         <table className="tbl">
           <thead>
-            <tr><th scope="col">Description</th><th scope="col" className="!text-right">Qty</th><th scope="col" className="!text-right">Unit price</th><th scope="col" className="!text-right">Tax</th><th scope="col" className="!text-right">Amount</th></tr>
+            <tr><th scope="col">Description</th><th scope="col" className="!text-right">Qty</th>
+              {delivery && <><th scope="col" className="!text-right">Delivered</th><th scope="col" className="!text-right">Left</th></>}
+              <th scope="col" className="!text-right">Unit price</th><th scope="col" className="!text-right">Tax</th><th scope="col" className="!text-right">Amount</th></tr>
           </thead>
           <tbody>
             {doc.lines.map((l) => (
               <tr key={l.line_no}>
                 <td>{l.description}</td>
                 <td className="num text-right">{l.quantity}</td>
+                {delivery && <>
+                  <td className="num text-right">{delivery[l.id ?? ""]?.delivered ?? "—"}</td>
+                  <td className={`num text-right ${Number(delivery[l.id ?? ""]?.remaining ?? 0) > 0 ? "font-semibold text-warn" : ""}`}>{delivery[l.id ?? ""]?.remaining ?? "—"}</td>
+                </>}
                 <td className="num text-right">{formatAmount(l.unit_price)}</td>
                 <td className="num text-right">{formatAmount(l.line_tax)}</td>
                 <td className="num text-right font-semibold">{formatAmount(l.line_subtotal)}</td>
@@ -188,6 +210,9 @@ function QuoteBody({ doc }: { doc: QuoteDetail }) {
         <div className="mt-1 flex justify-between border-t-2 border-ink pt-2 text-lg font-extrabold"><dt>Total</dt><dd className="num">{formatMoney(doc.total, doc.currency)}</dd></div>
       </dl>
       {doc.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{doc.notes}</p>}
+      {delivery && left && doc.status === "converted" && (
+        <p className="mt-4 text-[13px] text-muted">Closed before everything was delivered: what is left is no longer owed to the customer.</p>
+      )}
     </Card>
   );
 }

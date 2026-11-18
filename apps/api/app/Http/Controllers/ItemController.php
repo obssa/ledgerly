@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Inventory\Models\Item;
 use App\Domain\Inventory\Models\StockBalance;
+use App\Domain\Inventory\Reservations;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
@@ -28,7 +29,7 @@ final class ItemController extends Controller
     {
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, Reservations $reservations): JsonResponse
     {
         $this->authorizeCompany('inventory.view');
         $q = $request->validate([
@@ -49,9 +50,13 @@ final class ItemController extends Controller
             ->groupBy('item_id')->selectRaw('item_id, sum(quantity)::numeric(18,2)::text AS quantity, sum(value)::numeric(20,2)::text AS value')
             ->get()->keyBy('item_id');
 
+        // 067: what the open sales orders still want of each stock item.
+        $stock = $reservations->byItem($items->where('type', 'inventory')->pluck('id')->map(fn ($id) => (string) $id)->values()->all());
+
         return response()->json([
             'data' => $items->map(fn (Item $i) => [...$i->toArray(),
-                'on_hand' => $onHand[$i->getKey()]->quantity ?? '0.00', 'value' => $onHand[$i->getKey()]->value ?? '0.00']),
+                'on_hand' => $onHand[$i->getKey()]->quantity ?? '0.00', 'value' => $onHand[$i->getKey()]->value ?? '0.00',
+                'reserved' => $stock[(string) $i->getKey()]['reserved'] ?? '0.00', 'available' => $stock[(string) $i->getKey()]['available'] ?? null]),
             'can' => $this->can(),
         ]);
     }

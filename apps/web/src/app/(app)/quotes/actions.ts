@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ApiError, ledgerly, type QuoteKind } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { invoiceBody } from "@/lib/invoice";
+import { deliveries } from "@/lib/orders";
 import { getSession } from "@/lib/session";
 
 /*
@@ -76,11 +77,12 @@ export async function quoteStep(_: FormState | undefined, form: FormData): Promi
   const note = text(form, "note");
   const NOTICE: Record<string, string> = {
     send: "Marked as sent.", accept: kind === "quote" ? "Accepted." : "Confirmed.", decline: "Declined.", extend: "Offered again.", cancel: "Cancelled.",
+    ...(kind === "sales_order" ? { close: "Closed: what was left is no longer owed." } : {}),
   };
   if (typeof step !== "string" || !(step in NOTICE)) return { error: "Unknown action." };
   try {
     const body = step === "extend" ? { valid_until: text(form, "valid_until") ?? "" } : note ? { note } : {};
-    await ledgerly.quoteStep(kind, id, step as "send" | "accept" | "decline" | "extend" | "cancel", body, ctx);
+    await ledgerly.quoteStep(kind, id, step as "send" | "accept" | "decline" | "extend" | "cancel" | "close", body, ctx);
   } catch (error) {
     return refusal(error);
   }
@@ -104,9 +106,11 @@ export async function convertQuote(_: FormState | undefined, form: FormData): Pr
   const ctx = await context();
   const kind = kindOf(form);
   const to = form.get("to") === "sales_order" ? "sales_order" : "invoice";
+  // 067: an order's quantities to deliver now, one field per open line (deliver_<line id>).
+  const lines = kind === "sales_order" ? deliveries(form) : undefined;
   let made: { id: string; type: string };
   try {
-    made = await ledgerly.convertQuote(kind, text(form, "id") ?? "", to, text(form, "number") ?? undefined, ctx);
+    made = await ledgerly.convertQuote(kind, text(form, "id") ?? "", to, text(form, "number") ?? undefined, ctx, lines);
   } catch (error) {
     return refusal(error);
   }

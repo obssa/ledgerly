@@ -584,6 +584,9 @@ export interface Item {
   costing?: "average" | "fifo";
   is_active: boolean;
   on_hand?: string;
+  /** What the confirmed sales orders still want of a stock item, and on hand less that (067; below zero when short). */
+  reserved?: string;
+  available?: string | null;
   value?: string;
   balances?: { warehouse: { id: string; name: string }; quantity: string; value: string }[];
   can?: { edit: boolean; adjust: boolean };
@@ -665,6 +668,7 @@ export interface Supplier {
 }
 
 export interface InvoiceLine {
+  id?: string;
   line_no: number;
   description: string;
   quantity: string;
@@ -676,6 +680,8 @@ export interface InvoiceLine {
   item_id?: string | null;
   /** The project the line is tagged with (job costing), if any. */
   project_id?: string | null;
+  /** On an invoice made from a sales order: the order line it delivers (067). */
+  source_line_id?: string | null;
   line_subtotal: string;
   line_tax: string;
 }
@@ -826,7 +832,35 @@ export interface QuoteDetail extends Omit<InvoiceDetail, "type" | "status" | "ca
   made?: { id: string; type: string; number: string | null; status: string } | null;
   /** Earlier versions kept when it was revised after it went to the customer (or was confirmed). */
   versions: number;
-  can: { edit: boolean; send: boolean; accept: boolean; decline: boolean; extend: boolean; cancel: boolean; convert: boolean; email: boolean };
+  /** A sales order's lines (by line id): ordered, delivered by its live invoices, and left to deliver (067). */
+  delivery?: Record<string, { ordered: string; delivered: string; remaining: string }> | null;
+  /** The invoices made from a sales order, the earliest first. */
+  invoices?: { id: string; number: string | null; issue_date: string; status: string; total: string }[] | null;
+  can: { edit: boolean; send: boolean; accept: boolean; decline: boolean; extend: boolean; cancel: boolean; convert: boolean; email: boolean; close?: boolean };
+}
+
+/** GET /sales-orders/back-orders: what confirmed orders still owe, and the stock their items have (067). */
+export interface BackOrderLine {
+  order_id: string;
+  number: string | null;
+  issue_date: string;
+  due_date: string | null;
+  contact_id: string;
+  customer: string;
+  line_id: string;
+  line_no: number;
+  description: string;
+  item_id: string | null;
+  sku: string | null;
+  item_name: string | null;
+  item_type: string | null;
+  ordered: string;
+  delivered: string;
+  remaining: string;
+}
+export interface BackOrders {
+  data: BackOrderLine[];
+  stock: Record<string, { on_hand: string; reserved: string; available: string }>;
 }
 
 export const quotePath = (kind: QuoteKind) => (kind === "quote" ? "quotes" : "sales-orders");
@@ -1516,13 +1550,15 @@ export const ledgerly = {
   createQuote: (kind: QuoteKind, body: Record<string, unknown>, ctx: RequestOptions) => api<QuoteDetail>(quotePath(kind), { ...ctx, method: "POST", body }),
   updateQuote: (kind: QuoteKind, id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<QuoteDetail>(`${quotePath(kind)}/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
-  quoteStep: (kind: QuoteKind, id: string, step: "send" | "accept" | "decline" | "extend" | "cancel", body: Record<string, unknown>, ctx: RequestOptions) =>
+  quoteStep: (kind: QuoteKind, id: string, step: "send" | "accept" | "decline" | "extend" | "cancel" | "close", body: Record<string, unknown>, ctx: RequestOptions) =>
     api<QuoteDetail>(`${quotePath(kind)}/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   emailQuote: (kind: QuoteKind, id: string, note: string | undefined, ctx: RequestOptions) =>
     api<{ sent_to: string; status: QuoteStatus; number: string | null }>(`${quotePath(kind)}/${encodeURIComponent(id)}/email`, { ...ctx, method: "POST", body: note ? { note } : {} }),
-  convertQuote: (kind: QuoteKind, id: string, to: "invoice" | "sales_order", number: string | undefined, ctx: RequestOptions) =>
+  convertQuote: (kind: QuoteKind, id: string, to: "invoice" | "sales_order", number: string | undefined, ctx: RequestOptions,
+    lines?: { line_id: string; quantity: string }[]) =>
     api<{ id: string; type: "invoice" | "sales_order"; number: string | null; status: string }>(`${quotePath(kind)}/${encodeURIComponent(id)}/convert`,
-      { ...ctx, method: "POST", body: { to, ...(number ? { number } : {}) } }),
+      { ...ctx, method: "POST", body: { to, ...(number ? { number } : {}), ...(lines ? { lines } : {}) } }),
+  backOrders: (ctx: RequestOptions) => api<BackOrders>("sales-orders/back-orders", ctx),
   updateInvoice: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   approveInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),
