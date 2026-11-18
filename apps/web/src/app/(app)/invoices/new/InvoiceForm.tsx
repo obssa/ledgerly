@@ -11,6 +11,7 @@ import { createBill } from "../../bills/actions";
 import { createExpense } from "../../expenses/actions";
 import { createInvoice } from "../actions";
 import { saveQuote } from "../../quotes/actions";
+import { savePurchaseOrder } from "../../purchase-orders/actions";
 import { todayIn } from "@/lib/dates";
 
 /** The words and postings that differ between a sales invoice and a supplier's bill; the form is the same. */
@@ -35,6 +36,11 @@ const KIND = {
   sales_order: {
     party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Order number",
     notes: "Notes for the customer (optional)", noun: "sales order", posting: [],
+  },
+  // A purchase order posts nothing either (068): its bills do.
+  purchase_order: {
+    party: "Supplier", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Order number",
+    notes: "Notes for the supplier (optional)", noun: "purchase order", posting: [],
   },
 } as const;
 
@@ -82,10 +88,11 @@ const addDays = (date: string, days: number) => {
  */
 export function InvoiceForm({ options, kind = "invoice", draft }: { options: InvoiceOptions; kind?: keyof typeof KIND; draft?: Draft }) {
   const words = KIND[kind];
-  const quote = kind === "quote" || kind === "sales_order";
+  const purchase = kind === "purchase_order";
+  const quote = kind === "quote" || kind === "sales_order" || purchase;
   // A quote already sent, or an order already confirmed, is revised: its earlier version is kept, with what changed.
   const revision = quote && draft !== undefined && draft.status !== "draft";
-  const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : quote ? saveQuote : createInvoice, undefined);
+  const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : purchase ? savePurchaseOrder : quote ? saveQuote : createInvoice, undefined);
   const today = todayIn();
   const firstRate = options.taxRates[0]?.id ?? "";
   const firstAccount = options.accounts[0]?.id ?? "";
@@ -186,9 +193,9 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               <input className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </div>
             {kind !== "expense" && (
-              <Field key={`${customerId}-${issueDate}`} name="due_date" label={kind === "quote" ? "Valid until" : kind === "sales_order" ? "Deliver by" : "Due date"} type="date"
+              <Field key={`${customerId}-${issueDate}`} name="due_date" label={kind === "quote" ? "Valid until" : kind === "sales_order" ? "Deliver by" : purchase ? "Expected by" : "Due date"} type="date"
                 defaultValue={draft?.due_date && customerId === draft.contact.id && issueDate === draft.issue_date ? draft.due_date
-                  : kind === "quote" ? addDays(issueDate, 30) : kind === "sales_order" ? "" : customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
+                  : kind === "quote" ? addDays(issueDate, 30) : kind === "sales_order" || purchase ? "" : customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
             )}
             <div>
               <label className="field-label" htmlFor="currency">Currency</label>
@@ -196,7 +203,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 {options.currencies.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            {(kind === "invoice" || quote) && (options.people ?? []).length > 0 && (
+            {(kind === "invoice" || (quote && !purchase)) && (options.people ?? []).length > 0 && (
               <div>
                 <label className="field-label" htmlFor="salesperson_id">Salesperson</label>
                 <select className={`field ${bad("salesperson_id") ? "!border-bad" : ""}`} id="salesperson_id" name="salesperson_id" defaultValue={draft?.salesperson_id ?? ""}>
@@ -207,7 +214,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             )}
             {stockLine && (
               <div>
-                <label className="field-label" htmlFor="warehouse_id">{kind === "bill" ? "Goods arrive in" : "Goods leave from"}</label>
+                <label className="field-label" htmlFor="warehouse_id">{kind === "bill" || purchase ? "Goods arrive in" : "Goods leave from"}</label>
                 <select className={`field ${bad("warehouse_id") ? "!border-bad" : ""}`} id="warehouse_id" name="warehouse_id" defaultValue={draft?.warehouse_id ?? undefined}>
                   {(options.warehouses ?? []).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
@@ -297,12 +304,14 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             <p className="mt-1.5 text-[13px] text-muted">
               {kind === "quote"
                 ? "Send it to the customer (it is numbered then). When they accept, turn it into a sales order or an invoice. Unanswered after its date, it expires."
-                : "Confirm it (it is numbered then), and turn it into an invoice when the goods or the work are delivered."}
+                : purchase
+                  ? "Issue it to the supplier (it is numbered then), and turn it into a bill as their invoices come in, in as many bills as it takes."
+                  : "Confirm it (it is numbered then), and turn it into an invoice when the goods or the work are delivered."}
             </p>
             {revision && (
               <div className="mt-3">
                 <label className="field-label" htmlFor="reason">What changed (kept with the earlier version)</label>
-                <input className="field" id="reason" name="reason" maxLength={500} placeholder="Customer asked for 12 bags" />
+                <input className="field" id="reason" name="reason" maxLength={500} placeholder={purchase ? "Supplier changed the price" : "Customer asked for 12 bags"} />
               </div>
             )}
           </Card>
@@ -334,7 +343,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               <>
                 <button type="submit" name="intent" value="draft" className="btn" disabled={pending}>Save draft</button>
                 <button type="submit" name="intent" value={kind === "quote" ? "send" : "accept"} className="btn btn-primary" disabled={pending}>
-                  {pending ? "Saving…" : kind === "quote" ? "Save and mark as sent" : "Save and confirm"}
+                  {pending ? "Saving…" : kind === "quote" ? "Save and mark as sent" : purchase ? "Save and issue" : "Save and confirm"}
                 </button>
               </>
             ) : (

@@ -26,9 +26,9 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
       <Card className="!p-2" label="Items">
         <div className="overflow-x-auto">
           <table className="tbl">
-            <thead><tr><th scope="col">Name</th><th scope="col">SKU</th><th scope="col">Type</th><th scope="col" className="!text-right">Sale price</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Reserved</th><th scope="col" className="!text-right">Available</th><th scope="col" className="!text-right">Value</th></tr></thead>
+            <thead><tr><th scope="col">Name</th><th scope="col">SKU</th><th scope="col">Type</th><th scope="col" className="!text-right">Sale price</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Reserved</th><th scope="col" className="!text-right">Available</th><th scope="col" className="!text-right">On order</th><th scope="col" className="!text-right">Value</th></tr></thead>
             <tbody>
-              {data.length === 0 && <tr><td colSpan={8} className="text-muted">{search ? "No item matches." : "No items yet."}</td></tr>}
+              {data.length === 0 && <tr><td colSpan={9} className="text-muted">{search ? "No item matches." : "No items yet."}</td></tr>}
               {data.map((i) => {
                 const low = i.type === "inventory" && i.reorder_point !== null && parse(i.on_hand ?? "0") <= parse(i.reorder_point);
                 return (
@@ -40,6 +40,7 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
                     <td className={`num text-right ${low ? "font-semibold text-warn" : ""}`}>{i.type === "inventory" ? `${formatAmount(i.on_hand ?? "0")} ${i.unit}` : "—"}</td>
                     <td className="num text-right">{i.type === "inventory" ? formatAmount(i.reserved ?? "0") : "—"}</td>
                     <td className={`num text-right ${i.available && parse(i.available) < 0n ? "font-semibold text-bad" : ""}`}>{i.type === "inventory" && i.available ? formatAmount(i.available) : "—"}</td>
+                    <td className="num text-right">{i.type === "inventory" ? formatAmount(i.on_order ?? "0") : "—"}</td>
                     <td className="num text-right">{i.type === "inventory" ? formatAmount(i.value ?? "0") : "—"}</td>
                   </tr>
                 );

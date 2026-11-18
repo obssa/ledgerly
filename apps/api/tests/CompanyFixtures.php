@@ -88,6 +88,8 @@ trait CompanyFixtures
         $ids['posted_bill'] = $this->postJson('/api/v1/bills', $bill('R-100'), $h)->assertCreated()->json('id');
         $this->postJson("/api/v1/bills/{$ids['posted_bill']}/approve", [], $h)->assertOk();
         $ids['bill'] = $this->postJson('/api/v1/bills', $bill('R-101'), $h)->assertCreated()->json('id');
+        // A draft purchase order to the supplier (068).
+        $ids['purchase_order'] = $this->postJson('/api/v1/purchase-orders', $bill('PO-REF'), $h)->assertCreated()->json('id');
         $ids['supplier_credit'] = $this->postJson("/api/v1/bills/{$ids['posted_bill']}/credits", ['issue_date' => '2026-11-06', 'reference' => 'RC-1',
             'notes' => 'Rent overcharged', 'lines' => [['description' => 'Rent correction', 'quantity' => '1', 'unit_price' => '40', 'account_id' => $ids['rent']]]], $h)
             ->assertCreated()->json('id');
@@ -160,7 +162,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(254, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(264, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -198,6 +200,7 @@ trait CompanyFixtures
             'attachment' => $ids['attachment'],
             'quote' => $ids['quote'],
             'salesOrder' => $ids['sales_order'],
+            'purchaseOrder' => $ids['purchase_order'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

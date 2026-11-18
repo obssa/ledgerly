@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
 final class SaveQuote
 {
     /** The states each type can be edited in; after the first, an edit keeps the earlier version. */
-    public const EDITABLE = ['quote' => ['draft', 'sent'], 'sales_order' => ['draft', 'accepted']];
+    public const EDITABLE = ['quote' => ['draft', 'sent'], 'sales_order' => ['draft', 'accepted'], 'purchase_order' => ['draft', 'accepted']];
 
     public function __construct(
         private readonly CurrentCompany $company,
@@ -41,15 +41,16 @@ final class SaveQuote
                 if (! in_array($document->status, self::EDITABLE[$type], true)) {
                     throw new LedgerException(self::noun($type) . ' ' . ($document->number ?? '') . " is {$document->status}; it can no longer be changed.");
                 }
-                // 067: the lines its invoices deliver stay as they were ordered.
-                if ($type === 'sales_order' && Document::query()->where('source_document_id', $document->getKey())->exists()) {
-                    throw new LedgerException("Sales order {$document->number} has invoices made from it; it can no longer be changed. Close it and make a new order for the rest.");
+                // 067, 068: the lines its invoices deliver, or its bills bill, stay as they were ordered.
+                if (in_array($type, ['sales_order', 'purchase_order'], true) && Document::query()->where('source_document_id', $document->getKey())->exists()) {
+                    $made = $type === 'purchase_order' ? 'bills' : 'invoices';
+                    throw new LedgerException(self::noun($type) . " {$document->number} has {$made} made from it; it can no longer be changed. Close it and make a new order for the rest.");
                 }
             }
             // A quote's or an order's own lines deliver nothing.
             $data['lines'] = array_map(fn (array $l) => array_diff_key($l, ['source_line_id' => true]), $data['lines']);
 
-            $data['salesperson_id'] = $this->drafts->salesperson($data, $document);
+            $data['salesperson_id'] = $type === 'purchase_order' ? null : $this->drafts->salesperson($data, $document);
             $calc = $this->drafts->calculate($data);
             // Once it has gone to the customer (or been confirmed) its number stays; a draft takes a typed number in manual mode.
             $calc['header']['number'] = $document !== null && $document->status !== 'draft'
@@ -91,6 +92,6 @@ final class SaveQuote
 
     public static function noun(string $type): string
     {
-        return $type === 'sales_order' ? 'Sales order' : 'Quote';
+        return match ($type) { 'sales_order' => 'Sales order', 'purchase_order' => 'Purchase order', default => 'Quote' };
     }
 }

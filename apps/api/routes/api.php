@@ -29,6 +29,7 @@ use App\Http\Controllers\QuoteLinkController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
+use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RecurringJournalController;
 use App\Http\Controllers\ReportExportController;
@@ -90,6 +91,7 @@ Route::bind('expense', $documentOf(['expense']));
 Route::bind('supplierCredit', $documentOf(['vendor_credit']));
 Route::bind('quote', $documentOf(['quote']));
 Route::bind('salesOrder', $documentOf(['sales_order']));
+Route::bind('purchaseOrder', $documentOf(['purchase_order']));
 // Payments received and payments made share one table too.
 $paymentOf = fn (array $where) => fn (string $id) => Str::isUuid($id)
     ? Payment::query()->where($where)->findOrFail($id)
@@ -324,6 +326,17 @@ Route::prefix('v1')->group(function () {
             Route::get('suppliers/{supplier}/statement', [SupplierController::class, 'statement']);
             Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
 
+            // Purchase orders (068): issued to a supplier, billed in parts, closed or cancelled; nothing posts.
+            Route::get('purchase-orders', [PurchaseOrderController::class, 'index']);
+            Route::post('purchase-orders', [PurchaseOrderController::class, 'store']);
+            Route::get('purchase-orders/open', [PurchaseOrderController::class, 'open']);   // before {purchaseOrder}
+            Route::get('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show']);
+            Route::put('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update']);
+            Route::post('purchase-orders/{purchaseOrder}/issue', [PurchaseOrderController::class, 'issue']);
+            Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel']);
+            Route::post('purchase-orders/{purchaseOrder}/bill', [PurchaseOrderController::class, 'bill']);
+            Route::post('purchase-orders/{purchaseOrder}/close', [PurchaseOrderController::class, 'close']);
+            Route::get('purchase-orders/{purchaseOrder}/history', [PurchaseOrderController::class, 'history']);
             Route::get('bills', [BillController::class, 'index']);
             Route::post('bills', [BillController::class, 'store']);
             Route::get('bills/{bill}', [BillController::class, 'show']);

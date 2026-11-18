@@ -23,6 +23,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
     label: "Money out",
     items: [
       { href: "/bills", label: "Bills and purchases" },
+      { href: "/purchase-orders", label: "Purchase orders" },
       { href: "/suppliers", label: "Suppliers" },
       { href: "/payments-made", label: "Payments made" },
       { href: "/expenses", label: "Expenses" },
