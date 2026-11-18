@@ -7,6 +7,7 @@ namespace App\Domain\Sales\Actions;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Purchases\ReceivedGoods;
+use App\Domain\Sales\DeliveredGoods;
 use App\Domain\Sales\DocumentNumbers;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Tenancy\Support\CurrentCompany;
@@ -31,6 +32,7 @@ final class QuoteWorkflow
         private readonly SaveQuote $quotes,
         private readonly AuditLogger $audit,
         private readonly ReceivedGoods $received,
+        private readonly DeliveredGoods $delivered,
     ) {
     }
 
@@ -86,6 +88,9 @@ final class QuoteWorkflow
         if ($document->type === 'purchase_order' && $this->received->items((string) $document->getKey()) !== []) {
             throw new LedgerException("Purchase order {$document->number} has goods received against it: bill them and close it instead.");
         }
+        if ($document->type === 'sales_order' && $this->delivered->items((string) $document->getKey()) !== []) {
+            throw new LedgerException("Sales order {$document->number} has goods delivered: invoice them and close it instead.");
+        }
 
         return $this->move($document, (string) $document->type, ['draft', 'sent', 'accepted'], 'void', "{$document->type}_cancelled", $userId, $note);
     }
@@ -120,6 +125,15 @@ final class QuoteWorkflow
             foreach ($this->received->byLine((string) $order->getKey()) as $lineId => $r) {
                 if (bccomp($r['received'], $delivery[$lineId]['delivered'] ?? '0', 2) > 0) {
                     throw new LedgerException('Goods received on this order are not billed yet: bill them before closing the order.');
+                }
+            }
+        }
+        // 071: goods that left on delivery notes are invoiced before the order is closed.
+        if ($order->type === 'sales_order') {
+            $delivery = $this->remaining($order);
+            foreach ($this->delivered->byLine((string) $order->getKey()) as $lineId => $r) {
+                if (bccomp($r['delivered'], $delivery[$lineId]['delivered'] ?? '0', 2) > 0) {
+                    throw new LedgerException('Goods delivered on this order are not invoiced yet: invoice them before closing the order.');
                 }
             }
         }
@@ -181,9 +195,7 @@ final class QuoteWorkflow
             $quantities = [];
             if (in_array($source->type, self::ORDERS, true)) {
                 $left = $this->remaining($source);
-                if ($source->type === 'purchase_order') {
-                    $left = $this->billable($source, $left);
-                }
+                $left = $this->billable($source, $left);
                 $want = $deliver ?? array_map(fn (array $r) => $r['remaining'], $left);
                 foreach ($want as $lineId => $quantity) {
                     if (! isset($left[$lineId])) {
@@ -192,7 +204,9 @@ final class QuoteWorkflow
                     if (bccomp((string) $quantity, $left[$lineId]['remaining'], 2) > 0) {
                         $no = $lines->firstWhere('id', $lineId)?->line_no;
                         throw ValidationException::withMessages(['lines' => [isset($left[$lineId]['received'])
-                            ? "Line {$no}: only {$left[$lineId]['remaining']} was received and is not yet billed. Record the goods received note first."
+                            ? ($source->type === 'purchase_order'
+                                ? "Line {$no}: only {$left[$lineId]['remaining']} was received and is not yet billed. Record the goods received note first."
+                                : "Line {$no}: only {$left[$lineId]['remaining']} was delivered and is not yet invoiced. Record the delivery note first.")
                             : "Line {$no}: only {$left[$lineId]['remaining']} is left to deliver."]]);
                     }
                 }
@@ -294,16 +308,21 @@ final class QuoteWorkflow
     public function billable(Document $order, ?array $left = null): array
     {
         $left ??= $this->remaining($order);
-        $items = $this->received->items((string) $order->getKey());
+        // 071: a sales order line whose item left on delivery notes is invoiced for what was delivered and not yet invoiced.
+        $purchase = $order->type === 'purchase_order';
+        $goods = $purchase ? $this->received : $this->delivered;
+        $items = $goods->items((string) $order->getKey());
         if ($items === []) {
             return $left;
         }
-        $received = $this->received->byLine((string) $order->getKey());
+        $byLine = $goods->byLine((string) $order->getKey());
+        $key = $purchase ? 'received' : 'delivered';
         foreach ($order->lines as $line) {
             $id = (string) $line->getKey();
             if (isset($left[$id]) && in_array((string) $line->item_id, $items, true)) {
-                $open = bcsub($received[$id]['received'] ?? '0', $left[$id]['delivered'], 2);
-                $left[$id]['received'] = $received[$id]['received'] ?? '0.00';
+                $moved = $byLine[$id][$key] ?? '0.00';
+                $open = bcsub($moved, $left[$id]['delivered'], 2);
+                $left[$id]['received'] = $moved;   // what came in (a receipt) or went out (a delivery note) for this line
                 $left[$id]['remaining'] = bccomp($open, '0', 2) > 0 ? $open : '0.00';
             }
         }

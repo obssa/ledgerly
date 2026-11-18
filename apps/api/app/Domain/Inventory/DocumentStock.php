@@ -12,6 +12,7 @@ use App\Domain\Ledger\Models\Account;
 use App\Domain\Ledger\Money;
 use App\Domain\Ledger\PostingService;
 use App\Domain\Purchases\ReceivedGoods;
+use App\Domain\Sales\DeliveredGoods;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Tenancy\Models\Company;
 use DateTimeImmutable;
@@ -35,7 +36,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class DocumentStock
 {
-    public function __construct(private readonly StockLedger $stock, private readonly PostingService $posting, private readonly ReceivedGoods $received)
+    public function __construct(private readonly StockLedger $stock, private readonly PostingService $posting, private readonly ReceivedGoods $received,
+        private readonly DeliveredGoods $delivered)
     {
     }
 
@@ -87,6 +89,8 @@ final class DocumentStock
 
         if (in_array($doc->type, ['invoice', 'sales_receipt'], true)) {   // a cash sale's goods leave like an invoice's (070)
             $cost = Money::zero($base);
+            // 071: the items its order's delivery notes took out already left, with their cost: the invoice bills them only.
+            $lines = $this->matchDelivered($doc, $lines, $company);
             foreach ($lines as ['line' => $line, 'item' => $item]) {
                 $move = $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'sale',
                     '-' . $line->quantity, '0', $doc->number, $doc->getKey(), $userId);
@@ -130,6 +134,51 @@ final class DocumentStock
         if ($cleared !== []) {
             $this->clearReceived($doc, $cleared, $draft, $company, $date, $userId);
         }
+    }
+
+    /**
+     * 071: an invoice made from a sales order whose delivery notes delivered some of its items. Each stock line for such
+     * an item is matched to what was delivered and not yet invoiced, never more; it moves no stock and adds no cost of
+     * goods sold (the note recorded both). The other stock lines are returned, to leave as usual.
+     *
+     * @param list<array{line: object, item: Item}> $lines
+     * @return list<array{line: object, item: Item}>
+     */
+    private function matchDelivered(Document $doc, array $lines, Company $company): array
+    {
+        if ($doc->type !== 'invoice' || $doc->source_document_id === null) {
+            return $lines;
+        }
+        $items = $this->delivered->items((string) $doc->source_document_id);
+        if ($items === []) {
+            return $lines;
+        }
+        $done = $this->delivered->byLine((string) $doc->source_document_id);
+        $rest = [];
+        foreach ($lines as $l) {
+            ['line' => $line, 'item' => $item] = $l;
+            if (! in_array((string) $item->getKey(), $items, true)) {
+                $rest[] = $l;
+
+                continue;
+            }
+            $orderLine = $line->source_line_id !== null ? (string) $line->source_line_id : null;
+            $d = $orderLine !== null ? ($done[$orderLine] ?? null) : null;
+            if ($d === null) {
+                throw ValidationException::withMessages(['lines' => ["Line {$line->line_no}: {$item->name} of this order leaves on delivery notes; invoice it from the order's line."]]);
+            }
+            $open = bcsub($d['delivered'], $d['matched'], 2);
+            if (bccomp((string) $line->quantity, $open, 2) > 0) {
+                throw ValidationException::withMessages(['lines' => ["Line {$line->line_no}: only {$open} {$item->unit} of {$item->name} was delivered and not yet invoiced. Record the delivery note first."]]);
+            }
+            DB::table('invoice_delivery_matches')->insert([
+                'id' => (string) Str::uuid7(), 'company_id' => $company->getKey(), 'invoice_id' => $doc->getKey(), 'invoice_line_id' => $line->getKey(),
+                'order_line_id' => $orderLine, 'quantity' => (string) $line->quantity,
+            ]);
+            $done[$orderLine]['matched'] = bcadd($d['matched'], (string) $line->quantity, 2);
+        }
+
+        return $rest;
     }
 
     /**

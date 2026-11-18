@@ -850,10 +850,32 @@ export interface QuoteDetail extends Omit<InvoiceDetail, "type" | "status" | "ca
   /** Earlier versions kept when it was revised after it went to the customer (or was confirmed). */
   versions: number;
   /** A sales order's lines (by line id): ordered, delivered by its live invoices, and left to deliver (067). */
-  delivery?: Record<string, { ordered: string; delivered: string; remaining: string }> | null;
+  /** 071: with what left on delivery notes (shipped), and what can be invoiced now (billable). */
+  delivery?: Record<string, { ordered: string; delivered: string; remaining: string; shipped?: string; billable?: string }> | null;
   /** The invoices made from a sales order, the earliest first. */
   invoices?: { id: string; number: string | null; issue_date: string; status: string; total: string }[] | null;
-  can: { edit: boolean; send: boolean; accept: boolean; decline: boolean; extend: boolean; cancel: boolean; convert: boolean; email: boolean; close?: boolean };
+  /** 071: the order's delivery notes, and its stock lines that can still leave (by line id). */
+  delivery_notes?: { id: string; number: string; delivered_on: string; reference: string | null; status: "posted" | "void"; warehouse: string }[] | null;
+  leaving?: Record<string, string> | null;
+  can: { edit: boolean; send: boolean; accept: boolean; decline: boolean; extend: boolean; cancel: boolean; convert: boolean; email: boolean; close?: boolean; deliver?: boolean };
+}
+
+/** A delivery note (071): what of a confirmed sales order left, out of stock at its cost, the cost of goods sold recorded then. */
+export interface DeliveryNote {
+  id: string; number: string; delivered_on: string; reference: string | null; note: string | null; status: "posted" | "void";
+  journal_entry_id: string | null; void_reason: string | null; voided_at: string | null; created_at: string;
+  sales_order_id: string; order_number: string | null; contact_id: string; customer: string; warehouse_id: string; warehouse: string; cost: string;
+  lines: { id: string; order_line_id: string; line_no: number; description: string; item_id: string; item_name: string; unit: string | null; quantity: string }[];
+  can: { void: boolean };
+}
+export interface DeliveryNoteSummary {
+  id: string; number: string; delivered_on: string; reference: string | null; status: "posted" | "void";
+  sales_order_id: string; order_number: string | null; customer: string; warehouse: string;
+}
+/** GET /delivery-notes/uninvoiced: goods that left and are not yet on an invoice, line by line. */
+export interface UninvoicedGoods {
+  data: { order_id: string; number: string | null; contact_id: string; customer: string; line_id: string; line_no: number; description: string;
+    item_id: string | null; item_name: string | null; unit: string | null; last_delivered: string; unit_price: string; delivered: string; invoiced: string; open: string }[];
 }
 
 /** GET /sales-orders/back-orders: what confirmed orders still owe, and the stock their items have (067). */
@@ -1534,6 +1556,13 @@ export const ledgerly = {
   submitBill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
   voidBill: (id: string, reason: string, ctx: RequestOptions) =>
     api<BillDetail>(`bills/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
+  deliverSalesOrder: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<DeliveryNote>(`sales-orders/${encodeURIComponent(id)}/deliver`, { ...ctx, method: "POST", body }),
+  deliveryNotes: (ctx: RequestOptions) => api<{ data: DeliveryNoteSummary[] }>("delivery-notes", ctx),
+  deliveryNote: (id: string, ctx: RequestOptions) => api<DeliveryNote>(`delivery-notes/${encodeURIComponent(id)}`, ctx),
+  voidDeliveryNote: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<DeliveryNote>(`delivery-notes/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body }),
+  uninvoicedGoods: (ctx: RequestOptions) => api<UninvoicedGoods>("delivery-notes/uninvoiced", ctx),
   salesReceipts: (ctx: RequestOptions) => api<{ data: SalesReceipt[] }>("sales-receipts", ctx),
   salesReceipt: (id: string, ctx: RequestOptions) => api<SalesReceipt>(`sales-receipts/${encodeURIComponent(id)}`, ctx),
   createSalesReceipt: (body: Record<string, unknown>, ctx: RequestOptions) => api<SalesReceipt>("sales-receipts", { ...ctx, method: "POST", body }),

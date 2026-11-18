@@ -21,7 +21,7 @@ final class StockLedger
     /** @return array{id: string, amount: Money, unit_cost: string} the move and its value (signed, base currency) */
     public function move(string $companyId, string $baseCurrency, string $itemId, string $warehouseId, DateTimeImmutable $date, string $kind,
         string $quantity, string $unitCost, ?string $reference, ?string $documentId, ?string $userId, ?string $amount = null, ?string $transferGroup = null,
-        ?string $projectId = null, ?string $goodsReceiptId = null): array
+        ?string $projectId = null, ?string $goodsReceiptId = null, ?string $deliveryNoteId = null): array
     {
         // The database refuses stock going below zero (024); saying so here gives the person a clear answer.
         if (str_starts_with(trim($quantity), '-')) {
@@ -43,6 +43,7 @@ final class StockLedger
                 'transfer_group' => $transferGroup,
                 'project_id' => $projectId,   // stock issued to a project (055)
                 'goods_receipt_id' => $goodsReceiptId,   // the goods received note's own moves (069)
+                'delivery_note_id' => $deliveryNoteId,   // the delivery note's own moves (071)
             ]);
         } catch (QueryException $e) {
             // Two moves out at once: the second finds less on hand than it read above (check_violation, 024).

@@ -29,6 +29,7 @@ use App\Http\Controllers\QuoteLinkController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
+use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\GoodsReceiptController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\SalesReceiptController;
@@ -311,6 +312,11 @@ Route::prefix('v1')->group(function () {
             }
             Route::post('quotes/{quote}/send', [QuoteController::class, 'send']);
             Route::post('sales-orders/{salesOrder}/close', [QuoteController::class, 'close']);
+            Route::post('sales-orders/{salesOrder}/deliver', [DeliveryNoteController::class, 'deliver']);
+            Route::get('delivery-notes', [DeliveryNoteController::class, 'index']);
+            Route::get('delivery-notes/uninvoiced', [DeliveryNoteController::class, 'uninvoiced']);   // before {deliveryNote}
+            Route::get('delivery-notes/{deliveryNote}', [DeliveryNoteController::class, 'show'])->whereUuid('deliveryNote');
+            Route::post('delivery-notes/{deliveryNote}/void', [DeliveryNoteController::class, 'void'])->whereUuid('deliveryNote');
             foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense']] as $path => [$param, $kind]) {
                 Route::get("{$path}/{{$param}}/attachments", [AttachmentController::class, 'index'])->defaults('kind', $kind);
             }

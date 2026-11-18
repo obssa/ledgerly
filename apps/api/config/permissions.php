@@ -20,6 +20,8 @@
 | inventory.transfer move stock between warehouses; no ledger effect (bookkeeper, purchasing, accountant)
 | inventory.receive  record or void a goods received note against a purchase order: stock in at the order's cost
 |                    against goods received not invoiced (bookkeeper, purchasing, accountant via 'inventory.*')
+| inventory.deliver  record or void a delivery note against a sales order: stock out at its cost, cost of goods
+|                    sold recorded then (bookkeeper, sales, accountant via 'inventory.*')
 | banking.view       bank, wallet and cash accounts with balances and registers (also viewers)
 | banking.manage     open, rename, give bank details to and archive money accounts (bookkeeper, accountant via 'banking.*')
 | banking.review     import statements and match, categorise (posts an entry) or exclude their lines (bookkeeper, accountant)
@@ -60,8 +62,8 @@ return [
         'owner' => ['*'],
         'admin' => ['*'],
         'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'inventory.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*', 'projects.*', 'assets.*', 'audit.view'],
-        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'banking.*', 'contacts.*', 'reports.view', 'projects.view', 'projects.time', 'assets.view'],
-        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view', 'projects.time'],
+        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'inventory.deliver', 'banking.*', 'contacts.*', 'reports.view', 'projects.view', 'projects.time', 'assets.view'],
+        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view', 'inventory.deliver', 'projects.time'],
         'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'projects.time'],
         'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review', 'projects.view', 'projects.time', 'assets.view'],
         'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'banking.view', 'reports.view', 'tax.view', 'projects.view', 'assets.view'],
@@ -95,6 +97,7 @@ return [
         'inventory.transfer' => 'Inventory: move stock between warehouses',
         'inventory.adjust' => 'Inventory: adjust stock (posts to the ledger)',
         'inventory.receive' => 'Inventory: receive goods against purchase orders (posts to the ledger)',
+        'inventory.deliver' => 'Inventory: deliver goods against sales orders (posts to the ledger)',
         'banking.view' => 'Banking: see accounts, balances and registers',
         'banking.manage' => 'Banking: open and change bank, wallet and cash accounts',
         'banking.review' => 'Banking: import statements and categorise lines',

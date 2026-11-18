@@ -46,6 +46,10 @@ final class SaveQuote
                     $made = $type === 'purchase_order' ? 'bills' : 'invoices';
                     throw new LedgerException(self::noun($type) . " {$document->number} has {$made} made from it; it can no longer be changed. Close it and make a new order for the rest.");
                 }
+                // 071: the delivery notes name its lines.
+                if ($type === 'sales_order' && DB::table('delivery_notes')->where('sales_order_id', $document->getKey())->exists()) {
+                    throw new LedgerException("Sales order {$document->number} has goods delivered against it; it can no longer be changed. Close it and make a new order for the rest.");
+                }
                 // 069: the goods received notes name its lines.
                 if ($type === 'purchase_order' && DB::table('goods_receipts')->where('purchase_order_id', $document->getKey())->exists()) {
                     throw new LedgerException("Purchase order {$document->number} has goods received against it; it can no longer be changed. Close it and make a new order for the rest.");

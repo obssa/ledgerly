@@ -3,17 +3,21 @@
 import { useActionState } from "react";
 import type { QuoteDetail } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
-import { convertQuote, emailQuote, quoteStep } from "./actions";
+import { convertQuote, deliverGoods, emailQuote, quoteStep } from "./actions";
 
 /** What can be done with this quote or sales order now, for this role. The API checks again on every call. */
 export function QuoteActions({ doc }: { doc: QuoteDetail }) {
   const [state, action, pending] = useActionState(quoteStep, undefined);
   const [mailed, mail, mailing] = useActionState(emailQuote, undefined);
   const [converted, convert, converting] = useActionState(convertQuote, undefined);
+  const [delivered, deliver, delivering] = useActionState(deliverGoods, undefined);
   const quote = doc.type === "quote";
-  // 067: a confirmed order is invoiced for what goes out now; each line starts at what is left of it.
+  // 067: a confirmed order is invoiced for what goes out now; each line starts at what is left of it. 071: a line whose
+  // goods leave on delivery notes starts at what left and is not yet invoiced.
+  const toInvoice = (id: string) => doc.delivery?.[id]?.billable ?? doc.delivery?.[id]?.remaining ?? "0";
   const open = !quote && doc.status === "accepted" && doc.delivery
-    ? doc.lines.filter((l) => l.id && Number(doc.delivery?.[l.id]?.remaining ?? 0) > 0) : [];
+    ? doc.lines.filter((l) => l.id && Number(toInvoice(l.id)) > 0) : [];
+  const leaving = doc.lines.filter((l) => l.id && doc.leaving?.[l.id]);
   const hidden = (step?: string) => (
     <>
       <input type="hidden" name="id" value={doc.id} />
@@ -32,6 +36,41 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
     <div className="flex flex-col gap-3">
       {flash(state)}
       {flash(converted)}
+      {flash(delivered)}
+
+      {doc.can.deliver && (
+        <form action={deliver} className="rounded-xl border border-line p-3">
+          {hidden()}
+          <h2 className="text-[15px] font-bold">Goods leaving?</h2>
+          <p className="mt-1 text-[13px] text-muted">
+            Record what goes to the customer on a delivery note: it leaves stock today at its cost. The invoice then bills it without moving it again.
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <label className="field-label" htmlFor="delivered-on">Delivered on</label>
+              <input className="field num" id="delivered-on" name="delivered_on" type="date" defaultValue={todayIn()} max={todayIn()} required />
+            </div>
+            <div>
+              <label className="field-label" htmlFor="delivered-ref">Waybill or their order</label>
+              <input className="field" id="delivered-ref" name="reference" maxLength={100} />
+            </div>
+          </div>
+          <fieldset className="mt-2">
+            <legend className="sr-only">Quantities leaving</legend>
+            {leaving.map((l) => (
+              <div key={l.id} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]">
+                <label htmlFor={`leave-${l.id}`} className="min-w-0 flex-1">{l.description} <span className="text-muted">({doc.leaving?.[l.id ?? ""]} to deliver)</span></label>
+                <input className="field num !w-[96px] text-right" id={`leave-${l.id}`} name={`receive_${l.id}`} defaultValue={doc.leaving?.[l.id ?? ""]}
+                  inputMode="decimal" pattern="\d+(\.\d{1,2})?" aria-describedby="leave-help" />
+              </div>
+            ))}
+            <p id="leave-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that does not go now. Only stock items go on a delivery note.</p>
+          </fieldset>
+          <label className="field-label mt-2" htmlFor="delivered-note">Note (optional)</label>
+          <input className="field" id="delivered-note" name="note" maxLength={500} />
+          <button type="submit" className="btn btn-primary mt-2" disabled={delivering}>{delivering ? "Recording…" : "Record the delivery note"}</button>
+        </form>
+      )}
 
       {doc.can.convert && (
         <form action={convert} className="rounded-xl border border-line p-3">
@@ -49,10 +88,11 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
               <legend className="sr-only">Quantities to deliver now</legend>
               {open.map((l) => {
                 const d = doc.delivery?.[l.id ?? ""];
+                const shipped = Number(d?.shipped ?? 0) > 0;
                 return (
                   <div key={l.id} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]">
-                    <label htmlFor={`deliver-${l.id}`} className="min-w-0 flex-1">{l.description} <span className="text-muted">({d?.remaining} left)</span></label>
-                    <input className="field num !w-[96px] text-right" id={`deliver-${l.id}`} name={`deliver_${l.id}`} defaultValue={d?.remaining}
+                    <label htmlFor={`deliver-${l.id}`} className="min-w-0 flex-1">{l.description} <span className="text-muted">({toInvoice(l.id ?? "")} {shipped ? "delivered, not invoiced" : "left"})</span></label>
+                    <input className="field num !w-[96px] text-right" id={`deliver-${l.id}`} name={`deliver_${l.id}`} defaultValue={toInvoice(l.id ?? "")}
                       inputMode="decimal" pattern="\d+(\.\d{1,2})?" aria-describedby="deliver-help" />
                   </div>
                 );
