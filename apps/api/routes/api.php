@@ -273,6 +273,7 @@ Route::prefix('v1')->group(function () {
             Route::post('invoices/{invoice}/retention', [InvoiceController::class, 'retain']);
             Route::post('invoices/{invoice}/retention/release', [InvoiceController::class, 'releaseRetention']);
             Route::get('invoices/{invoice}/history', [InvoiceController::class, 'history']);
+            Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf']);
 
             // Quotes and sales orders (056): the same controller, each route finding only its own kind.
             foreach (['quotes' => ['quote', 'quote'], 'sales-orders' => ['sales_order', 'salesOrder']] as $path => [$kind, $param]) {

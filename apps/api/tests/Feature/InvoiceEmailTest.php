@@ -48,5 +48,36 @@ final class InvoiceEmailTest extends TestCase
         $text = implode("\n", (array) $sent->toMail(new AnonymousNotifiable())->introLines);
         $this->assertStringContainsString('Coffee: 2 × 500.00', $text);
         $this->assertStringContainsString('total ETB 1,050.00', $text);
+
+        // The invoice itself goes with it, as a PDF file.
+        $mail = $sent->toMail(new AnonymousNotifiable());
+        $this->assertCount(1, $mail->rawAttachments);
+        $this->assertStringStartsWith('%PDF-', $mail->rawAttachments[0]['data']);
+        $this->assertSame('application/pdf', $mail->rawAttachments[0]['options']['mime']);
+        $this->assertStringEndsWith('.pdf', $mail->rawAttachments[0]['name']);
+    }
+
+    public function test_a_posted_invoice_downloads_as_a_pdf_built_from_its_own_escaped_records(): void
+    {
+        config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
+        $b = $this->companyWithRecords('b@example.test', 'Blue Nile Traders');
+        $c = $this->companyWithRecords('owner@example.test', 'Abyssinia Coffee');
+        $h = ['X-Company-Id' => $c['company']];
+        $this->owner()->table('contacts')->where('id', $c['contact'])->update(['name' => '<img src="http://evil.example/x.png"> Kaldi & Sons']);
+
+        $this->get("/api/v1/invoices/{$c['draft']}/pdf", [...$h, 'Accept' => 'application/json'])->assertUnprocessable();   // a draft has none
+        $file = $this->get("/api/v1/invoices/{$c['invoice']}/pdf", $h)->assertOk();
+        $this->assertSame('application/pdf', $file->headers->get('Content-Type'));
+        $this->assertStringContainsString('attachment; filename=', (string) $file->headers->get('Content-Disposition'));
+        $this->assertStringStartsWith('%PDF-', (string) $file->getContent());
+
+        // The page is the company's records, escaped: a name with markup is text, never an image fetched from elsewhere.
+        $html = \App\Domain\Tenancy\Support\DatabaseTenantContext::run($c['user'], $c['company'], fn () => app(\App\Domain\Sales\InvoicePdf::class)->html(
+            \App\Domain\Tenancy\Models\Company::query()->findOrFail($c['company']), \App\Domain\Sales\Models\Document::query()->findOrFail($c['invoice'])));
+        $this->assertStringContainsString('&lt;img src=&quot;http://evil.example/x.png&quot;&gt; Kaldi &amp; Sons', $html);
+        $this->assertStringNotContainsString('<img', $html);
+
+        $this->actingAs(\App\Models\User::query()->findOrFail($b['user']), 'sanctum');
+        $this->get("/api/v1/invoices/{$c['invoice']}/pdf", ['X-Company-Id' => $b['company'], 'Accept' => 'application/json'])->assertNotFound();
     }
 }
