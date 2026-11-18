@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getInvoice, getMoneyAccounts, getOpenInvoices } from "@/lib/data";
+import { getCompanySettings, getInvoice, getMoneyAccounts, getOpenInvoices } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { ApplyCredit } from "./ApplyCredit";
 import { Reminders } from "./Reminders";
 import { RetentionPanel } from "./RetentionPanel";
 import { InvoiceActions } from "./InvoiceActions";
+import { PrintInvoice, SendInvoice } from "./SendInvoice";
 
 export const metadata = { title: "Invoice" };
 
@@ -24,7 +25,7 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "good" | "warn" 
 export default async function InvoicePage({ params, searchParams }: PageProps<"/invoices/[id]">) {
   const { id } = await params;
   const { posted } = await searchParams;
-  const invoice = await getInvoice(id);
+  const [invoice, company] = await Promise.all([getInvoice(id), getCompanySettings()]);
   if (!invoice) notFound();
   const creditNote = invoice.type === "credit_note";
   const status = creditNote && invoice.status === "paid" ? { label: "Applied", tone: "good" as const }
@@ -41,8 +42,17 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
     <>
       <PageTitle
         eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / {kind}</>}
-        title={<>{kind} {invoice.number ? <span className="num">{invoice.number}</span> : "(draft)"} <Pill tone={status.tone}>{status.label}</Pill></>}
+        title={<>{kind} {invoice.number ? <span className="num">{invoice.number}</span> : "(draft)"} <span className="print:hidden"><Pill tone={status.tone}>{status.label}</Pill></span></>}
+        actions={["posted", "part_paid", "paid"].includes(invoice.status) ? <PrintInvoice /> : undefined}
       />
+      {/* On paper: who it is from (the page's own header and side panels are not printed). */}
+      <div className="mb-4 hidden text-[13px] print:block">
+        <div className="text-[16px] font-bold">{company.trading_name || company.legal_name}</div>
+        {company.trading_name && <div>{company.legal_name}</div>}
+        {company.tin && <div>TIN <span className="num">{company.tin}</span>{company.vat_number ? <> · VAT <span className="num">{company.vat_number}</span></> : null}</div>}
+        {[company.address_line1, company.address_line2, company.city].filter(Boolean).join(", ") && <div>{[company.address_line1, company.address_line2, company.city].filter(Boolean).join(", ")}</div>}
+        {(company.phone || company.email) && <div>{[company.phone, company.email].filter(Boolean).join(" · ")}</div>}
+      </div>
       {posted === "0" && invoice.status !== "posted" && (
         <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
           Saved as a draft but not posted. Approve it below to see why, or send it for approval.
@@ -97,7 +107,10 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
           {invoice.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{invoice.notes}</p>}
         </Card>
 
-        <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+        <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4 print:hidden">
+          {!invoice.demo && invoice.can.email && ["posted", "part_paid", "paid"].includes(invoice.status) && (
+            <SendInvoice invoiceId={invoice.id} email={invoice.contact.email ?? null} label={kind} />
+          )}
           {!invoice.demo && <InvoiceActions invoice={invoice} />}
           {!creditNote && invoice.can.credit && ["posted", "part_paid", "paid"].includes(invoice.status) && !invoice.demo && (
             <Link href={`/invoices/${encodeURIComponent(invoice.id)}/credit-note`} className="btn justify-center">Issue a credit note</Link>

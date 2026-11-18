@@ -144,6 +144,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('members/{membership}/reactivate', [TeamController::class, 'reactivate']);
                 Route::get('company/export', [CompanyExportController::class, 'download']);
                 Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind']);
+                Route::post('invoices/{invoice}/email', [InvoiceController::class, 'email']);
             });
             Route::put('company', [CompanySettingsController::class, 'update']);
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);

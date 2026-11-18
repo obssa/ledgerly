@@ -44,6 +44,7 @@ final class InvoiceController extends Controller
                 'apply' => (bool) $membership?->can('payments.receive'),
                 'refund' => (bool) $membership?->can('payments.pay'),   // paying a customer's credit back
                 'remind' => (bool) $membership?->can('invoices.create'),
+                'email' => (bool) $membership?->can('invoices.create'),
                 'retain' => (bool) $membership?->can('payments.receive'),
             ],
             'retentions' => $invoice->type === 'invoice' ? app(\App\Domain\Sales\Retention::class)->of($invoice->getKey()) : [],
@@ -174,6 +175,48 @@ final class InvoiceController extends Controller
         $retention->release($this->current->get(), $invoice, $data['released_on'], $request->user()->getKey());
 
         return $this->present($invoice->refresh());
+    }
+
+    /**
+     * Module 2: the posted invoice (or credit note) sent to the customer by email, its lines and totals in the message.
+     * At most once in five minutes for the same document; recorded in the audit log.
+     */
+    public function email(Request $request, Document $invoice): JsonResponse
+    {
+        $this->authorizeCompany('invoices.create');
+        abort_unless(in_array($invoice->type, ['invoice', 'credit_note'], true), 404);
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:500']]);
+        if (! in_array($invoice->status, ['posted', 'part_paid', 'paid'], true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['invoice' => ['Only a posted document is sent: post it first.']]);
+        }
+        $company = $this->current->get();
+        $contact = DB::table('contacts')->where(['company_id' => $company->getKey(), 'id' => $invoice->contact_id])->first(['name', 'email']);
+        $to = trim((string) ($contact->email ?? ''));
+        if ($to === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages(['invoice' => ['The customer has no email address: add one to send the invoice.']]);
+        }
+        $key = 'invoice-email:' . $invoice->getKey();
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 1)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['invoice' => ['It was sent a moment ago: wait a few minutes before sending it again.']]);
+        }
+        \Illuminate\Support\Facades\RateLimiter::hit($key, 300);
+
+        $invoice->load(['lines', 'einvoiceSubmissions']);
+        $money = fn ($v) => number_format((float) $v, 2);
+        $clearance = $invoice->einvoiceSubmissions->firstWhere('status', 'cleared')?->clearance_number;
+        \Illuminate\Support\Facades\Notification::route('mail', [$to => (string) $contact->name])->notify(new \App\Notifications\InvoiceSent(
+            company: (string) ($company->trading_name ?: $company->legal_name), companyTin: $company->tin ? (string) $company->tin : null,
+            replyTo: $company->email ? (string) $company->email : null, customer: (string) $contact->name, number: (string) $invoice->number,
+            kind: $invoice->type, issueDate: $invoice->issue_date->format('j M Y'), dueDate: $invoice->due_date?->format('j M Y'), currency: (string) $invoice->currency,
+            lines: $invoice->lines->map(fn ($l) => ['description' => (string) $l->description, 'quantity' => rtrim(rtrim((string) $l->quantity, '0'), '.'),
+                'unit_price' => $money($l->unit_price), 'amount' => $money(bcadd((string) $l->line_subtotal, (string) $l->line_tax, 2))])->values()->all(),
+            subtotal: $money($invoice->subtotal), tax: $money($invoice->tax_total), total: $money($invoice->total), amountDue: $money($invoice->amount_due),
+            clearance: $clearance ? (string) $clearance : null, note: $data['note'] ?? null,
+        ));
+        app(\App\Domain\Audit\AuditLogger::class)->record($company->getKey(), 'invoice_emailed', $invoice->type, $invoice->getKey(), null,
+            ['sent_to' => $to, 'number' => $invoice->number], userId: $request->user()->getKey());
+
+        return response()->json(['sent_to' => $to]);
     }
 
     /** Module 2: a payment reminder by email to the customer, sent by hand (048). */
