@@ -14,6 +14,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\CompanyExportController;
+use App\Http\Controllers\ImportController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\ProjectMilestoneController;
 use App\Http\Controllers\SavedReportController;
@@ -231,6 +232,9 @@ Route::prefix('v1')->group(function () {
 
             Route::get('customers', [CustomerController::class, 'index']);
             Route::post('customers', [CustomerController::class, 'store']);
+            Route::post('imports/customers', [ImportController::class, 'store'])->defaults('kind', 'customers');
+            Route::post('imports/suppliers', [ImportController::class, 'store'])->defaults('kind', 'suppliers');
+            Route::post('imports/items', [ImportController::class, 'store'])->defaults('kind', 'items');
             Route::get('customers/{customer}', [CustomerController::class, 'show']);
             Route::get('customers/{customer}/statement', [CustomerController::class, 'statement']);
             Route::put('customers/{customer}', [CustomerController::class, 'update']);
