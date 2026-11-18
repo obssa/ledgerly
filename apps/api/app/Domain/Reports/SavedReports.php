@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 final class SavedReports
 {
     public const REPORTS = ['profit-and-loss', 'balance-sheet', 'trial-balance', 'general-ledger', 'cash-flow', 'changes-in-equity',
-        'financial-health', 'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-movement', 'stock-ageing'];
+        'financial-health', 'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-movement', 'stock-ageing', 'custom'];
 
     /** Reports of one date (the period's last day): the rest cover the period. */
     public const AT_A_DATE = ['balance-sheet', 'trial-balance', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-ageing'];
@@ -31,6 +31,8 @@ final class SavedReports
         'purchases' => ['group' => ['contact', 'item', 'month']],
         'stock-movement' => ['warehouse_id' => 'uuid'],
         'stock-ageing' => ['warehouse_id' => 'uuid'],
+        'custom' => ['rows' => CustomReport::ROWS, 'columns' => CustomReport::COLUMNS, 'measure' => CustomReport::MEASURES,
+            'account_type' => CustomReport::ACCOUNT_TYPES, 'project_id' => 'uuid', 'location_id' => 'uuid', 'class_id' => 'uuid'],
     ];
 
     /**

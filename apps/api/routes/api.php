@@ -344,6 +344,7 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/changes-in-equity', [FinancialStatementController::class, 'changesInEquity']);
             Route::get('reports/financial-health', [FinancialStatementController::class, 'health']);
             Route::get('reports/profit-by-dimension', [AnalysisReportController::class, 'profitByDimension']);
+            Route::get('reports/custom', [AnalysisReportController::class, 'custom']);
             Route::get('reports/sales', [AnalysisReportController::class, 'sales']);
             Route::post('reports/exports', [ReportExportController::class, 'store']);
             Route::get('saved-reports', [SavedReportController::class, 'index']);

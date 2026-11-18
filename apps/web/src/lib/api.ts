@@ -988,6 +988,15 @@ export interface Member {
   me?: boolean;
 }
 
+/** Module 10: the custom report (rows by one grouping, columns by period). */
+export interface CustomReport {
+  from: string; to: string; currency: string;
+  columns: string[];
+  rows: { key: string | null; code: string | null; label: string; values: string[]; total: string }[];
+  totals: string[];
+  total: string;
+}
+
 export interface InvoiceRetention { id: string; amount: string; held_on: string; released_on: string | null }
 
 export interface InvoiceReminderSent { kind: "manual" | "scheduled"; step: number | null; sent_to: string; sent_at: string }
@@ -1371,6 +1380,7 @@ export const ledgerly = {
   deleteSavedReport: (id: string, ctx: RequestOptions) => api<{ removed: boolean }>(`saved-reports/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE" }),
   recordExport: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ recorded: boolean; at: string }>("reports/exports", { ...ctx, method: "POST", body }),
   profitByDimension: (q: { kind: string; from?: string; to?: string }, ctx: RequestOptions) => api<ProfitByDimension>("reports/profit-by-dimension", { ...ctx, query: q }),
+  customReport: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<CustomReport>("reports/custom", { ...ctx, query: q }),
   documentAnalysis: (side: "sales" | "purchases", q: { group: string; from?: string; to?: string }, ctx: RequestOptions) =>
     api<DocumentAnalysis>(`reports/${side}`, { ...ctx, query: q }),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>

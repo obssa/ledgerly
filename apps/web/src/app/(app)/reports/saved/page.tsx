@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getSavedReports } from "@/lib/data";
 import { isDate } from "@/lib/reports";
-import { SAVEABLE, SCHEDULES, savedReportUrl } from "@/lib/saved-reports";
+import { SAVEABLE, SCHEDULES, savedReportUrl, OPTION_KEYS } from "@/lib/saved-reports";
 import { ReportsNav } from "../ReportsNav";
 import { RemoveSavedReport, SavedReportForm } from "./SavedReportForms";
 
@@ -14,7 +14,7 @@ const OPTION = /^[a-z_]{1,20}$|^[0-9a-f-]{36}$/;
 export default async function SavedReportsPage({ searchParams }: PageProps<"/reports/saved">) {
   const q = await searchParams;
   const one = (k: string) => (typeof q[k] === "string" ? (q[k] as string) : undefined);
-  const options = Object.fromEntries(["group", "kind", "account_id", "warehouse_id"].map((k) => [k, one(k)]).filter(([, v]) => v && OPTION.test(v))) as Record<string, string>;
+  const options = Object.fromEntries(OPTION_KEYS.map((k) => [k, one(k)]).filter(([, v]) => v && OPTION.test(v))) as Record<string, string>;
   const asOf = one("as_of");
   const initial = { report: one("report"), from: isDate(one("from")) ? one("from") : undefined, to: isDate(one("to")) ? one("to") : isDate(asOf) ? asOf : undefined, options };
   const saved = await getSavedReports();
