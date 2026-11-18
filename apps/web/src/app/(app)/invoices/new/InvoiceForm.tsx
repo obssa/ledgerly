@@ -77,6 +77,8 @@ interface Line {
   projectId?: string;
   /** The sales order line this invoice line delivers (067): kept through edits. */
   sourceLineId?: string;
+  /** 072: another unit of the item; empty is the item's own unit. */
+  unitId?: string;
 }
 
 const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
@@ -112,17 +114,28 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const projects = options.projects ?? [];
   const [lines, setLines] = useState<Line[]>(draft && draft.lines.length > 0
     ? draft.lines.map((l, i) => ({ key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
-        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", sourceLineId: l.source_line_id ?? undefined }))
+        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", sourceLineId: l.source_line_id ?? undefined, unitId: l.unit_id ?? "" }))
     : [{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const items = options.items ?? [];
+  const withUnits = kind !== "expense" && items.some((i) => (i.units ?? []).length > 0);   // 072: the Unit column only when an item has units
   const stockLine = lines.some((l) => items.find((i) => i.id === l.itemId)?.type === "inventory");
   /** Picking an item fills the line from it; the person can still change what was filled. */
   const pickItem = (key: number, itemId: string) => {
     const item = items.find((i) => i.id === itemId);
     setLines((ls) => ls.map((l) => (l.key !== key ? l : {
-      ...l, itemId,
+      ...l, itemId, unitId: "",
       ...(item ? { description: item.name, unitPrice: item.price ?? l.unitPrice, accountId: item.account_id && options.accounts.some((a) => a.id === item.account_id) ? item.account_id : l.accountId } : {}),
     })));
+  };
+  /** 072: another unit of the item; the price follows from the item's own price times the unit's size. */
+  const pickUnit = (key: number, unitId: string) => {
+    setLines((ls) => ls.map((l) => {
+      if (l.key !== key) return l;
+      const item = items.find((i) => i.id === l.itemId);
+      const unit = item?.units?.find((u) => u.id === unitId);
+      const factor = unit ? Number(unit.factor) : 1;
+      return { ...l, unitId, ...(item?.price ? { unitPrice: (Number(item.price) * factor).toFixed(2) } : {}) };
+    }));
   };
 
   const customer = options.customers.find((c) => c.id === customerId);
@@ -137,7 +150,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
-  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}) })));
+  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, unit_id: l.unitId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}) })));
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
   const bad = (name: string) => Boolean(state?.fields?.[name]);
 
@@ -246,7 +259,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr>{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}<th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+                <tr>{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}<th scope="col">Description</th><th scope="col">Qty</th>{withUnits && <th scope="col">Unit</th>}<th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
               </thead>
               <tbody>
                 {lines.map((l, i) => {
@@ -264,6 +277,21 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                       )}
                       <td><input aria-label="Description" className="field min-w-[180px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} /></td>
                       <td><input aria-label="Quantity" inputMode="decimal" className="field num w-[72px] text-right" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} /></td>
+                      {withUnits && (() => {
+                        const item = items.find((it) => it.id === l.itemId);
+                        const units = item?.units ?? [];
+                        // A line made from an order line stays in that line's unit (072): no choice then.
+                        return (
+                          <td>
+                            {item && units.length > 0 && !l.sourceLineId ? (
+                              <select aria-label="Unit" className="field w-[120px]" value={l.unitId ?? ""} onChange={(e) => pickUnit(l.key, e.target.value)}>
+                                <option value="">{item.unit}</option>
+                                {units.map((u) => <option key={u.id} value={u.id}>{u.name} ({Number(u.factor)} {item.unit})</option>)}
+                              </select>
+                            ) : <span className="text-[13px] text-muted">{(l.unitId && units.find((u) => u.id === l.unitId)?.name) || draft?.lines.find((d) => d.unit_id === l.unitId && l.unitId)?.unit_name || item?.unit || ""}</span>}
+                          </td>
+                        );
+                      })()}
                       <td><input aria-label="Unit price" inputMode="decimal" className="field num w-[110px] text-right" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} /></td>
                       <td>
                         <select aria-label="Tax" className="field w-[130px]" value={l.taxRateId} onChange={(e) => update(l.key, { taxRateId: e.target.value })}>

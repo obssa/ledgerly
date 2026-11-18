@@ -109,6 +109,9 @@ trait CompanyFixtures
         $ids['delivery_note'] = (string) Str::uuid7();
         $this->owner()->table('delivery_notes')->insert(['id' => $ids['delivery_note'], 'company_id' => $company, 'sales_order_id' => $confirmed,
             'number' => 'DN-FIXTURE-1', 'delivered_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
+        // A unit of the stock item (072), written as the owner so no audit or stock changes: a carton of 12 bags.
+        $ids['item_unit'] = (string) Str::uuid7();
+        $this->owner()->table('item_units')->insert(['id' => $ids['item_unit'], 'company_id' => $company, 'item_id' => $ids['stock_item'], 'name' => 'Carton', 'factor' => '12']);
         $ids['goods_receipt'] = (string) Str::uuid7();
         $this->owner()->table('goods_receipts')->insert(['id' => $ids['goods_receipt'], 'company_id' => $company, 'purchase_order_id' => $issued,
             'number' => 'GRN-FIXTURE-1', 'received_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
@@ -184,7 +187,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(278, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(280, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -226,6 +229,7 @@ trait CompanyFixtures
             'goodsReceipt' => $ids['goods_receipt'],
             'salesReceipt' => $ids['sales_receipt'],
             'deliveryNote' => $ids['delivery_note'],
+            'unit' => $ids['item_unit'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

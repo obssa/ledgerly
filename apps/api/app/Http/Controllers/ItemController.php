@@ -50,6 +50,10 @@ final class ItemController extends Controller
             ->groupBy('item_id')->selectRaw('item_id, sum(quantity)::numeric(18,2)::text AS quantity, sum(value)::numeric(20,2)::text AS value')
             ->get()->keyBy('item_id');
 
+        // 072: the other units each item is bought or sold in.
+        $units = DB::table('item_units')->whereIn('item_id', $items->pluck('id'))->where('is_active', true)->orderBy('factor')
+            ->get(['id', 'item_id', 'name', 'factor'])->groupBy('item_id');
+
         // 067: what the open sales orders still want of each stock item.
         $stock = $reservations->byItem($items->where('type', 'inventory')->pluck('id')->map(fn ($id) => (string) $id)->values()->all());
 
@@ -57,7 +61,8 @@ final class ItemController extends Controller
             'data' => $items->map(fn (Item $i) => [...$i->toArray(),
                 'on_hand' => $onHand[$i->getKey()]->quantity ?? '0.00', 'value' => $onHand[$i->getKey()]->value ?? '0.00',
                 'reserved' => $stock[(string) $i->getKey()]['reserved'] ?? '0.00', 'available' => $stock[(string) $i->getKey()]['available'] ?? null,
-                'on_order' => $stock[(string) $i->getKey()]['on_order'] ?? '0.00']),
+                'on_order' => $stock[(string) $i->getKey()]['on_order'] ?? '0.00',
+                'units' => ($units[$i->getKey()] ?? collect())->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'factor' => (string) $u->factor])->values()]),
             'can' => $this->can(),
         ]);
     }
@@ -138,7 +143,54 @@ final class ItemController extends Controller
         $balances = StockBalance::query()->where('item_id', $item->getKey())->with('warehouse:id,name')->get()
             ->map(fn (StockBalance $b) => ['warehouse' => $b->warehouse, 'quantity' => (string) $b->quantity, 'value' => (string) $b->value]);
 
-        return [...$item->toArray(), 'balances' => $balances, 'can' => $this->can()];
+        $units = DB::table('item_units')->where('item_id', $item->getKey())->orderByDesc('is_active')->orderBy('factor')
+            ->get(['id', 'name', 'factor', 'is_active', 'created_at']);
+
+        return [...$item->toArray(), 'balances' => $balances, 'units' => $units, 'can' => $this->can()];
+    }
+
+    /**
+     * 072: another unit the item is bought or sold in, a fixed number of its own: a carton of 12, a 25 kg sack. Its name
+     * and size never change once made; it is archived instead.
+     */
+    public function addUnit(Request $request, Item $item): JsonResponse
+    {
+        $this->authorizeCompany('inventory.items');
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:30'],
+            'factor' => ['required', 'decimal:0,6', 'gt:0', 'max:1000000'],
+        ], ['factor.gt' => 'How many of the item\'s own unit are in one: above zero.']);
+        $name = trim($data['name']);
+        if (mb_strtolower($name) === mb_strtolower(trim((string) $item->unit))) {
+            throw ValidationException::withMessages(['name' => ["{$item->name} is already counted in {$item->unit}: a unit is another one."]]);
+        }
+        if (DB::table('item_units')->where('item_id', $item->getKey())->whereRaw('lower(btrim(name)) = ?', [mb_strtolower($name)])->exists()) {
+            throw ValidationException::withMessages(['name' => ["{$item->name} already has a unit called {$name}."]]);
+        }
+        $id = (string) \Illuminate\Support\Str::uuid7();
+        DB::table('item_units')->insert(['id' => $id, 'company_id' => $item->company_id, 'item_id' => $item->getKey(), 'name' => $name,
+            'factor' => (string) $data['factor'], 'created_by' => $request->user()->getKey()]);
+        $this->audit->record($this->current->id(), 'unit_added', 'item', $item->getKey(), null,
+            ['unit_id' => $id, 'name' => $name, 'factor' => (string) $data['factor']], userId: $request->user()->getKey());
+
+        return response()->json($this->present($item->refresh()), 201);
+    }
+
+    /** 072: a unit no longer offered on new lines; the lines already in it keep it. */
+    public function archiveUnit(Request $request, Item $item, string $unit): JsonResponse
+    {
+        $this->authorizeCompany('inventory.items');
+        $found = DB::table('item_units')->where(['id' => $unit, 'item_id' => $item->getKey()])->first(['id', 'name', 'is_active']);
+        if ($found === null) {
+            abort(404);
+        }
+        if ($found->is_active) {
+            DB::table('item_units')->where('id', $unit)->update(['is_active' => false]);
+            $this->audit->record($this->current->id(), 'unit_archived', 'item', $item->getKey(), ['unit_id' => $unit, 'name' => $found->name, 'is_active' => true],
+                ['is_active' => false], userId: $request->user()->getKey());
+        }
+
+        return response()->json($this->present($item->refresh()));
     }
 
     private function can(): array

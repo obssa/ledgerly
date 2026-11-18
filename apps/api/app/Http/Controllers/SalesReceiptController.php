@@ -82,6 +82,7 @@ final class SalesReceiptController extends Controller
             'lines.*.account_id' => ['required', 'uuid', Rule::exists('accounts', 'id')->where(fn (Builder $q) => $q->where('is_active', true)->where('type', 'income'))],
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')->whereIn('kind', ['vat', 'tot'])],
             'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')->where('is_active', true)],
+            'lines.*.unit_id' => ['nullable', 'uuid', Rule::exists('item_units', 'id')->where('is_active', true)],   // 072
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
         ], ['lines.*.account_id.exists' => 'Choose an income account.']);
 

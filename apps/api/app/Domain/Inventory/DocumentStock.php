@@ -41,6 +41,17 @@ final class DocumentStock
     {
     }
 
+    /**
+     * 072: what a line moves in the item's own unit: its quantity times its unit's size, to 2 decimals (half up). A line
+     * in the item's own unit has a size of 1.
+     */
+    public static function baseQuantity(object $line): string
+    {
+        $exact = bcmul((string) $line->quantity, (string) ($line->unit_factor ?? '1'), 8);
+
+        return bcdiv(bcadd($exact, '0.005', 8), '1', 2);
+    }
+
     /** @return list<array{line: object, item: Item}> the document's lines that move stock */
     public function stockLines(Document $doc): array
     {
@@ -93,7 +104,7 @@ final class DocumentStock
             $lines = $this->matchDelivered($doc, $lines, $company);
             foreach ($lines as ['line' => $line, 'item' => $item]) {
                 $move = $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'sale',
-                    '-' . $line->quantity, '0', $doc->number, $doc->getKey(), $userId);
+                    '-' . self::baseQuantity($line), '0', $doc->number, $doc->getKey(), $userId);
                 $cost = $cost->plus($move['amount']->negated());
             }
             if (! $cost->isZero()) {
@@ -129,7 +140,7 @@ final class DocumentStock
                 continue;
             }
             $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'purchase',
-                (string) $line->quantity, '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId, $share->toDecimalString());
+                self::baseQuantity($line), '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId, $share->toDecimalString());
         }
         if ($cleared !== []) {
             $this->clearReceived($doc, $cleared, $draft, $company, $date, $userId);
@@ -227,8 +238,9 @@ final class DocumentStock
                 $balance = DB::table('stock_balances')->where(['company_id' => $company->getKey(), 'item_id' => $item->getKey(), 'warehouse_id' => $r['warehouse_id']])
                     ->first(['quantity', 'value']);
                 $onHand = (string) ($balance->quantity ?? '0');
-                $have = bccomp($onHand, '0', 2) <= 0 ? '0' : (bccomp($onHand, $quantity, 2) >= 0 ? $quantity : $onHand);
-                $kept = bccomp($have, $quantity, 2) === 0 ? $difference : $difference->multipliedBy($have)->dividedBy($quantity)->roundToCurrency();
+                $own = self::baseQuantity($line);   // 072: stock is in the item's own unit
+                $have = bccomp($onHand, '0', 2) <= 0 ? '0' : (bccomp($onHand, $own, 2) >= 0 ? $own : $onHand);
+                $kept = bccomp($have, $own, 2) === 0 ? $difference : $difference->multipliedBy($have)->dividedBy($own)->roundToCurrency();
                 $worth = Money::of((string) ($balance->value ?? '0'), $base);
                 if ($kept->isNegative() && $worth->plus($kept)->isNegative()) {
                     $kept = $worth->negated();   // never below zero: the rest to cost of goods sold
@@ -339,16 +351,17 @@ final class DocumentStock
             $backQty = ($back[$item->getKey()] ?? collect())->reduce(fn (string $s, $m) => bcadd($s, (string) $m->quantity, 2), '0');
             $backCost = ($back[$item->getKey()] ?? collect())->reduce(fn (string $s, $m) => bcadd($s, (string) $m->amount, 2), '0');
             $left = bcsub($soldQty, $backQty, 2);
-            if (bccomp((string) $line->quantity, $left, 2) > 0) {
+            $qty = self::baseQuantity($line);   // 072
+            if (bccomp($qty, $left, 2) > 0) {
                 throw ValidationException::withMessages(['lines' => [bccomp($soldQty, '0', 2) === 0
                     ? "{$item->name} was not sold on {$original->number}: it cannot come back on this credit note."
                     : "Only {$left} {$item->unit} of {$item->name} can still come back from {$original->number}."]]);
             }
-            $value = bccomp((string) $line->quantity, $left, 2) === 0
+            $value = bccomp($qty, $left, 2) === 0
                 ? Money::of(bcsub($soldCost, $backCost, 2), $base)
-                : Money::of($soldCost, $base)->multipliedBy((string) $line->quantity)->dividedBy($soldQty)->roundToCurrency();
+                : Money::of($soldCost, $base)->multipliedBy($qty)->dividedBy($soldQty)->roundToCurrency();
             $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'sale_return',
-                (string) $line->quantity, '0', $doc->number, $doc->getKey(), $userId, $value->toDecimalString());
+                $qty, '0', $doc->number, $doc->getKey(), $userId, $value->toDecimalString());
             $cost = $cost->plus($value);
         }
         if (! $cost->isZero()) {
@@ -381,13 +394,14 @@ final class DocumentStock
             $in = ($received[$item->getKey()] ?? collect())->reduce(fn (string $s, $m) => bcadd($s, (string) $m->quantity, 2), '0');
             $back = ($gone[$item->getKey()] ?? collect())->reduce(fn (string $s, $m) => bcsub($s, (string) $m->quantity, 2), '0');
             $left = bcsub($in, $back, 2);
-            if (bccomp((string) $line->quantity, $left, 2) > 0) {
+            $qty = self::baseQuantity($line);   // 072
+            if (bccomp($qty, $left, 2) > 0) {
                 throw ValidationException::withMessages(['lines' => [bccomp($in, '0', 2) === 0
                     ? "{$item->name} did not come in on {$bill->label()}: it cannot go back on this credit."
                     : "Only {$left} {$item->unit} of {$item->name} can still go back from {$bill->label()}."]]);
             }
             $move = $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'purchase_return',
-                '-' . $line->quantity, '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId);
+                '-' . $qty, '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId);
             $out = $out->plus($move['amount']->negated());
         }
         $inventory = Account::system('inventory')->getKey();

@@ -201,6 +201,8 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/purchase-orders/{purchaseOrder}/history' => 'bills.view',
         'POST api/v1/purchase-orders/{purchaseOrder}/receive' => 'inventory.receive',
         'GET api/v1/sales-receipts' => 'invoices.view',
+        'POST api/v1/items/{item}/units' => 'inventory.items',
+        'POST api/v1/items/{item}/units/{unit}/archive' => 'inventory.items',
         'POST api/v1/sales-orders/{salesOrder}/deliver' => 'inventory.deliver',
         'GET api/v1/delivery-notes' => 'invoices.view',
         'GET api/v1/delivery-notes/uninvoiced' => 'invoices.view',

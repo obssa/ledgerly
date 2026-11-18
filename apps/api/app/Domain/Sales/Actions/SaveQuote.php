@@ -87,8 +87,7 @@ final class SaveQuote
             $document->amount_due = '0.00';   // nothing is owed on a quote or an order (056)
             $document->save();
 
-            $document->lines()->delete();
-            $document->lines()->createMany($calc['lines']);
+            SaveInvoiceDraft::writeLines($document, $calc['lines']);   // a refused line (a unit not its item's, 072) is a 422
             $document->refresh()->load('lines');
 
             $this->audit->record($this->company->id(), $revised ? "{$type}_revised" : "{$type}_saved", $type, $document->getKey(),

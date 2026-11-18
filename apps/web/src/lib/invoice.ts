@@ -14,6 +14,8 @@ export interface InvoiceLineInput {
   project_id?: string | null;
   /** The sales order line it delivers (067), kept through edits. */
   source_line_id?: string | null;
+  /** Another unit of the item (072): quantity and price are in it. */
+  unit_id?: string | null;
 }
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.replace(/[,\s]/g, "") : "");
@@ -37,6 +39,7 @@ export function parseLines(json: FormDataEntryValue | null): InvoiceLineInput[] 
     ...(str(l?.item_id) ? { item_id: str(l?.item_id) } : {}),
     ...(str(l?.project_id) ? { project_id: str(l?.project_id) } : {}),
     ...(str(l?.source_line_id) ? { source_line_id: str(l?.source_line_id) } : {}),
+    ...(str(l?.unit_id) ? { unit_id: str(l?.unit_id) } : {}),
   }));
 }
 

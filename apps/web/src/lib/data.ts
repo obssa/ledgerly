@@ -361,7 +361,7 @@ export interface InvoiceOptions {
   /** For an expense: the bank, cash and wallet accounts it can be paid from. */
   moneyAccounts?: { id: string; code: string; name: string; currency: string | null }[];
   /** Items to pick on a line, and the warehouses stock lines use. */
-  items?: { id: string; name: string; type: string; unit: string; price: string | null; account_id: string | null }[];
+  items?: { id: string; name: string; type: string; unit: string; price: string | null; account_id: string | null; units?: { id: string; name: string; factor: string }[] }[];
   warehouses?: { id: string; name: string }[];
   /** Active projects a line can be tagged with (job costing). */
   projects?: { id: string; code: string; name: string }[];
@@ -405,7 +405,7 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === numberedAs)?.mode === "manual",
-      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id })),
+      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id, units: i.units ?? [] })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       projects: await activeProjects(ctx),
       demo: false,
@@ -436,7 +436,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === "bill")?.mode === "manual",
-      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id })),
+      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id, units: i.units ?? [] })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       projects: await activeProjects(ctx),
       demo: false,

@@ -4,6 +4,7 @@ import { Card, PageTitle, Pill } from "@/components/ui";
 import { getItem, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { AdjustStock, ItemForm } from "../ItemForms";
+import { ItemUnits } from "./ItemUnits";
 
 export const metadata = { title: "Item" };
 
@@ -43,6 +44,11 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
         <Card className="min-w-0 flex-[2_1_520px]" label="Item details">
           <ItemForm item={item} readOnly={!item.can?.edit} />
         </Card>
+        {item.type !== "service" && (
+          <Card className="min-w-0 flex-[1_1_300px]" label="Units">
+            <ItemUnits item={item} />
+          </Card>
+        )}
       </div>
     </>
   );

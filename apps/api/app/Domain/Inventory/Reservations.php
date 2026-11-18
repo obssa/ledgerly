@@ -28,7 +28,7 @@ final class Reservations
             ->join('contacts as c', 'c.id', '=', 'o.contact_id')
             ->leftJoin('items as i', 'i.id', '=', 'l.item_id')
             ->selectRaw('o.id AS order_id, o.number, o.issue_date, o.due_date, c.id AS contact_id, c.name AS customer, l.id AS line_id, l.line_no, '
-                . 'l.description, l.item_id, i.sku, i.name AS item_name, i.type AS item_type, l.quantity::text AS ordered, '
+                . 'l.description, l.item_id, i.sku, i.name AS item_name, i.type AS item_type, coalesce(l.unit_name, i.unit) AS unit, l.quantity::text AS ordered, '
                 . self::done($type) . '::numeric(18,2)::text AS delivered, (l.quantity - ' . self::done($type) . ')::numeric(18,2)::text AS remaining')
             ->orderByRaw('o.due_date NULLS LAST')->orderBy('o.issue_date')->orderBy('o.number')->orderBy('l.line_no')
             ->limit(2000)->get()->map(fn ($r) => (array) $r)->all();
@@ -46,7 +46,7 @@ final class Reservations
         $left = fn (string $type) => $this->open($type)->join('items as i', 'i.id', '=', 'l.item_id')->where('i.type', 'inventory')
             ->when($itemIds !== null, fn (Builder $q) => $q->whereIn('l.item_id', $itemIds))
             ->groupBy('l.item_id')
-            ->selectRaw('l.item_id, sum(l.quantity - ' . self::done($type) . ')::numeric(18,2)::text AS quantity')
+            ->selectRaw('l.item_id, sum(round((l.quantity - ' . self::done($type) . ') * l.unit_factor, 2))::numeric(18,2)::text AS quantity')   // 072: in the item's own unit
             ->pluck('quantity', 'item_id');
         $reserved = $left('sales_order');
         $ordered = $left('purchase_order');

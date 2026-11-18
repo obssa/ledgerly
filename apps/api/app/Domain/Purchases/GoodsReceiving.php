@@ -137,7 +137,8 @@ final class GoodsReceiving
                     'id' => (string) Str::uuid7(), 'company_id' => $company->getKey(), 'goods_receipt_id' => $id, 'order_line_id' => $lineId,
                     'item_id' => $line->item_id, 'quantity' => $quantity, 'amount' => $values[$lineId]->toDecimalString(),
                 ]);
-                $this->stock->move($company->getKey(), $base, (string) $line->item_id, $warehouse->getKey(), $at, 'purchase', $quantity, '0',
+                $own = DocumentStock::baseQuantity((object) ['quantity' => $quantity, 'unit_factor' => $line->unit_factor]);   // 072
+                $this->stock->move($company->getKey(), $base, (string) $line->item_id, $warehouse->getKey(), $at, 'purchase', $own, '0',
                     $reference ?? $number, null, $userId, $values[$lineId]->toDecimalString(), goodsReceiptId: $id);
             }
 
@@ -182,9 +183,11 @@ final class GoodsReceiving
             $reversalId = $receipt->journal_entry_id ? $this->posting->reverse($receipt->journal_entry_id, $date, $userId)->getKey() : null;
             // The reversal takes the received value off the inventory account; the goods go out at today's cost.
             $difference = Money::zero($base);
-            foreach ($lines as $l) {
+            // Out again as they came in, in the item's own unit (072): the note's own moves.
+            $in = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'goods_receipt_id' => $receiptId, 'kind' => 'purchase'])->orderBy('seq')->get();
+            foreach ($in as $l) {
                 try {
-                    $out = $this->stock->move($company->getKey(), $base, (string) $l->item_id, (string) $receipt->warehouse_id, $date, 'purchase_return',
+                    $out = $this->stock->move($company->getKey(), $base, (string) $l->item_id, (string) $l->warehouse_id, $date, 'purchase_return',
                         '-' . $l->quantity, '0', "Void of {$receipt->number}", null, $userId, goodsReceiptId: $receiptId);
                 } catch (QueryException $e) {
                     if (str_contains($e->getMessage(), 'Not enough stock')) {

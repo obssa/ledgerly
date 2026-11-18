@@ -52,6 +52,30 @@ export async function saveItem(_: FormState | undefined, form: FormData): Promis
   return { notice: "Saved." };
 }
 
+/** 072: another unit the item is bought or sold in (a carton of 12); its name and size never change. */
+export async function addItemUnit(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.addItemUnit(text(form, "id") ?? "", { name: text(form, "name") ?? "", factor: amount(text(form, "factor")) }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Unit added." };
+}
+
+/** 072: a unit no longer offered on new lines; documents already in it keep it. */
+export async function archiveItemUnit(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.archiveItemUnit(text(form, "id") ?? "", text(form, "unit_id") ?? "", ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Unit archived." };
+}
+
 export async function adjustStock(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   const body: Record<string, unknown> = {

@@ -83,7 +83,7 @@ final class AnalysisReports
             ->selectRaw("sum(({$sign}) * round(dl.line_subtotal * d.fx_rate, 2))::numeric(20,2)::text AS amount")
             ->selectRaw("sum(({$sign}) * round(dl.line_tax * d.fx_rate, 2))::numeric(20,2)::text AS tax")
             ->selectRaw('count(DISTINCT d.id) AS documents')
-            ->selectRaw($group === 'item' ? 'sum(dl.quantity)::numeric(20,2)::text AS quantity' : 'NULL AS quantity')
+            ->selectRaw($group === 'item' ? 'sum(round(dl.quantity * dl.unit_factor, 2))::numeric(20,2)::text AS quantity' : 'NULL AS quantity')   // 072: in the item's own unit
             ->limit(2000)->get();
         $out = $rows->map(fn ($r) => ['key' => $r->key, 'label' => $r->label ?? match ($group) { 'item' => 'No item (described lines)', 'salesperson' => 'No salesperson', default => '—' }, 'amount' => $r->amount,
             'tax' => $r->tax, 'documents' => (int) $r->documents, 'quantity' => $r->quantity])->values()->all();
