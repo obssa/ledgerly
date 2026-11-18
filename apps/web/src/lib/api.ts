@@ -742,6 +742,8 @@ export interface InvoiceDetail extends Invoice {
   salesperson?: { id: string; name: string } | null;
   /** The quote or sales order it was made from (056). */
   source?: { id: string; type: string; number: string | null } | null;
+  /** A credit note whose goods came back into stock (058). */
+  restock?: boolean;
   fx_rate: string;
   notes: string | null;
   contact: Contact & { email?: string | null };

@@ -53,6 +53,7 @@ final class SaveInvoiceDraft
                 $data['currency'] = $original->currency;
                 $data['fx_rate'] = (string) $original->fx_rate;
                 $data['salesperson_id'] = $original->salesperson_id;   // a credit note takes back the sale of whoever made it
+                $data['warehouse_id'] = $original->warehouse_id;   // returned goods come back where they left from (058)
             }
             $data['salesperson_id'] = in_array($type, ['invoice', 'credit_note'], true) ? $this->salesperson($data, $document, $original) : null;
 
@@ -75,6 +76,9 @@ final class SaveInvoiceDraft
 
             $document ??= new Document(['type' => $type, 'created_by' => $userId, 'original_document_id' => $original?->getKey()]);
             $document->fill($calc['header']);
+            if ($type === 'credit_note' && array_key_exists('restock', $data)) {
+                $document->restock = (bool) $data['restock'];   // the goods came back into stock (058)
+            }
             $document->status = 'draft'; // a change while awaiting approval sends it back to draft
             $document->forceFill($calc['totals']);
             $document->amount_due = $calc['totals']['total'];

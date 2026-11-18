@@ -71,7 +71,7 @@ export async function createCreditNote(_: FormState | undefined, form: FormData)
   const body = invoiceBody(form);
   let id: string;
   try {
-    id = (await ledgerly.createCreditNote(invoiceId, { issue_date: body.issue_date, notes: body.notes, lines: body.lines }, ctx)).id;
+    id = (await ledgerly.createCreditNote(invoiceId, { issue_date: body.issue_date, notes: body.notes, lines: body.lines, restock: form.get("restock") === "1" }, ctx)).id;
   } catch (error) {
     return refusal(error);
   }

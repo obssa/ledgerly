@@ -33,6 +33,7 @@ class Document extends Model
             'custom_fields' => 'array',
             'lock_version' => 'integer',
             'opening' => 'boolean',
+            'restock' => 'boolean',
         ];
     }
 
