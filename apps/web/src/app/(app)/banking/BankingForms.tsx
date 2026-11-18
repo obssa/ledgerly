@@ -91,6 +91,8 @@ export function TransferMoney({ accounts, base }: { accounts: BankAccount[]; bas
   const to = accounts.find((a) => a.id === toId);
   const across = Boolean(from && to && from.currency !== to.currency);
   const foreign = [from?.currency, to?.currency].find((c) => c && c !== base);
+  // Dollars to euros: each currency at its own rate, in an entry of its own.
+  const twoForeign = Boolean(from && to && from.currency !== base && to.currency !== base && from.currency !== to.currency);
   const label = (a: BankAccount) => `${a.code} ${a.name}${a.currency !== base ? ` (${a.currency})` : ""}`;
   return (
     <form action={action} noValidate className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] items-end gap-3">
@@ -109,7 +111,8 @@ export function TransferMoney({ accounts, base }: { accounts: BankAccount[]; bas
       </div>
       <Field name="amount" label={`Amount sent${from ? ` (${from.currency})` : ""}`} invalid={bad("amount")} />
       {across && <Field name="amount_received" label={`Amount received${to ? ` (${to.currency})` : ""}`} invalid={bad("amount_received")} />}
-      {(across || foreign) && <Field name="fx_rate" label={`Rate (${base} per ${foreign ?? ""})`} invalid={bad("fx_rate")} hint="Leave empty for the day's rate" />}
+      {(across || foreign) && <Field name="fx_rate" label={`Rate (${base} per ${twoForeign ? from?.currency : foreign ?? ""})`} invalid={bad("fx_rate")} hint="Leave empty for the day's rate" />}
+      {twoForeign && <Field name="fx_rate_to" label={`Rate (${base} per ${to?.currency})`} invalid={bad("fx_rate_to")} hint="Leave empty for the day's rate" />}
       <Field name="fee" label={`Fee${from ? ` (${from.currency})` : ""}`} />
       <Field name="date" label="Date" type="date" defaultValue={today} invalid={bad("date")} />
       <Field name="memo" label="Memo" />

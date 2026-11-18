@@ -69,6 +69,7 @@ export async function transferMoney(_: FormState | undefined, form: FormData): P
       date: text(form, "date") ?? "", amount: amount(text(form, "amount")), ...(amount(text(form, "fee")) ? { fee: amount(text(form, "fee")) } : {}),
       ...(amount(text(form, "amount_received")) ? { amount_received: amount(text(form, "amount_received")) } : {}),
       ...(amount(text(form, "fx_rate")) ? { fx_rate: amount(text(form, "fx_rate")) } : {}),
+      ...(amount(text(form, "fx_rate_to")) ? { fx_rate_to: amount(text(form, "fx_rate_to")) } : {}),
       ...(text(form, "memo") ? { memo: text(form, "memo") } : {}) }, ctx);
   } catch (error) {
     return refusal(error);
