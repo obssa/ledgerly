@@ -13,6 +13,7 @@ if (config('queue.default') === 'redis') {
 Schedule::command('ledgerly:post-recurring')->hourly();
 Schedule::command('ledgerly:send-saved-reports')->hourly();
 Schedule::command('ledgerly:send-invoice-reminders')->hourly();
+Schedule::command('ledgerly:subscriptions-tick')->dailyAt('01:00');
 
 /*
 | Posts recurring journals that have come due (App\Domain\Ledger\RecurringJournals), each in its own company's
@@ -124,6 +125,119 @@ Artisan::command('ledgerly:send-invoice-reminders', function (\App\Domain\Sales\
 
     return 0;
 })->purpose('Email the payment reminders that have come due');
+
+/*
+| Ledgerly's own subscriptions (053): once a day, a trial past its end is suspended, a subscription past its paid-until
+| date becomes past due, and past due beyond the grace days is suspended (suspended books are read-only). Only while
+| billing is enforced (config/billing.php); never the shared demo. Runs as the application, outside any company.
+*/
+Artisan::command('ledgerly:subscriptions-tick', function () {
+    if (! config('billing.enforce')) {
+        $this->info('Billing is not enforced (BILLING_ENFORCE): nothing moves.');
+
+        return 0;
+    }
+    $moved = (int) DB::selectOne('SELECT subscriptions_tick(?::date, ?) AS n', [now('Africa/Addis_Ababa')->format('Y-m-d'), (int) config('billing.grace_days')])->n;
+    $this->info("{$moved} subscriptions moved.");
+
+    return 0;
+})->purpose('Move subscriptions on with time: trials ended, payments overdue');
+
+/*
+| The operator's hand on a subscription (053), run as the owner role (the application cannot change it): record a payment
+| (--activate --paid-until), change the plan, extend a trial, suspend or cancel. Every change is kept in
+| subscription_events with who did it. Usually run through .github/workflows/billing.yml.
+*/
+Artisan::command('ledgerly:subscription {organisation : the organisation id, or the id of one of its companies}
+        {--plan= : starter, essentials, plus, advanced or accountant}
+        {--activate : the subscription is paid: active}
+        {--paid-until= : the last day paid for (Y-m-d), with --activate}
+        {--extend-trial= : days more of trial, from today or the trial end, whichever is later}
+        {--suspend : suspend now (read-only books)}
+        {--cancel : cancel (read-only; the books are kept for the statutory period)}
+        {--reference= : the bank transfer reference}
+        {--note= : a note for the record}
+        {--by=operator : who is doing this}', function () {
+    $db = DB::connection('owner');
+    $id = (string) $this->argument('organisation');
+    if (! \Illuminate\Support\Str::isUuid($id)) {
+        $this->error('Give an organisation or company id.');
+
+        return 1;
+    }
+    $org = $db->table('organisations')->where('id', $id)->first()
+        ?? $db->table('organisations')->where('id', $db->table('companies')->where('id', $id)->value('organisation_id'))->first();
+    if ($org === null) {
+        $this->error('No such organisation or company.');
+
+        return 1;
+    }
+    $actions = array_filter(['activate' => $this->option('activate'), 'extend' => $this->option('extend-trial') !== null,
+        'suspend' => $this->option('suspend'), 'cancel' => $this->option('cancel')]);
+    if (count($actions) > 1) {
+        $this->error('One of --activate, --extend-trial, --suspend or --cancel at a time.');
+
+        return 1;
+    }
+    $plan = $this->option('plan');
+    if ($plan !== null && ! array_key_exists($plan, config('billing.plans'))) {
+        $this->error('Unknown plan: ' . implode(', ', array_keys(config('billing.plans'))));
+
+        return 1;
+    }
+    $set = $plan !== null ? ['plan' => $plan] : [];
+    $action = $plan !== null ? 'plan_changed' : null;
+    if ($this->option('activate')) {
+        $until = (string) $this->option('paid-until');
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $until) || $until < now()->format('Y-m-d')) {
+            $this->error('--paid-until is the last day paid for, today or later (Y-m-d).');
+
+            return 1;
+        }
+        $set += ['status' => 'active', 'paid_until' => $until, 'past_due_since' => null];
+        $action = 'payment_recorded';
+    } elseif ($this->option('extend-trial') !== null) {
+        $days = (int) $this->option('extend-trial');
+        if ($org->status !== 'trial' || $days < 1 || $days > 90) {
+            $this->error('Only a trial is extended, by 1 to 90 days.');
+
+            return 1;
+        }
+        $from = max(now(), \Illuminate\Support\Carbon::parse((string) ($org->trial_ends_at ?? now())));
+        $set += ['trial_ends_at' => $from->copy()->addDays($days)];
+        $action = 'trial_extended';
+    } elseif ($this->option('suspend')) {
+        $set += ['status' => 'suspended'];
+        $action = 'suspended';
+    } elseif ($this->option('cancel')) {
+        $set += ['status' => 'cancelled', 'cancelled_at' => now(), 'delete_after' => now()->addYears(10)->format('Y-m-d')];
+        $action = 'cancelled';
+    }
+    if ($action === null) {
+        $this->line("Plan {$org->plan}, status {$org->status}, trial ends " . ($org->trial_ends_at ?? '-') . ', paid until ' . ($org->paid_until ?? '-') . '.');
+
+        return 0;
+    }
+    try {
+        $db->transaction(function () use ($db, $org, $set, $action) {
+            $db->table('organisations')->where('id', $org->id)->update([...$set, 'updated_at' => now()]);
+            $after = $db->table('organisations')->where('id', $org->id)->first();
+            $db->table('subscription_events')->insert([
+                'organisation_id' => $org->id, 'action' => $action, 'from_status' => $org->status, 'to_status' => $after->status,
+                'plan' => $after->plan, 'paid_until' => $after->paid_until, 'trial_ends_at' => $after->trial_ends_at,
+                'reference' => $this->option('reference'), 'note' => $this->option('note'), 'by_whom' => mb_substr((string) $this->option('by'), 0, 120),
+            ]);
+        });
+    } catch (\Illuminate\Database\QueryException $e) {
+        $this->error('Refused: ' . ($e->errorInfo[2] ?? $e->getMessage()));
+
+        return 1;
+    }
+    $now = $db->table('organisations')->where('id', $org->id)->first();
+    $this->info("{$action}: plan {$now->plan}, status {$now->status}, trial ends " . ($now->trial_ends_at ?? '-') . ', paid until ' . ($now->paid_until ?? '-') . '.');
+
+    return 0;
+})->purpose("Record a payment or change a company's Ledgerly subscription (owner role)");
 
 /*
 | Run before `migrate` when the tables live outside `public` (DB_SCHEMA, shared hosting): Laravel creates its

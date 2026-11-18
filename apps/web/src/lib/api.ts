@@ -1055,6 +1055,8 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 
 export type { SignedInSession } from "./sessions";
 export type { Grantable } from "./team";
+export type { Subscription } from "./subscription";
+import type { Subscription } from "./subscription";
 import type { Grantable } from "./team";
 import type { SignedInSession } from "./sessions";
 
@@ -1382,6 +1384,7 @@ export const ledgerly = {
   recordExport: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ recorded: boolean; at: string }>("reports/exports", { ...ctx, method: "POST", body }),
   profitByDimension: (q: { kind: string; from?: string; to?: string }, ctx: RequestOptions) => api<ProfitByDimension>("reports/profit-by-dimension", { ...ctx, query: q }),
   customReport: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<CustomReport>("reports/custom", { ...ctx, query: q }),
+  subscription: (ctx: RequestOptions) => api<Subscription>("subscription", ctx),
   documentAnalysis: (side: "sales" | "purchases", q: { group: string; from?: string; to?: string }, ctx: RequestOptions) =>
     api<DocumentAnalysis>(`reports/${side}`, { ...ctx, query: q }),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>

@@ -1,5 +1,6 @@
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanySettings, getCurrencies, getDimensions, getNumbering } from "@/lib/data";
+import { getCompanySettings, getCurrencies, getDimensions, getNumbering, getSubscription } from "@/lib/data";
+import { subscriptionStatus } from "@/lib/subscription";
 import { CompanyProfileForm, CurrenciesPanel, DimensionsPanel, NumberingPanel, PeriodLockForm } from "./SettingsForms";
 
 export const metadata = { title: "Company settings" };
@@ -9,7 +10,7 @@ export const metadata = { title: "Company settings" };
  * accountant closes periods. What a role cannot change is shown read-only (the API refuses it anyway).
  */
 export default async function SettingsPage() {
-  const [settings, currencies, numbering, dimensions] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering(), getDimensions()]);
+  const [settings, currencies, numbering, dimensions, subscription] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering(), getDimensions(), getSubscription()]);
   const year = settings.fiscal_years.at(-1);
 
   return (
@@ -79,6 +80,25 @@ export default async function SettingsPage() {
               Framework: IFRS for SMEs · Country: {settings.country_code}
             </p>
           </Card>
+
+          {subscription && !subscription.demo && (
+            <Card label="Plan and billing">
+              <h2 className="text-[19px] font-bold">Plan and billing</h2>
+              <dl className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 text-sm">
+                <div><dt className="text-muted">Plan</dt><dd className="font-semibold">{subscription.plan_name}</dd></div>
+                <div><dt className="text-muted">Status</dt><dd><Pill tone={subscription.read_only ? "bad" : subscription.status === "active" ? "good" : "warn"}>{subscriptionStatus(subscription)}</Pill></dd></div>
+                {subscription.until && <div><dt className="text-muted">{subscription.status === "trial" ? "Trial ends" : "Paid until"}</dt><dd className="num">{subscription.until}</dd></div>}
+              </dl>
+              {subscription.instructions && (
+                <div className="mt-4 rounded-lg border border-line p-3 text-[13px]">
+                  <p className="font-semibold">How to pay</p>
+                  <p className="mt-1 whitespace-pre-line">{subscription.instructions}</p>
+                  <p className="mt-2 text-muted">Once the transfer arrives, your subscription is marked paid.</p>
+                </div>
+              )}
+              {subscription.contact && <p className="mt-3 text-[13px] text-muted">Questions about billing: <a className="font-semibold text-brand hover:underline" href={`mailto:${subscription.contact}`}>{subscription.contact}</a></p>}
+            </Card>
+          )}
 
           {!settings.demo && (
             <Card label="Company data">

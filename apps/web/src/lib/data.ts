@@ -7,6 +7,7 @@ import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
 import { isDate } from "./reports";
 import { sortSessions, type SignedInSession } from "./sessions";
+import type { Subscription } from "./subscription";
 
 /**
  * Server-side data access. In demo mode returns sample data; otherwise calls the API with the session's
@@ -956,6 +957,18 @@ export const getCashFlow = (q: { from: string; to: string }): Promise<CashFlowSt
 export const getChangesInEquity = (q: { from: string; to: string }): Promise<ChangesInEquity | null> => statement((ctx) => ledgerly.changesInEquity(q, ctx));
 export const getProfitByDimension = (q: { kind: string; from: string; to: string }): Promise<ProfitByDimension | null> => statement((ctx) => ledgerly.profitByDimension(q, ctx));
 export const getCustomReport = (q: Record<string, string | undefined>) => statement((ctx) => ledgerly.customReport(q, ctx));
+
+/**
+ * The subscription, for the notice across the app and Settings. Never redirects and never fails a page: anything
+ * unexpected (signed out, no company, the demo without an API) is simply no subscription to show.
+ */
+export async function getSubscription(): Promise<Subscription | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  const { token, companyId } = await getSession();
+  if (!token || !companyId) return null;
+  return ledgerly.subscription({ token, companyId }).catch(() => null);
+}
 export const getDocumentAnalysis = (side: "sales" | "purchases", q: { group: string; from: string; to: string }): Promise<DocumentAnalysis | null> =>
   statement((ctx) => ledgerly.documentAnalysis(side, q, ctx));
 export const getAuditLog = (q: Record<string, string | undefined>): Promise<AuditLog | null> => statement((ctx) => ledgerly.auditLog(q, ctx));

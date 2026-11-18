@@ -1,0 +1,69 @@
+# The operator's hand on a company's Ledgerly subscription (053): record a bank transfer (activate until a date), change
+# the plan, extend a trial, suspend or cancel, or just show it. Runs scripts/deploy/cpanel/billing.sh on the server as the
+# owner role, with the owner password on stdin only (as a release does). Every run is kept in subscription_events.
+name: billing
+
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: Organisation id, or the id of one of its companies
+        required: true
+      action:
+        description: What to do
+        type: choice
+        options: [show, activate, plan, extend-trial, suspend, cancel]
+        default: show
+      plan:
+        description: Plan (activate or plan)
+        type: choice
+        options: ['', starter, essentials, plus, advanced, accountant]
+        default: ''
+      paid_until:
+        description: Last day paid for, Y-m-d (activate)
+        default: ''
+      days:
+        description: Days more of trial (extend-trial)
+        default: ''
+      reference:
+        description: Bank transfer reference
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  billing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: live
+    steps:
+      - uses: actions/checkout@v7
+      - name: SSH with a pinned host key
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$HOST" && test -n "$USER" && test -n "$KEY" && test -n "$KNOWN_HOSTS" || { echo "Deploy secrets are incomplete"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host target\n  HostName %s\n  Port %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$HOST" "$PORT" "$USER" > ~/.ssh/config
+          scp scripts/deploy/cpanel/billing.sh target:ledgerly/deploy/billing.sh
+      - name: Change the subscription
+        env:
+          OWNER_PASSWORD: ${{ secrets.DEPLOY_DB_OWNER_PASSWORD }}
+          PHP_BIN: ${{ vars.DEPLOY_PHP_BIN || '/opt/alt/php83/usr/bin/php' }}
+          ID: ${{ inputs.id }}
+          ACTION: ${{ inputs.action }}
+          PLAN: ${{ inputs.plan }}
+          PAID_UNTIL: ${{ inputs.paid_until }}
+          DAYS: ${{ inputs.days }}
+          REFERENCE: ${{ inputs.reference }}
+        run: |
+          # The inputs reach the server as quoted arguments, and billing.sh checks each against a fixed pattern.
+          q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+          printf '%s\n' "$OWNER_PASSWORD" | ssh target "PHP_BIN=$(q "$PHP_BIN") bash ~/ledgerly/deploy/billing.sh $(q "$ID") $(q "$ACTION") $(q "$PLAN") $(q "$PAID_UNTIL") $(q "$DAYS") $(q "$REFERENCE")"
