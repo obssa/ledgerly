@@ -116,6 +116,11 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <div className="flex justify-between py-1 font-semibold"><dt>{creditNote ? "Credit left" : "Still due"}</dt><dd className="num">{formatMoney(invoice.amount_due, invoice.currency)}</dd></div>
           </dl>
           {invoice.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{invoice.notes}</p>}
+          {/* On paper: how to pay and the footer line, from the company's invoice template. */}
+          {!creditNote && company.invoice_template?.payment_details && (
+            <div className="mt-4 hidden text-[13px] print:block"><strong>How to pay</strong><p className="whitespace-pre-line">{company.invoice_template.payment_details}</p></div>
+          )}
+          {company.invoice_template?.footer && <p className="mt-6 hidden text-center text-[12px] text-muted print:block">{company.invoice_template.footer}</p>}
         </Card>
 
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4 print:hidden">

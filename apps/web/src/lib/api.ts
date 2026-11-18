@@ -54,6 +54,8 @@ export interface CompanySettings {
   reminders?: { enabled: boolean; days: number[] };
   /** Email reminders of tax returns due (054): on unless turned off. */
   tax_reminders?: boolean;
+  /** How invoices look on paper and as PDF files. */
+  invoice_template?: { accent: string | null; payment_details: string | null; footer: string | null };
   can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean; manage_dimensions: boolean };
   options: { tax_id_label: string; calendars: string[]; legal_forms: string[] };
 }

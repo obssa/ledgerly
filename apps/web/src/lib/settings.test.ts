@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REMINDERS_SHOWN, reminderDays, settingsBody, TAX_REMINDERS_SHOWN, VAT_SHOWN } from "./settings";
+import { REMINDERS_SHOWN, reminderDays, settingsBody, TAX_REMINDERS_SHOWN, VAT_SHOWN, TEMPLATE_SHOWN } from "./settings";
 
 const form = (entries: [string, string][]) => {
   const f = new FormData();
@@ -54,6 +54,15 @@ describe("payment reminders", () => {
     });
     expect(settingsBody(form([["version", "v1"], [REMINDERS_SHOWN, "1"], ["reminders.enabled", "on"], ["reminders.days", "14"]])).reminders)
       .toEqual({ enabled: true, days: [14] });
+  });
+});
+
+describe("invoice template", () => {
+  it("is sent only when its fields were on the form, a colour only as #RRGGBB", () => {
+    expect(settingsBody(form([["version", "v1"]]))).not.toHaveProperty("invoice_template");
+    expect(settingsBody(form([["version", "v1"], [TEMPLATE_SHOWN, "1"], ["invoice_template.accent", "#0C7C59"], ["invoice_template.payment_details", " CBE 1000 "],
+      ["invoice_template.footer", ""]])).invoice_template).toEqual({ accent: "#0C7C59", payment_details: "CBE 1000", footer: null });
+    expect((settingsBody(form([["version", "v1"], [TEMPLATE_SHOWN, "1"], ["invoice_template.accent", "red"]])).invoice_template as { accent: unknown }).accent).toBeNull();
   });
 });
 
