@@ -40,8 +40,8 @@ export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
   );
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const json = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, project_id: l.projectId || null, item_id: l.itemId || null })));
-  // Lines that name an item: on a credit note, those goods may have come back into stock (058).
-  const withItems = !bill && lines.some((l) => l.itemId !== "");
+  // Lines that name an item: those goods may have come back into stock (058), or gone back to the supplier (059).
+  const withItems = lines.some((l) => l.itemId !== "");
 
   return (
     <form action={action} noValidate className="flex flex-col gap-4">
@@ -70,9 +70,11 @@ export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
               <label className="flex items-start gap-2 text-sm font-semibold">
                 <input type="checkbox" name="restock" value="1" className="mt-0.5 size-[18px] accent-brand" />
                 <span>
-                  The goods came back into stock
+                  {bill ? "The goods went back to the supplier" : "The goods came back into stock"}
                   <span className="block text-[13px] font-normal text-muted">
-                    Stock items on this credit note return to the warehouse they left from, at the cost they left with; leave it off for a price correction.
+                    {bill
+                      ? "Stock items on this credit leave the warehouse they came into, at today's average cost; leave it off for a price correction on goods you keep."
+                      : "Stock items on this credit note return to the warehouse they left from, at the cost they left with; leave it off for a price correction."}
                   </span>
                 </span>
               </label>
