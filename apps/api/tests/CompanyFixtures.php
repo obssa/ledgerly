@@ -63,6 +63,9 @@ trait CompanyFixtures
         $ids['draft'] = $this->postJson('/api/v1/invoices', $invoice(), $h)->assertCreated()->json('id');
         // Draft quote and sales order (056): a draft accepts every action, so the control calls reach the controller.
         $ids['quote'] = $this->postJson('/api/v1/quotes', $invoice(), $h)->assertCreated()->json('id');
+        // A customer's post-dated cheque held for next year (062).
+        $ids['post_dated_cheque'] = $this->postJson('/api/v1/post-dated-cheques', ['direction' => 'in', 'contact_id' => $ids['contact'], 'account_id' => $ids['bank'],
+            'cheque_number' => '700001', 'handed_on' => '2026-11-03', 'cheque_date' => '2027-12-31', 'currency' => 'ETB', 'amount' => '100'], $h)->assertCreated()->json('id');
         $ids['sales_order'] = $this->postJson('/api/v1/sales-orders', $invoice(), $h)->assertCreated()->json('id');
 
         // A stock item with 20 on hand at 50.00 (opening stock, 2 Nov) in the company's main store.
@@ -152,7 +155,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(239, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(243, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -186,6 +189,7 @@ trait CompanyFixtures
             'project' => $ids['project'],
             'timeEntry' => $ids['time_entry'],
             'milestone' => $ids['milestone'],
+            'cheque' => $ids['post_dated_cheque'],
             'quote' => $ids['quote'],
             'salesOrder' => $ids['sales_order'],
             'fixedAsset' => $ids['fixed_asset'],

@@ -3154,6 +3154,64 @@ BEGIN
   UPDATE fixed_assets SET tax_method = 'reducing_balance', tax_annual_rate = 0.25, tax_opening_depreciation = 1000 WHERE id = a;
   RAISE NOTICE 'PASS T87 an asset''s tax depreciation names one rule, and never more than its cost before Ledgerly';
 END $$;
+-- T88: post-dated cheques (062). Held from the company's own customer (in) or to its own supplier (out) through its
+-- own bank account, dated after the day it changes hands; a cheque written is numbered once per account; it stays as
+-- recorded, is presented once as the matching payment or cancelled, and another company never sees it. Company A as
+-- f1: customer c1, supplier c8, bank account a10.
+DO $$
+DECLARE
+  c1  constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  c8  constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  a10 constant uuid := '00000000-0000-0000-0000-000000000a10';
+  p   constant uuid := '00000000-0000-0000-0000-000000000c88';
+  pay constant uuid := '00000000-0000-0000-0000-000000000e88';
+BEGIN
+  BEGIN
+    INSERT INTO post_dated_cheques (company_id, direction, contact_id, account_id, cheque_number, cheque_date, handed_on, currency, amount, created_by)
+      VALUES (app_company_id(), 'in', c8, a10, '880001', '2027-09-30', '2027-08-20', 'ETB', 500, app_user_id());
+    RAISE EXCEPTION 'FAIL T88a: a cheque was received from a supplier who is not a customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO post_dated_cheques (company_id, direction, contact_id, account_id, cheque_number, cheque_date, handed_on, currency, amount, created_by)
+      VALUES (app_company_id(), 'in', c1, a10, '880001', '2027-08-20', '2027-08-20', 'ETB', 500, app_user_id());
+    RAISE EXCEPTION 'FAIL T88b: a cheque dated the day it changed hands was held as post-dated';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO post_dated_cheques (id, company_id, direction, contact_id, account_id, cheque_number, cheque_date, handed_on, currency, amount, created_by)
+    VALUES (p, app_company_id(), 'in', c1, a10, '880001', '2027-09-30', '2027-08-20', 'ETB', 500, app_user_id());
+  INSERT INTO post_dated_cheques (company_id, direction, contact_id, account_id, cheque_number, cheque_date, handed_on, currency, amount, created_by)
+    VALUES (app_company_id(), 'out', c8, a10, '990001', '2027-09-30', '2027-08-20', 'ETB', 300, app_user_id());
+  BEGIN
+    INSERT INTO post_dated_cheques (company_id, direction, contact_id, account_id, cheque_number, cheque_date, handed_on, currency, amount, created_by)
+      VALUES (app_company_id(), 'out', c8, a10, '990001', '2027-10-31', '2027-08-21', 'ETB', 200, app_user_id());
+    RAISE EXCEPTION 'FAIL T88c: a cheque number of the account was written twice';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    UPDATE post_dated_cheques SET amount = 600 WHERE id = p;
+    RAISE EXCEPTION 'FAIL T88d: a post-dated cheque was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- Presented only as the payment it became: same customer, account, number and amount, on or after its date.
+  INSERT INTO payments (id, company_id, direction, contact_id, account_id, payment_date, method, currency, amount, cheque_number)
+    VALUES (pay, app_company_id(), 'in', c1, a10, '2027-09-30', 'cheque', 'ETB', 400, '880001');
+  BEGIN
+    UPDATE post_dated_cheques SET status = 'presented', payment_id = pay, closed_on = '2027-09-30' WHERE id = p;
+    RAISE EXCEPTION 'FAIL T88e: a cheque was presented as a payment of another amount';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE post_dated_cheques SET status = 'cancelled', closed_on = '2027-08-25' WHERE id = p;
+  BEGIN
+    UPDATE post_dated_cheques SET status = 'held', closed_on = NULL WHERE id = p;
+    RAISE EXCEPTION 'FAIL T88f: a cancelled cheque was held again';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM post_dated_cheques WHERE id = p;
+    RAISE EXCEPTION 'FAIL T88g: a post-dated cheque was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM post_dated_cheques) THEN
+    RAISE EXCEPTION 'FAIL T88h: company B saw company A''s post-dated cheques';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T88 post-dated cheques are held apart from the books, numbered once, and presented once as their payment';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
