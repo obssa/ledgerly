@@ -22,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 final class ItemController extends Controller
 {
     private const FIELDS = ['sku', 'name', 'type', 'unit', 'sale_price', 'purchase_price', 'income_account_id', 'expense_account_id',
-        'authority_item_code', 'reorder_point', 'is_active'];
+        'authority_item_code', 'reorder_point', 'is_active', 'costing'];
 
     public function __construct(private readonly AuditLogger $audit, private readonly CurrentCompany $current)
     {
@@ -77,8 +77,13 @@ final class ItemController extends Controller
     {
         $this->authorizeCompany('inventory.items');
         $data = $this->validated($request, $item);
-        if (isset($data['type']) && $data['type'] !== $item->type && DB::table('stock_moves')->where(['company_id' => $item->company_id, 'item_id' => $item->getKey()])->exists()) {
+        $moved = DB::table('stock_moves')->where(['company_id' => $item->company_id, 'item_id' => $item->getKey()])->exists();
+        if (isset($data['type']) && $data['type'] !== $item->type && $moved) {
             throw ValidationException::withMessages(['type' => ['This item has stock moves: its type stays. Archive it and add a new item instead.']]);
+        }
+        // FIFO or weighted average is chosen before the first stock move and kept (064).
+        if (isset($data['costing']) && $data['costing'] !== $item->costing && $moved) {
+            throw ValidationException::withMessages(['costing' => ['This item has stock moves: its costing stays. Archive it and add a new item to cost it another way.']]);
         }
 
         $before = $item->only(self::FIELDS);
@@ -98,7 +103,7 @@ final class ItemController extends Controller
     {
         $req = $item === null ? 'required' : 'sometimes';
 
-        return $request->validate([
+        $data = $request->validate([
             'name' => [$req, 'string', 'max:200'],
             'sku' => ['sometimes', 'nullable', 'string', 'max:60', Rule::unique('items', 'sku')->where('company_id', $this->current->id())->ignore($item?->getKey())],
             'type' => [$req, Rule::in(['inventory', 'non_inventory', 'service'])],
@@ -111,7 +116,14 @@ final class ItemController extends Controller
             'authority_item_code' => ['sometimes', 'nullable', 'string', 'max:60'],
             'reorder_point' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0'],
             'is_active' => [$item === null ? 'prohibited' : 'sometimes', 'boolean'],
-        ]);
+            // Weighted average by default; FIFO, for a stock item, before its first move (064).
+            'costing' => ['sometimes', Rule::in(['average', 'fifo'])],
+        ], ['costing.in' => 'Weighted average or FIFO.']);
+        if (($data['costing'] ?? 'average') === 'fifo' && ($data['type'] ?? $item?->type) !== 'inventory') {
+            throw ValidationException::withMessages(['costing' => ['Only a stock item is costed FIFO.']]);
+        }
+
+        return $data;
     }
 
     /** @return array<string, mixed> */

@@ -578,6 +578,8 @@ export interface Item {
   income_account_id: string | null;
   expense_account_id: string | null;
   reorder_point: string | null;
+  /** Weighted average (default) or FIFO, chosen before the item's first stock move (064). */
+  costing?: "average" | "fifo";
   is_active: boolean;
   on_hand?: string;
   value?: string;

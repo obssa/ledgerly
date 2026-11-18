@@ -36,6 +36,14 @@ export function ItemForm({ item, readOnly = false }: { item?: Item; readOnly?: b
         <Field name="sale_price" label="Sale price" defaultValue={item?.sale_price ?? ""} invalid={bad("sale_price")} />
         <Field name="purchase_price" label="Purchase price" defaultValue={item?.purchase_price ?? ""} invalid={bad("purchase_price")} />
         <Field name="reorder_point" label="Reorder when on hand falls to" defaultValue={item?.reorder_point ?? ""} invalid={bad("reorder_point")} />
+        <div>
+          <label className="field-label" htmlFor="costing">Costing (stock items)</label>
+          <select className={`field ${bad("costing") ? "!border-bad" : ""}`} id="costing" name="costing" defaultValue={item?.costing ?? "average"}>
+            <option value="average">Weighted average</option>
+            <option value="fifo">FIFO (first in, first out)</option>
+          </select>
+          <p className="mt-1 text-[12px] text-muted">Chosen before the first stock move, and kept.</p>
+        </div>
       </fieldset>
       {!readOnly && <button type="submit" className="btn btn-primary mt-6" disabled={pending}>{pending ? "Saving…" : item ? "Save item" : "Add item"}</button>}
     </form>
