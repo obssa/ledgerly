@@ -114,7 +114,7 @@ export async function reviewStatementLine(_: FormState | undefined, form: FormDa
   const step = text(form, "step") as keyof typeof STEPS | undefined;
   if (!step || !(step in STEPS)) return { error: "Choose what to do with the line." };
   const body: Record<string, string> = {};
-  for (const field of ["journal_line_id", "account_id", "contact_id", "memo", "reason"]) {
+  for (const field of ["journal_line_id", "account_id", "contact_id", "memo", "reason", "fx_rate"]) {
     const v = text(form, field);
     if (v) body[field] = v;
   }

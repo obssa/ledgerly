@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getStatement } from "@/lib/data";
+import { getCompanySettings, getStatement } from "@/lib/data";
 import { STATEMENT_TABS, categorisable, signed, statementTab } from "@/lib/statements";
 import { ImportStatement, ReviewLine } from "../../StatementForms";
 
@@ -14,7 +14,7 @@ const LABEL = { imported: "To review", matched: "Matched", categorised: "Categor
 export default async function StatementPage({ params, searchParams }: PageProps<"/banking/[id]/statement">) {
   const { id } = await params;
   const tab = statementTab((await searchParams).status);
-  const statement = await getStatement(id, tab);
+  const [statement, company] = await Promise.all([getStatement(id, tab), getCompanySettings()]);
   if (!statement) notFound();
   const { lines, accounts } = statement;
   const options = categorisable(accounts, id);
@@ -58,7 +58,7 @@ export default async function StatementPage({ params, searchParams }: PageProps<
                       {amount.text}
                     </td>
                     <td><Pill tone={TONE[l.status]}>{LABEL[l.status]}</Pill></td>
-                    <td><ReviewLine line={l} accounts={options} canReview={lines.can.review} /></td>
+                    <td><ReviewLine line={l} accounts={options} canReview={lines.can.review} foreign={lines.account.currency !== company.base_currency ? { currency: lines.account.currency, base: company.base_currency } : undefined} /></td>
                   </tr>
                 );
               })}

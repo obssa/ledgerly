@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Banking\Models\BankTransaction;
 use App\Domain\Banking\StatementCsv;
+use App\Domain\Ledger\ExchangeRates;
 use App\Domain\Ledger\JournalDraft;
 use App\Domain\Ledger\JournalLineDraft;
 use App\Domain\Ledger\Models\Account;
@@ -42,6 +43,7 @@ final class StatementController extends Controller
         private readonly AuditLogger $audit,
         private readonly PostingService $posting,
         private readonly StatementCsv $csv,
+        private readonly ExchangeRates $rates,
     ) {
     }
 
@@ -146,16 +148,20 @@ final class StatementController extends Controller
             'account_id' => ['required', 'uuid'],
             'contact_id' => ['nullable', 'uuid'],
             'memo' => ['nullable', 'string', 'max:255'],
+            'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],   // a foreign-currency account's line: base per unit; else the day's rate
         ]);
         $this->assertToReview($statementLine);
         $company = $this->current->get();
         $bank = Account::query()->findOrFail($statementLine->account_id);
-        if ($this->currencyOf($bank) !== $company->base_currency) {
-            throw ValidationException::withMessages(['account_id' => ["{$bank->name} is kept in {$bank->currency}: match its lines to entries instead; categorising foreign-currency lines is not available yet."]]);
-        }
+        $currency = $this->currencyOf($bank);
         $target = Account::query()->where('is_active', true)->find($data['account_id']);
         if ($target === null || $target->getKey() === $bank->getKey()) {
             throw ValidationException::withMessages(['account_id' => ['Choose another active account of this company.']]);
+        }
+        // A bank, cash or wallet account without a currency of its own is in the base currency; other accounts take any.
+        $targetCurrency = in_array($target->subtype, ['bank', 'cash', 'mobile_money'], true) ? $this->currencyOf($target) : $target->currency;
+        if ($targetCurrency !== null && $targetCurrency !== $currency) {
+            throw ValidationException::withMessages(['account_id' => ["{$target->name} is kept in {$targetCurrency}: a {$currency} line goes to an account in {$currency} or with no currency of its own."]]);
         }
         if (in_array($target->subtype, self::NOT_FOR_CATEGORISING, true)) {
             throw ValidationException::withMessages(['account_id' => ["{$target->name} is kept by its own documents: record a payment, bill or stock entry and match the line to it instead."]]);
@@ -165,24 +171,29 @@ final class StatementController extends Controller
             throw ValidationException::withMessages(['contact_id' => ['Choose a customer or supplier of this company.']]);
         }
 
-        $amount = Money::of($this->decimal($statementLine->amount), $company->base_currency);
+        // A foreign-currency account's line is in its currency, entered at the day's rate (or the one given).
+        $base = $company->base_currency;
+        $rate = $currency === $base ? '1' : $this->rates->forDocument($company, $currency, substr((string) $statementLine->posted_on, 0, 10), $data['fx_rate'] ?? null);
+        $amount = Money::of($this->decimal($statementLine->amount), $currency);
         $memo = $data['memo'] ?? $statementLine->description;
-        $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($statementLine->posted_on), $company->base_currency, $company->base_currency,
-            '1', mb_substr($memo, 0, 255), 'bank_transaction', $statementLine->getKey());
+        $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($statementLine->posted_on), $base, $currency,
+            $rate, mb_substr($memo, 0, 255), 'bank_transaction', $statementLine->getKey());
         $in = ! $amount->isNegative();
-        $size = $in ? $amount : $amount->negated();
-        $draft->add($in ? JournalLineDraft::debit($bank->getKey(), $size, null, $statementLine->description, $contact?->getKey())
-            : JournalLineDraft::credit($bank->getKey(), $size, null, $statementLine->description, $contact?->getKey()));
-        $draft->add($in ? JournalLineDraft::credit($target->getKey(), $size, null, $memo, $contact?->getKey())
-            : JournalLineDraft::debit($target->getKey(), $size, null, $memo, $contact?->getKey()));
+        $txn = $in ? $amount : $amount->negated();
+        $size = $currency === $base ? $txn : $txn->convertTo($base, $rate)->roundToCurrency();
+        $draft->add($in ? JournalLineDraft::debit($bank->getKey(), $size, $txn, $statementLine->description, $contact?->getKey())
+            : JournalLineDraft::credit($bank->getKey(), $size, $txn, $statementLine->description, $contact?->getKey()));
+        $draft->add($in ? JournalLineDraft::credit($target->getKey(), $size, $txn, $memo, $contact?->getKey())
+            : JournalLineDraft::debit($target->getKey(), $size, $txn, $memo, $contact?->getKey()));
 
         $userId = $request->user()->getKey();
-        DB::transaction(function () use ($draft, $userId, $statementLine, $bank, $target, $amount) {
+        DB::transaction(function () use ($draft, $userId, $statementLine, $bank, $target, $amount, $size) {
             $entry = $this->posting->post($draft, $userId);
             $bankLine = DB::table('journal_lines')->where(['company_id' => $entry->company_id, 'journal_entry_id' => $entry->getKey(), 'account_id' => $bank->getKey()])->value('id');
             $this->explain($statementLine, 'categorised', $bankLine);
             $this->audit->record($this->current->id(), 'statement_line_categorised', 'bank_transaction', $statementLine->getKey(), null,
-                ['account' => "{$target->code} {$target->name}", 'amount' => $amount->toDecimalString(), 'journal_entry' => $entry->number], userId: $userId);
+                ['account' => "{$target->code} {$target->name}", 'amount' => $amount->toDecimalString(), 'currency' => $amount->currency,
+                    'base' => $size->toDecimalString(), 'journal_entry' => $entry->number], userId: $userId);
         });
 
         return $this->show($statementLine);

@@ -103,6 +103,30 @@ final class StatementTest extends TestCase
         $this->assertSame(1, $this->owner()->table('audit_log')->where(['subject_id' => $this->c['statement_line'], 'action' => 'statement_line_reopened'])->count());
     }
 
+    public function test_a_dollar_accounts_line_is_categorised_in_dollars_at_the_days_rate(): void
+    {
+        $usd = $this->postJson('/api/v1/bank-accounts', ['name' => 'CBE USD account', 'kind' => 'bank', 'currency' => 'USD'], $this->h)->assertCreated()->json('id');
+        $this->postJson('/api/v1/exchange-rates', ['currency' => 'USD', 'rate_date' => '2026-11-07', 'rate' => '154.50'], $this->h)->assertCreated();
+        $this->postJson("/api/v1/bank-accounts/{$usd}/statements", ['csv' => "Date,Description,Amount\n07/11/2026,SWIFT charge,-12.00\n30/10/2026,Card fee,-3.00\n"], $this->h)->assertCreated();
+        $lines = collect($this->getJson("/api/v1/bank-accounts/{$usd}/statement-lines", $this->h)->json('data'))->keyBy('description');
+        $charges = $this->owner()->table('accounts')->where(['company_id' => $this->c['company'], 'system_key' => 'bank_charges'])->value('id');
+
+        // 12.00 dollars of charges at 154.50: 1,854.00 birr, an entry in dollars.
+        $done = $this->postJson("/api/v1/statement-lines/{$lines['SWIFT charge']['id']}/categorise", ['account_id' => $charges], $this->h)->assertOk()
+            ->assertJsonPath('status', 'categorised');
+        $entry = $this->owner()->table('journal_entries')->where('id', $done->json('entry.id'))->first();
+        $this->assertSame(['USD', '154.500000'], [$entry->currency, (string) $entry->fx_rate]);
+        $this->assertSame('1854.00', (string) $this->owner()->table('journal_lines')->where(['journal_entry_id' => $entry->id, 'account_id' => $charges])->value('debit'));
+        $this->getJson("/api/v1/bank-accounts/{$usd}", $this->h)->assertOk()->assertJsonPath('balance', '-12.00');
+
+        // No rate known on 30 October and none given: the person is asked for one; given, it is used. A birr bank account cannot take a dollar line.
+        $this->postJson("/api/v1/statement-lines/{$lines['Card fee']['id']}/categorise", ['account_id' => $charges], $this->h)->assertUnprocessable()->assertJsonValidationErrors('fx_rate');
+        $this->postJson("/api/v1/statement-lines/{$lines['Card fee']['id']}/categorise", ['account_id' => $this->c['bank'], 'fx_rate' => '155'], $this->h)->assertUnprocessable();
+        $this->postJson("/api/v1/statement-lines/{$lines['Card fee']['id']}/categorise", ['account_id' => $charges, 'fx_rate' => '155'], $this->h)->assertOk();
+        $this->assertSame(1, $this->owner()->table('audit_log')->where(['company_id' => $this->c['company'], 'action' => 'statement_line_categorised'])
+            ->where('after->base', '1854.00')->count());
+    }
+
     public function test_a_line_is_excluded_with_a_reason_and_brought_back(): void
     {
         $this->postJson("/api/v1/statement-lines/{$this->c['statement_line']}/exclude", [], $this->h)->assertUnprocessable()->assertJsonValidationErrors('reason');
