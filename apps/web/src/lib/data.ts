@@ -292,12 +292,21 @@ export async function getChart(archived = false): Promise<{ data: ChartAccount[]
 }
 
 /** The opening balances and the accounts they can be entered on. null in the demo, which has no ledger to change. */
-export async function getOpeningBalances(): Promise<{ opening: OpeningBalances; accounts: Account[] } | null> {
+export async function getOpeningBalances(): Promise<{
+  opening: OpeningBalances; accounts: Account[]; customers: { id: string; name: string }[]; suppliers: { id: string; name: string }[]; currencies: string[];
+} | null> {
   await connection();
   if (isDemoMode()) return null;
   return withApi(async (ctx) => {
-    const [opening, accounts] = await Promise.all([ledgerly.openingBalances(ctx), ledgerly.accounts(ctx)]);
-    return { opening, accounts: accounts.data };
+    const [opening, accounts, customers, suppliers, currencies] = await Promise.all([
+      ledgerly.openingBalances(ctx), ledgerly.accounts(ctx), ledgerly.customers({}, ctx), ledgerly.suppliers({}, ctx), ledgerly.currencies(ctx),
+    ]);
+    return {
+      opening, accounts: accounts.data,
+      customers: customers.data.map((c) => ({ id: c.id, name: c.name })),
+      suppliers: suppliers.data.map((s) => ({ id: s.id, name: s.name })),
+      currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
+    };
   });
 }
 

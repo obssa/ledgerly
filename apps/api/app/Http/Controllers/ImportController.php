@@ -20,13 +20,20 @@ final class ImportController extends Controller
 {
     private const MAX_ROWS = 2000;
 
-    /** kind => [controller, permission, columns it takes (heading => field), numeric fields] */
+    /** kind => [controller, permission, the controller's action, the fields a file must have] */
     private const KINDS = [
-        'customers' => [CustomerController::class, 'contacts.create'],
-        'suppliers' => [SupplierController::class, 'contacts.create'],
-        'items' => [ItemController::class, 'inventory.items'],
-        'accounts' => [ChartController::class, 'accounting.chart'],
+        'customers' => [CustomerController::class, 'contacts.create', 'store', ['name']],
+        'suppliers' => [SupplierController::class, 'contacts.create', 'store', ['name']],
+        'items' => [ItemController::class, 'inventory.items', 'store', ['name']],
+        'accounts' => [ChartController::class, 'accounting.chart', 'store', ['code', 'name', 'type']],
+        // Open invoices and bills from the old books (057), each through POST opening-balances/invoices or bills.
+        'open-invoices' => [OpeningBalanceController::class, 'accounting.opening', 'invoice', ['contact', 'number', 'issue_date', 'amount']],
+        'open-bills' => [OpeningBalanceController::class, 'accounting.opening', 'bill', ['contact', 'reference', 'issue_date', 'amount']],
     ];
+
+    /** How a missing required field is named to the person. */
+    private const HEADINGS = ['name' => 'Name', 'code' => 'Code', 'type' => 'Type', 'contact' => 'Customer (or Supplier)', 'number' => 'Number',
+        'reference' => 'Supplier invoice number', 'issue_date' => 'Date', 'amount' => 'Amount'];
 
     /** The headings each kind reads (lower case, spaces as underscores), with a few common other names. */
     private const COLUMNS = [
@@ -43,6 +50,16 @@ final class ImportController extends Controller
         // The chart: a parent is named by its code, above its accounts in the file.
         'accounts' => ['code' => 'code', 'account_code' => 'code', 'number' => 'code', 'account_number' => 'code', 'name' => 'name', 'account_name' => 'name',
             'account' => 'name', 'type' => 'type', 'account_type' => 'type', 'kind' => 'kind', 'parent' => 'parent', 'parent_code' => 'parent'],
+        // A customer or supplier is named as in Ledgerly; dates as 2026-06-30 or 30/06/2026; the amount is what was still open.
+        'open-invoices' => ['customer' => 'contact', 'customer_name' => 'contact', 'name' => 'contact', 'number' => 'number', 'invoice_number' => 'number',
+            'invoice' => 'number', 'date' => 'issue_date', 'issue_date' => 'issue_date', 'invoice_date' => 'issue_date', 'due_date' => 'due_date', 'due' => 'due_date',
+            'currency' => 'currency', 'amount' => 'amount', 'open_amount' => 'amount', 'amount_due' => 'amount', 'balance' => 'amount', 'outstanding' => 'amount',
+            'rate' => 'fx_rate', 'fx_rate' => 'fx_rate', 'exchange_rate' => 'fx_rate'],
+        'open-bills' => ['supplier' => 'contact', 'supplier_name' => 'contact', 'name' => 'contact', 'reference' => 'reference', 'supplier_invoice' => 'reference',
+            'supplier_invoice_number' => 'reference', 'invoice_number' => 'reference', 'number' => 'number', 'our_number' => 'number',
+            'date' => 'issue_date', 'issue_date' => 'issue_date', 'bill_date' => 'issue_date', 'due_date' => 'due_date', 'due' => 'due_date',
+            'currency' => 'currency', 'amount' => 'amount', 'open_amount' => 'amount', 'amount_due' => 'amount', 'balance' => 'amount', 'outstanding' => 'amount',
+            'rate' => 'fx_rate', 'fx_rate' => 'fx_rate', 'exchange_rate' => 'fx_rate'],
     ];
 
     /** Opening balances: one line per account, by its code, as a debit and a credit or one signed balance (debit positive). */
@@ -54,12 +71,12 @@ final class ImportController extends Controller
         'capital' => 'equity', 'income' => 'income', 'revenue' => 'income', 'revenues' => 'income', 'sales' => 'income', 'expense' => 'expense',
         'expenses' => 'expense', 'cost' => 'expense', 'costs' => 'expense'];
 
-    private const NUMERIC = ['payment_terms_days', 'credit_limit', 'sale_price', 'purchase_price', 'reorder_point'];
+    private const NUMERIC = ['payment_terms_days', 'credit_limit', 'sale_price', 'purchase_price', 'reorder_point', 'amount', 'fx_rate'];
 
     public function store(Request $request, string $kind): JsonResponse
     {
         abort_unless(isset(self::KINDS[$kind]), 404);
-        [$controller, $permission] = self::KINDS[$kind];
+        [$controller, $permission, $action, $required] = self::KINDS[$kind];
         $this->authorizeCompany($permission);
         $data = $request->validate(['csv' => ['required', 'string', 'max:900000'], 'check' => ['sometimes', 'boolean']]);
         $check = (bool) ($data['check'] ?? false);
@@ -68,10 +85,13 @@ final class ImportController extends Controller
         $columns = self::COLUMNS[$kind];
         $used = array_values(array_filter($headings, fn ($h) => isset($columns[$h])));
         $fieldsUsed = array_map(fn ($h) => $columns[$h], $used);
-        if (! in_array('name', $fieldsUsed, true) || ($kind === 'accounts' && count(array_intersect(['code', 'type'], $fieldsUsed)) < 2)) {
-            throw ValidationException::withMessages(['csv' => [$kind === 'accounts'
-                ? 'The first line names the columns: "Code", "Name" and "Type" at least.' : 'The first line names the columns, and one of them is "Name".']]);
+        if (array_diff($required, $fieldsUsed) !== []) {
+            $names = array_map(fn ($f) => '"' . self::HEADINGS[$f] . '"', $required);
+            throw ValidationException::withMessages(['csv' => [count($names) === 1
+                ? "The first line names the columns, and one of them is {$names[0]}."
+                : 'The first line names the columns: ' . implode(', ', $names) . ' at least.']]);
         }
+        $contacts = in_array($kind, ['open-invoices', 'open-bills'], true) ? $this->contactsByName($kind === 'open-bills' ? 'is_vendor' : 'is_customer') : [];
         if (count($rows) === 0 || count($rows) > self::MAX_ROWS) {
             throw ValidationException::withMessages(['csv' => ['A file has 1 to ' . self::MAX_ROWS . ' rows below its headings.']]);
         }
@@ -108,13 +128,20 @@ final class ImportController extends Controller
                         continue;
                     }
                 }
+                if (in_array($kind, ['open-invoices', 'open-bills'], true)) {
+                    $fields = $this->openDocumentRow($fields, $contacts, $kind === 'open-bills' ? 'supplier' : 'customer');
+                    if (isset($fields['error'])) {
+                        $errors[] = ['row' => $n + 2, 'name' => $fields['label'], 'messages' => [$fields['error']]];
+                        continue;
+                    }
+                }
                 $sub = Request::create('/', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], json_encode($fields, JSON_THROW_ON_ERROR));
                 $sub->setUserResolver(fn () => $request->user());
                 try {
-                    app()->call([app($controller), 'store'], ['request' => $sub]);
+                    app()->call([app($controller), $action], ['request' => $sub]);
                     $added++;
                 } catch (ValidationException $e) {
-                    $errors[] = ['row' => $n + 2, 'name' => $fields['name'] ?? null, 'messages' => array_values(array_unique(array_merge(...array_values($e->errors()))))];
+                    $errors[] = ['row' => $n + 2, 'name' => $fields['name'] ?? $fields['label'] ?? null, 'messages' => array_values(array_unique(array_merge(...array_values($e->errors()))))];
                     if (count($errors) >= 100) {
                         break;
                     }
@@ -247,6 +274,59 @@ final class ImportController extends Controller
         }
 
         return $fields;
+    }
+
+    /**
+     * The company's customers or suppliers by name, lower case (read through row-level security). A name two of them
+     * share maps to null: such a row is entered on the opening balances page instead.
+     *
+     * @return array<string, ?string>
+     */
+    private function contactsByName(string $flag): array
+    {
+        $map = [];
+        foreach (DB::table('contacts')->where($flag, true)->get(['id', 'name']) as $c) {
+            $key = mb_strtolower(trim((string) $c->name));
+            $map[$key] = array_key_exists($key, $map) ? null : (string) $c->id;
+        }
+
+        return $map === [] ? ['' => null] : $map;
+    }
+
+    /**
+     * An open invoice or bill row as POST opening-balances/invoices or bills takes it: the customer or supplier by
+     * name, dates as Y-m-d (30/06/2026 read day first), the base currency when none is given.
+     *
+     * @param array<string, string> $fields
+     * @param array<string, ?string> $contacts
+     * @return array<string, mixed>
+     */
+    private function openDocumentRow(array $fields, array $contacts, string $who): array
+    {
+        $name = trim((string) ($fields['contact'] ?? ''));
+        $fields['label'] = trim($name . ' ' . ($fields['number'] ?? $fields['reference'] ?? ''));
+        $key = mb_strtolower($name);
+        if ($name === '' || ! array_key_exists($key, $contacts)) {
+            return [...$fields, 'error' => "No {$who} named \"{$name}\": add or import the {$who}s first."];
+        }
+        if ($contacts[$key] === null) {
+            return [...$fields, 'error' => "Two {$who}s are named \"{$name}\": enter this one on the opening balances page."];
+        }
+        $fields['contact_id'] = $contacts[$key];
+        foreach (['issue_date', 'due_date'] as $date) {
+            if (isset($fields[$date]) && preg_match('#^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$#', $fields[$date], $m)) {
+                $fields[$date] = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+            }
+        }
+        $fields['currency'] = strtoupper($fields['currency'] ?? $this->current()->base_currency);
+        unset($fields['contact']);
+
+        return $fields;
+    }
+
+    private function current(): \App\Domain\Tenancy\Models\Company
+    {
+        return app(\App\Domain\Tenancy\Support\CurrentCompany::class)->get();
     }
 
     /** @return array{0: list<string>, 1: list<list<string>>} headings (lower case, spaces as underscores) and the rows below */

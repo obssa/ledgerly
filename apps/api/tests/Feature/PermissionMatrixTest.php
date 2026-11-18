@@ -57,6 +57,8 @@ final class PermissionMatrixTest extends TestCase
         'PUT api/v1/numbering' => 'company.manage',
         'GET api/v1/opening-balances' => 'accounting.view',
         'PUT api/v1/opening-balances' => 'accounting.opening',
+        'POST api/v1/opening-balances/invoices' => 'accounting.opening',
+        'POST api/v1/opening-balances/bills' => 'accounting.opening',
 
         'GET api/v1/accounts' => 'company.view',
         'GET api/v1/chart' => 'accounting.view',
@@ -138,6 +140,8 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/imports/items' => 'inventory.items',
         'POST api/v1/imports/accounts' => 'accounting.chart',
         'POST api/v1/imports/opening-balances' => 'accounting.opening',
+        'POST api/v1/imports/open-invoices' => 'accounting.opening',
+        'POST api/v1/imports/open-bills' => 'accounting.opening',
         'POST api/v1/invoices/{invoice}/retention' => 'payments.receive',
         'POST api/v1/invoices/{invoice}/retention/release' => 'payments.receive',
         'POST api/v1/invoices/{invoice}/void' => 'transactions.edit',

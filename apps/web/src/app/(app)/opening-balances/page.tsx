@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getOpeningBalances } from "@/lib/data";
+import { formatMoney } from "@/lib/format";
 import { OpeningBalancesForm } from "./OpeningBalancesForm";
+import { OpeningDocumentForm } from "./OpeningDocumentForm";
 
 export const metadata = { title: "Opening balances" };
 
@@ -21,7 +23,8 @@ export default async function OpeningBalancesPage() {
     );
   }
 
-  const { opening, accounts } = data;
+  const { opening, accounts, customers, suppliers, currencies } = data;
+  const documents = opening.documents ?? [];
   const usable = accounts.filter(
     (a) => a.is_active && !opening.from_detail.includes(a.system_key ?? "") && (a.currency === null || a.currency === opening.base_currency),
   );
@@ -51,6 +54,43 @@ export default async function OpeningBalancesPage() {
           </>
         )}
       </Card>
+
+      {opening.conversion_date !== null && (
+        <Card className="mt-4 max-w-[1000px]" label="Open invoices and bills">
+          <h2 className="text-[17px] font-bold">Open invoices and bills from the old books</h2>
+          <p className="mt-1 max-w-[720px] text-sm text-muted">
+            Enter each invoice a customer still owed, and each bill still owed to a supplier, on {opening.conversion_date}: its number,
+            dates and the amount still open. It posts on the conversion date against opening balance equity (no sale, cost or tax again),
+            is never sent to the tax authority, and is paid, aged and stated like any other. Many at once:{" "}
+            <Link href="/import?kind=open-invoices" className="font-bold text-brand">import invoices</Link> or{" "}
+            <Link href="/import?kind=open-bills" className="font-bold text-brand">bills</Link> from a spreadsheet.
+          </p>
+          {documents.length > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="tbl">
+                <thead><tr><th scope="col">Kind</th><th scope="col">Number</th><th scope="col">Customer or supplier</th><th scope="col">Issued</th><th scope="col">Due</th><th scope="col" className="!text-right">Open at conversion</th><th scope="col" className="!text-right">Still due</th></tr></thead>
+                <tbody>
+                  {documents.map((d) => (
+                    <tr key={d.id}>
+                      <td>{d.type === "bill" ? "Bill" : "Invoice"}</td>
+                      <td className="num font-semibold">
+                        <Link href={`/${d.type === "bill" ? "bills" : "invoices"}/${encodeURIComponent(d.id)}`} className="hover:underline">{d.number}</Link>
+                        {d.reference && <span className="text-[12px] text-muted"> ({d.reference})</span>}
+                      </td>
+                      <td>{d.contact?.name}</td>
+                      <td className="num">{d.issue_date}</td>
+                      <td className="num">{d.due_date ?? "—"}</td>
+                      <td className="num text-right">{formatMoney(d.total, d.currency)}</td>
+                      <td className="num text-right font-semibold">{formatMoney(d.amount_due, d.currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {opening.can.enter && <OpeningDocumentForm conversionDate={opening.conversion_date} customers={customers} suppliers={suppliers} currencies={currencies} />}
+        </Card>
+      )}
     </>
   );
 }

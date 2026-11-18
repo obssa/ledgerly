@@ -177,6 +177,8 @@ Route::prefix('v1')->group(function () {
 
             Route::get('opening-balances', [OpeningBalanceController::class, 'show']);
             Route::put('opening-balances', [OpeningBalanceController::class, 'update']);
+            Route::post('opening-balances/invoices', [OpeningBalanceController::class, 'invoice']);
+            Route::post('opening-balances/bills', [OpeningBalanceController::class, 'bill']);
 
             Route::get('accounts', [LedgerController::class, 'accounts']);
             Route::get('chart', [ChartController::class, 'index']);
@@ -242,6 +244,8 @@ Route::prefix('v1')->group(function () {
             Route::post('imports/items', [ImportController::class, 'store'])->defaults('kind', 'items');
             Route::post('imports/accounts', [ImportController::class, 'store'])->defaults('kind', 'accounts');
             Route::post('imports/opening-balances', [ImportController::class, 'openingBalances']);
+            Route::post('imports/open-invoices', [ImportController::class, 'store'])->defaults('kind', 'open-invoices');
+            Route::post('imports/open-bills', [ImportController::class, 'store'])->defaults('kind', 'open-bills');
             Route::get('customers/{customer}', [CustomerController::class, 'show']);
             Route::get('customers/{customer}/statement', [CustomerController::class, 'statement']);
             Route::put('customers/{customer}', [CustomerController::class, 'update']);

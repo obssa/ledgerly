@@ -86,7 +86,24 @@ export interface OpeningBalances {
   difference: string;
   /** System keys of control accounts whose opening balance comes from their detail, not one figure. */
   from_detail: string[];
+  /** Open invoices and bills brought in from the old books at conversion (057), not voided. */
+  documents?: OpeningDocument[];
   can: { enter: boolean };
+}
+
+export interface OpeningDocument {
+  id: string;
+  type: "invoice" | "bill";
+  number: string;
+  /** A bill's supplier invoice number. */
+  reference: string | null;
+  contact: { id: string; name: string } | null;
+  issue_date: string;
+  due_date: string | null;
+  currency: string;
+  total: string;
+  amount_due: string;
+  status: string;
 }
 
 /** GET /numbering: how each type of document is numbered, and the number the next posted one would get. */
@@ -1235,6 +1252,8 @@ export const ledgerly = {
   addAccount: (body: Record<string, unknown>, ctx: RequestOptions) => api<ChartAccount>("accounts", { ...ctx, method: "POST", body }),
   changeAccount: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<ChartAccount>(`accounts/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   openingBalances: (ctx: RequestOptions) => api<OpeningBalances>("opening-balances", ctx),
+  enterOpeningDocument: (type: "invoice" | "bill", body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ id: string; number: string }>(`opening-balances/${type === "bill" ? "bills" : "invoices"}`, { ...ctx, method: "POST", body }),
   saveOpeningBalances: (lines: { account_id: string; debit?: string; credit?: string }[], ctx: RequestOptions) =>
     api<OpeningBalances>("opening-balances", { ...ctx, method: "PUT", body: { lines } }),
   dimensions: (ctx: RequestOptions) => api<{ data: Dimension[] }>("dimensions", ctx),
