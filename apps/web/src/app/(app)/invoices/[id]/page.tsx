@@ -6,6 +6,7 @@ import { formatAmount, formatMoney } from "@/lib/format";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { ApplyCredit } from "./ApplyCredit";
 import { Reminders } from "./Reminders";
+import { RetentionPanel } from "./RetentionPanel";
 import { InvoiceActions } from "./InvoiceActions";
 
 export const metadata = { title: "Invoice" };
@@ -103,6 +104,10 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
           )}
           {!creditNote && !invoice.demo && ["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0 && (
             <Reminders invoiceId={invoice.id} sent={invoice.reminders ?? []} canSend={Boolean(invoice.can.remind)} />
+          )}
+          {!creditNote && !invoice.demo && ["posted", "part_paid", "paid"].includes(invoice.status) && (invoice.can.retain || (invoice.retentions ?? []).length > 0) && (
+            <RetentionPanel invoiceId={invoice.id} retentions={invoice.retentions ?? []} canManage={Boolean(invoice.can.retain)}
+              canHold={["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0} />
           )}
           {canApply && <ApplyCredit creditNoteId={invoice.id} left={invoice.amount_due} invoices={openInvoices} />}
           {canRefund && <RefundPanel side="customer" contactId={invoice.contact.id} currency={invoice.currency} left={invoice.amount_due} creditId={invoice.id} accounts={moneyAccounts} />}

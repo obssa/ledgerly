@@ -88,6 +88,10 @@ final class EditPostedInvoice
         $edited = DB::transaction(function () use ($invoice, $calc, $reason, $userId, $company, $reopen, $closedUntil) {
             $invoice = Document::query()->with('lines')->lockForUpdate()->findOrFail($invoice->getKey());
             $invoice->assertVersion(isset($calc['lock_version']) ? (int) $calc['lock_version'] : null);
+            // Retention held is not part of what was paid: the invoice is edited once it is released (050).
+            if (DB::table('invoice_retentions')->where('document_id', $invoice->getKey())->whereNull('released_on')->exists()) {
+                throw new \App\Domain\Ledger\Exceptions\LedgerException("{$invoice->number} holds retention: release it before editing the invoice.");
+            }
             $paid = Money::of($invoice->total, $invoice->currency)->minus(Money::of($invoice->amount_due, $invoice->currency));
             if (! $paid->isZero() && $calc['header']['currency'] !== $invoice->currency) {
                 throw new LedgerException("{$invoice->number} is partly paid; its currency cannot change.");

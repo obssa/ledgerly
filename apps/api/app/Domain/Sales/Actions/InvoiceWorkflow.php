@@ -53,6 +53,10 @@ final class InvoiceWorkflow
         return DB::transaction(function () use ($invoice, $reason, $userId, $membership, $company) {
             $invoice = Document::query()->lockForUpdate()->findOrFail($invoice->getKey());
             $this->states->assert('invoice', $invoice->status, 'void', $invoice->label());
+            // The database refuses it too (050); said here in words.
+            if (DB::table('invoice_retentions')->where('document_id', $invoice->getKey())->whereNull('released_on')->exists()) {
+                throw new LedgerException("{$invoice->number} holds retention: release it before voiding the invoice.");
+            }
 
             $reversalId = null;
             if ($invoice->status === 'posted') {

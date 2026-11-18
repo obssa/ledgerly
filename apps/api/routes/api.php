@@ -240,6 +240,8 @@ Route::prefix('v1')->group(function () {
             Route::post('invoices/{invoice}/reject', [InvoiceController::class, 'reject']);
             Route::post('invoices/{invoice}/approve', [InvoiceController::class, 'approve']);
             Route::post('invoices/{invoice}/void', [InvoiceController::class, 'void']);
+            Route::post('invoices/{invoice}/retention', [InvoiceController::class, 'retain']);
+            Route::post('invoices/{invoice}/retention/release', [InvoiceController::class, 'releaseRetention']);
             Route::get('invoices/{invoice}/history', [InvoiceController::class, 'history']);
 
             Route::post('invoices/{invoice}/credit-notes', [CreditNoteController::class, 'store']);

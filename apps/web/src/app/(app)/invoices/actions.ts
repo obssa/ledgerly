@@ -77,6 +77,32 @@ export async function applyCredit(_: FormState | undefined, form: FormData): Pro
   return { notice: "Credit applied." };
 }
 
+/** Module 9a: retention the customer holds back on this invoice, as a share of the total or an amount. */
+export async function holdRetention(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const amount = (text(form, "amount") ?? "").replace(/,/g, "");
+  const percent = (text(form, "percent") ?? "").replace(/,/g, "");
+  try {
+    await ledgerly.holdRetention(text(form, "id") ?? "", { ...(amount ? { amount } : percent ? { percent } : {}), held_on: text(form, "held_on") ?? "" }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Retention held: it is owed when released." };
+}
+
+/** Releases the retention held on this invoice: the customer owes it again. */
+export async function releaseRetention(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.releaseRetention(text(form, "id") ?? "", text(form, "released_on") ?? "", ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Released: the customer owes it again." };
+}
+
 /** Module 2: emails the customer a payment reminder for this invoice now (at most once a day). */
 export async function remindInvoice(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
