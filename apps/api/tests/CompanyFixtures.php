@@ -96,6 +96,11 @@ trait CompanyFixtures
         $this->owner()->table('documents')->insert(['id' => $issued, 'company_id' => $company, 'type' => 'purchase_order',
             'number' => 'PO-FIXTURE-1', 'contact_id' => $ids['supplier'], 'issue_date' => '2026-11-05', 'currency' => 'ETB', 'warehouse_id' => $ids['store']]);
         $this->owner()->table('documents')->where('id', $issued)->update(['status' => 'accepted']);   // issued, as the state machine allows
+        // A draft cash sale (070), written as the owner: a real one for the routes to find that posts nothing, so the
+        // fixture's ledger stays as every other test expects. Voiding a draft is allowed and posts nothing either.
+        $ids['sales_receipt'] = (string) Str::uuid7();
+        $this->owner()->table('documents')->insert(['id' => $ids['sales_receipt'], 'company_id' => $company, 'type' => 'sales_receipt',
+            'contact_id' => $ids['contact'], 'issue_date' => '2026-11-05', 'currency' => 'ETB', 'paid_from_account_id' => $ids['bank'], 'payment_method' => 'cash']);
         $ids['goods_receipt'] = (string) Str::uuid7();
         $this->owner()->table('goods_receipts')->insert(['id' => $ids['goods_receipt'], 'company_id' => $company, 'purchase_order_id' => $issued,
             'number' => 'GRN-FIXTURE-1', 'received_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
@@ -171,7 +176,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(269, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(273, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -211,6 +216,7 @@ trait CompanyFixtures
             'salesOrder' => $ids['sales_order'],
             'purchaseOrder' => $ids['purchase_order'],
             'goodsReceipt' => $ids['goods_receipt'],
+            'salesReceipt' => $ids['sales_receipt'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

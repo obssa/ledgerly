@@ -56,7 +56,7 @@ final class SaveInvoiceDraft
                 $data['salesperson_id'] = $original->salesperson_id;   // a credit note takes back the sale of whoever made it
                 $data['warehouse_id'] = $original->warehouse_id;   // returned goods come back where they left from (058)
             }
-            $data['salesperson_id'] = in_array($type, ['invoice', 'credit_note'], true) ? $this->salesperson($data, $document, $original) : null;
+            $data['salesperson_id'] = in_array($type, ['invoice', 'credit_note', 'sales_receipt'], true) ? $this->salesperson($data, $document, $original) : null;
 
             $calc = $this->calculate($data);
             if ($type === 'bill') {
@@ -120,7 +120,7 @@ final class SaveInvoiceDraft
         $number = isset($data['number']) && trim((string) $data['number']) !== '' ? trim((string) $data['number']) : null;
         $automatic = $this->numbers->isAutomatic($this->company->id(), $type);
 
-        $noun = match ($type) { 'bill', 'expense', 'quote' => $type, 'vendor_credit' => 'supplier credit', 'sales_order' => 'sales order', default => 'invoice' };
+        $noun = match ($type) { 'bill', 'expense', 'quote' => $type, 'vendor_credit' => 'supplier credit', 'sales_order' => 'sales order', 'sales_receipt' => 'cash sale', default => 'invoice' };
         if ($automatic && $number !== null) {
             $when = in_array($type, ['quote', 'sales_order'], true) ? ($type === 'quote' ? 'sent' : 'confirmed') : 'posted';
             throw ValidationException::withMessages(['number' => [ucfirst($noun) . "s are numbered when they are {$when}. Leave the number empty."]]);

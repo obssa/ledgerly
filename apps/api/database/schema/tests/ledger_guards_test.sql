@@ -3679,6 +3679,53 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T95 goods are received against an issued order, never beyond it, billed no further than received, kept, and value-only price adjustments stay above zero';
 END $$;
+
+-- T96: sales receipts (070). A cash sale names the money account it went into and how it was paid, one of the
+-- company's own bank, cash or mobile-money accounts; posted, it leaves nothing to pay; it is for a customer; an
+-- invoice names no money account; another company never sees it. Company A as f1, customer c1, petty cash a57.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  cash constant uuid := '00000000-0000-0000-0000-000000000a57';
+  income constant uuid := '00000000-0000-0000-0000-000000000a40';
+  sr constant uuid := '00000000-0000-0000-0000-000000000eb0';
+BEGIN
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency) VALUES (app_company_id(), 'sales_receipt', c1, '2027-10-01', 'ETB');
+    RAISE EXCEPTION 'FAIL T96a: a sales receipt named no money account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, paid_from_account_id, payment_method)
+      VALUES (app_company_id(), 'sales_receipt', c1, '2027-10-01', 'ETB', income, 'cash');
+    RAISE EXCEPTION 'FAIL T96b: a sales receipt went into an account that holds no money';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, paid_from_account_id, payment_method)
+      VALUES (app_company_id(), 'sales_receipt', c8, '2027-10-01', 'ETB', cash, 'cash');
+    RAISE EXCEPTION 'FAIL T96c: a sales receipt was made for a contact that is not a customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, paid_from_account_id, payment_method)
+      VALUES (app_company_id(), 'invoice', c1, '2027-10-01', 'ETB', cash, 'cash');
+    RAISE EXCEPTION 'FAIL T96d: an invoice named a money account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, paid_from_account_id, payment_method, total, amount_due)
+    VALUES (sr, app_company_id(), 'sales_receipt', c1, '2027-10-01', 'ETB', cash, 'mobile_money', 115, 115);
+  BEGIN
+    UPDATE documents SET status = 'posted', number = 'SR-T96-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = sr;
+    RAISE EXCEPTION 'FAIL T96e: a posted sales receipt was left owing';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET status = 'posted', number = 'SR-T96-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001', amount_due = 0 WHERE id = sr;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM documents WHERE id = sr) THEN
+    RAISE EXCEPTION 'FAIL T96f: company B saw company A''s sales receipt';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T96 a sales receipt names the money account it went into, is for a customer and leaves nothing to pay';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

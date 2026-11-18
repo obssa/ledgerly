@@ -49,7 +49,8 @@ final class InvoicePostingBuilder
             baseCurrency: $baseCurrency,
             currency: $currency,
             fxRate: $fxRate,
-            memo: ['invoice' => 'Invoice ', 'credit_note' => 'Credit note ', 'bill' => 'Bill ', 'expense' => 'Expense ', 'vendor_credit' => 'Supplier credit '][$sourceType] . $documentNumber,
+            memo: ['invoice' => 'Invoice ', 'credit_note' => 'Credit note ', 'bill' => 'Bill ', 'expense' => 'Expense ', 'vendor_credit' => 'Supplier credit ',
+                'sales_receipt' => 'Cash sale '][$sourceType] . $documentNumber,
             sourceType: $sourceType,
             sourceId: $documentId,
         );
