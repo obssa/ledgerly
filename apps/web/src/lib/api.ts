@@ -636,6 +636,8 @@ export interface InvoiceLine {
   discount_rate: string;
   tax_rate_id: string | null;
   account_id: string;
+  /** The item sold on the line, if any. */
+  item_id?: string | null;
   /** The project the line is tagged with (job costing), if any. */
   project_id?: string | null;
   line_subtotal: string;
@@ -712,6 +714,9 @@ export interface Expense extends Bill {
 
 export interface InvoiceDetail extends Invoice {
   type: "invoice" | "credit_note";
+  prices_include_tax?: boolean;
+  /** Where stock lines leave from (025). */
+  warehouse_id?: string | null;
   /** A credit note names the invoice it corrects. */
   original_document_id: string | null;
   original?: { id: string; number: string | null } | null;
@@ -1347,6 +1352,8 @@ export const ledgerly = {
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
+  updateInvoice: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   approveInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),
   submitInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
   voidInvoice: (id: string, reason: string, ctx: RequestOptions) =>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { Card } from "@/components/ui";
+import type { InvoiceDetail } from "@/lib/api";
 import type { InvoiceOptions } from "@/lib/data";
 import { documentAmounts, lineAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
@@ -63,19 +64,22 @@ const addDays = (date: string, days: number) => {
  * the same exact-decimal rules as the API (src/lib/decimal.ts mirrors TaxCalculator); the API recalculates on save,
  * and its numbers are the ones that post.
  */
-export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOptions; kind?: keyof typeof KIND }) {
+export function InvoiceForm({ options, kind = "invoice", draft }: { options: InvoiceOptions; kind?: keyof typeof KIND; draft?: InvoiceDetail }) {
   const words = KIND[kind];
   const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : createInvoice, undefined);
   const today = todayIn();
   const firstRate = options.taxRates[0]?.id ?? "";
   const firstAccount = options.accounts[0]?.id ?? "";
 
-  const [customerId, setCustomerId] = useState("");
-  const [issueDate, setIssueDate] = useState(today);
-  const [currency, setCurrency] = useState(options.baseCurrency);
-  const [inclusive, setInclusive] = useState(false);
+  const [customerId, setCustomerId] = useState(draft?.contact.id ?? "");
+  const [issueDate, setIssueDate] = useState(draft?.issue_date ?? today);
+  const [currency, setCurrency] = useState(draft?.currency ?? options.baseCurrency);
+  const [inclusive, setInclusive] = useState(Boolean(draft?.prices_include_tax));
   const projects = options.projects ?? [];
-  const [lines, setLines] = useState<Line[]>([{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
+  const [lines, setLines] = useState<Line[]>(draft && draft.lines.length > 0
+    ? draft.lines.map((l, i) => ({ key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
+        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "" }))
+    : [{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const items = options.items ?? [];
   const stockLine = lines.some((l) => items.find((i) => i.id === l.itemId)?.type === "inventory");
   /** Picking an item fills the line from it; the person can still change what was filled. */
@@ -114,6 +118,8 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
   return (
     <form action={action} noValidate className="flex flex-wrap items-start gap-4">
       <input type="hidden" name="lines" value={linesJson} />
+      {draft && <input type="hidden" name="id" value={draft.id} />}
+      {draft?.lock_version && <input type="hidden" name="lock_version" value={String(draft.lock_version)} />}
       <div className="flex min-w-0 flex-[2_1_560px] flex-col gap-4">
         {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
         <Card label={`${words.party} and terms`}>
@@ -154,13 +160,14 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
                 </div>
               </>
             )}
-            {options.manualNumbers && <Field name="number" label={words.numberLabel} invalid={bad("number")} />}
+            {options.manualNumbers && <Field name="number" label={words.numberLabel} defaultValue={draft?.number ?? ""} invalid={bad("number")} />}
             <div>
               <label className="field-label" htmlFor="issue_date">Issue date</label>
               <input className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </div>
             {kind !== "expense" && (
-              <Field key={`${customerId}-${issueDate}`} name="due_date" label="Due date" type="date" defaultValue={customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
+              <Field key={`${customerId}-${issueDate}`} name="due_date" label="Due date" type="date"
+                defaultValue={draft?.due_date && customerId === draft.contact.id && issueDate === draft.issue_date ? draft.due_date : customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />
             )}
             <div>
               <label className="field-label" htmlFor="currency">Currency</label>
@@ -171,7 +178,7 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
             {kind === "invoice" && (options.people ?? []).length > 0 && (
               <div>
                 <label className="field-label" htmlFor="salesperson_id">Salesperson</label>
-                <select className={`field ${bad("salesperson_id") ? "!border-bad" : ""}`} id="salesperson_id" name="salesperson_id" defaultValue="">
+                <select className={`field ${bad("salesperson_id") ? "!border-bad" : ""}`} id="salesperson_id" name="salesperson_id" defaultValue={draft?.salesperson_id ?? ""}>
                   <option value="">None</option>
                   {(options.people ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -180,13 +187,13 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
             {stockLine && (
               <div>
                 <label className="field-label" htmlFor="warehouse_id">{kind === "bill" ? "Goods arrive in" : "Goods leave from"}</label>
-                <select className={`field ${bad("warehouse_id") ? "!border-bad" : ""}`} id="warehouse_id" name="warehouse_id">
+                <select className={`field ${bad("warehouse_id") ? "!border-bad" : ""}`} id="warehouse_id" name="warehouse_id" defaultValue={draft?.warehouse_id ?? undefined}>
                   {(options.warehouses ?? []).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
               </div>
             )}
             {currency !== options.baseCurrency && (
-              <Field name="fx_rate" label={`Rate (${options.baseCurrency} for 1 ${currency})`} hint="Empty: the company's rate for the issue date" invalid={bad("fx_rate")} />
+              <Field name="fx_rate" defaultValue={draft && currency === draft.currency && draft.currency !== options.baseCurrency ? draft.fx_rate : ""} label={`Rate (${options.baseCurrency} for 1 ${currency})`} hint="Empty: the company's rate for the issue date" invalid={bad("fx_rate")} />
             )}
             <div className="flex items-end">
               <label className="flex min-h-[42px] items-center gap-2 text-sm font-semibold">
@@ -258,7 +265,7 @@ export function InvoiceForm({ options, kind = "invoice" }: { options: InvoiceOpt
         </Card>
         <Card label="Notes">
           <label className="field-label" htmlFor="notes">{words.notes}</label>
-          <textarea className="field min-h-[72px]" id="notes" name="notes" maxLength={2000} />
+          <textarea className="field min-h-[72px]" id="notes" name="notes" maxLength={2000} defaultValue={draft?.notes ?? ""} />
         </Card>
       </div>
 
