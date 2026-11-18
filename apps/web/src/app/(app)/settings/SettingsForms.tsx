@@ -5,7 +5,7 @@ import type { CompanySettings, Currencies, Dimension, Numbering } from "@/lib/ap
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
-import { VAT_SHOWN, REMINDERS_SHOWN } from "@/lib/settings";
+import { VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN } from "@/lib/settings";
 import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock, toggleDimension } from "./actions";
 import { todayIn } from "@/lib/dates";
 
@@ -122,6 +122,15 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
           <label className="field-label" htmlFor="reminders-days">Days after the due date</label>
           <input className="field num" id="reminders-days" name="reminders.days" inputMode="numeric" defaultValue={(settings.reminders?.days ?? [7, 30]).join(", ")} placeholder="7, 30" />
         </div>
+      </fieldset>
+
+      <fieldset disabled={!editable} className="mt-4">
+        <legend className="sr-only">Tax return reminders</legend>
+        <input type="hidden" name={TAX_REMINDERS_SHOWN} value="1" />
+        <label className="flex items-center gap-2 text-sm" htmlFor="tax-reminders">
+          <input type="checkbox" id="tax-reminders" name="tax_reminders" defaultChecked={settings.tax_reminders ?? true} />
+          Email the people who file tax when a return is due within ten days, and when it is overdue
+        </label>
       </fieldset>
 
       {editable && (

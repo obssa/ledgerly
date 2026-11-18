@@ -14,6 +14,7 @@ Schedule::command('ledgerly:post-recurring')->hourly();
 Schedule::command('ledgerly:send-saved-reports')->hourly();
 Schedule::command('ledgerly:send-invoice-reminders')->hourly();
 Schedule::command('ledgerly:subscriptions-tick')->dailyAt('01:00');
+Schedule::command('ledgerly:send-tax-reminders')->dailyAt('05:00');
 
 /*
 | Posts recurring journals that have come due (App\Domain\Ledger\RecurringJournals), each in its own company's
@@ -238,6 +239,60 @@ Artisan::command('ledgerly:subscription {organisation : the organisation id, or 
 
     return 0;
 })->purpose("Record a payment or change a company's Ledgerly subscription (owner role)");
+
+/*
+| Reminders of tax returns that are due (054): from each company's filing calendar (the country pack's due dates), an
+| email to the people who may file tax when a return is due within ten days, and again when it has just become overdue
+| (within a week of its due date, so a company new to Ledgerly is not sent its whole past). Once per period and stage.
+| Which companies come from tax_reminder_companies(): in use, not the demo, reminders not turned off.
+*/
+Artisan::command('ledgerly:send-tax-reminders', function (\App\Domain\Tax\TaxCalendar $calendar, \App\Domain\Tenancy\Support\CurrentCompany $current) {
+    $sent = 0;
+    foreach (DB::select('SELECT company_id FROM tax_reminder_companies()') as $row) {
+        try {
+            $sent += \App\Domain\Tenancy\Support\DatabaseTenantContext::run(null, $row->company_id, function () use ($calendar, $current, $row) {
+                $company = \App\Domain\Tenancy\Models\Company::query()->findOrFail($row->company_id);
+                $current->set($company);
+                $today = $current->today();
+                $soonest = (new \DateTimeImmutable($today))->modify('-7 days')->format('Y-m-d');
+                $members = \App\Domain\Tenancy\Models\Membership::query()->where(['company_id' => $company->getKey(), 'status' => 'active'])->get()
+                    ->filter(fn ($m) => $m->can('tax.file'));
+                $people = \App\Models\User::query()->whereIn('id', $members->pluck('user_id'))->get();
+                $count = 0;
+                foreach ($calendar->for($company, $today)['kinds'] as $kind => $k) {
+                    foreach ($k['periods'] as $p) {
+                        $stage = match (true) {
+                            $p['status'] === 'due_soon' => 'due_soon',
+                            $p['status'] === 'overdue' && $p['due_on'] >= $soonest => 'overdue',
+                            default => null,
+                        };
+                        if ($stage === null || DB::table('tax_reminders')->where(['company_id' => $company->getKey(), 'kind' => $kind,
+                            'period_start' => $p['period_start'], 'stage' => $stage])->exists()) {
+                            continue;
+                        }
+                        DB::table('tax_reminders')->insert(['company_id' => $company->getKey(), 'kind' => $kind, 'period_start' => $p['period_start'],
+                            'period_end' => $p['period_end'], 'due_on' => $p['due_on'], 'stage' => $stage, 'sent_to' => $people->count()]);
+                        foreach ($people as $person) {
+                            $person->notify(new \App\Notifications\TaxReturnDue((string) ($company->trading_name ?: $company->legal_name), $kind,
+                                $p['period_start'], $p['period_end'], $p['due_on'], $stage));
+                        }
+                        $count++;
+                    }
+                }
+
+                return $count;
+            });
+        } catch (\Throwable $e) {
+            report($e);
+            $this->error("Tax reminders for company {$row->company_id} failed: " . $e::class);
+        } finally {
+            $current->forget();
+        }
+    }
+    $this->info("{$sent} tax return reminders sent.");
+
+    return 0;
+})->purpose('Email the people who file tax about returns due soon or just overdue');
 
 /*
 | Run before `migrate` when the tables live outside `public` (DB_SCHEMA, shared hosting): Laravel creates its

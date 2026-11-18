@@ -52,6 +52,8 @@ export interface CompanySettings {
   approval?: Partial<Record<"invoice_above" | "bill_above" | "journal_above", string>>;
   /** Payment reminders: emailed to the customer so many days after an invoice falls due (048). */
   reminders?: { enabled: boolean; days: number[] };
+  /** Email reminders of tax returns due (054): on unless turned off. */
+  tax_reminders?: boolean;
   can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean; manage_dimensions: boolean };
   options: { tax_id_label: string; calendars: string[]; legal_forms: string[] };
 }

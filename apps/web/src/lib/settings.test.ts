@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REMINDERS_SHOWN, reminderDays, settingsBody, VAT_SHOWN } from "./settings";
+import { REMINDERS_SHOWN, reminderDays, settingsBody, TAX_REMINDERS_SHOWN, VAT_SHOWN } from "./settings";
 
 const form = (entries: [string, string][]) => {
   const f = new FormData();
@@ -54,5 +54,13 @@ describe("payment reminders", () => {
     });
     expect(settingsBody(form([["version", "v1"], [REMINDERS_SHOWN, "1"], ["reminders.enabled", "on"], ["reminders.days", "14"]])).reminders)
       .toEqual({ enabled: true, days: [14] });
+  });
+});
+
+describe("tax return reminders", () => {
+  it("sends the switch only when the form showed it, unticked as off", () => {
+    expect(settingsBody(form([["version", "v1"], [TAX_REMINDERS_SHOWN, "1"]])).tax_reminders).toBe(false);
+    expect(settingsBody(form([["version", "v1"], [TAX_REMINDERS_SHOWN, "1"], ["tax_reminders", "on"]])).tax_reminders).toBe(true);
+    expect(settingsBody(form([["version", "v1"]]))).not.toHaveProperty("tax_reminders");
   });
 });

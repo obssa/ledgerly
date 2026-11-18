@@ -2796,6 +2796,36 @@ BEGIN
   RAISE NOTICE 'PASS T79 subscriptions change only through billing, and time moves them only towards less, outside any company';
 END $$;
 SET ROLE ledgerly_web;
+-- T80: tax return reminders (054). Once per period and stage, kept as sent, seen only by the company; the scheduler's
+-- list of companies is read only outside any company. Company A as its owner f1.
+DO $$
+BEGIN
+  INSERT INTO tax_reminders (company_id, kind, period_start, period_end, due_on, stage, sent_to)
+    VALUES (app_company_id(), 'vat', '2027-08-01', '2027-08-31', '2027-09-30', 'due_soon', 2);
+  BEGIN
+    INSERT INTO tax_reminders (company_id, kind, period_start, period_end, due_on, stage, sent_to)
+      VALUES (app_company_id(), 'vat', '2027-08-01', '2027-08-31', '2027-09-30', 'due_soon', 2);
+    RAISE EXCEPTION 'FAIL T80a: a period was reminded twice at the same stage';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    UPDATE tax_reminders SET sent_to = 0 WHERE company_id = app_company_id();
+    RAISE EXCEPTION 'FAIL T80b: a sent reminder was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  IF EXISTS (SELECT 1 FROM tax_reminder_companies()) THEN
+    RAISE EXCEPTION 'FAIL T80c: the scheduler''s companies were read inside a company';
+  END IF;
+
+  PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+  IF NOT EXISTS (SELECT 1 FROM tax_reminder_companies() WHERE company_id = '00000000-0000-0000-0000-00000000000a') THEN
+    RAISE EXCEPTION 'FAIL T80d: a company in use is not reminded';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM tax_reminders) THEN
+    RAISE EXCEPTION 'FAIL T80e: company B saw company A''s tax reminders';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T80 a tax return is reminded once per stage, kept, seen by its company, and listed only to the scheduler';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -16,6 +16,7 @@ export const APPROVAL_LIMITS = ["invoice_above", "bill_above", "journal_above"] 
 /** A checkbox sends nothing when unticked, so the form carries this marker to say the checkbox was shown. */
 export const VAT_SHOWN = "vat_registered_shown";
 export const REMINDERS_SHOWN = "reminders_shown";
+export const TAX_REMINDERS_SHOWN = "tax_reminders_shown";
 
 /** "7, 30" → [7, 30]: whole days after the due date, at most three. Anything else is left for the API to refuse. */
 export function reminderDays(text: string): number[] {
@@ -42,6 +43,7 @@ export function settingsBody(form: FormData): Record<string, unknown> {
     }));
   }
 
+  if (form.has(TAX_REMINDERS_SHOWN)) body.tax_reminders = form.get("tax_reminders") === "on";
   if (form.has(REMINDERS_SHOWN)) body.reminders = { enabled: form.get("reminders.enabled") === "on", days: reminderDays(value("reminders.days")) };
 
   return body;

@@ -91,6 +91,8 @@ final class CompanySettingsController extends Controller
             'reminders.enabled' => ['required_with:reminders', 'boolean'],
             'reminders.days' => ['required_with:reminders', 'array', 'min:1', 'max:3'],
             'reminders.days.*' => ['integer', 'between:1,365', 'distinct'],
+            // Reminders of tax returns due (054): on unless turned off.
+            'tax_reminders' => ['sometimes', 'boolean'],
         ]);
 
         if ($data['version'] !== $this->version($company)) {
@@ -112,6 +114,10 @@ final class CompanySettingsController extends Controller
             sort($days);
             $company->settings = [...($company->settings ?? []), 'reminders' => ['enabled' => (bool) $data['reminders']['enabled'], 'days' => $days]];
             unset($data['reminders']);
+        }
+        if (array_key_exists('tax_reminders', $data)) {
+            $company->settings = [...($company->settings ?? []), 'tax_reminders' => (bool) $data['tax_reminders']];
+            unset($data['tax_reminders']);
         }
         $company->fill($data);
         $changes = AuditLogger::diff($before, $this->editable($company));
@@ -242,6 +248,7 @@ final class CompanySettingsController extends Controller
 
         $fields['approval'] = array_intersect_key($company->settings['approval'] ?? [], array_flip(self::APPROVAL_LIMITS));
         $fields['reminders'] = \App\Domain\Sales\InvoiceReminders::settingsOf($company);
+        $fields['tax_reminders'] = (bool) ($company->settings['tax_reminders'] ?? true);
 
         return $fields;
     }
