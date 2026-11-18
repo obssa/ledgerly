@@ -240,6 +240,8 @@ Route::prefix('v1')->group(function () {
             Route::post('imports/customers', [ImportController::class, 'store'])->defaults('kind', 'customers');
             Route::post('imports/suppliers', [ImportController::class, 'store'])->defaults('kind', 'suppliers');
             Route::post('imports/items', [ImportController::class, 'store'])->defaults('kind', 'items');
+            Route::post('imports/accounts', [ImportController::class, 'store'])->defaults('kind', 'accounts');
+            Route::post('imports/opening-balances', [ImportController::class, 'openingBalances']);
             Route::get('customers/{customer}', [CustomerController::class, 'show']);
             Route::get('customers/{customer}/statement', [CustomerController::class, 'statement']);
             Route::put('customers/{customer}', [CustomerController::class, 'update']);
