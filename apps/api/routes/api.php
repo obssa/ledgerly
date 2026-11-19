@@ -513,6 +513,7 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/cash-forecast', [FinancialStatementController::class, 'cashForecast']);
             Route::get('reports/kpis', [FinancialStatementController::class, 'kpis']);
             Route::get('reports/changes-in-equity', [FinancialStatementController::class, 'changesInEquity']);
+            Route::get('reports/notes', [FinancialStatementController::class, 'notes']);   // Module 10: the notes pack
             Route::get('reports/financial-health', [FinancialStatementController::class, 'health']);
             Route::get('reports/profit-by-dimension', [AnalysisReportController::class, 'profitByDimension']);
             Route::get('reports/custom', [AnalysisReportController::class, 'custom']);

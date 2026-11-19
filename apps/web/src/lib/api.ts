@@ -1187,6 +1187,16 @@ export interface DirectCashFlow {
   net_change: string; opening_cash: string; closing_cash: string; cash_change: string; balanced: boolean;
 }
 
+/** GET /reports/notes: the notes to the financial statements (Module 10). */
+export interface NotesLines { lines: { code: string; name: string; amount: string }[]; total: string }
+export interface FinancialNotes {
+  from: string; to: string; company: string; currency: string;
+  policies: { framework: string; basis: string; fiscal_year_start_month: number; inventory: string; depreciation_methods: string[] };
+  ppe: { cost: { opening: string; additions: string; disposals: string; closing: string }; depreciation: { opening: string; charged: string; released: string; closing: string };
+    carrying_opening: string; carrying_closing: string };
+  receivables: NotesLines; inventory: NotesLines; payables: NotesLines; taxes: NotesLines; loans: NotesLines & { movement: string };
+}
+
 export interface ChangesInEquity {
   from: string;
   to: string;
@@ -1895,6 +1905,7 @@ export const ledgerly = {
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
   balanceSheet: (asOf: string, ctx: RequestOptions) => api<BalanceSheet>("reports/balance-sheet", { ...ctx, query: { as_of: asOf } }),
   cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),
+  notes: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<FinancialNotes>("reports/notes", { ...ctx, query: q }),
   directCashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<DirectCashFlow>("reports/cash-flow", { ...ctx, query: { ...q, method: "direct" } }),
   kpis: (ctx: RequestOptions) => api<Kpis>("reports/kpis", ctx),
   cashForecast: (weeks: number, ctx: RequestOptions) => api<CashForecast>("reports/cash-forecast", { ...ctx, query: { weeks: String(weeks) } }),

@@ -32,6 +32,15 @@ final class FinancialStatementController extends Controller
         return response()->json([...$statement, 'currency' => $this->current->get()->base_currency]);
     }
 
+    /** Module 10: the notes to the financial statements for the period. */
+    public function notes(Request $request): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        [$from, $to] = $this->period($request);
+
+        return response()->json($this->statements->notes($this->current->id(), $from, $to));
+    }
+
     public function changesInEquity(Request $request): JsonResponse
     {
         $this->authorizeCompany('reports.view');
