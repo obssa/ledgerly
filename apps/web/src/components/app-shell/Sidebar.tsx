@@ -30,6 +30,7 @@ const groups: { label?: string; items: NavItem[] }[] = [
       { href: "/suppliers", label: "Suppliers" },
       { href: "/payments-made", label: "Payments made" },
       { href: "/expenses", label: "Expenses" },
+      { href: "/expense-claims", label: "Expense claims" },
     ],
   },
   {

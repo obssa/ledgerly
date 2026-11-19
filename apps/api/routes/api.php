@@ -30,6 +30,7 @@ use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
 use App\Http\Controllers\BadDebtController;
+use App\Http\Controllers\ExpenseClaimController;
 use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\BatchInvoiceController;
 use App\Http\Controllers\LateInterestController;
@@ -98,6 +99,7 @@ Route::bind('invoice', $documentOf(['invoice', 'credit_note']));
 Route::bind('bill', $documentOf(['bill', 'vendor_credit']));
 Route::bind('expense', $documentOf(['expense']));
 Route::bind('salesReceipt', $documentOf(['sales_receipt']));
+Route::bind('expenseClaim', $documentOf(['bill']));   // 083: the controller checks it is a claim, and whose
 Route::bind('supplierCredit', $documentOf(['vendor_credit']));
 Route::bind('quote', $documentOf(['quote']));
 Route::bind('salesOrder', $documentOf(['sales_order']));
@@ -187,7 +189,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('invoices/{invoice}/email', [InvoiceController::class, 'email']);
                 Route::post('quotes/{quote}/email', [QuoteController::class, 'email']);
                 // Files attached to documents (063): not stored for the shared demo accounts.
-                foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense']] as $path => [$param, $kind]) {
+                foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense'], 'expense-claims' => ['expenseClaim', 'expense_claim']] as $path => [$param, $kind]) {
                     Route::post("{$path}/{{$param}}/attachments", [AttachmentController::class, 'store'])->defaults('kind', $kind);
                 }
                 Route::post('sales-orders/{salesOrder}/email', [QuoteController::class, 'email']);
@@ -335,7 +337,7 @@ Route::prefix('v1')->group(function () {
             Route::get('delivery-notes/uninvoiced', [DeliveryNoteController::class, 'uninvoiced']);   // before {deliveryNote}
             Route::get('delivery-notes/{deliveryNote}', [DeliveryNoteController::class, 'show'])->whereUuid('deliveryNote');
             Route::post('delivery-notes/{deliveryNote}/void', [DeliveryNoteController::class, 'void'])->whereUuid('deliveryNote');
-            foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense']] as $path => [$param, $kind]) {
+            foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense'], 'expense-claims' => ['expenseClaim', 'expense_claim']] as $path => [$param, $kind]) {
                 Route::get("{$path}/{{$param}}/attachments", [AttachmentController::class, 'index'])->defaults('kind', $kind);
             }
             Route::get('attachments/{attachment}', [AttachmentController::class, 'download'])->whereUuid('attachment');
@@ -399,6 +401,10 @@ Route::prefix('v1')->group(function () {
             Route::get('payments-made', [PaymentMadeController::class, 'index']);
             Route::post('payments-made', [PaymentMadeController::class, 'store']);
             Route::post('payments-made/batch', [PaymentMadeController::class, 'batch']);   // Module 3: batch payments
+            Route::get('expense-claims', [ExpenseClaimController::class, 'index']);   // 083
+            Route::post('expense-claims', [ExpenseClaimController::class, 'store']);
+            Route::get('expense-claims/{expenseClaim}', [ExpenseClaimController::class, 'show'])->whereUuid('expenseClaim');
+            Route::post('expense-claims/{expenseClaim}/submit', [ExpenseClaimController::class, 'submit'])->whereUuid('expenseClaim');
             Route::get('payments-made/withholding/{supplier}', [PaymentMadeController::class, 'withholding']);
             Route::get('payments-made/{paymentMade}', [PaymentMadeController::class, 'show']);
             Route::post('payments-made/{paymentMade}/reverse', [PaymentMadeController::class, 'reverse']);

@@ -14,6 +14,8 @@
 |                    (a refund received from a supplier needs payments.receive)
 | expenses.create    record an expense already paid (fuel, utilities, petty cash): bookkeeper, accountant, owner, admin
 | expenses.view      read expenses: also approvers and viewers
+| expenses.claim     claim back what one paid for the company out of one's own pocket (083): every role that works, not viewers;
+|                    the claimant sees and submits their own claims, someone with bills.approve posts them
 | inventory.view     items, warehouses, stock on hand: every role that works with goods
 | inventory.items    add and change items and warehouses (bookkeeper, purchasing, accountant)
 | inventory.adjust   stock adjustments and opening stock, which post to the ledger (accountant, owner, admin)
@@ -62,10 +64,10 @@ return [
         'owner' => ['*'],
         'admin' => ['*'],
         'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'inventory.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*', 'projects.*', 'assets.*', 'audit.view'],
-        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'inventory.deliver', 'banking.*', 'contacts.*', 'reports.view', 'projects.view', 'projects.time', 'assets.view'],
-        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view', 'inventory.deliver', 'projects.time'],
-        'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'projects.time'],
-        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review', 'projects.view', 'projects.time', 'assets.view'],
+        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'expenses.claim', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'inventory.deliver', 'banking.*', 'contacts.*', 'reports.view', 'projects.view', 'projects.time', 'assets.view'],
+        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view', 'inventory.deliver', 'projects.time', 'expenses.claim'],
+        'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'projects.time', 'expenses.claim'],
+        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review', 'projects.view', 'projects.time', 'assets.view', 'expenses.claim'],
         'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'banking.view', 'reports.view', 'tax.view', 'projects.view', 'assets.view'],
         'custom' => [],
     ],
@@ -91,6 +93,7 @@ return [
         'bills.approve' => 'Purchases: post bills',
         'expenses.view' => 'Expenses: see expenses',
         'expenses.create' => 'Expenses: record expenses',
+        'expenses.claim' => 'Expenses: claim back what one paid',
         'transactions.edit' => 'Edit posted documents while the period is open',
         'inventory.view' => 'Inventory: see items and stock',
         'inventory.items' => 'Inventory: add and change items and warehouses',

@@ -59,6 +59,10 @@ final class ApproveInvoice
             $invoice = Document::query()->lockForUpdate()->findOrFail($invoice->getKey());
             $invoice->assertVersion($lockVersion);
             $this->states->assert('invoice', $invoice->status, 'posted', $invoice->label());
+            // 083: the database refuses it too; said here in words.
+            if ($invoice->claimed_by !== null && $invoice->claimed_by === $userId) {
+                throw new LedgerException("{$invoice->label()} is your own expense claim: someone else approves it.");
+            }
 
             $limit = $company->settings['approval'][in_array($invoice->type, ['bill', 'vendor_credit'], true) ? 'bill_above' : 'invoice_above'] ?? null;
             // A cash sale (070) records money already received, as an expense records money already spent.
