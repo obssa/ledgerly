@@ -90,7 +90,7 @@ final class DocumentStock
                     continue;
                 }
                 $out[] = ['line' => (object) ['line_no' => $line->line_no, 'quantity' => bcmul($sold, (string) $p->quantity, 2), 'unit_factor' => '1',
-                    'source_line_id' => null, 'id' => null], 'item' => $items[$p->component_id]];
+                    'source_line_id' => null, 'id' => null, 'batch_number' => null, 'batch_expires_on' => null], 'item' => $items[$p->component_id]];
             }
         }
 
@@ -121,10 +121,8 @@ final class DocumentStock
             if (in_array($doc->type, ['bill', 'vendor_credit'], true)) {
                 throw ValidationException::withMessages(['lines' => ["Line {$bundles[0]->line_no}: a bundle is sold, not bought. Buy its parts instead."]]);
             }
-            if ($doc->type === 'credit_note' && $doc->restock) {
-                throw ValidationException::withMessages(['lines' => ["Line {$bundles[0]->line_no}: a bundle's parts are not brought back on a credit note yet. Credit it without taking the goods back, and adjust the stock."]]);
-            }
-            if (in_array($doc->type, ['invoice', 'sales_receipt'], true)) {
+            // A bundle sold took its stock parts out; brought back on a credit note, they come back at the cost they left with.
+            if (in_array($doc->type, ['invoice', 'sales_receipt'], true) || ($doc->type === 'credit_note' && $doc->restock)) {
                 $lines = [...$lines, ...$this->bundleParts($bundles)];
             }
         }
