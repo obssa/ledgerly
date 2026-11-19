@@ -1179,6 +1179,14 @@ export interface CashFlowStatement {
   balanced: boolean;
 }
 
+/** GET /reports/cash-flow?method=direct: the cash received and paid by what it was for (Module 10). */
+export interface DirectCashFlow {
+  from: string; to: string; currency: string; method: "direct";
+  lines: { key: string; label: string; amount: string; accounts: { code: string; name: string; amount: string }[] }[];
+  totals: Record<"operating" | "investing" | "financing", string>;
+  net_change: string; opening_cash: string; closing_cash: string; cash_change: string; balanced: boolean;
+}
+
 export interface ChangesInEquity {
   from: string;
   to: string;
@@ -1876,6 +1884,7 @@ export const ledgerly = {
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
   balanceSheet: (asOf: string, ctx: RequestOptions) => api<BalanceSheet>("reports/balance-sheet", { ...ctx, query: { as_of: asOf } }),
   cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),
+  directCashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<DirectCashFlow>("reports/cash-flow", { ...ctx, query: { ...q, method: "direct" } }),
   kpis: (ctx: RequestOptions) => api<Kpis>("reports/kpis", ctx),
   cashForecast: (weeks: number, ctx: RequestOptions) => api<CashForecast>("reports/cash-forecast", { ...ctx, query: { weeks: String(weeks) } }),
   changesInEquity: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<ChangesInEquity>("reports/changes-in-equity", { ...ctx, query: q }),

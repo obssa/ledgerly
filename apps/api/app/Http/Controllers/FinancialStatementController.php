@@ -25,8 +25,11 @@ final class FinancialStatementController extends Controller
     {
         $this->authorizeCompany('reports.view');
         [$from, $to] = $this->period($request);
+        // Indirect by default (from the profit); direct shows the cash received and paid by what it was for (Module 10).
+        $method = $request->validate(['method' => ['nullable', 'in:indirect,direct']])['method'] ?? 'indirect';
+        $statement = $method === 'direct' ? $this->statements->directCashFlow($this->current->id(), $from, $to) : $this->statements->cashFlow($this->current->id(), $from, $to);
 
-        return response()->json([...$this->statements->cashFlow($this->current->id(), $from, $to), 'currency' => $this->current->get()->base_currency]);
+        return response()->json([...$statement, 'currency' => $this->current->get()->base_currency]);
     }
 
     public function changesInEquity(Request $request): JsonResponse

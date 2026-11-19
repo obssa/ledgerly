@@ -108,6 +108,73 @@ final class FinancialStatements
         ];
     }
 
+    /** Where cash paid or received is shown on the direct-method statement, by the account on the other side of it. */
+    public const DIRECT_LINES = [
+        'customers' => 'Received from customers', 'suppliers' => 'Paid to suppliers and for expenses', 'employees' => 'Paid to employees',
+        'taxes' => 'Taxes paid and received', 'other' => 'Other operating cash', 'investing' => 'Investing', 'financing' => 'Financing',
+    ];
+
+    /**
+     * The cash flow statement for a period, direct method: the cash that moved through the bank, cash and wallet accounts,
+     * shown by what it was for: each entry that touched a cash account is classified by its other lines (credit less
+     * debit of each is the cash it brought in), so the lines add up exactly to the change in cash; transfers between the
+     * company's own cash accounts cancel out.
+     *
+     * @return array<string, mixed>
+     */
+    public function directCashFlow(string $companyId, string $from, string $to): array
+    {
+        $cash = DB::table('accounts')->where(['company_id' => $companyId, 'type' => 'asset'])->whereIn('subtype', self::CASH)->pluck('id')->all();
+        $touched = DB::table('journal_lines')->where('company_id', $companyId)->whereBetween('entry_date', [$from, $to])->whereIn('account_id', $cash)
+            ->select('journal_entry_id');
+        $rows = DB::table('journal_lines as l')->join('accounts as a', 'a.id', '=', 'l.account_id')
+            ->where('l.company_id', $companyId)->whereBetween('l.entry_date', [$from, $to])->whereNotIn('l.account_id', $cash)
+            ->whereIn('l.journal_entry_id', $touched)
+            ->groupBy('a.id', 'a.code', 'a.name', 'a.type', 'a.subtype', 'a.system_key')->orderBy('a.code')
+            ->select('a.code', 'a.name', 'a.type', 'a.subtype', 'a.system_key')
+            ->selectRaw('sum(l.credit - l.debit)::numeric(20,2)::text AS amount')->get();
+        $lines = array_fill_keys(array_keys(self::DIRECT_LINES), []);
+        foreach ($rows as $a) {
+            if (BigDecimal::of($a->amount)->isZero()) {
+                continue;
+            }
+            $lines[self::directLine($a)][] = ['code' => $a->code, 'name' => $a->name, 'amount' => $a->amount];
+        }
+        $sum = fn (array $ls) => array_reduce($ls, fn (BigDecimal $t, array $l) => $t->plus($l['amount']), BigDecimal::zero());
+        $operating = $sum([...$lines['customers'], ...$lines['suppliers'], ...$lines['employees'], ...$lines['taxes'], ...$lines['other']]);
+        $investing = $sum($lines['investing']);
+        $financing = $sum($lines['financing']);
+        $cashChange = BigDecimal::of((string) (DB::table('journal_lines')->where('company_id', $companyId)->whereBetween('entry_date', [$from, $to])
+            ->whereIn('account_id', $cash)->selectRaw('coalesce(sum(debit - credit), 0)::numeric(20,2)::text AS v')->value('v') ?? '0'));
+        $opening = BigDecimal::of((string) (DB::table('journal_lines')->where('company_id', $companyId)->where('entry_date', '<', $from)
+            ->whereIn('account_id', $cash)->selectRaw('coalesce(sum(debit - credit), 0)::numeric(20,2)::text AS v')->value('v') ?? '0'));
+        $net = $operating->plus($investing)->plus($financing);
+
+        return [
+            'from' => $from, 'to' => $to, 'method' => 'direct',
+            'lines' => array_map(fn (string $key) => ['key' => $key, 'label' => self::DIRECT_LINES[$key], 'accounts' => $lines[$key],
+                'amount' => (string) $sum($lines[$key])->toScale(2)], array_keys(self::DIRECT_LINES)),
+            'totals' => ['operating' => (string) $operating->toScale(2), 'investing' => (string) $investing->toScale(2), 'financing' => (string) $financing->toScale(2)],
+            'net_change' => (string) $net->toScale(2),
+            'opening_cash' => (string) $opening->toScale(2), 'closing_cash' => (string) $opening->plus($cashChange)->toScale(2),
+            'cash_change' => (string) $cashChange->toScale(2),
+            'balanced' => $net->isEqualTo($cashChange),
+        ];
+    }
+
+    private static function directLine(object $a): string
+    {
+        return match (true) {
+            in_array($a->system_key, ['accounts_receivable', 'customer_deposits', 'doubtful_debts_allowance'], true) || $a->type === 'income' && $a->subtype !== 'other_income' && $a->system_key !== 'asset_disposal' => 'customers',
+            in_array($a->system_key, ['salaries_payable', 'salaries_expense', 'employer_contributions', 'paye_payable'], true) => 'employees',
+            in_array($a->system_key, ['vat_payable', 'vat_receivable', 'withholding_payable', 'withholding_receivable', 'income_tax_payable', 'income_tax_expense'], true) => 'taxes',
+            ($a->type === 'asset' && $a->subtype === 'fixed_asset') || $a->system_key === 'asset_disposal' => 'investing',
+            ($a->type === 'liability' && $a->subtype === 'loan') || ($a->type === 'equity' && $a->subtype !== 'retained_earnings') => 'financing',
+            in_array($a->system_key, ['accounts_payable', 'grni', 'inventory', 'cogs'], true) || $a->type === 'expense' || ($a->type === 'asset' && in_array($a->subtype, ['inventory', 'prepayment'], true)) => 'suppliers',
+            default => 'other',
+        };
+    }
+
     /**
      * The statement of changes in equity for a period: each equity account's opening balance, what moved in it, and its
      * closing balance (credit-positive). Retained earnings are shown with the profit, closed or not: closing entries are
