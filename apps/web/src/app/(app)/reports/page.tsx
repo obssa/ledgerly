@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import type { ProfitAndLossRow } from "@/lib/api";
 import { parse } from "@/lib/decimal";
 import { getCompanySettings, getProfitAndLoss, getReportPeriod, getShellContext } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { periodLabel, previousPeriod } from "@/lib/reports";
+import { periodLabel, previousPeriod, samePeriodLastYear } from "@/lib/reports";
 import { ExportLink, PeriodForm, ReportsNav } from "./ReportsNav";
 
 export const metadata = { title: "Profit and loss" };
@@ -24,7 +25,9 @@ function change(current: string, previous: string | null): string {
 export default async function ReportsPage({ searchParams }: PageProps<"/reports">) {
   const q = await searchParams;
   const period = await getReportPeriod(q);
-  const before = previousPeriod(period.from, period.to);
+  // Against the period just before, or (compare=year) the same period last year.
+  const lastYear = q.compare === "year";
+  const before = lastYear ? samePeriodLastYear(period.from, period.to) : previousPeriod(period.from, period.to);
   const [pl, { companyName }, settings] = await Promise.all([
     getProfitAndLoss({ ...period, compare_from: before.from, compare_to: before.to }), getShellContext(), getCompanySettings(),
   ]);
@@ -72,6 +75,10 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" actions={<ExportLink report="profit-and-loss" params={period} />} />
       <PeriodForm from={period.from} to={period.to} />
+      <nav aria-label="Compare with" className="mb-3 flex flex-wrap gap-2 text-[13px]">
+        <Link href={`/reports?from=${period.from}&to=${period.to}`} className={`btn !py-1 ${lastYear ? "" : "btn-primary"}`}>Against the period before</Link>
+        <Link href={`/reports?from=${period.from}&to=${period.to}&compare=year`} className={`btn !py-1 ${lastYear ? "btn-primary" : ""}`}>Against the same period last year</Link>
+      </nav>
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports" />
         <Card className="min-w-0 flex-[4_1_560px]" label="Profit and loss statement">
