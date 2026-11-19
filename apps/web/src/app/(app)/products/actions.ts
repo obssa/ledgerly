@@ -71,6 +71,19 @@ export async function setBundleParts(_: FormState | undefined, form: FormData): 
   return { notice: "Parts saved." };
 }
 
+/** 090: where the item is kept in a warehouse; empty clears it. */
+export async function setBinLocation(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const bin = text(form, "bin") ?? "";
+  try {
+    await ledgerly.setBinLocation(text(form, "id") ?? "", { warehouse_id: text(form, "warehouse_id") ?? "", bin: bin || null }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: bin ? `Kept in ${bin}.` : "Bin cleared." };
+}
+
 /** 089: the item's variants, from up to three options with values separated by commas. */
 export async function makeVariants(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

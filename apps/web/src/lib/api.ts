@@ -634,7 +634,9 @@ export interface Item {
   /** Still to come on issued purchase orders (068). */
   on_order?: string;
   value?: string;
-  balances?: { warehouse: { id: string; name: string }; quantity: string; value: string }[];
+  balances?: { warehouse: { id: string; name: string }; quantity: string; value: string; bin?: string | null }[];
+  /** 090: where it is kept in each warehouse. */
+  locations?: { warehouse_id: string; warehouse: string; bin: string }[];
   /** 072: other units it is bought or sold in, each a fixed number of its own (archived ones on the item's own page only). */
   units?: { id: string; name: string; factor: string; is_active?: boolean; barcode?: string | null }[];
   /** 085: the barcode printed on it. */
@@ -1723,6 +1725,8 @@ export const ledgerly = {
   item: (id: string, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, ctx),
   createItem: (body: Record<string, unknown>, ctx: RequestOptions) => api<Item>("items", { ...ctx, method: "POST", body }),
   updateItem: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  setBinLocation: (id: string, body: { warehouse_id: string; bin: string | null }, ctx: RequestOptions) =>
+    api<Item>(`items/${encodeURIComponent(id)}/locations`, { ...ctx, method: "PUT", body }),
   makeVariants: (id: string, options: { name: string; values: string[] }[], ctx: RequestOptions) =>
     api<{ made: { id: string; name: string; variant_label: string }[] }>(`items/${encodeURIComponent(id)}/variants`, { ...ctx, method: "POST", body: { options } }),
   itemAssembly: (id: string, ctx: RequestOptions) => api<ItemAssembly>(`items/${encodeURIComponent(id)}/assembly`, ctx),
