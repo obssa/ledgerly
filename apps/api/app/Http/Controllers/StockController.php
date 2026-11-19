@@ -65,6 +65,7 @@ final class StockController extends Controller
             'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
             'quantity' => ['required', 'decimal:0,2', 'gt:0'],
             'reference' => ['nullable', 'string', 'max:60'],
+            'batch' => ['nullable', 'string', 'max:60'],   // 074: move this batch; none moves the first expiring
         ]);
 
         return DB::transaction(function () use ($data, $stock, $audit, $request) {
@@ -82,10 +83,16 @@ final class StockController extends Controller
             $group = (string) \Illuminate\Support\Str::uuid7();
 
             $out = $stock->move($company->getKey(), $company->base_currency, $item->getKey(), $from->getKey(), $date, 'transfer_out',
-                '-' . $data['quantity'], '0', $reference, null, $request->user()->getKey(), null, $group);
-            $in = $stock->move($company->getKey(), $company->base_currency, $item->getKey(), $to->getKey(), $date, 'transfer_in',
-                (string) $data['quantity'], '0', $data['reference'] ?? "Transfer from {$from->name}", null, $request->user()->getKey(),
-                $out['amount']->negated()->toDecimalString(), $group);
+                '-' . $data['quantity'], '0', $reference, null, $request->user()->getKey(), null, $group, batch: ['number' => $data['batch'] ?? null]);
+            // In as it went out: batch by batch (074), each at the value that left.
+            $value = \App\Domain\Ledger\Money::zero($company->base_currency);
+            foreach ($out['parts'] as $part) {
+                $in = $stock->move($company->getKey(), $company->base_currency, $item->getKey(), $to->getKey(), $date, 'transfer_in',
+                    ltrim($part['quantity'], '-'), '0', $data['reference'] ?? "Transfer from {$from->name}", null, $request->user()->getKey(),
+                    ltrim($part['amount'], '-'), $group, batchId: $part['batch_id']);
+                $value = $value->plus($in['amount']);
+            }
+            $in = ['amount' => $value, 'unit_cost' => $out['unit_cost']];
 
             $audit->record($company->getKey(), 'stock_transferred', 'item', $item->getKey(), null, [
                 'from' => $from->name, 'to' => $to->name, 'quantity' => (string) $data['quantity'], 'value' => $in['amount']->toDecimalString(),
@@ -93,6 +100,28 @@ final class StockController extends Controller
 
             return response()->json(['transfer_group' => $group, 'value' => $in['amount']->toDecimalString(), 'unit_cost' => $in['unit_cost']], 201);
         });
+    }
+
+    /**
+     * 074: what is on hand by batch, the first to expire first; with within_days, only batches expiring by then
+     * (already expired ones included).
+     */
+    public function batches(Request $request): JsonResponse
+    {
+        $this->authorizeCompany('inventory.view');
+        $q = $request->validate(['within_days' => ['nullable', 'integer', 'min:0', 'max:3650'], 'warehouse_id' => ['nullable', 'uuid']]);
+        $today = $this->current->today();
+        $until = isset($q['within_days']) ? (new DateTimeImmutable($today))->modify("+{$q['within_days']} days")->format('Y-m-d') : null;
+
+        $rows = DB::table('batch_balances as bb')->join('stock_batches as b', 'b.id', '=', 'bb.batch_id')
+            ->join('items as i', 'i.id', '=', 'bb.item_id')->join('warehouses as w', 'w.id', '=', 'bb.warehouse_id')
+            ->where('bb.quantity', '>', 0)
+            ->when($q['warehouse_id'] ?? null, fn ($b, $id) => $b->where('bb.warehouse_id', $id))
+            ->when($until, fn ($b, $d) => $b->whereNotNull('b.expires_on')->where('b.expires_on', '<=', $d))
+            ->orderByRaw('b.expires_on ASC NULLS LAST')->orderBy('i.name')->orderBy('b.number')->limit(2000)
+            ->get(['bb.item_id', 'i.name as item_name', 'i.sku', 'i.unit', 'b.id as batch_id', 'b.number', 'b.expires_on', 'bb.warehouse_id', 'w.name as warehouse', 'bb.quantity']);
+
+        return response()->json(['data' => $rows->map(fn ($r) => [...(array) $r, 'expired' => $r->expires_on !== null && (string) $r->expires_on < $today])->values(), 'today' => $today]);
     }
 
     /** Stock items at or below their reorder point, across all warehouses. */
@@ -177,6 +206,8 @@ final class StockController extends Controller
             'counted' => ['required', 'array', 'min:1', 'max:1000'],
             'counted.*.item_id' => ['required', 'uuid', 'distinct'],
             'counted.*.quantity' => ['required', 'decimal:0,2', 'min:0'],
+            'counted.*.batch' => ['nullable', 'string', 'max:60'],   // 074: the batch found over, for an item tracked by batch
+            'counted.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
             'note' => ['nullable', 'string', 'max:300'],
         ]);
 
@@ -210,7 +241,7 @@ final class StockController extends Controller
                     $amount = bcadd(bcmul($unit, $diff, 6), '0.005', 2);   // half up to the cent (never negative here)
                 }
                 $move = $stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'adjustment', $diff, '0', $reference, null,
-                    $request->user()->getKey(), $amount);
+                    $request->user()->getKey(), $amount, batch: ['number' => $c['batch'] ?? null, 'expires_on' => $c['expires_on'] ?? null]);
                 $net = $net->plus($move['amount']);
                 $lines[] = ['item' => $item->name, 'books' => $books, 'counted' => (string) $c['quantity'], 'difference' => $diff, 'value' => $move['amount']->toDecimalString()];
             }
@@ -245,6 +276,8 @@ final class StockController extends Controller
             'unit_cost' => ['required_if:opening,true', 'nullable', 'decimal:0,6', 'min:0'],   // for stock coming in
             'opening' => ['sometimes', 'boolean'],
             'reason' => ['required', 'string', 'min:3', 'max:300'],
+            'batch' => ['nullable', 'string', 'max:60'],   // 074: the batch coming in (or going out) for an item tracked by batch
+            'expires_on' => ['nullable', 'date_format:Y-m-d'],
         ]);
         $opening = (bool) ($data['opening'] ?? false);
         $in = ! str_starts_with(trim((string) $data['quantity']), '-');   // not zero (validated): in or out
@@ -267,7 +300,8 @@ final class StockController extends Controller
             $date = new DateTimeImmutable($data['date']);
 
             $move = $stock->move($company->getKey(), $company->base_currency, $item->getKey(), $warehouse->getKey(), $date,
-                $opening ? 'opening' : 'adjustment', (string) $data['quantity'], (string) ($data['unit_cost'] ?? '0'), $data['reason'], null, $request->user()->getKey());
+                $opening ? 'opening' : 'adjustment', (string) $data['quantity'], (string) ($data['unit_cost'] ?? '0'), $data['reason'], null, $request->user()->getKey(),
+                batch: ['number' => $data['batch'] ?? null, 'expires_on' => $data['expires_on'] ?? null]);
 
             $value = $in ? $move['amount'] : $move['amount']->negated();
             $entry = null;

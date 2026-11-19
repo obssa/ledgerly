@@ -46,6 +46,21 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
         <Card className="min-w-0 flex-[2_1_520px]" label="Item details">
           <ItemForm item={item} readOnly={!item.can?.edit} />
         </Card>
+        {item.tracking === "batch" && (
+          <Card className="min-w-0 flex-[1_1_300px]" label="Batches">
+            <h2 className="text-[15px] font-bold">Batches</h2>
+            {(item.batches ?? []).length === 0 ? <p className="mt-2 text-sm text-muted">None yet. Each delivery names its batch as it comes in.</p> : (
+              <ul className="mt-2 text-sm">
+                {item.batches!.map((b) => (
+                  <li key={`${b.id}-${b.warehouse ?? ""}`} className="flex justify-between gap-2 border-t border-line py-1.5">
+                    <span><span className="num font-semibold">{b.number}</span> <span className="text-muted">{b.expires_on ? `expires ${b.expires_on}` : "no expiry"}</span></span>
+                    <span className="num">{b.quantity ?? "0.00"} {item.unit}{b.warehouse ? ` · ${b.warehouse}` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
         {item.type === "bundle" && (
           <Card className="min-w-0 flex-[1_1_360px]" label="Parts">
             <BundleParts item={item} choices={choices.map((i) => ({ id: i.id, name: i.name, unit: i.unit, type: i.type }))} />

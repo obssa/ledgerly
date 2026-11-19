@@ -20,7 +20,13 @@ class DocumentLine extends Model
         'document_id', 'line_no', 'item_id', 'description', 'quantity', 'unit_price', 'discount_rate',
         'tax_rate_id', 'account_id', 'line_subtotal', 'line_tax', 'project_id', 'source_line_id',
         'unit_id',   // 072: the database fills unit_name and unit_factor from it
+        'batch_number', 'batch_expires_on',   // 074: the batch a bill or credit-note line brings in
     ];
+
+    protected function casts(): array
+    {
+        return ['batch_expires_on' => 'date'];
+    }
 
     public function document(): BelongsTo
     {

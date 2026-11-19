@@ -582,6 +582,10 @@ export interface Item {
   reorder_point: string | null;
   /** Weighted average (default) or FIFO, chosen before the item's first stock move (064). */
   costing?: "average" | "fifo";
+  /** 074: tracked by batch (with expiry), chosen before the first stock move. */
+  tracking?: "none" | "batch";
+  /** 074: its batches with what is on hand in each warehouse, the first to expire first. */
+  batches?: { id: string; number: string; expires_on: string | null; warehouse: string | null; quantity: string | null }[] | null;
   is_active: boolean;
   on_hand?: string;
   /** What the confirmed sales orders still want of a stock item, and on hand less that (067; below zero when short). */
@@ -692,6 +696,9 @@ export interface InvoiceLine {
   unit_id?: string | null;
   unit_name?: string | null;
   unit_factor?: string;
+  /** 074: the batch a bill line brings in, or a credit-note line brings back. */
+  batch_number?: string | null;
+  batch_expires_on?: string | null;
   line_subtotal: string;
   line_tax: string;
 }
@@ -1613,6 +1620,9 @@ export const ledgerly = {
     api<{ move_id: string; amount: string; unit_cost: string }>("stock/adjustments", { ...ctx, method: "POST", body }),
   binCard: (q: { item_id: string; warehouse_id: string; from: string; to: string }, ctx: RequestOptions) => api<BinCard>("reports/bin-card", { ...ctx, query: q }),
   transferStock: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ value: string }>("stock/transfers", { ...ctx, method: "POST", body }),
+  stockBatches: (q: { within_days?: number }, ctx: RequestOptions) =>
+    api<{ data: { item_id: string; item_name: string; sku: string | null; unit: string; batch_id: string; number: string; expires_on: string | null;
+      warehouse_id: string; warehouse: string; quantity: string; expired: boolean }[]; today: string }>("stock/batches", { ...ctx, query: q.within_days === undefined ? {} : { within_days: String(q.within_days) } }),
   reorder: (ctx: RequestOptions) =>
     api<{ data: { item: { id: string; sku: string | null; name: string; unit: string; reorder_point: string; purchase_price: string | null }; on_hand: string }[] }>("stock/reorder", ctx),
   stockMovement: (q: { from?: string; to?: string; warehouse_id?: string }, ctx: RequestOptions) => api<StockMovement>("reports/stock-movement", { ...ctx, query: q }),

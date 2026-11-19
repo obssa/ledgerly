@@ -46,7 +46,7 @@ changing anything.
 ## Commands
 
 ```bash
-# Database rules (110 checks): needs a PostgreSQL owner role
+# Database rules (111 checks): needs a PostgreSQL owner role
 PGHOST=... PGPORT=... PGUSER=ledgerly_owner bash apps/api/database/schema/tests/run.sh
 
 cd apps/api && php artisan test          # unit + feature

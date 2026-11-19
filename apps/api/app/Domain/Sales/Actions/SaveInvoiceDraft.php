@@ -241,6 +241,8 @@ final class SaveInvoiceDraft
                 'project_id' => $line['project_id'] ?? null,
                 'source_line_id' => $line['source_line_id'] ?? null,
                 'unit_id' => $line['unit_id'] ?? null,   // 072: another unit of the item; quantity and price are in it
+                'batch_number' => isset($line['batch_number']) && trim((string) $line['batch_number']) !== '' ? trim((string) $line['batch_number']) : null,   // 074
+                'batch_expires_on' => isset($line['batch_number']) && trim((string) $line['batch_number']) !== '' ? ($line['batch_expires_on'] ?? null) : null,
                 'line_subtotal' => $result->subtotal->toDecimalString(),
                 'line_tax' => $result->tax->toDecimalString(),
             ];

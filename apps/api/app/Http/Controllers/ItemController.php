@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 final class ItemController extends Controller
 {
     private const FIELDS = ['sku', 'name', 'type', 'unit', 'sale_price', 'purchase_price', 'income_account_id', 'expense_account_id',
-        'authority_item_code', 'reorder_point', 'is_active', 'costing'];
+        'authority_item_code', 'reorder_point', 'is_active', 'costing', 'tracking'];
 
     public function __construct(private readonly AuditLogger $audit, private readonly CurrentCompany $current)
     {
@@ -96,6 +96,9 @@ final class ItemController extends Controller
         if (isset($data['costing']) && $data['costing'] !== $item->costing && $moved) {
             throw ValidationException::withMessages(['costing' => ['This item has stock moves: its costing stays. Archive it and add a new item to cost it another way.']]);
         }
+        if (isset($data['tracking']) && $data['tracking'] !== $item->tracking && $moved) {
+            throw ValidationException::withMessages(['tracking' => ['This item has stock moves: its tracking stays. Archive it and add a new item to track it by batch.']]);
+        }
 
         $before = $item->only(self::FIELDS);
         $item->fill($data);
@@ -129,9 +132,14 @@ final class ItemController extends Controller
             'is_active' => [$item === null ? 'prohibited' : 'sometimes', 'boolean'],
             // Weighted average by default; FIFO, for a stock item, before its first move (064).
             'costing' => ['sometimes', Rule::in(['average', 'fifo'])],
+            // Tracked by batch (074), for a stock item, before its first move.
+            'tracking' => ['sometimes', Rule::in(['none', 'batch'])],
         ], ['costing.in' => 'Weighted average or FIFO.']);
         if (($data['costing'] ?? 'average') === 'fifo' && ($data['type'] ?? $item?->type) !== 'inventory') {
             throw ValidationException::withMessages(['costing' => ['Only a stock item is costed FIFO.']]);
+        }
+        if (($data['tracking'] ?? 'none') === 'batch' && ($data['type'] ?? $item?->type) !== 'inventory') {
+            throw ValidationException::withMessages(['tracking' => ['Only a stock item is tracked by batch.']]);
         }
 
         return $data;
@@ -153,7 +161,14 @@ final class ItemController extends Controller
             : null;
         $used = $item->type === 'bundle' && DB::table('document_lines')->where('item_id', $item->getKey())->exists();
 
-        return [...$item->toArray(), 'balances' => $balances, 'units' => $units, 'components' => $components,
+        // 074: its batches with what is on hand of each, the first to expire first.
+        $batches = $item->tracking === 'batch'
+            ? DB::table('stock_batches as b')->leftJoin('batch_balances as bb', 'bb.batch_id', '=', 'b.id')->leftJoin('warehouses as w', 'w.id', '=', 'bb.warehouse_id')
+                ->where('b.item_id', $item->getKey())->orderByRaw('b.expires_on ASC NULLS LAST')->orderBy('b.number')
+                ->get(['b.id', 'b.number', 'b.expires_on', 'w.name as warehouse', 'bb.quantity'])
+            : null;
+
+        return [...$item->toArray(), 'balances' => $balances, 'units' => $units, 'components' => $components, 'batches' => $batches,
             'can' => [...$this->can(), 'components' => $item->type === 'bundle' && ! $used && (bool) $this->current->membership()?->can('inventory.items')]];
     }
 

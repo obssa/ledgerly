@@ -15,7 +15,7 @@ export default async function InventoryPage() {
   return (
     <>
       <PageTitle eyebrow="Operations" title="Stock on hand"
-        actions={<><Link href="/reports/inventory-valuation" className="btn">Valuation</Link><Link href="/products" className="btn">Products and services</Link></>} />
+        actions={<><Link href="/inventory/batches" className="btn">Batches and expiry</Link><Link href="/reports/inventory-valuation" className="btn">Valuation</Link><Link href="/products" className="btn">Products and services</Link></>} />
       {low.length > 0 && (
         <Card className="mb-4" label="Running low">
           <h2 className="mb-2 text-[15px] font-bold text-warn">Running low</h2>

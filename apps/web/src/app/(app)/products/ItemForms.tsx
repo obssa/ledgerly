@@ -47,6 +47,14 @@ export function ItemForm({ item, readOnly = false }: { item?: Item; readOnly?: b
           </select>
           <p className="mt-1 text-[12px] text-muted">Chosen before the first stock move, and kept.</p>
         </div>
+        <div>
+          <label className="field-label" htmlFor="tracking">Batches (stock items)</label>
+          <select className={`field ${bad("tracking") ? "!border-bad" : ""}`} id="tracking" name="tracking" defaultValue={item?.tracking ?? "none"}>
+            <option value="none">Not tracked</option>
+            <option value="batch">Tracked by batch, with expiry</option>
+          </select>
+          <p className="mt-1 text-[12px] text-muted">Food, medicine, chemicals. Chosen before the first stock move, and kept.</p>
+        </div>
       </fieldset>
       {!readOnly && <button type="submit" className="btn btn-primary mt-6" disabled={pending}>{pending ? "Saving…" : item ? "Save item" : "Add item"}</button>}
     </form>
@@ -68,6 +76,12 @@ export function AdjustStock({ item, warehouses }: { item: Item; warehouses: { id
       </div>
       <Field name="quantity" label="Quantity (minus to take out)" invalid={bad("quantity")} />
       <Field name="unit_cost" label="Unit cost (stock coming in)" invalid={bad("unit_cost")} hint="Stock going out is valued at the average cost" />
+      {item.tracking === "batch" && (
+        <>
+          <Field name="batch" label="Batch" invalid={bad("batch")} hint="Coming in: its batch number. Going out: empty takes the first to expire" />
+          <Field name="expires_on" label="Expires on (coming in)" type="date" invalid={bad("expires_on")} />
+        </>
+      )}
       <Field name="date" label="Date" type="date" defaultValue={today} invalid={bad("date")} />
       <Field name="reason" label="Reason" invalid={bad("reason")} hint="For example: count on 30 Nov, bags torn" />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="opening" className="size-4" /> Opening stock (against opening balance equity)</label>

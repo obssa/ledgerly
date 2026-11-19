@@ -170,7 +170,7 @@ final class Delivering
             $moves = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'delivery_note_id' => $noteId, 'kind' => 'sale'])->orderBy('seq')->get();
             foreach ($moves as $m) {
                 $this->stock->move($company->getKey(), $base, (string) $m->item_id, (string) $m->warehouse_id, $date, 'sale_return',
-                    ltrim((string) $m->quantity, '-'), '0', "Void of {$note->number}", null, $userId, ltrim((string) $m->amount, '-'), deliveryNoteId: $noteId);
+                    ltrim((string) $m->quantity, '-'), '0', "Void of {$note->number}", null, $userId, ltrim((string) $m->amount, '-'), deliveryNoteId: $noteId, batchId: $m->batch_id);
             }
 
             DB::table('delivery_notes')->where('id', $noteId)->update(['status' => 'void', 'void_reason' => $reason, 'voided_by' => $userId, 'voided_at' => now()]);

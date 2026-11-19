@@ -117,11 +117,15 @@ final class PurchaseOrderController extends Controller
             'lines' => ['required', 'array', 'min:1', 'max:500'],
             'lines.*.line_id' => ['required', 'uuid', 'distinct'],
             'lines.*.quantity' => ['required', 'decimal:0,2', 'min:0'],
+            'lines.*.batch' => ['nullable', 'string', 'max:60'],   // 074: for an item tracked by batch
+            'lines.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
         ]);
         $quantities = collect($data['lines'])->mapWithKeys(fn (array $l) => [$l['line_id'] => (string) $l['quantity']])->all();
+        $batches = collect($data['lines'])->filter(fn (array $l) => ($l['batch'] ?? null) !== null)
+            ->mapWithKeys(fn (array $l) => [$l['line_id'] => ['number' => $l['batch'], 'expires_on' => $l['expires_on'] ?? null]])->all();
 
         return response()->json($receiving->receive($document, $quantities, $data['received_on'], $data['warehouse_id'] ?? null,
-            $data['reference'] ?? null, $data['note'] ?? null, $request->user()->getKey()), 201);
+            $data['reference'] ?? null, $data['note'] ?? null, $request->user()->getKey(), $batches), 201);
     }
 
     /** Nothing more is coming: what is left is dropped from the order. */

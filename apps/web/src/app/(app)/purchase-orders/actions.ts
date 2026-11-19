@@ -84,7 +84,10 @@ export async function receiveGoods(_: FormState | undefined, form: FormData): Pr
     const reference = text(form, "reference");
     const note = text(form, "note");
     made = await ledgerly.receivePurchaseOrder(text(form, "id") ?? "", {
-      received_on: text(form, "received_on") ?? "", lines: deliveries(form, "receive") ?? [],
+      received_on: text(form, "received_on") ?? "",
+      // 074: each line's batch and expiry, when given (for items tracked by batch).
+      lines: (deliveries(form, "receive") ?? []).map((l) => ({ ...l,
+        ...(text(form, `batch_${l.line_id}`) ? { batch: text(form, `batch_${l.line_id}`), ...(text(form, `expires_${l.line_id}`) ? { expires_on: text(form, `expires_${l.line_id}`) } : {}) } : {}) })),
       ...(reference ? { reference } : {}), ...(note ? { note } : {}),
     }, ctx);
   } catch (error) {
