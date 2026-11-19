@@ -7,6 +7,7 @@ import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { getSession } from "@/lib/session";
 import { countTotal, denominationsFrom } from "@/lib/cash";
 import { reconciliationBody } from "@/lib/reconcile";
+import { spreadsheetFrom } from "@/lib/xlsxRead";
 import { statementFrom } from "@/lib/statements";
 
 /* Server Functions behind banking. The API checks who may open accounts (banking.manage), transfer and deposit. */
@@ -91,9 +92,16 @@ export async function depositReceipts(_: FormState | undefined, form: FormData):
   return { notice: "Deposited and posted." };
 }
 
+const fileName = (form: FormData) => {
+  const f = form.get("file");
+  return f instanceof File ? f.name.slice(0, 200) : undefined;
+};
+
 export async function importStatement(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
-  const statement = await statementFrom(form);
+  // Module 5: a statement saved as an Excel workbook is read here, into the CSV the API reads by its column names.
+  const sheet = await spreadsheetFrom(form);
+  const statement = sheet === null ? await statementFrom(form) : "error" in sheet ? sheet : { ...sheet, fileName: fileName(form) };
   if ("error" in statement) return { error: statement.error, fields: { file: [statement.error] } };
   let result: { imported: number; skipped: number; from: string; to: string };
   try {

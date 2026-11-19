@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const { toXlsx } = await import("./xlsx");
-const { readXlsx, rowsToCsv, serialDate, XlsxError } = await import("./xlsxRead");
+const { readXlsx, rowsToCsv, serialDate, spreadsheetFrom, XlsxError } = await import("./xlsxRead");
 
 describe("reading a workbook", () => {
   it("reads back the first sheet a workbook was written with, text and numbers", () => {
@@ -22,5 +22,25 @@ describe("reading a workbook", () => {
   it("refuses what is not a workbook, or too large to read", () => {
     expect(() => readXlsx(new TextEncoder().encode("Date,Account\n2026-11-12,6800"))).toThrow(XlsxError);
     expect(() => readXlsx(new Uint8Array(6 * 1024 * 1024))).toThrow(XlsxError);
+  });
+});
+
+describe("a form's spreadsheet", () => {
+  const form = (file: File) => {
+    const f = new FormData();
+    f.append("file", file);
+    return f;
+  };
+
+  it("reads an Excel workbook into CSV, and leaves a CSV file to the CSV reader", async () => {
+    const book = toXlsx("Statement", [["Date", "Description", "Amount"], ["2026-11-12", "Telebirr from Kaldi", "1150"]]);
+    expect(await spreadsheetFrom(form(new File([new Uint8Array(book)], "november.xlsx")))).toEqual({ csv: "Date,Description,Amount\n2026-11-12,Telebirr from Kaldi,1150" });
+    expect(await spreadsheetFrom(form(new File(["Date,Amount\n2026-11-12,10"], "november.csv")))).toBeNull();
+    expect(await spreadsheetFrom(new FormData())).toBeNull();
+  });
+
+  it("says why a damaged workbook is not read", async () => {
+    const damaged = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3]);
+    expect(await spreadsheetFrom(form(new File([damaged], "broken.xlsx")))).toEqual({ error: expect.any(String) });
   });
 });
