@@ -66,6 +66,7 @@ final class SupplierCreditController extends Controller
                 ->where(fn (Builder $w) => $w->where('type', 'expense')->orWhere('system_key', 'inventory')
                     ->orWhere(fn (Builder $a) => $a->where('type', 'asset')->whereIn('subtype', ['fixed_asset', 'prepayment']))))],
             'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')],   // the company's own (row-level security)
+            'lines.*.batch_number' => ['nullable', 'string', 'max:60'],   // 074: the batch going back, chosen by hand (the first to expire otherwise)
             'restock' => ['sometimes', 'boolean'],   // the goods went back to the supplier (059)
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')->whereIn('kind', ['vat', 'tot'])],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
