@@ -240,6 +240,13 @@ export interface Kpis {
   month: { from: string; to: string; last_from: string; last_to: string; sales: string; sales_last: string | null; net_profit: string; net_profit_last: string | null };
 }
 
+/** A recurring invoice (077): an invoice repeated on a schedule. */
+export interface RecurringInvoice {
+  id: string; name: string; contact_id: string; customer: string; currency: string; frequency: "weekly" | "monthly" | "quarterly" | "yearly";
+  next_on: string; ends_on: string | null; post: boolean; is_active: boolean; made_count: number; last_made_on: string | null; last_error: string | null;
+  posts_as_name?: string | null; lines: number;
+}
+
 /** A bank rule (076): how a kind of statement line is categorised. */
 export interface BankRule {
   id: string; name: string; bank_account_id: string | null; bank_account: string | null; direction: "in" | "out" | "any"; contains: string;
@@ -1685,6 +1692,11 @@ export const ledgerly = {
     api<{ discarded: boolean }>(`reconciliations/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE", body: { reason } }),
   importStatement: (id: string, body: { csv: string; file_name?: string }, ctx: RequestOptions) =>
     api<{ imported: number; skipped: number; from: string; to: string }>(`bank-accounts/${encodeURIComponent(id)}/statements`, { ...ctx, method: "POST", body }),
+  repeatInvoice: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ id: string }>(`invoices/${encodeURIComponent(id)}/repeat`, { ...ctx, method: "POST", body }),
+  recurringInvoices: (ctx: RequestOptions) => api<{ data: RecurringInvoice[]; can: { manage: boolean } }>("recurring-invoices", ctx),
+  recurringInvoiceStep: (id: string, step: "pause" | "resume" | "make-due", ctx: RequestOptions) =>
+    api<{ made?: string[]; error?: string | null; next_on: string }>(`recurring-invoices/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body: {} }),
   bankRules: (ctx: RequestOptions) => api<{ data: BankRule[]; can: { manage: boolean } }>("bank-rules", ctx),
   createBankRule: (body: Record<string, unknown>, ctx: RequestOptions) => api<BankRule>("bank-rules", { ...ctx, method: "POST", body }),
   updateBankRule: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<BankRule>(`bank-rules/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),

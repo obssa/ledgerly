@@ -33,6 +33,7 @@ use App\Http\Controllers\BankRuleController;
 use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\GoodsReceiptController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\RecurringInvoiceController;
 use App\Http\Controllers\SalesReceiptController;
 use App\Http\Controllers\QuoteController;
 use App\Http\Controllers\RecurringJournalController;
@@ -235,6 +236,12 @@ Route::prefix('v1')->group(function () {
             Route::post('journal-requests/{journalRequest}/reject', [JournalRequestController::class, 'reject'])->whereUuid('journalRequest');
             Route::post('journal-requests/{journalRequest}/withdraw', [JournalRequestController::class, 'withdraw'])->whereUuid('journalRequest');
             Route::get('recurring-journals', [RecurringJournalController::class, 'index']);
+            Route::post('invoices/{invoice}/repeat', [RecurringInvoiceController::class, 'store']);   // 077
+            Route::get('recurring-invoices', [RecurringInvoiceController::class, 'index']);
+            Route::get('recurring-invoices/{recurringInvoice}', [RecurringInvoiceController::class, 'show'])->whereUuid('recurringInvoice');
+            Route::post('recurring-invoices/{recurringInvoice}/pause', [RecurringInvoiceController::class, 'pause'])->whereUuid('recurringInvoice');
+            Route::post('recurring-invoices/{recurringInvoice}/resume', [RecurringInvoiceController::class, 'resume'])->whereUuid('recurringInvoice');
+            Route::post('recurring-invoices/{recurringInvoice}/make-due', [RecurringInvoiceController::class, 'makeDue'])->whereUuid('recurringInvoice');
             Route::post('recurring-journals', [RecurringJournalController::class, 'store']);
             Route::post('recurring-journals/post-due', [RecurringJournalController::class, 'postDue']);
             Route::get('recurring-journals/{recurringJournal}', [RecurringJournalController::class, 'show'])->whereUuid('recurringJournal');

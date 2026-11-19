@@ -138,6 +138,40 @@ export async function remindInvoice(_: FormState | undefined, form: FormData): P
   }
 }
 
+/** 077: "Repeat this invoice": a recurring invoice from this one's customer, lines and notes. */
+export async function repeatInvoice(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.repeatInvoice(text(form, "id") ?? "", {
+      frequency: text(form, "frequency") ?? "", next_on: text(form, "next_on") ?? "", post: form.get("post") === "on",
+      ...(text(form, "ends_on") ? { ends_on: text(form, "ends_on") } : {}), ...(text(form, "name") ? { name: text(form, "name") } : {}),
+    }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect("/invoices/recurring");
+}
+
+/** 077: pause, resume, or make what has come due now. */
+export async function recurringInvoiceStep(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const step = text(form, "step");
+  if (step !== "pause" && step !== "resume" && step !== "make-due") return { error: "Unknown action." };
+  let result: { made?: string[]; error?: string | null; next_on: string };
+  try {
+    result = await ledgerly.recurringInvoiceStep(text(form, "id") ?? "", step, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  if (step === "make-due") {
+    if (result.error) return { error: `Paused: ${result.error}` };
+    const n = result.made?.length ?? 0;
+    return { notice: n === 0 ? `Nothing due yet: next on ${result.next_on}.` : `${n} invoice${n === 1 ? "" : "s"} made; next on ${result.next_on}.` };
+  }
+  return { notice: step === "pause" ? "Paused." : `Resumed: next on ${result.next_on}.` };
+}
+
 export async function invoiceAction(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   const id = text(form, "id") ?? "";

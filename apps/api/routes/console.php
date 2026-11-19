@@ -11,6 +11,7 @@ if (config('queue.default') === 'redis') {
     Schedule::command('horizon:snapshot')->everyFiveMinutes();
 }
 Schedule::command('ledgerly:post-recurring')->hourly();
+Schedule::command('ledgerly:make-recurring-invoices')->hourly();
 Schedule::command('ledgerly:send-saved-reports')->hourly();
 Schedule::command('ledgerly:send-invoice-reminders')->hourly();
 Schedule::command('ledgerly:subscriptions-tick')->dailyAt('01:00');
@@ -49,6 +50,37 @@ Artisan::command('ledgerly:post-recurring', function (\App\Domain\Ledger\Recurri
 
     return 0;
 })->purpose('Post recurring journals that have come due');
+
+/*
+| Makes the recurring invoices that have come due (077, App\Domain\Sales\RecurringInvoices), each in its own company's
+| context and as the person it makes invoices as. Which are due comes from recurring_invoices_due(): ids only. A template
+| that fails is paused with the reason; an unexpected error is reported and the others still run.
+*/
+Artisan::command('ledgerly:make-recurring-invoices', function (\App\Domain\Sales\RecurringInvoices $recurring, \App\Domain\Tenancy\Support\CurrentCompany $current) {
+    $due = DB::select('SELECT company_id, template_id, posts_as FROM recurring_invoices_due(?)', [now('UTC')->addDay()->format('Y-m-d')]);
+    $made = 0;
+    foreach ($due as $row) {
+        try {
+            $result = \App\Domain\Tenancy\Support\DatabaseTenantContext::run($row->posts_as, $row->company_id, function () use ($recurring, $current, $row) {
+                $current->set(\App\Domain\Tenancy\Models\Company::query()->findOrFail($row->company_id));
+
+                return $recurring->makeDue($current->get(), $row->template_id, $row->posts_as, $current->today());
+            });
+            $made += count($result['made']);
+            if ($result['error'] !== null) {
+                $this->warn("Recurring invoice {$row->template_id} paused: {$result['error']}");
+            }
+        } catch (\Throwable $e) {
+            report($e);
+            $this->error("Recurring invoice {$row->template_id} failed: " . $e::class);
+        } finally {
+            $current->forget();
+        }
+    }
+    $this->info("Made {$made} recurring invoices.");
+
+    return 0;
+})->purpose('Make the recurring invoices that have come due');
 
 /*
 | Sends the scheduled reports that have come due (045): an email to the person who saved each one, with a link to it and

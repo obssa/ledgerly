@@ -10,6 +10,7 @@ import { RetentionPanel } from "./RetentionPanel";
 import { InvoiceActions } from "./InvoiceActions";
 import { PrintInvoice, SendInvoice } from "./SendInvoice";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
+import { RepeatInvoice } from "./RepeatInvoice";
 
 export const metadata = { title: "Invoice" };
 
@@ -137,6 +138,9 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
           {!creditNote && !invoice.demo && ["posted", "part_paid", "paid"].includes(invoice.status) && (invoice.can.retain || (invoice.retentions ?? []).length > 0) && (
             <RetentionPanel invoiceId={invoice.id} retentions={invoice.retentions ?? []} canManage={Boolean(invoice.can.retain)}
               canHold={["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0} />
+          )}
+          {!creditNote && !invoice.demo && invoice.can.credit && invoice.status !== "void" && (
+            <RepeatInvoice invoiceId={invoice.id} canPost={invoice.can.approve} />
           )}
           <AttachmentsPanel kind="invoice" documentId={invoice.id} flag={typeof attachment === "string" ? attachment : undefined} demo={invoice.demo} />
           {canApply && <ApplyCredit creditNoteId={invoice.id} left={invoice.amount_due} invoices={openInvoices} />}
