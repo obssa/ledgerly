@@ -301,6 +301,7 @@ Route::prefix('v1')->group(function () {
             Route::post('imports/items', [ImportController::class, 'store'])->defaults('kind', 'items');
             Route::post('imports/accounts', [ImportController::class, 'store'])->defaults('kind', 'accounts');
             Route::post('imports/opening-balances', [ImportController::class, 'openingBalances']);
+            Route::post('imports/journals', [ImportController::class, 'journals']);   // Module 6
             Route::post('imports/open-invoices', [ImportController::class, 'store'])->defaults('kind', 'open-invoices');
             Route::post('imports/open-bills', [ImportController::class, 'store'])->defaults('kind', 'open-bills');
             Route::get('customers/{customer}', [CustomerController::class, 'show']);

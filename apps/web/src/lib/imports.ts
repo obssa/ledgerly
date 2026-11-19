@@ -39,6 +39,12 @@ export const IMPORT_KINDS = {
     example: "Supplier,Supplier invoice number,Date,Amount\nAddis Packaging,AP-55,20/06/2026,4000",
     required: "Supplier, Supplier invoice number, Date and Amount are required: what was still owed to each supplier on the conversion date.",
   },
+  journals: {
+    label: "Journals",
+    columns: ["Date", "Reference (rows with the same date and reference are one entry)", "Memo", "Account (its code)", "Debit", "Credit", "Description"],
+    example: "Date,Reference,Memo,Account,Debit,Credit\n2026-11-30,ACC-11,Audit fee accrued,6800,15000,\n2026-11-30,ACC-11,,2100,,15000",
+    required: "Date, Account, and Debit or Credit are required; each entry balances. They post as manual journals (above the approval limit they wait for approval), all or none. Receivables, payables and stock are not journalled: they come from their documents.",
+  },
 } as const;
 
 export type ImportKind = keyof typeof IMPORT_KINDS;
@@ -74,6 +80,9 @@ export function importSummary(r: ImportResult): string {
   if (r.kind === "open-invoices" || r.kind === "open-bills") {
     const noun = r.kind === "open-bills" ? "bills" : "invoices";
     return r.checked ? `All ${r.rows} rows are fine. Import them to bring in the open ${noun}.` : `${r.added} open ${noun} brought in.`;
+  }
+  if (r.kind === "journals") {
+    return r.checked ? `All ${r.rows} lines are fine. Import them to post the journals.` : `${r.added} journals posted (or sent for approval).`;
   }
   if (r.kind === "opening-balances") {
     return r.checked ? `All ${r.rows} lines are fine. Import them to enter the opening balances.` : `Opening balances entered: ${r.added} accounts.`;
