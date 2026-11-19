@@ -5,7 +5,7 @@ import type { CompanySettings, Currencies, Dimension, Numbering } from "@/lib/ap
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
-import { VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN, TEMPLATE_SHOWN } from "@/lib/settings";
+import { VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN, TEMPLATE_SHOWN, INTEREST_SHOWN } from "@/lib/settings";
 import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock, toggleDimension } from "./actions";
 import { todayIn } from "@/lib/dates";
 
@@ -131,6 +131,24 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
           <input type="checkbox" id="tax-reminders" name="tax_reminders" defaultChecked={settings.tax_reminders ?? true} />
           Email the people who file tax when a return is due within ten days, and when it is overdue
         </label>
+      </fieldset>
+
+      <h3 className="mb-1 mt-7 text-[15px] font-bold">Interest on late payment</h3>
+      <p className="mb-3 text-[13px] text-muted">Simple interest a year on what an overdue invoice still owes, charged by hand on a draft invoice to the customer. Leave the rate empty to charge none.</p>
+      <fieldset disabled={!editable} className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[18px]">
+        <legend className="sr-only">Interest on late payment</legend>
+        <input type="hidden" name={INTEREST_SHOWN} value="1" />
+        <div>
+          <label className="field-label" htmlFor="interest-rate">Rate, % a year</label>
+          <input className="field num" id="interest-rate" name="late_interest.rate" inputMode="decimal" defaultValue={settings.late_interest?.rate ?? ""} placeholder="None" />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="interest-account">Income account</label>
+          <select className="field" id="interest-account" name="late_interest.account_id" defaultValue={settings.late_interest?.account_id ?? ""}>
+            <option value="">Choose…</option>
+            {(settings.options.income_accounts ?? []).map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+          </select>
+        </div>
       </fieldset>
 
       <h3 className="mb-1 mt-7 text-[15px] font-bold">Invoices on paper and as PDF files</h3>

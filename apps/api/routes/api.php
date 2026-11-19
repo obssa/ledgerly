@@ -30,6 +30,7 @@ use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
 use App\Http\Controllers\BadDebtController;
+use App\Http\Controllers\LateInterestController;
 use App\Http\Controllers\BankRuleController;
 use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\GoodsReceiptController;
@@ -246,6 +247,8 @@ Route::prefix('v1')->group(function () {
             Route::get('invoices/{invoice}/write-offs', [BadDebtController::class, 'index']);   // 078
             Route::post('invoices/{invoice}/write-offs', [BadDebtController::class, 'store']);
             Route::post('invoices/{invoice}/write-offs/reverse', [BadDebtController::class, 'reverse']);
+            Route::get('invoices/{invoice}/interest', [LateInterestController::class, 'show']);   // 079
+            Route::post('invoices/{invoice}/interest', [LateInterestController::class, 'store']);
             Route::post('recurring-journals', [RecurringJournalController::class, 'store']);
             Route::post('recurring-journals/post-due', [RecurringJournalController::class, 'postDue']);
             Route::get('recurring-journals/{recurringJournal}', [RecurringJournalController::class, 'show'])->whereUuid('recurringJournal');

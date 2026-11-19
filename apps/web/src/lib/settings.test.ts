@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REMINDERS_SHOWN, reminderDays, settingsBody, TAX_REMINDERS_SHOWN, VAT_SHOWN, TEMPLATE_SHOWN } from "./settings";
+import { INTEREST_SHOWN, REMINDERS_SHOWN, reminderDays, settingsBody, TAX_REMINDERS_SHOWN, VAT_SHOWN, TEMPLATE_SHOWN } from "./settings";
 
 const form = (entries: [string, string][]) => {
   const f = new FormData();
@@ -71,5 +71,15 @@ describe("tax return reminders", () => {
     expect(settingsBody(form([["version", "v1"], [TAX_REMINDERS_SHOWN, "1"]])).tax_reminders).toBe(false);
     expect(settingsBody(form([["version", "v1"], [TAX_REMINDERS_SHOWN, "1"], ["tax_reminders", "on"]])).tax_reminders).toBe(true);
     expect(settingsBody(form([["version", "v1"]]))).not.toHaveProperty("tax_reminders");
+  });
+});
+
+describe("interest on late payment", () => {
+  it("sends the rate and account only when the form showed them, an empty rate as none", () => {
+    expect(settingsBody(form([["version", "v1"], [INTEREST_SHOWN, "1"], ["late_interest.rate", " 18 % "], ["late_interest.account_id", "acc-1"]])).late_interest)
+      .toEqual({ rate: "18", account_id: "acc-1" });
+    expect(settingsBody(form([["version", "v1"], [INTEREST_SHOWN, "1"], ["late_interest.rate", ""], ["late_interest.account_id", "acc-1"]])).late_interest)
+      .toEqual({ rate: null, account_id: null });
+    expect(settingsBody(form([["version", "v1"]]))).not.toHaveProperty("late_interest");
   });
 });
