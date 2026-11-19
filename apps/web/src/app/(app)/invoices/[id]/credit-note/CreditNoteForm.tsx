@@ -9,7 +9,7 @@ import { createSupplierCredit } from "../../../bills/actions";
 import { createCreditNote } from "../../actions";
 import { todayIn } from "@/lib/dates";
 
-interface Line { key: number; itemId: string; description: string; quantity: string; unitPrice: string; taxRateId: string; accountId: string; projectId: string }
+interface Line { key: number; itemId: string; description: string; quantity: string; unitPrice: string; taxRateId: string; accountId: string; projectId: string; batchNumber: string }
 
 const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
 
@@ -30,7 +30,9 @@ export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
   const [lines, setLines] = useState<Line[]>(invoice.lines.map((l, i) => ({
     key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price, taxRateId: l.tax_rate_id ?? "", accountId: l.account_id,
     projectId: projects.some((p) => p.id === l.project_id) ? (l.project_id ?? "") : "",
+    batchNumber: l.batch_number ?? "",   // 074: the batch it came in as (or left as), to change by hand
   })));
+  const batches = lines.some((l) => l.batchNumber !== "");
   const rateOf = (id: string) => taxRates.find((t) => t.id === id)?.rate ?? "0";
   const valid = lines.filter((l) => isDecimal(l.quantity) && isDecimal(l.unitPrice));
   const totals = useMemo(
@@ -39,7 +41,7 @@ export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
     [lines],
   );
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const json = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, project_id: l.projectId || null, item_id: l.itemId || null })));
+  const json = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, project_id: l.projectId || null, item_id: l.itemId || null, ...(l.batchNumber.trim() ? { batch_number: l.batchNumber.trim() } : {}) })));
   // Lines that name an item: those goods may have come back into stock (058), or gone back to the supplier (059).
   const withItems = lines.some((l) => l.itemId !== "");
 
@@ -86,13 +88,14 @@ export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
       <Card className="!p-2" label="Lines credited">
         <div className="overflow-x-auto">
           <table className="tbl">
-            <thead><tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th>{projects.length > 0 && <th scope="col">Project</th>}<th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
+            <thead><tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Unit price</th>{batches && <th scope="col">Batch</th>}{projects.length > 0 && <th scope="col">Project</th>}<th scope="col"><span className="sr-only">Remove</span></th></tr></thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={l.key}>
                   <td><input aria-label="Description" className="field min-w-[200px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} /></td>
                   <td><input aria-label="Quantity" inputMode="decimal" className="field num w-[80px] text-right" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} /></td>
                   <td><input aria-label="Unit price" inputMode="decimal" className="field num w-[120px] text-right" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} /></td>
+                  {batches && <td><input aria-label="Batch" className="field num w-[110px]" value={l.batchNumber} maxLength={60} onChange={(e) => update(l.key, { batchNumber: e.target.value })} /></td>}
                   {projects.length > 0 && (
                     <td>
                       <select aria-label="Project" className="field w-[150px]" value={l.projectId} onChange={(e) => update(l.key, { projectId: e.target.value })}>

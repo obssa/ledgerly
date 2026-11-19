@@ -481,7 +481,8 @@ final class DocumentStock
                     : "Only {$left} {$item->unit} of {$item->name} can still go back from {$bill->label()}."]]);
             }
             $move = $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'purchase_return',
-                '-' . $qty, '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId);
+                '-' . $qty, '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId,
+                batch: ['number' => $line->batch_number ?? null]);   // 074: the batch named on the line, or the first to expire
             $out = $out->plus($move['amount']->negated());
         }
         $inventory = Account::system('inventory')->getKey();
