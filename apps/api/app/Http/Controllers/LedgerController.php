@@ -147,12 +147,13 @@ final class LedgerController extends Controller
             'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
             'compare_from' => ['nullable', 'date_format:Y-m-d'],
             'compare_to' => ['nullable', 'date_format:Y-m-d', 'required_with:compare_from'],
+            'basis' => ['nullable', 'in:accrual,cash'],   // cash: income and expenses when the money moved
         ]);
 
         $company = $this->current->get();
 
         return response()->json($reports->profitAndLoss(
-            $company->getKey(), $company->base_currency, $q['from'], $q['to'], $q['compare_from'] ?? null, $q['compare_to'] ?? null,
+            $company->getKey(), $company->base_currency, $q['from'], $q['to'], $q['compare_from'] ?? null, $q['compare_to'] ?? null, $q['basis'] ?? 'accrual',
         ));
     }
 }

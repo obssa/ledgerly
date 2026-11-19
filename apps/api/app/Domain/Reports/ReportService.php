@@ -36,10 +36,11 @@ final class ReportService
      *
      * @return array{sections: array<string, list<array{code: string, name: string, current: string, previous: ?string}>>, totals: array<string, array{current: string, previous: ?string}>}
      */
-    public function profitAndLoss(string $companyId, string $currency, string $from, string $to, ?string $compareFrom = null, ?string $compareTo = null): array
+    public function profitAndLoss(string $companyId, string $currency, string $from, string $to, ?string $compareFrom = null, ?string $compareTo = null, string $basis = 'accrual'): array
     {
-        $current = $this->incomeStatementRows($companyId, $from, $to);
-        $previous = $compareFrom ? $this->incomeStatementRows($companyId, $compareFrom, $compareTo) : [];
+        $rows = fn (string $f, string $t) => $basis === 'cash' ? $this->cashBasisRows($companyId, $f, $t) : $this->incomeStatementRows($companyId, $f, $t);
+        $current = $rows($from, $to);
+        $previous = $compareFrom ? $rows($compareFrom, $compareTo) : [];
 
         $sections = ['income' => [], 'cost_of_sales' => [], 'expenses' => []];
         $totals = [];
@@ -71,6 +72,7 @@ final class ReportService
         ];
 
         return [
+            'basis' => $basis,
             'sections' => $sections,
             'totals' => [
                 'income' => $out($totals['income']),
@@ -176,6 +178,59 @@ final class ReportService
              WHERE a.type IN ('income', 'expense') AND (m.debit <> 0 OR m.credit <> 0)
              ORDER BY a.code
             SQL, [$companyId, $to, $companyId, $from, $companyId, $from, $to, $companyId]);
+
+        $keyed = [];
+        foreach ($rows as $row) {
+            $keyed[$row->code] = $row;
+        }
+
+        return $keyed;
+    }
+
+    /**
+     * The income and expenses of a period on the cash basis: when the money moved, not when it was invoiced or billed.
+     *   - An entry that moves a bank, cash or wallet account counts its income and expense lines on its date: a cash
+     *     sale, an expense, a categorised statement line, a payment's fee or exchange difference, a manual entry.
+     *   - A payment received or made counts, on its date, its share of each document it paid: the invoice's or bill's own
+     *     income and expense lines times what was paid over the document's total.
+     * The closing entries of a year (and their reversals) are left out, as in the accrual view; a reversed payment counts
+     * nothing. Fixed SQL, the period bound as values.
+     *
+     * @return array<string, object> by account code
+     */
+    private function cashBasisRows(string $companyId, string $from, string $to): array
+    {
+        $rows = DB::select(<<<'SQL'
+            WITH money AS (
+                SELECT id FROM accounts WHERE company_id = ?::uuid AND subtype IN ('bank', 'cash', 'mobile_money')
+            ), closing AS (
+                SELECT id FROM journal_entries WHERE company_id = ?::uuid AND source_type = 'closing'
+            ), moved AS (
+                SELECT l.account_id, l.debit, l.credit
+                  FROM journal_lines l
+                  JOIN journal_entries e ON e.company_id = l.company_id AND e.id = l.journal_entry_id
+                 WHERE l.company_id = ?::uuid AND e.entry_date BETWEEN ?::date AND ?::date
+                   AND e.source_type <> 'closing'
+                   AND NOT (e.source_type = 'reversal' AND e.source_id IN (SELECT id FROM closing))
+                   AND EXISTS (SELECT 1 FROM journal_lines m WHERE m.company_id = e.company_id AND m.journal_entry_id = e.id
+                                                               AND m.account_id IN (SELECT id FROM money))
+            ), paid AS (
+                SELECT l.account_id, l.debit * (a.amount / d.total) AS debit, l.credit * (a.amount / d.total) AS credit
+                  FROM payment_allocations a
+                  JOIN payments p ON p.company_id = a.company_id AND p.id = a.payment_id
+                  JOIN documents d ON d.company_id = a.company_id AND d.id = a.document_id
+                  JOIN journal_lines l ON l.company_id = d.company_id AND l.journal_entry_id = d.journal_entry_id
+                 WHERE a.company_id = ?::uuid AND p.status = 'posted' AND p.payment_date BETWEEN ?::date AND ?::date AND d.total > 0
+            )
+            SELECT a.code, a.name, a.type, a.subtype,
+                   round(CASE WHEN a.type = 'income' THEN sum(x.credit - x.debit) ELSE sum(x.debit - x.credit) END, 2)::numeric(20,2)::text AS amount
+              FROM (SELECT * FROM moved UNION ALL SELECT * FROM paid) x
+              JOIN accounts a ON a.id = x.account_id
+             WHERE a.type IN ('income', 'expense')
+             GROUP BY a.code, a.name, a.type, a.subtype
+            HAVING round(sum(x.debit - x.credit), 2) <> 0
+             ORDER BY a.code
+            SQL, [$companyId, $companyId, $companyId, $from, $to, $companyId, $from, $to]);
 
         $keyed = [];
         foreach ($rows as $row) {
