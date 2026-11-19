@@ -4141,6 +4141,52 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T103 a recurring invoice is for a customer, made as its owner, and its invoices are its customer''s';
 END $$;
+
+-- T104: bad debts (078). A write-off is of a posted invoice of the company, never more than it owes, dated on or after
+-- it, with its own bad-debt entry; another company never sees one. (Writing off and reversing, which need a posted
+-- entry, are checked end to end in BadDebtTest.) Company A as f1, customer c1.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  inv constant uuid := '00000000-0000-0000-0000-000000000f20';
+  draft constant uuid := '00000000-0000-0000-0000-000000000f21';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total, amount_due) VALUES
+    (inv, app_company_id(), 'invoice', c1, '2027-10-01', 'ETB', 500, 500), (draft, app_company_id(), 'invoice', c1, '2027-10-01', 'ETB', 300, 300);
+  UPDATE documents SET status = 'posted', number = 'INV-T104-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = inv;
+
+  BEGIN
+    INSERT INTO invoice_write_offs (company_id, document_id, amount, written_off_on, reason, entry_id, written_off_by)
+      VALUES (app_company_id(), draft, 100, '2027-10-05', 'Customer gone', '00000000-0000-0000-0000-00000000e001', f1);
+    RAISE EXCEPTION 'FAIL T104a: a bad debt was written off a draft invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO invoice_write_offs (company_id, document_id, amount, written_off_on, reason, entry_id, written_off_by)
+      VALUES (app_company_id(), inv, 600, '2027-10-05', 'Customer gone', '00000000-0000-0000-0000-00000000e001', f1);
+    RAISE EXCEPTION 'FAIL T104b: more was written off than the invoice owes';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO invoice_write_offs (company_id, document_id, amount, written_off_on, reason, entry_id, written_off_by)
+      VALUES (app_company_id(), inv, 100, '2027-09-01', 'Customer gone', '00000000-0000-0000-0000-00000000e001', f1);
+    RAISE EXCEPTION 'FAIL T104c: a write-off was dated before its invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO invoice_write_offs (company_id, document_id, amount, written_off_on, reason, entry_id, written_off_by)
+      VALUES (app_company_id(), inv, 100, '2027-10-05', 'Customer gone', '00000000-0000-0000-0000-00000000e001', f1);
+    RAISE EXCEPTION 'FAIL T104d: a write-off named an entry that is not its own bad-debt entry';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  IF (SELECT amount_due FROM documents WHERE id = inv) <> 500 THEN
+    RAISE EXCEPTION 'FAIL T104e: a refused write-off changed what the invoice owes';
+  END IF;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM invoice_write_offs WHERE document_id = inv) THEN
+    RAISE EXCEPTION 'FAIL T104f: company B saw company A''s write-offs';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T104 a bad debt is written off a posted invoice, within what it owes, with its own entry';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

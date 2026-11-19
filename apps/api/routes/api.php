@@ -29,6 +29,7 @@ use App\Http\Controllers\QuoteLinkController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
+use App\Http\Controllers\BadDebtController;
 use App\Http\Controllers\BankRuleController;
 use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\GoodsReceiptController;
@@ -242,6 +243,9 @@ Route::prefix('v1')->group(function () {
             Route::post('recurring-invoices/{recurringInvoice}/pause', [RecurringInvoiceController::class, 'pause'])->whereUuid('recurringInvoice');
             Route::post('recurring-invoices/{recurringInvoice}/resume', [RecurringInvoiceController::class, 'resume'])->whereUuid('recurringInvoice');
             Route::post('recurring-invoices/{recurringInvoice}/make-due', [RecurringInvoiceController::class, 'makeDue'])->whereUuid('recurringInvoice');
+            Route::get('invoices/{invoice}/write-offs', [BadDebtController::class, 'index']);   // 078
+            Route::post('invoices/{invoice}/write-offs', [BadDebtController::class, 'store']);
+            Route::post('invoices/{invoice}/write-offs/reverse', [BadDebtController::class, 'reverse']);
             Route::post('recurring-journals', [RecurringJournalController::class, 'store']);
             Route::post('recurring-journals/post-due', [RecurringJournalController::class, 'postDue']);
             Route::get('recurring-journals/{recurringJournal}', [RecurringJournalController::class, 'show'])->whereUuid('recurringJournal');
