@@ -204,44 +204,102 @@ final class StatementController extends Controller
     /** One line categorised: a new entry, Dr or Cr the bank, the other side to the account given (027). */
     private function categoriseLine(BankTransaction $statementLine, Account $target, ?Contact $contact, ?string $memoGiven, ?string $fxRate, string $userId, ?string $rule = null): void
     {
+        $this->categoriseParts($statementLine, [['account' => $target, 'contact' => $contact, 'memo' => $memoGiven, 'amount' => null]], $fxRate, $userId, $rule);
+    }
+
+    /**
+     * 077: a statement line split over several accounts: one entry, the whole line on the bank, each part on its own
+     * account (with its own contact and memo); the parts add up exactly to the line. A part with no amount is the
+     * whole line. In a foreign currency each part is converted at the line's rate, the last taking what rounding leaves.
+     *
+     * @param list<array{account: Account, contact: ?Contact, memo: ?string, amount: ?string}> $parts
+     */
+    private function categoriseParts(BankTransaction $statementLine, array $parts, ?string $fxRate, string $userId, ?string $rule = null): void
+    {
         $company = $this->current->get();
         $bank = Account::query()->findOrFail($statementLine->account_id);
         $currency = $this->currencyOf($bank);
-        if ($target->getKey() === $bank->getKey()) {
-            throw ValidationException::withMessages(['account_id' => ['Choose another active account of this company.']]);
-        }
-        // A bank, cash or wallet account without a currency of its own is in the base currency; other accounts take any.
-        $targetCurrency = in_array($target->subtype, ['bank', 'cash', 'mobile_money'], true) ? $this->currencyOf($target) : $target->currency;
-        if ($targetCurrency !== null && $targetCurrency !== $currency) {
-            throw ValidationException::withMessages(['account_id' => ["{$target->name} is kept in {$targetCurrency}: a {$currency} line goes to an account in {$currency} or with no currency of its own."]]);
-        }
-        if (in_array($target->subtype, self::NOT_FOR_CATEGORISING, true)) {
-            throw ValidationException::withMessages(['account_id' => ["{$target->name} is kept by its own documents: record a payment, bill or stock entry and match the line to it instead."]]);
+        foreach ($parts as $n => $part) {
+            $target = $part['account'];
+            $field = count($parts) === 1 ? 'account_id' : "parts.{$n}.account_id";
+            if ($target->getKey() === $bank->getKey()) {
+                throw ValidationException::withMessages([$field => ['Choose another active account of this company.']]);
+            }
+            // A bank, cash or wallet account without a currency of its own is in the base currency; other accounts take any.
+            $targetCurrency = in_array($target->subtype, ['bank', 'cash', 'mobile_money'], true) ? $this->currencyOf($target) : $target->currency;
+            if ($targetCurrency !== null && $targetCurrency !== $currency) {
+                throw ValidationException::withMessages([$field => ["{$target->name} is kept in {$targetCurrency}: a {$currency} line goes to an account in {$currency} or with no currency of its own."]]);
+            }
+            if (in_array($target->subtype, self::NOT_FOR_CATEGORISING, true)) {
+                throw ValidationException::withMessages([$field => ["{$target->name} is kept by its own documents: record a payment, bill or stock entry and match the line to it instead."]]);
+            }
         }
 
         // A foreign-currency account's line is in its currency, entered at the day's rate (or the one given).
         $base = $company->base_currency;
         $rate = $currency === $base ? '1' : $this->rates->forDocument($company, $currency, substr((string) $statementLine->posted_on, 0, 10), $fxRate);
         $amount = Money::of($this->decimal($statementLine->amount), $currency);
-        $memo = $memoGiven ?? $statementLine->description;
-        $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($statementLine->posted_on), $base, $currency,
-            $rate, mb_substr($memo, 0, 255), 'bank_transaction', $statementLine->getKey());
         $in = ! $amount->isNegative();
         $txn = $in ? $amount : $amount->negated();
         $size = $currency === $base ? $txn : $txn->convertTo($base, $rate)->roundToCurrency();
-        $draft->add($in ? JournalLineDraft::debit($bank->getKey(), $size, $txn, $statementLine->description, $contact?->getKey())
-            : JournalLineDraft::credit($bank->getKey(), $size, $txn, $statementLine->description, $contact?->getKey()));
-        $draft->add($in ? JournalLineDraft::credit($target->getKey(), $size, $txn, $memo, $contact?->getKey())
-            : JournalLineDraft::debit($target->getKey(), $size, $txn, $memo, $contact?->getKey()));
+        $given = array_reduce($parts, fn (Money $sum, array $p) => $sum->plus(Money::of($p['amount'] ?? $txn->amount, $currency)), Money::zero($currency));
+        if (! $given->minus($txn)->isZero()) {
+            throw ValidationException::withMessages(['parts' => ["The parts add up to {$given->toDecimalString()}; the line is {$txn->toDecimalString()}."]]);
+        }
 
-        DB::transaction(function () use ($draft, $userId, $statementLine, $bank, $target, $amount, $size, $rule) {
+        $memoOf = fn (array $p) => $p['memo'] ?? $statementLine->description;
+        $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($statementLine->posted_on), $base, $currency,
+            $rate, mb_substr(count($parts) === 1 ? $memoOf($parts[0]) : $statementLine->description, 0, 255), 'bank_transaction', $statementLine->getKey());
+        $single = count($parts) === 1 ? $parts[0]['contact']?->getKey() : null;
+        $draft->add($in ? JournalLineDraft::debit($bank->getKey(), $size, $txn, $statementLine->description, $single)
+            : JournalLineDraft::credit($bank->getKey(), $size, $txn, $statementLine->description, $single));
+        $left = $size;
+        $audit = [];
+        foreach (array_values($parts) as $n => $p) {
+            $partTxn = Money::of($p['amount'] ?? $txn->amount, $currency);
+            $partBase = $n === count($parts) - 1 ? $left : ($currency === $base ? $partTxn : $partTxn->convertTo($base, $rate)->roundToCurrency());
+            $left = $left->minus($partBase);
+            $contact = $p['contact']?->getKey();
+            $draft->add($in ? JournalLineDraft::credit($p['account']->getKey(), $partBase, $partTxn, $memoOf($p), $contact)
+                : JournalLineDraft::debit($p['account']->getKey(), $partBase, $partTxn, $memoOf($p), $contact));
+            $audit[] = ['account' => "{$p['account']->code} {$p['account']->name}", 'amount' => $partTxn->toDecimalString()];
+        }
+
+        DB::transaction(function () use ($draft, $userId, $statementLine, $bank, $amount, $size, $rule, $audit) {
             $entry = $this->posting->post($draft, $userId);
             $bankLine = DB::table('journal_lines')->where(['company_id' => $entry->company_id, 'journal_entry_id' => $entry->getKey(), 'account_id' => $bank->getKey()])->value('id');
             $this->explain($statementLine, 'categorised', $bankLine);
             $this->audit->record($this->current->id(), 'statement_line_categorised', 'bank_transaction', $statementLine->getKey(), null,
-                ['account' => "{$target->code} {$target->name}", 'amount' => $amount->toDecimalString(), 'currency' => $amount->currency,
+                [...(count($audit) === 1 ? ['account' => $audit[0]['account']] : ['parts' => $audit]), 'amount' => $amount->toDecimalString(), 'currency' => $amount->currency,
                     'base' => $size->toDecimalString(), 'journal_entry' => $entry->number, ...($rule !== null ? ['rule' => $rule] : [])], userId: $userId);
         });
+    }
+
+    /** 077: a statement line split over several accounts in one entry; the parts add up to the line. */
+    public function split(Request $request, BankTransaction $statementLine): JsonResponse
+    {
+        $this->authorizeCompany('banking.review');
+        $data = $request->validate([
+            'parts' => ['required', 'array', 'min:2', 'max:20'],
+            'parts.*.account_id' => ['required', 'uuid'],
+            'parts.*.amount' => ['required', 'decimal:0,2', 'gt:0'],
+            'parts.*.contact_id' => ['nullable', 'uuid'],
+            'parts.*.memo' => ['nullable', 'string', 'max:255'],
+            'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+        ]);
+        $this->assertToReview($statementLine);
+        $parts = [];
+        foreach ($data['parts'] as $n => $p) {
+            // Loaded through the company-scoped models (CLAUDE.md rule 4).
+            $account = Account::query()->where('is_active', true)->find($p['account_id'])
+                ?? throw ValidationException::withMessages(["parts.{$n}.account_id" => ['Choose an active account of this company.']]);
+            $contact = isset($p['contact_id']) ? (Contact::query()->find($p['contact_id'])
+                ?? throw ValidationException::withMessages(["parts.{$n}.contact_id" => ['Choose a customer or supplier of this company.']])) : null;
+            $parts[] = ['account' => $account, 'contact' => $contact, 'memo' => $p['memo'] ?? null, 'amount' => (string) $p['amount']];
+        }
+        $this->categoriseParts($statementLine, $parts, $data['fx_rate'] ?? null, $request->user()->getKey());
+
+        return $this->show($statementLine);
     }
 
     /** Leave the line out of the books, saying why: a duplicate, a line of another account, a hold the bank released. */
