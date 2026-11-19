@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { demoAccounts, demoKpis } from "@/lib/demo";
 import { isDemoMode } from "@/lib/api";
-import { getInvoices } from "@/lib/data";
+import { getInvoices, getKpis } from "@/lib/data";
 import { getSession } from "@/lib/session";
 import { formatAmount, formatMoney, toEthiopian } from "@/lib/format";
 
@@ -23,6 +23,9 @@ export default async function HomePage() {
     .sort((a, b) => daysOverdue(b.due_date, today) - daysOverdue(a.due_date, today))
     .slice(0, 4);
   const k = demoKpis;
+  const live = demo ? null : await getKpis();
+  const month = live ? new Date(`${live.month.from}T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" }) : "";
+  const signed = (v: string) => (v.startsWith("-") ? `▼ ${formatAmount(v.slice(1), live?.currency ?? "ETB")}` : `▲ ${formatAmount(v, live?.currency ?? "ETB")}`);
 
   return (
     <>
@@ -30,6 +33,21 @@ export default async function HomePage() {
         title={firstName ? `Welcome, ${firstName}` : "Welcome"}
         eyebrow={`${today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Addis_Ababa" })} · ${toEthiopian(today).label}${demo ? " · Books closed to 30 September" : ""}`}
       />
+
+      {live && (
+      <section aria-label="Key figures" className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        <Kpi label="Cash and wallets" value={formatMoney(live.cash.now, live.currency)} note={`${signed(live.cash.change)} since a month ago`}
+          tone={live.cash.change.startsWith("-") ? "bad" : "good"} />
+        <Kpi label="Customers owe you" value={formatMoney(live.receivable.balance, live.currency)}
+          note={live.receivable.overdue_count > 0 ? `${live.receivable.overdue_count} invoice${live.receivable.overdue_count === 1 ? "" : "s"} overdue · ${formatAmount(live.receivable.overdue, live.currency)}` : "Nothing overdue"}
+          tone={live.receivable.overdue_count > 0 ? "bad" : "good"} />
+        <Kpi label="You owe suppliers" value={formatMoney(live.payable.balance, live.currency)}
+          note={live.payable.due_this_week_count > 0 ? `${live.payable.due_this_week_count} bill${live.payable.due_this_week_count === 1 ? "" : "s"} due within a week · ${formatAmount(live.payable.due_this_week, live.currency)}` : "Nothing due this week"} />
+        <Kpi label={`Net profit · ${month} so far`} value={formatMoney(live.month.net_profit, live.currency)}
+          note={`Sales ${formatAmount(live.month.sales, live.currency)} · last month ${formatAmount(live.month.net_profit_last ?? "0", live.currency)} profit`}
+          tone={live.month.net_profit.startsWith("-") ? "bad" : "good"} />
+      </section>
+      )}
 
       {demo && (
 
