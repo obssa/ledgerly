@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { importSummary, type ImportKind } from "@/lib/imports";
 import { runImport } from "./actions";
 
-/** A CSV file (or pasted lines): Check runs every row and keeps nothing; Import adds them all, or none. */
+/** An Excel or CSV file (or pasted lines): Check runs every row and keeps nothing; Import adds them all, or none. */
 export function ImportForm({ kind, example }: { kind: ImportKind; example: string }) {
   const [state, action, pending] = useActionState(runImport, undefined);
   const r = state?.result;
@@ -27,8 +27,8 @@ export function ImportForm({ kind, example }: { kind: ImportKind; example: strin
         </div>
       )}
       <div>
-        <label className="field-label" htmlFor="file">CSV file</label>
-        <input className="field" id="file" name="file" type="file" accept=".csv,.txt,text/csv,text/plain" />
+        <label className="field-label" htmlFor="file">Excel or CSV file</label>
+        <input className="field" id="file" name="file" type="file" accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
       </div>
       <div>
         <label className="field-label" htmlFor="csv">Or paste the lines (the first line names the columns)</label>

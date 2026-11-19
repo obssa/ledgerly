@@ -7,6 +7,7 @@ import { formStateFromError, type FormState } from "@/lib/forms";
 import { importKind, type ImportResult } from "@/lib/imports";
 import { getSession } from "@/lib/session";
 import { statementFrom } from "@/lib/statements";
+import { spreadsheetFrom } from "@/lib/xlsxRead";
 
 export type ImportState = FormState & { result?: ImportResult };
 
@@ -15,7 +16,8 @@ export async function runImport(_: ImportState | undefined, form: FormData): Pro
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
   if (!companyId) redirect("/onboarding");
-  const file = await statementFrom(form);
+  // An Excel workbook is read here (Module 6); a CSV file or pasted lines as before.
+  const file = (await spreadsheetFrom(form)) ?? (await statementFrom(form));
   if ("error" in file) {
     return { error: file.error.replace("statement", "file").replace("your bank or wallet exported", "a spreadsheet saved as") };
   }

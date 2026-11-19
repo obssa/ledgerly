@@ -66,6 +66,15 @@ final class ImportController extends Controller
     private const OPENING_COLUMNS = ['code' => 'code', 'account_code' => 'code', 'account' => 'code', 'number' => 'code', 'account_number' => 'code',
         'debit' => 'debit', 'dr' => 'debit', 'credit' => 'credit', 'cr' => 'credit', 'balance' => 'balance', 'amount' => 'balance', 'name' => 'name', 'account_name' => 'name'];
 
+    /** Module 6: the columns of a journal file; rows with the same date and reference are one entry. */
+    private const JOURNAL_COLUMNS = ['date' => 'date', 'entry_date' => 'date', 'reference' => 'reference', 'ref' => 'reference', 'journal' => 'reference',
+        'entry' => 'reference', 'journal_number' => 'reference', 'memo' => 'memo', 'narration' => 'memo', 'code' => 'code', 'account' => 'code',
+        'account_code' => 'code', 'account_number' => 'code', 'debit' => 'debit', 'dr' => 'debit', 'credit' => 'credit', 'cr' => 'credit',
+        'description' => 'description', 'line_description' => 'description'];
+
+    /** At most this many entries in one file. */
+    private const MAX_JOURNALS = 200;
+
     /** The words a spreadsheet uses for the five account types. */
     private const TYPES = ['asset' => 'asset', 'assets' => 'asset', 'liability' => 'liability', 'liabilities' => 'liability', 'equity' => 'equity',
         'capital' => 'equity', 'income' => 'income', 'revenue' => 'income', 'revenues' => 'income', 'sales' => 'income', 'expense' => 'expense',
@@ -166,6 +175,119 @@ final class ImportController extends Controller
      * credit or one signed balance. They go through PUT opening-balances as one set (the same checks, one entry at the
      * conversion date, any difference to opening balance equity), replacing the balances entered before.
      */
+    /**
+     * Module 6: manual journals from a spreadsheet (saved as CSV, or an Excel file the web turns into CSV). Each entry is
+     * the rows with the same date and reference, posted as a manual journal would be (balanced, on the company's own
+     * accounts and never on one kept by documents; above the approval limit it waits for approval). All are posted or
+     * none; a check posts nothing and lists what would be refused, by file row.
+     */
+    public function journals(Request $request): JsonResponse
+    {
+        $this->authorizeCompany('journals.create');
+        $data = $request->validate(['csv' => ['required', 'string', 'max:900000'], 'check' => ['sometimes', 'boolean']]);
+        $check = (bool) ($data['check'] ?? false);
+
+        [$headings, $rows] = $this->parse($data['csv']);
+        $columns = self::JOURNAL_COLUMNS;
+        $fields = array_values(array_unique(array_map(fn ($h) => $columns[$h], array_values(array_filter($headings, fn ($h) => isset($columns[$h]))))));
+        foreach (['date', 'code'] as $needed) {
+            if (! in_array($needed, $fields, true) || array_intersect(['debit', 'credit'], $fields) === []) {
+                throw ValidationException::withMessages(['csv' => ['The first line names the columns: "Date", "Account" (its code), "Debit" and "Credit"; "Reference", "Memo" and "Description" if you have them.']]);
+            }
+        }
+        if (count($rows) === 0 || count($rows) > self::MAX_ROWS) {
+            throw ValidationException::withMessages(['csv' => ['A file has 1 to ' . self::MAX_ROWS . ' rows below its headings.']]);
+        }
+
+        $errors = [];
+        $entries = [];   // "date|reference" => [date, memo, lines, rows]
+        $codes = [];
+        foreach ($rows as $n => $cells) {
+            $row = [];
+            foreach ($headings as $i => $h) {
+                if (isset($columns[$h]) && ! isset($row[$columns[$h]])) {
+                    $row[$columns[$h]] = trim((string) ($cells[$i] ?? ''));
+                }
+            }
+            $at = $n + 2;
+            $amount = fn (string $f) => isset($row[$f]) && $row[$f] !== '' ? str_replace([',', ' '], '', $row[$f]) : null;
+            [$debit, $credit] = [$amount('debit'), $amount('credit')];
+            foreach (['debit' => $debit, 'credit' => $credit] as $f => $v) {
+                if ($v !== null && ! preg_match('/^\d{1,18}(\.\d{1,2})?$/', $v)) {
+                    $errors[] = ['row' => $at, 'name' => $row['reference'] ?? null, 'messages' => ["The {$f} is not an amount with up to 2 decimals."]];
+                    continue 2;
+                }
+            }
+            if (bccomp($debit ?? '0', '0', 2) === 0 && bccomp($credit ?? '0', '0', 2) === 0) {
+                continue;   // a line with no amount
+            }
+            $date = $row['date'] ?? '';
+            if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || \DateTimeImmutable::createFromFormat('!Y-m-d', $date)?->format('Y-m-d') !== $date) {
+                $errors[] = ['row' => $at, 'name' => $row['reference'] ?? null, 'messages' => ['The date is not a date such as 2026-11-30.']];
+                continue;
+            }
+            $codes[] = $row['code'] ?? '';
+            $key = $date . '|' . ($row['reference'] ?? '');
+            $entries[$key] ??= ['date' => $date, 'reference' => $row['reference'] ?? '', 'memo' => '', 'lines' => [], 'rows' => []];
+            if (($row['memo'] ?? '') !== '' && $entries[$key]['memo'] === '') {
+                $entries[$key]['memo'] = $row['memo'];
+            }
+            $entries[$key]['lines'][] = ['code' => $row['code'] ?? '', 'debit' => $debit, 'credit' => $credit, 'description' => ($row['description'] ?? '') !== '' ? mb_substr($row['description'], 0, 255) : null];
+            $entries[$key]['rows'][] = $at;
+        }
+        if (count($entries) > self::MAX_JOURNALS) {
+            throw ValidationException::withMessages(['csv' => ['A file has at most ' . self::MAX_JOURNALS . ' entries.']]);
+        }
+        // Accounts by code, through the company-scoped model (CLAUDE.md rule 4).
+        $accounts = Account::query()->whereIn('code', array_values(array_unique($codes)))->pluck('id', 'code');
+
+        $added = 0;
+        $made = [];
+        if ($errors === [] && $entries === []) {
+            $errors[] = ['row' => 2, 'name' => null, 'messages' => ['No line in the file has an amount.']];
+        }
+        if ($errors === []) {
+            DB::beginTransaction();   // a savepoint: a check, or one refused entry, keeps nothing
+            try {
+                foreach ($entries as $e) {
+                    $lines = [];
+                    foreach ($e['lines'] as $i => $l) {
+                        if (! isset($accounts[$l['code']])) {
+                            $errors[] = ['row' => $e['rows'][$i], 'name' => $e['reference'] ?: null, 'messages' => ["No account with code {$l['code']} in the chart."]];
+                            continue 2;
+                        }
+                        $lines[] = array_filter(['account_id' => $accounts[$l['code']], 'debit' => $l['debit'], 'credit' => $l['credit'], 'description' => $l['description']], fn ($v) => $v !== null);
+                    }
+                    $memo = $e['memo'] !== '' ? $e['memo'] : ($e['reference'] !== '' ? "Imported journal {$e['reference']}" : 'Imported journal');
+                    $sub = Request::create('/', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'],
+                        json_encode(['date' => $e['date'], 'memo' => mb_substr($memo, 0, 500), 'lines' => $lines], JSON_THROW_ON_ERROR));
+                    $sub->setUserResolver(fn () => $request->user());
+                    try {
+                        $result = app()->call([app(JournalController::class), 'store'], ['request' => $sub])->getData(true);
+                        $made[] = ['reference' => $e['reference'], 'date' => $e['date'], 'status' => $result['status'] ?? null, 'number' => $result['number'] ?? null];
+                        $added++;
+                    } catch (ValidationException $ex) {
+                        foreach ($ex->errors() as $field => $messages) {
+                            $line = preg_match('/^lines\.(\d+)\./', $field, $m) ? (int) $m[1] : null;
+                            $errors[] = ['row' => $line !== null ? ($e['rows'][$line] ?? $e['rows'][0]) : $e['rows'][0], 'name' => $e['reference'] ?: null, 'messages' => array_values($messages)];
+                        }
+                    }
+                }
+            } catch (\Throwable $ex) {
+                DB::rollBack();
+                throw $ex;
+            }
+            $check || $errors !== [] ? DB::rollBack() : DB::commit();
+        }
+        $keep = ! $check && $errors === [];
+
+        return response()->json([
+            'kind' => 'journals', 'checked' => $check, 'rows' => count($rows), 'entries' => count($entries), 'added' => $keep ? $added : 0,
+            'journals' => $keep ? $made : [], 'errors' => $errors, 'skipped' => [], 'columns' => $fields,
+            'ignored_columns' => array_values(array_filter($headings, fn ($h) => $h !== '' && ! isset($columns[$h]))),
+        ], $keep ? 201 : 200);
+    }
+
     public function openingBalances(Request $request): JsonResponse
     {
         $this->authorizeCompany('accounting.opening');

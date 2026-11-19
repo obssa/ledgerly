@@ -29,7 +29,7 @@ export default async function ImportPage({ searchParams }: PageProps<"/import">)
         </Card>
         <Card className="min-w-0 flex-[1_1_280px]" label="The file">
           <h2 className="text-[15px] font-bold">The file</h2>
-          <p className="mt-1.5 text-[13px] text-muted">Save the sheet as CSV (in Excel: File, Save as, CSV UTF-8). The first line names the columns. {importRequires(kind)} Columns read:</p>
+          <p className="mt-1.5 text-[13px] text-muted">Choose the Excel workbook (its first sheet is read) or a CSV file. The first line names the columns. {importRequires(kind)} Columns read:</p>
           <ul className="mt-2 list-disc pl-5 text-[13px]">{k.columns.map((c) => <li key={c}>{c}</li>)}</ul>
           <p className="mt-2 text-[13px] text-muted">Up to 2,000 rows. Amounts may have thousands separators. Other columns are left out and named after a check.</p>
         </Card>
