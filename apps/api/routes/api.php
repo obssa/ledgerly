@@ -398,6 +398,7 @@ Route::prefix('v1')->group(function () {
 
             Route::get('payments-made', [PaymentMadeController::class, 'index']);
             Route::post('payments-made', [PaymentMadeController::class, 'store']);
+            Route::post('payments-made/batch', [PaymentMadeController::class, 'batch']);   // Module 3: batch payments
             Route::get('payments-made/withholding/{supplier}', [PaymentMadeController::class, 'withholding']);
             Route::get('payments-made/{paymentMade}', [PaymentMadeController::class, 'show']);
             Route::post('payments-made/{paymentMade}/reverse', [PaymentMadeController::class, 'reverse']);

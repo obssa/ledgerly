@@ -1574,6 +1574,9 @@ export const ledgerly = {
   openBills: (contactId: string, ctx: RequestOptions) =>
     api<{ data: Bill[] }>("bills", { ...ctx, query: { contact_id: contactId, open: "1" } }),
   paymentsMade: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-made", ctx),
+  /** Module 3: one payment per supplier for the bills given, all or none. */
+  payBatch: (body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ batch_id: string; payments: { id: string; supplier: string; amount: string; withholding: string; bills: number }[] }>("payments-made/batch", { ...ctx, method: "POST", body }),
   paymentMade: (id: string, ctx: RequestOptions) =>
     api<PaymentReceived & { withholding_certificate: string | null; unallocated: string; contact?: { id: string; name: string; tax_id?: string | null; payout?: Payout }; can: { reverse: boolean; allocate: boolean; refund: boolean } }>(
       `payments-made/${encodeURIComponent(id)}`, ctx),
