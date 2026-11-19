@@ -25,10 +25,11 @@ export function ImportStatement({ accountId }: { accountId: string }) {
       <Message state={state} />
       <input type="hidden" name="account_id" value={accountId} />
       <div>
-        <label className="field-label" htmlFor="file">Statement file (CSV)</label>
-        <input className="field" id="file" name="file" type="file" accept=".csv,.txt,text/csv,text/plain" aria-describedby="file-hint" />
+        <label className="field-label" htmlFor="file">Statement file</label>
+        <input className="field" id="file" name="file" type="file" accept=".csv,.txt,.ofx,.qfx,.sta,.940,.mt940,.xml,.camt,text/csv,text/plain,application/xml,text/xml" aria-describedby="file-hint" />
         <p id="file-hint" className="mt-1.5 text-[13px] text-muted">
-          Any bank or wallet export with a date, a description and an amount (or money out and money in) column. Lines already imported are skipped.
+          CSV (any export with a date, a description and an amount, or money out and money in, column), OFX or QFX, SWIFT MT940, or ISO 20022 camt.053.
+          The form is recognised from the file itself. Lines already imported are skipped.
         </p>
       </div>
       <details>
