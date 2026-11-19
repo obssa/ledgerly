@@ -108,6 +108,68 @@ final class FinancialStatements
         ];
     }
 
+    /**
+     * Module 10: the notes to the financial statements for a period, from the books as they stand: the accounting
+     * policies the company uses, and the notes behind the balance sheet figures (property, plant and equipment with its
+     * depreciation, receivables, inventory, payables and accruals, taxes, loans). Each note is opening, movement and
+     * closing (or the closing balance), so it agrees with the statements of the same period.
+     *
+     * @return array<string, mixed>
+     */
+    public function notes(string $companyId, string $from, string $to): array
+    {
+        $before = (new \DateTimeImmutable($from))->modify('-1 day')->format('Y-m-d');
+        $opening = collect($this->movements($companyId, null, $before))->keyBy('id');
+        $closing = collect($this->movements($companyId, null, $to))->keyBy('id');
+        $period = collect($this->movements($companyId, $from, $to))->keyBy('id');
+        $sum = fn ($set, callable $pick) => $set->filter($pick)->reduce(fn (BigDecimal $t, $a) => $t->plus($a->amount), BigDecimal::zero());
+        $str = fn (BigDecimal $v) => (string) $v->toScale(2);
+        $isPpe = fn ($a) => $a->type === 'asset' && $a->subtype === 'fixed_asset';
+        $isDep = fn ($a) => self::isDepreciation($a);
+        // Additions and disposals at cost: the debits and credits to the cost accounts in the period.
+        $ppeMoves = DB::table('journal_lines as l')->join('accounts as a', 'a.id', '=', 'l.account_id')
+            ->where('l.company_id', $companyId)->whereBetween('l.entry_date', [$from, $to])->where('a.type', 'asset')->where('a.subtype', 'fixed_asset')
+            ->selectRaw('coalesce(sum(l.debit), 0)::numeric(20,2)::text AS additions, coalesce(sum(l.credit), 0)::numeric(20,2)::text AS disposals')->first();
+        $depMoves = DB::table('journal_lines as l')->join('accounts as a', 'a.id', '=', 'l.account_id')
+            ->where('l.company_id', $companyId)->whereBetween('l.entry_date', [$from, $to])->where('a.type', 'asset')->where('a.subtype', 'contra_asset')
+            ->where(fn ($q) => $q->whereNull('a.system_key')->orWhere('a.system_key', '<>', 'doubtful_debts_allowance'))
+            ->selectRaw('coalesce(sum(l.credit), 0)::numeric(20,2)::text AS charged, coalesce(sum(l.debit), 0)::numeric(20,2)::text AS released')->first();
+        $costOpen = $sum($opening, $isPpe);
+        $costClose = $sum($closing, $isPpe);
+        $depOpen = $sum($opening, $isDep)->negated();
+        $depClose = $sum($closing, $isDep)->negated();
+        $balance = fn (callable $pick, bool $credit = false) => $credit ? $sum($closing, $pick)->negated() : $sum($closing, $pick);
+        $lines = fn (callable $pick, bool $credit = false) => $closing->filter($pick)->filter(fn ($a) => ! BigDecimal::of($a->amount)->isZero())
+            ->map(fn ($a) => ['code' => $a->code, 'name' => $a->name, 'amount' => $str($credit ? BigDecimal::of($a->amount)->negated() : BigDecimal::of($a->amount))])->values()->all();
+        $company = DB::table('companies')->where('id', $companyId)->first(['legal_name', 'base_currency', 'framework', 'fiscal_year_start_month', 'accounting_basis']);
+        $fifo = DB::table('items')->where(['company_id' => $companyId, 'type' => 'inventory', 'costing' => 'fifo', 'is_active' => true])->count();
+        $methods = DB::table('fixed_assets')->where('company_id', $companyId)->distinct()->pluck('method')->filter()->values()->all();
+
+        return [
+            'from' => $from, 'to' => $to, 'company' => $company->legal_name, 'currency' => $company->base_currency,
+            'policies' => [
+                'framework' => 'IFRS for SMEs', 'basis' => $company->accounting_basis ?? 'accrual', 'fiscal_year_start_month' => (int) $company->fiscal_year_start_month,
+                'inventory' => $fifo > 0 ? "Weighted average cost; {$fifo} items first in, first out" : 'Weighted average cost',
+                'depreciation_methods' => $methods,
+            ],
+            'ppe' => [
+                'cost' => ['opening' => $str($costOpen), 'additions' => (string) $ppeMoves->additions, 'disposals' => (string) $ppeMoves->disposals, 'closing' => $str($costClose)],
+                'depreciation' => ['opening' => $str($depOpen), 'charged' => (string) $depMoves->charged, 'released' => (string) $depMoves->released, 'closing' => $str($depClose)],
+                'carrying_opening' => $str($costOpen->minus($depOpen)), 'carrying_closing' => $str($costClose->minus($depClose)),
+            ],
+            'receivables' => ['lines' => $lines(fn ($a) => in_array($a->system_key, ['accounts_receivable', 'doubtful_debts_allowance', 'withholding_receivable'], true) || $a->subtype === 'receivable'),
+                'total' => $str($balance(fn ($a) => in_array($a->system_key, ['accounts_receivable', 'doubtful_debts_allowance', 'withholding_receivable'], true) || $a->subtype === 'receivable'))],
+            'inventory' => ['lines' => $lines(fn ($a) => $a->type === 'asset' && $a->subtype === 'inventory'), 'total' => $str($balance(fn ($a) => $a->type === 'asset' && $a->subtype === 'inventory'))],
+            'payables' => ['lines' => $lines(fn ($a) => $a->type === 'liability' && in_array($a->subtype, ['payable', 'accrual', 'payroll', 'deposit'], true), true),
+                'total' => $str($balance(fn ($a) => $a->type === 'liability' && in_array($a->subtype, ['payable', 'accrual', 'payroll', 'deposit'], true), true))],
+            'taxes' => ['lines' => $lines(fn ($a) => $a->type === 'liability' && $a->subtype === 'tax_payable', true),
+                'total' => $str($balance(fn ($a) => $a->type === 'liability' && $a->subtype === 'tax_payable', true))],
+            'loans' => ['lines' => $lines(fn ($a) => $a->type === 'liability' && $a->subtype === 'loan', true),
+                'total' => $str($balance(fn ($a) => $a->type === 'liability' && $a->subtype === 'loan', true)),
+                'movement' => $str($sum($period, fn ($a) => $a->type === 'liability' && $a->subtype === 'loan')->negated())],
+        ];
+    }
+
     /** Where cash paid or received is shown on the direct-method statement, by the account on the other side of it. */
     public const DIRECT_LINES = [
         'customers' => 'Received from customers', 'suppliers' => 'Paid to suppliers and for expenses', 'employees' => 'Paid to employees',
