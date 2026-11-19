@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getBalanceSheet, getCompanySettings, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { isDate } from "@/lib/reports";
+import { isDate, yearEarlier } from "@/lib/reports";
 import { ExportLink, PeriodForm, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Balance sheet" };
@@ -10,13 +11,30 @@ export const metadata = { title: "Balance sheet" };
 export default async function BalanceSheetPage({ searchParams }: PageProps<"/reports/balance-sheet">) {
   const q = await searchParams;
   const asOf = isDate(q.as_of) ? q.as_of : await getCompanyToday();
-  const [bs, settings] = await Promise.all([getBalanceSheet(asOf), getCompanySettings()]);
+  // Comparison with last year (compare=year): the balance sheet a year earlier, account by account.
+  const lastYear = q.compare === "year";
+  const before = yearEarlier(asOf);
+  const [bs, prior, settings] = await Promise.all([getBalanceSheet(asOf), lastYear ? getBalanceSheet(before) : Promise.resolve(null), getCompanySettings()]);
   const cur = settings.base_currency;
-  const section = (title: string, rows: { code: string; name: string; amount: string }[], total: string) => (
+  const cols = prior ? 3 : 2;
+  type Key = "assets" | "liabilities" | "equity";
+  // Every account in either year, in code order: one that was empty in a year shows nothing there.
+  const merged = (key: Key) => {
+    const now = new Map((bs?.sections[key] ?? []).map((r) => [r.code, r]));
+    const then = new Map((prior?.sections[key] ?? []).map((r) => [r.code, r]));
+    return [...new Set([...now.keys(), ...then.keys()])].sort().map((code) => ({
+      code, name: (now.get(code) ?? then.get(code))!.name, amount: now.get(code)?.amount ?? null, previous: then.get(code)?.amount ?? null,
+    }));
+  };
+  const amount = (v: string | null) => (v === null ? "—" : formatAmount(v, cur));
+  const section = (title: string, key: Key, total: string, previous: string | null) => (
     <>
-      <tr><th scope="rowgroup" colSpan={2} className="!border-0 !pt-5 !text-[13px] !text-ink">{title}</th></tr>
-      {rows.map((r) => <tr key={r.code}><td className="pl-7"><span className="num text-muted">{r.code}</span> {r.name}</td><td className="num text-right">{formatAmount(r.amount, cur)}</td></tr>)}
-      <tr className="font-bold"><td>Total {title.toLowerCase()}</td><td className="num text-right">{formatAmount(total, cur)}</td></tr>
+      <tr><th scope="rowgroup" colSpan={cols} className="!border-0 !pt-5 !text-[13px] !text-ink">{title}</th></tr>
+      {merged(key).filter((r) => prior || r.amount !== null).map((r) => (
+        <tr key={r.code}><td className="pl-7"><span className="num text-muted">{r.code}</span> {r.name}</td>
+          <td className="num text-right">{amount(r.amount)}</td>{prior && <td className="num text-right">{amount(r.previous)}</td>}</tr>
+      ))}
+      <tr className="font-bold"><td>Total {title.toLowerCase()}</td><td className="num text-right">{formatAmount(total, cur)}</td>{prior && <td className="num text-right">{amount(previous)}</td>}</tr>
     </>
   );
 
@@ -24,6 +42,10 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Balance sheet" actions={<ExportLink report="balance-sheet" params={{ as_of: asOf }} />} />
       <PeriodForm to={asOf} single />
+      <nav aria-label="Compare with" className="mb-3 flex flex-wrap gap-2 text-[13px]">
+        <Link href={`/reports/balance-sheet?as_of=${asOf}`} className={`btn !py-1 ${lastYear ? "" : "btn-primary"}`}>This date only</Link>
+        <Link href={`/reports/balance-sheet?as_of=${asOf}&compare=year`} className={`btn !py-1 ${lastYear ? "btn-primary" : ""}`}>Against {before}</Link>
+      </nav>
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/balance-sheet" />
         {!bs ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (
@@ -34,12 +56,17 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
             </div>
             <div className="overflow-x-auto">
               <table className="tbl">
+                {prior && (
+                  <thead><tr><th scope="col">Account</th><th scope="col" className="!text-right">{asOf}</th><th scope="col" className="!text-right">{before}</th></tr></thead>
+                )}
                 <tbody>
-                  {section("Assets", bs.sections.assets, bs.equation.assets)}
-                  {section("Liabilities", bs.sections.liabilities, bs.equation.liabilities)}
-                  {section("Equity", bs.sections.equity, bs.equation.equity)}
-                  <tr><td className="pl-7">Profit not yet closed to retained earnings</td><td className="num text-right">{formatAmount(bs.equation.profit_to_date, cur)}</td></tr>
-                  <tr className="bg-side font-extrabold text-white"><td>Liabilities and equity</td><td className="num text-right">{formatAmount(bs.equation.liabilities_and_equity, cur)}</td></tr>
+                  {section("Assets", "assets", bs.equation.assets, prior?.equation.assets ?? null)}
+                  {section("Liabilities", "liabilities", bs.equation.liabilities, prior?.equation.liabilities ?? null)}
+                  {section("Equity", "equity", bs.equation.equity, prior?.equation.equity ?? null)}
+                  <tr><td className="pl-7">Profit not yet closed to retained earnings</td><td className="num text-right">{formatAmount(bs.equation.profit_to_date, cur)}</td>
+                    {prior && <td className="num text-right">{formatAmount(prior.equation.profit_to_date, cur)}</td>}</tr>
+                  <tr className="bg-side font-extrabold text-white"><td>Liabilities and equity</td><td className="num text-right">{formatAmount(bs.equation.liabilities_and_equity, cur)}</td>
+                    {prior && <td className="num text-right">{formatAmount(prior.equation.liabilities_and_equity, cur)}</td>}</tr>
                 </tbody>
               </table>
             </div>

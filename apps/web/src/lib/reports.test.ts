@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STOCK_BANDS, isDate, periodLabel, previousPeriod, showRatio, columnLabel, customOptions } from "./reports";
+import { STOCK_BANDS, isDate, periodLabel, previousPeriod, samePeriodLastYear, showRatio, columnLabel, customOptions, yearEarlier } from "./reports";
 
 describe("previousPeriod", () => {
   it("is the same length, ending the day before", () => {
@@ -44,5 +44,16 @@ describe("custom report", () => {
     expect(columnLabel("2026-11")).toBe("Nov 2026");
     expect(columnLabel("2026-Q4")).toBe("Q4 2026");
     expect(columnLabel("Total")).toBe("Total");
+  });
+});
+
+describe("comparison with last year", () => {
+  it("moves a date back a year, 29 February to 28 February", () => {
+    expect(yearEarlier("2026-11-19")).toBe("2025-11-19");
+    expect(yearEarlier("2028-02-29")).toBe("2027-02-28");
+    expect(yearEarlier("2027-02-28")).toBe("2026-02-28");
+  });
+  it("moves a whole period back a year", () => {
+    expect(samePeriodLastYear("2026-07-08", "2026-11-19")).toEqual({ from: "2025-07-08", to: "2025-11-19" });
   });
 });

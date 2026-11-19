@@ -13,6 +13,18 @@ export function previousPeriod(from: string, to: string): { from: string; to: st
   return { from: toString(new Date(end.getTime() - days * DAY)), to: toString(end) };
 }
 
+/** The same date a year earlier; 29 February becomes 28 February. */
+export function yearEarlier(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const last = new Date(Date.UTC(y - 1, m, 0)).getUTCDate();
+  return `${y - 1}-${String(m).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
+}
+
+/** The same period a year earlier: comparison with last year. */
+export function samePeriodLastYear(from: string, to: string): { from: string; to: string } {
+  return { from: yearEarlier(from), to: yearEarlier(to) };
+}
+
 /** A period as words: "1 Jan 2026 to 17 Nov 2026", or one month as "October 2026". */
 export function periodLabel(from: string, to: string): string {
   const f = toDate(from);
