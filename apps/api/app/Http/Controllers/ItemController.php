@@ -23,7 +23,10 @@ use Illuminate\Validation\ValidationException;
 final class ItemController extends Controller
 {
     private const FIELDS = ['sku', 'name', 'type', 'unit', 'sale_price', 'purchase_price', 'income_account_id', 'expense_account_id',
-        'authority_item_code', 'reorder_point', 'is_active', 'costing', 'tracking', 'max_level', 'preferred_supplier_id'];
+        'authority_item_code', 'reorder_point', 'is_active', 'costing', 'tracking', 'max_level', 'preferred_supplier_id', 'barcode'];
+
+    /** 085: 4 to 64 printable characters, no space at either end (the database checks the same). */
+    private const BARCODE = ['nullable', 'string', 'regex:/^[!-~][ -~]{2,62}[!-~]$/'];
 
     public function __construct(private readonly AuditLogger $audit, private readonly CurrentCompany $current)
     {
@@ -43,7 +46,8 @@ final class ItemController extends Controller
             ->when($q['type'] ?? null, fn ($b, $t) => $b->where('type', $t))
             // A bound value with the query builder's ilike; the search text never becomes SQL (CLAUDE.md rule 1).
             ->when($q['search'] ?? null, fn ($b, $s) => $b->where(fn ($w) => $w
-                ->where('name', 'ilike', '%' . addcslashes($s, '%_\\') . '%')->orWhere('sku', $s)))
+                ->where('name', 'ilike', '%' . addcslashes($s, '%_\\') . '%')->orWhere('sku', $s)->orWhere('barcode', $s)
+                ->orWhereIn('id', DB::table('item_units')->where('barcode', $s)->select('item_id'))))
             ->orderBy('name')->limit(500)->get();
 
         $onHand = StockBalance::query()->whereIn('item_id', $items->pluck('id'))
@@ -52,7 +56,7 @@ final class ItemController extends Controller
 
         // 072: the other units each item is bought or sold in.
         $units = DB::table('item_units')->whereIn('item_id', $items->pluck('id'))->where('is_active', true)->orderBy('factor')
-            ->get(['id', 'item_id', 'name', 'factor'])->groupBy('item_id');
+            ->get(['id', 'item_id', 'name', 'factor', 'barcode'])->groupBy('item_id');
 
         // 067: what the open sales orders still want of each stock item.
         $stock = $reservations->byItem($items->where('type', 'inventory')->pluck('id')->map(fn ($id) => (string) $id)->values()->all());
@@ -62,7 +66,7 @@ final class ItemController extends Controller
                 'on_hand' => $onHand[$i->getKey()]->quantity ?? '0.00', 'value' => $onHand[$i->getKey()]->value ?? '0.00',
                 'reserved' => $stock[(string) $i->getKey()]['reserved'] ?? '0.00', 'available' => $stock[(string) $i->getKey()]['available'] ?? null,
                 'on_order' => $stock[(string) $i->getKey()]['on_order'] ?? '0.00',
-                'units' => ($units[$i->getKey()] ?? collect())->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'factor' => (string) $u->factor])->values()]),
+                'units' => ($units[$i->getKey()] ?? collect())->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'factor' => (string) $u->factor, 'barcode' => $u->barcode])->values()]),
             'can' => $this->can(),
         ]);
     }
@@ -137,7 +141,8 @@ final class ItemController extends Controller
             'costing' => ['sometimes', Rule::in(['average', 'fifo'])],
             // Tracked by batch (074), for a stock item, before its first move.
             'tracking' => ['sometimes', Rule::in(['none', 'batch'])],
-        ], ['costing.in' => 'Weighted average or FIFO.']);
+            'barcode' => ['sometimes', ...self::BARCODE],   // 085: the barcode printed on it
+        ], ['costing.in' => 'Weighted average or FIFO.', 'barcode.regex' => 'A barcode is 4 to 64 letters, digits or symbols.']);
         if (($data['costing'] ?? 'average') === 'fifo' && ($data['type'] ?? $item?->type) !== 'inventory') {
             throw ValidationException::withMessages(['costing' => ['Only a stock item is costed FIFO.']]);
         }
@@ -149,8 +154,23 @@ final class ItemController extends Controller
         if (($data['tracking'] ?? 'none') === 'batch' && ($data['type'] ?? $item?->type) !== 'inventory') {
             throw ValidationException::withMessages(['tracking' => ['Only a stock item is tracked by batch.']]);
         }
+        if (! empty($data['barcode'])) {
+            $this->assertBarcodeFree((string) $data['barcode'], $item?->getKey(), null);
+        }
 
         return $data;
+    }
+
+    /** 085: within the company a barcode names one item or one unit (the database refuses a second one too). */
+    private function assertBarcodeFree(string $code, ?string $itemId, ?string $unitId): void
+    {
+        $item = DB::table('items')->where('barcode', $code)->when($itemId, fn ($q) => $q->where('id', '<>', $itemId))->value('name');
+        $unit = DB::table('item_units as u')->join('items as i', 'i.id', '=', 'u.item_id')->where('u.barcode', $code)
+            ->when($unitId, fn ($q) => $q->where('u.id', '<>', $unitId))->first(['i.name', 'u.name as unit']);
+        if ($item !== null || $unit !== null) {
+            $whose = $item ?? "{$unit->name} ({$unit->unit})";
+            throw ValidationException::withMessages(['barcode' => ["Barcode {$code} is already on {$whose}."]]);
+        }
     }
 
     /** @return array<string, mixed> */
@@ -160,7 +180,7 @@ final class ItemController extends Controller
             ->map(fn (StockBalance $b) => ['warehouse' => $b->warehouse, 'quantity' => (string) $b->quantity, 'value' => (string) $b->value]);
 
         $units = DB::table('item_units')->where('item_id', $item->getKey())->orderByDesc('is_active')->orderBy('factor')
-            ->get(['id', 'name', 'factor', 'is_active', 'created_at']);
+            ->get(['id', 'name', 'factor', 'is_active', 'created_at', 'barcode']);
 
         // 073: a bundle's parts, and whether they can still change (not once the bundle is on a document).
         $components = $item->type === 'bundle'
@@ -226,7 +246,11 @@ final class ItemController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:30'],
             'factor' => ['required', 'decimal:0,6', 'gt:0', 'max:1000000'],
-        ], ['factor.gt' => 'How many of the item\'s own unit are in one: above zero.']);
+            'barcode' => self::BARCODE,   // 085: the barcode of this unit (a carton's own)
+        ], ['factor.gt' => 'How many of the item\'s own unit are in one: above zero.', 'barcode.regex' => 'A barcode is 4 to 64 letters, digits or symbols.']);
+        if (! empty($data['barcode'])) {
+            $this->assertBarcodeFree((string) $data['barcode'], null, null);
+        }
         $name = trim($data['name']);
         if (mb_strtolower($name) === mb_strtolower(trim((string) $item->unit))) {
             throw ValidationException::withMessages(['name' => ["{$item->name} is already counted in {$item->unit}: a unit is another one."]]);
@@ -236,7 +260,7 @@ final class ItemController extends Controller
         }
         $id = (string) \Illuminate\Support\Str::uuid7();
         DB::table('item_units')->insert(['id' => $id, 'company_id' => $item->company_id, 'item_id' => $item->getKey(), 'name' => $name,
-            'factor' => (string) $data['factor'], 'created_by' => $request->user()->getKey()]);
+            'factor' => (string) $data['factor'], 'created_by' => $request->user()->getKey(), 'barcode' => $data['barcode'] ?? null]);
         $this->audit->record($this->current->id(), 'unit_added', 'item', $item->getKey(), null,
             ['unit_id' => $id, 'name' => $name, 'factor' => (string) $data['factor']], userId: $request->user()->getKey());
 

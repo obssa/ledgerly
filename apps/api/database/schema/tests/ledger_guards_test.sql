@@ -4485,6 +4485,46 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', f1::text, true);
   RAISE NOTICE 'PASS T110 a requisition is asked for by its member, decided by someone else and ordered once approved';
 END $$;
+
+-- T111: barcodes (085). A barcode is printable, with no space at either end; within a company it names one item or one
+-- unit, never both; another company may use the same one. Company A as f1, item b1; company B's item b8.
+DO $$
+DECLARE
+  b1 constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  u1 constant uuid := '00000000-0000-0000-0000-000000000f90';
+BEGIN
+  BEGIN
+    UPDATE items SET barcode = ' 4006381333931' WHERE id = b1;
+    RAISE EXCEPTION 'FAIL T111a: a barcode began with a space';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE items SET barcode = '4006381333931' WHERE id = b1;
+  INSERT INTO item_units (id, company_id, item_id, name, factor, created_by) VALUES (u1, app_company_id(), b1, 'T111 carton', 12, '00000000-0000-0000-0000-0000000000f1');
+  BEGIN
+    UPDATE item_units SET barcode = '4006381333931' WHERE id = u1;
+    RAISE EXCEPTION 'FAIL T111b: a unit took the barcode of an item';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  UPDATE item_units SET barcode = '14006381333938' WHERE id = u1;
+  BEGIN
+    INSERT INTO items (company_id, name, type, barcode) VALUES (app_company_id(), 'T111 other', 'service', '14006381333938');
+    RAISE EXCEPTION 'FAIL T111c: an item took the barcode of a unit';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO items (company_id, name, type, barcode) VALUES (app_company_id(), 'T111 twin', 'service', '4006381333931');
+    RAISE EXCEPTION 'FAIL T111d: two items had one barcode';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+
+  -- Another company's item may carry the same barcode (as the owner of the test, to reach company B's row).
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  UPDATE items SET barcode = '4006381333931' WHERE id = '00000000-0000-0000-0000-0000000000b8';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'FAIL T111e: company B could not use a barcode company A uses';
+  END IF;
+  UPDATE items SET barcode = NULL WHERE id = '00000000-0000-0000-0000-0000000000b8';
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  UPDATE item_units SET barcode = NULL, is_active = false WHERE id = u1;
+  UPDATE items SET barcode = NULL WHERE id = b1;
+  RAISE NOTICE 'PASS T111 a barcode names one item or one unit within a company';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

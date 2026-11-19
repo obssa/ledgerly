@@ -14,6 +14,7 @@ import { createInvoice } from "../actions";
 import { saveQuote } from "../../quotes/actions";
 import { savePurchaseOrder } from "../../purchase-orders/actions";
 import { todayIn } from "@/lib/dates";
+import { findBarcode } from "@/lib/barcodes";
 
 /** The words and postings that differ between a sales invoice and a supplier's bill; the form is the same. */
 const KIND = {
@@ -162,6 +163,29 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
+  /** 085: a barcode scanned or typed adds its item in that unit (one more if it is already on a line). */
+  const [scanned, setScanned] = useState<string | null>(null);
+  const scan = (code: string) => {
+    const hit = findBarcode(items, code);
+    if (!hit) {
+      setScanned(code.trim() === "" ? null : `No item has barcode ${code.trim()}.`);
+      return;
+    }
+    setScanned(null);
+    const item = items.find((i) => i.id === hit.itemId)!;
+    const unit = hit.unitId ? item.units?.find((u) => u.id === hit.unitId) : undefined;
+    const base = priceOf(item);
+    const price = base ? (Number(base) * (unit ? Number(unit.factor) : 1)).toFixed(2) : "";
+    const account = item.account_id && options.accounts.some((a) => a.id === item.account_id) ? item.account_id : firstAccount;
+    setLines((ls) => {
+      const same = ls.find((l) => l.itemId === hit.itemId && (l.unitId || "") === (hit.unitId ?? ""));
+      if (same) return ls.map((l) => (l.key === same.key ? { ...l, quantity: String(Number(plain(l.quantity) || "0") + 1) } : l));
+      const filled = { itemId: item.id, unitId: hit.unitId ?? "", description: item.name, quantity: "1", unitPrice: price, accountId: account };
+      const last = ls[ls.length - 1];
+      if (last && !last.itemId && last.description.trim() === "" && last.unitPrice === "") return ls.map((l) => (l.key === last.key ? { ...l, ...filled } : l));
+      return [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, taxRateId: firstRate, ...filled }];
+    });
+  };
   const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, unit_id: l.unitId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}),
     ...(l.batchNumber ? { batch_number: l.batchNumber, batch_expires_on: l.batchExpires || null } : {}) })));
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
@@ -343,7 +367,17 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             </table>
           </div>
           <div className="flex flex-wrap justify-between gap-4 px-3 pb-2 pt-4">
-            <button type="button" className="btn self-start" onClick={addLine}>+ Add line</button>
+            <div className="flex flex-col gap-2 self-start">
+              <button type="button" className="btn self-start" onClick={addLine}>+ Add line</button>
+              {items.some((i) => i.barcode || (i.units ?? []).some((u) => u.barcode)) && (
+                <div>
+                  <label className="field-label" htmlFor="scan">Scan or type a barcode</label>
+                  <input className="field num w-[220px]" id="scan" inputMode="numeric" autoComplete="off"
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); scan(e.currentTarget.value); e.currentTarget.value = ""; } }} />
+                  {scanned && <p role="alert" className="mt-1 text-[13px] text-bad">{scanned}</p>}
+                </div>
+              )}
+            </div>
             <dl className="flex-[0_1_320px] text-sm">
               <div className="flex justify-between py-1.5"><dt>Subtotal</dt><dd className="num">{formatAmount(totals.subtotal, currency)}</dd></div>
               <div className="flex justify-between py-1.5"><dt>Tax</dt><dd className="num">{formatAmount(totals.tax, currency)}</dd></div>
