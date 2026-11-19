@@ -387,7 +387,7 @@ final class DocumentStock
         $warehouse = $this->warehouseFor($doc);
         $original = Document::query()->findOrFail($doc->original_document_id);
         $sold = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $original->getKey(), 'kind' => 'sale'])
-            ->get(['item_id', 'quantity', 'amount'])->groupBy('item_id');
+            ->get(['item_id', 'quantity', 'amount'])->concat($this->deliveredAndBilled($original, $company))->groupBy('item_id');
         $back = DB::table('stock_moves as m')->join('documents as c', 'c.id', '=', 'm.document_id')
             ->where(['m.company_id' => $company->getKey(), 'c.type' => 'credit_note', 'c.original_document_id' => $original->getKey()])
             ->whereIn('m.kind', ['sale_return', 'sale'])->get(['m.item_id', 'm.quantity', 'm.amount'])->groupBy('item_id');
@@ -419,6 +419,36 @@ final class DocumentStock
             $draft->add(JournalLineDraft::debit(Account::system('inventory')->getKey(), $cost, $zero, "Goods returned, {$doc->number}"));
             $draft->add(JournalLineDraft::credit(Account::system('cogs')->getKey(), $cost, $zero, "Cost of goods returned, {$doc->number}"));
         }
+    }
+
+    /**
+     * 081: goods the invoice billed from delivery notes left on the notes, not on the invoice. They count as sold by it,
+     * item by item in the item's own unit, at the average cost per unit they left those notes with; as moves out, so
+     * they add up with the invoice's own.
+     *
+     * @return list<object{item_id: string, quantity: string, amount: string}>
+     */
+    private function deliveredAndBilled(Document $invoice, Company $company): array
+    {
+        $matches = DB::table('invoice_delivery_matches as m')
+            ->join('document_lines as il', 'il.id', '=', 'm.invoice_line_id')
+            ->join('document_lines as ol', 'ol.id', '=', 'm.order_line_id')
+            ->where(['m.company_id' => $company->getKey(), 'm.invoice_id' => $invoice->getKey()])
+            ->get(['il.item_id', 'm.order_line_id', 'm.quantity', 'ol.unit_factor']);
+        $out = [];
+        foreach ($matches->groupBy('item_id') as $itemId => $rows) {
+            $qty = $rows->reduce(fn (string $s, $r) => bcadd($s, self::baseQuantity((object) ['quantity' => (string) $r->quantity, 'unit_factor' => $r->unit_factor]), 2), '0');
+            $notes = DB::table('delivery_note_lines as dl')->join('delivery_notes as d', 'd.id', '=', 'dl.delivery_note_id')
+                ->whereIn('dl.order_line_id', $rows->pluck('order_line_id')->all())->where('d.status', 'posted')->distinct()->pluck('dl.delivery_note_id');
+            $left = DB::table('stock_moves')->whereIn('delivery_note_id', $notes)->where(['item_id' => $itemId, 'kind' => 'sale'])->get(['quantity', 'amount']);
+            $leftQty = $left->reduce(fn (string $s, $m) => bcsub($s, (string) $m->quantity, 2), '0');
+            $leftCost = $left->reduce(fn (string $s, $m) => bcsub($s, (string) $m->amount, 2), '0');
+            $cost = bccomp($leftQty, '0', 2) > 0
+                ? Money::of($leftCost, $company->base_currency)->multipliedBy($qty)->dividedBy($leftQty)->roundToCurrency()->toDecimalString() : '0.00';
+            $out[] = (object) ['item_id' => (string) $itemId, 'quantity' => '-' . $qty, 'amount' => '-' . $cost];
+        }
+
+        return $out;
     }
 
     /**
