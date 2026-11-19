@@ -5,7 +5,7 @@ import { PrintButton } from "./PrintButton";
 /** The reports, grouped by the accounting cycle; every entry is a page that exists. */
 const CYCLE: { stage: string; reports: [string, string][] }[] = [
   { stage: "Financial statements", reports: [["Profit and loss", "/reports"], ["Balance sheet", "/reports/balance-sheet"], ["Cash flow statement", "/reports/cash-flow"],
-    ["Changes in equity", "/reports/changes-in-equity"]] },
+    ["Changes in equity", "/reports/changes-in-equity"], ["Cash forecast (13 weeks)", "/reports/cash-forecast"]] },
   { stage: "Ledger and trial balance", reports: [["Trial balance", "/reports/trial-balance"], ["General ledger", "/reports/general-ledger"], ["Journal report", "/journal"],
     ["Audit adjustments", "/close"]] },
   { stage: "Customers and suppliers", reports: [["Sales analysis", "/reports/sales"], ["AR ageing", "/reports/ar-ageing"], ["Customer statements", "/customers"],

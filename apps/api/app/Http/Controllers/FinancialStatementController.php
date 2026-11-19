@@ -58,4 +58,13 @@ final class FinancialStatementController extends Controller
 
         return [(string) $from, $to];
     }
+
+    /** Module 5: the cash forecast, 4 to 26 weeks (13 by default) from today: what is held, and what is due in and out. */
+    public function cashForecast(Request $request, \App\Domain\Banking\CashForecast $forecast): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $q = $request->validate(['weeks' => ['nullable', 'integer', 'min:4', 'max:26']]);
+
+        return response()->json($forecast->weeks($this->current->id(), $this->current->today(), (int) ($q['weeks'] ?? 13)));
+    }
 }

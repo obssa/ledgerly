@@ -223,6 +223,14 @@ export interface StatementLine {
   rule?: { rule_id: string; name: string; account: { id: string; code: string; name: string }; contact: { id: string; name: string } | null; memo: string | null } | null;
 }
 
+/** GET /reports/cash-forecast: from the cash held today, what is due in and out week by week. */
+export interface CashForecast {
+  as_of: string; weeks: number; opening: string; closing: string; goes_below_zero: boolean;
+  overdue: { receivables: string; payables: string };
+  lowest: { week: number; from: string; closing: string } | null;
+  data: { week: number; from: string; to: string; receivables: string; payables: string; cheques_in: string; cheques_out: string; in: string; out: string; net: string; closing: string }[];
+}
+
 /** A bank rule (076): how a kind of statement line is categorised. */
 export interface BankRule {
   id: string; name: string; bank_account_id: string | null; bank_account: string | null; direction: "in" | "out" | "any"; contains: string;
@@ -1760,6 +1768,7 @@ export const ledgerly = {
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
   balanceSheet: (asOf: string, ctx: RequestOptions) => api<BalanceSheet>("reports/balance-sheet", { ...ctx, query: { as_of: asOf } }),
   cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),
+  cashForecast: (weeks: number, ctx: RequestOptions) => api<CashForecast>("reports/cash-forecast", { ...ctx, query: { weeks: String(weeks) } }),
   changesInEquity: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<ChangesInEquity>("reports/changes-in-equity", { ...ctx, query: q }),
   financialHealth: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<FinancialHealth>("reports/financial-health", { ...ctx, query: q }),
   auditLog: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<AuditLog>("audit-log", { ...ctx, query: q }),
