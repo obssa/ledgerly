@@ -584,6 +584,9 @@ export interface Item {
   costing?: "average" | "fifo";
   /** 074: tracked by batch (with expiry), chosen before the first stock move. */
   tracking?: "none" | "batch";
+  /** 075: what a suggested order brings it back up to, and who it goes to. */
+  max_level?: string | null;
+  preferred_supplier_id?: string | null;
   /** 074: its batches with what is on hand in each warehouse, the first to expire first. */
   batches?: { id: string; number: string; expires_on: string | null; warehouse: string | null; quantity: string | null }[] | null;
   is_active: boolean;
@@ -1624,7 +1627,10 @@ export const ledgerly = {
     api<{ data: { item_id: string; item_name: string; sku: string | null; unit: string; batch_id: string; number: string; expires_on: string | null;
       warehouse_id: string; warehouse: string; quantity: string; expired: boolean }[]; today: string }>("stock/batches", { ...ctx, query: q.within_days === undefined ? {} : { within_days: String(q.within_days) } }),
   reorder: (ctx: RequestOptions) =>
-    api<{ data: { item: { id: string; sku: string | null; name: string; unit: string; reorder_point: string; purchase_price: string | null }; on_hand: string }[] }>("stock/reorder", ctx),
+    api<{ data: { item: { id: string; sku: string | null; name: string; unit: string; reorder_point: string; max_level: string | null; purchase_price: string | null };
+      supplier: { id: string; name: string | null } | null; on_hand: string; on_order: string; reserved: string; position: string; suggested: string }[] }>("stock/reorder", ctx),
+  orderLowStock: (body: { warehouse_id: string; lines: { item_id: string; quantity: string }[] }, ctx: RequestOptions) =>
+    api<{ data: { id: string; contact_id: string; lines: number; total: string }[] }>("stock/reorder/purchase-orders", { ...ctx, method: "POST", body }),
   stockMovement: (q: { from?: string; to?: string; warehouse_id?: string }, ctx: RequestOptions) => api<StockMovement>("reports/stock-movement", { ...ctx, query: q }),
   stockAgeing: (q: { as_of?: string; warehouse_id?: string }, ctx: RequestOptions) => api<StockAgeing>("reports/stock-ageing", { ...ctx, query: q }),
   inventoryValuation: (asOf: string | undefined, ctx: RequestOptions) =>

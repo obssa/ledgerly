@@ -18,7 +18,7 @@ const TYPES: Record<string, string> = {
 };
 
 /** New item, or the details of one. Type is fixed once the item has stock moves (the API says so). */
-export function ItemForm({ item, readOnly = false }: { item?: Item; readOnly?: boolean }) {
+export function ItemForm({ item, readOnly = false, suppliers = [] }: { item?: Item; readOnly?: boolean; suppliers?: { id: string; name: string }[] }) {
   const [state, action, pending] = useActionState(item ? saveItem : createItem, undefined);
   const bad = (n: string) => Boolean(state?.fields?.[n]);
   return (
@@ -39,6 +39,15 @@ export function ItemForm({ item, readOnly = false }: { item?: Item; readOnly?: b
         <Field name="sale_price" label="Sale price" defaultValue={item?.sale_price ?? ""} invalid={bad("sale_price")} />
         <Field name="purchase_price" label="Purchase price" defaultValue={item?.purchase_price ?? ""} invalid={bad("purchase_price")} />
         <Field name="reorder_point" label="Reorder when on hand falls to" defaultValue={item?.reorder_point ?? ""} invalid={bad("reorder_point")} />
+        <Field name="max_level" label="Order back up to" defaultValue={item?.max_level ?? ""} invalid={bad("max_level")} hint="The maximum level a suggested order brings it to" />
+        <div>
+          <label className="field-label" htmlFor="preferred_supplier_id">Preferred supplier</label>
+          <select className={`field ${bad("preferred_supplier_id") ? "!border-bad" : ""}`} id="preferred_supplier_id" name="preferred_supplier_id" defaultValue={item?.preferred_supplier_id ?? ""}>
+            <option value="">None</option>
+            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <p className="mt-1 text-[12px] text-muted">Who a suggested purchase order goes to.</p>
+        </div>
         <div>
           <label className="field-label" htmlFor="costing">Costing (stock items)</label>
           <select className={`field ${bad("costing") ? "!border-bad" : ""}`} id="costing" name="costing" defaultValue={item?.costing ?? "average"}>

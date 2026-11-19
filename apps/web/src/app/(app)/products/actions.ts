@@ -26,7 +26,8 @@ const amount = (v: string | undefined) => (v ?? "").replace(/[,\s]/g, "");
 function itemBody(form: FormData): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   for (const name of ["name", "sku", "type", "unit", "costing", "tracking"]) if (form.has(name)) body[name] = text(form, name) ?? (name === "sku" ? null : "");
-  for (const name of ["sale_price", "purchase_price", "reorder_point"]) if (form.has(name)) body[name] = amount(text(form, name)) || null;
+  for (const name of ["sale_price", "purchase_price", "reorder_point", "max_level"]) if (form.has(name)) body[name] = amount(text(form, name)) || null;
+  if (form.has("preferred_supplier_id")) body.preferred_supplier_id = text(form, "preferred_supplier_id") || null;   // 075
   return body;
 }
 
@@ -91,6 +92,24 @@ export async function archiveItemUnit(_: FormState | undefined, form: FormData):
   }
   refresh();
   return { notice: "Unit archived." };
+}
+
+/** 075: draft purchase orders for the items ticked (order_<item id>), at the quantities typed (qty_<item id>), one per supplier. */
+export async function orderLowStock(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const lines: { item_id: string; quantity: string }[] = [];
+  for (const [key, value] of form.entries()) {
+    const m = /^order_([0-9a-f-]{36})$/.exec(key);
+    if (m && value === "on") lines.push({ item_id: m[1], quantity: amount(text(form, `qty_${m[1]}`)) });
+  }
+  if (lines.length === 0) return { error: "Tick the items to order." };
+  let made: { id: string }[];
+  try {
+    made = (await ledgerly.orderLowStock({ warehouse_id: text(form, "warehouse_id") ?? "", lines }, ctx)).data;
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(made.length === 1 ? `/purchase-orders/${encodeURIComponent(made[0].id)}` : "/purchase-orders");
 }
 
 export async function adjustStock(_: FormState | undefined, form: FormData): Promise<FormState> {

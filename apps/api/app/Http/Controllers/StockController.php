@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Sales\Actions\SaveQuote;
+use App\Domain\Inventory\Reservations;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Inventory\Models\Item;
 use App\Domain\Inventory\Models\StockBalance;
@@ -125,16 +127,83 @@ final class StockController extends Controller
     }
 
     /** Stock items at or below their reorder point, across all warehouses. */
-    public function reorder(): JsonResponse
+    /**
+     * Stock items running low (075): what is on hand, plus what is on order from suppliers, less what the open sales
+     * orders hold, at or below the reorder point. The suggested order brings it back up to the maximum level (or to the
+     * reorder point when there is none), from the preferred supplier at the item's purchase price.
+     */
+    public function reorder(Reservations $reservations): JsonResponse
     {
         $this->authorizeCompany('inventory.view');
         $items = Item::query()->where(['is_active' => true, 'type' => 'inventory'])->whereNotNull('reorder_point')->orderBy('name')->get();
-        $onHand = StockBalance::query()->whereIn('item_id', $items->pluck('id'))->groupBy('item_id')
-            ->selectRaw('item_id, sum(quantity)::numeric(18,2)::text AS quantity')->pluck('quantity', 'item_id');
-        $base = $this->current->get()->base_currency;
+        $stock = $reservations->byItem($items->pluck('id')->map(fn ($id) => (string) $id)->values()->all());
+        $suppliers = DB::table('contacts')->whereIn('id', $items->pluck('preferred_supplier_id')->filter())->pluck('name', 'id');
 
-        return response()->json(['data' => $items->filter(fn (Item $i) => ! Money::of((string) $i->reorder_point, $base)->minus(Money::of((string) ($onHand[$i->getKey()] ?? '0'), $base))->isNegative())
-            ->map(fn (Item $i) => ['item' => $i->only(['id', 'sku', 'name', 'unit', 'reorder_point', 'purchase_price']), 'on_hand' => (string) ($onHand[$i->getKey()] ?? '0.00')])->values()]);
+        $rows = [];
+        foreach ($items as $i) {
+            $s = $stock[(string) $i->getKey()] ?? ['on_hand' => '0.00', 'reserved' => '0.00', 'on_order' => '0.00'];
+            $position = bcsub(bcadd((string) $s['on_hand'], (string) $s['on_order'], 2), (string) $s['reserved'], 2);
+            if (bccomp($position, (string) $i->reorder_point, 2) > 0) {
+                continue;
+            }
+            $target = (string) ($i->max_level ?? $i->reorder_point);
+            $suggested = bcsub($target, $position, 2);
+            $rows[] = [
+                'item' => $i->only(['id', 'sku', 'name', 'unit', 'reorder_point', 'max_level', 'purchase_price', 'preferred_supplier_id']),
+                'supplier' => $i->preferred_supplier_id ? ['id' => $i->preferred_supplier_id, 'name' => $suppliers[$i->preferred_supplier_id] ?? null] : null,
+                'on_hand' => (string) $s['on_hand'], 'on_order' => (string) $s['on_order'], 'reserved' => (string) $s['reserved'],
+                'position' => $position, 'suggested' => bccomp($suggested, '0', 2) > 0 ? $suggested : '0.00',
+            ];
+        }
+
+        return response()->json(['data' => $rows, 'can' => ['order' => (bool) $this->current->membership()?->can('bills.create')]]);
+    }
+
+    /**
+     * 075: draft purchase orders for the items given (item and quantity), one per preferred supplier, at each item's
+     * purchase price, the stock arriving in the warehouse given. Nothing posts; they are issued as any purchase order.
+     */
+    public function orderLow(Request $request, SaveQuote $save): JsonResponse
+    {
+        $this->authorizeCompany('bills.create');
+        $data = $request->validate([
+            'warehouse_id' => ['required', 'uuid'],
+            'lines' => ['required', 'array', 'min:1', 'max:200'],
+            'lines.*.item_id' => ['required', 'uuid', 'distinct'],
+            'lines.*.quantity' => ['required', 'decimal:0,2', 'gt:0'],
+        ]);
+        $warehouse = Warehouse::query()->where('is_active', true)->find($data['warehouse_id'])
+            ?? throw ValidationException::withMessages(['warehouse_id' => ['Choose an active warehouse of this company.']]);
+        // Loaded through the company-scoped model (CLAUDE.md rule 4).
+        $items = Item::query()->where(['is_active' => true, 'type' => 'inventory'])->whereIn('id', array_column($data['lines'], 'item_id'))->get()->keyBy('id');
+        $bySupplier = [];
+        foreach ($data['lines'] as $n => $l) {
+            $item = $items[$l['item_id']] ?? throw ValidationException::withMessages(["lines.{$n}.item_id" => ['Each line is an active stock item of this company.']]);
+            if ($item->preferred_supplier_id === null) {
+                throw ValidationException::withMessages(["lines.{$n}.item_id" => ["{$item->name} has no preferred supplier: set one on the item first."]]);
+            }
+            $bySupplier[$item->preferred_supplier_id][] = [$item, (string) $l['quantity']];
+        }
+
+        $company = $this->current->get();
+        $inventory = Account::system('inventory')->getKey();
+        $today = $this->current->today();
+        $made = DB::transaction(function () use ($bySupplier, $save, $request, $company, $inventory, $today, $warehouse) {
+            $made = [];
+            foreach ($bySupplier as $supplier => $lines) {
+                $order = $save->handle([
+                    'contact_id' => $supplier, 'issue_date' => $today, 'currency' => $company->base_currency, 'warehouse_id' => $warehouse->getKey(),
+                    'notes' => 'Suggested by the reorder levels.',
+                    'lines' => array_map(fn (array $l) => ['description' => $l[0]->name, 'quantity' => $l[1], 'unit_price' => (string) ($l[0]->purchase_price ?? '0'),
+                        'account_id' => $inventory, 'item_id' => $l[0]->getKey()], $lines),
+                ], 'purchase_order', null, $request->user()->getKey());
+                $made[] = ['id' => $order->getKey(), 'contact_id' => $supplier, 'lines' => count($lines), 'total' => (string) $order->total];
+            }
+
+            return $made;
+        });
+
+        return response()->json(['data' => $made], 201);
     }
 
     /**

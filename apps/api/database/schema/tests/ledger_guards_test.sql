@@ -4016,6 +4016,37 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T100 a tracked item''s every move names its own batch, and a batch never goes below zero';
 END $$;
+
+-- T101: reorder levels (075). A maximum level is never below the reorder point; a preferred supplier is one of the
+-- company's own suppliers, never a customer only or another company's. Company A as f1: item b1, supplier c8, customer c1.
+DO $$
+DECLARE
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  other uuid;
+BEGIN
+  BEGIN
+    UPDATE items SET reorder_point = 50, max_level = 40 WHERE id = item;
+    RAISE EXCEPTION 'FAIL T101a: a maximum level was set below the reorder point';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE items SET preferred_supplier_id = c1 WHERE id = item;
+    RAISE EXCEPTION 'FAIL T101b: a customer that is not a supplier was made the preferred supplier';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- Another company's supplier, should one be visible (row-level security hides them from this role, so the rule
+  -- is the last line of defence, not the only one).
+  SELECT id INTO other FROM contacts WHERE company_id <> app_company_id() AND is_vendor LIMIT 1;
+  IF other IS NOT NULL THEN
+    BEGIN
+      UPDATE items SET preferred_supplier_id = other WHERE id = item;
+      RAISE EXCEPTION 'FAIL T101c: another company''s supplier was made the preferred supplier';
+    EXCEPTION WHEN check_violation OR foreign_key_violation THEN NULL; END;
+  END IF;
+  UPDATE items SET reorder_point = 50, max_level = 200, preferred_supplier_id = c8 WHERE id = item;
+  UPDATE items SET reorder_point = NULL, max_level = NULL, preferred_supplier_id = NULL WHERE id = item;
+  RAISE NOTICE 'PASS T101 a maximum level is never below the reorder point, and the preferred supplier is the company''s own supplier';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
