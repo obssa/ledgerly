@@ -669,6 +669,23 @@ export async function getBinCard(q: { item_id: string; warehouse_id: string; fro
   }
 }
 
+/**
+ * The suppliers a form offers to choose from (an item's preferred supplier, 075), or none for a role that may not read
+ * contacts: the form still opens, and the API checks again on save.
+ */
+export async function getSupplierChoices(): Promise<{ id: string; name: string }[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return withApi(async (ctx) => {
+    try {
+      return (await ledgerly.suppliers({}, ctx)).data.map((s) => ({ id: s.id, name: s.name }));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) return [];
+      throw error;
+    }
+  });
+}
+
 export async function getSuppliers(q: { search?: string; archived?: boolean }): Promise<{ data: Supplier[]; can: { create: boolean; edit: boolean; bill: boolean }; demo: boolean }> {
   await connection();
   if (isDemoMode()) return { data: [], can: { create: false, edit: false, bill: false }, demo: true };
