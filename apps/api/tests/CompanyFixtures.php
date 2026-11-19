@@ -116,6 +116,11 @@ trait CompanyFixtures
         $ids['bank_rule'] = (string) Str::uuid7();
         $this->owner()->table('bank_rules')->insert(['id' => $ids['bank_rule'], 'company_id' => $company, 'name' => 'Fixture rule', 'contains' => 'FIXTURE-NEVER-MATCHES',
             'direction' => 'out', 'target_account_id' => $ids['rent']]);
+        // A paused recurring invoice (077), written as the owner, so no route's call makes an invoice on its own.
+        $ids['recurring_invoice'] = (string) Str::uuid7();
+        $this->owner()->table('recurring_invoices')->insert(['id' => $ids['recurring_invoice'], 'company_id' => $company, 'name' => 'Fixture retainer',
+            'contact_id' => $ids['contact'], 'currency' => 'ETB', 'frequency' => 'monthly', 'next_on' => '2027-01-01', 'is_active' => false, 'posts_as' => $user->getKey(),
+            'lines' => json_encode([['description' => 'Retainer', 'quantity' => '1', 'unit_price' => '100', 'account_id' => $ids['sales']]])]);
         $ids['goods_receipt'] = (string) Str::uuid7();
         $this->owner()->table('goods_receipts')->insert(['id' => $ids['goods_receipt'], 'company_id' => $company, 'purchase_order_id' => $issued,
             'number' => 'GRN-FIXTURE-1', 'received_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
@@ -191,7 +196,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(291, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(297, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -235,6 +240,7 @@ trait CompanyFixtures
             'deliveryNote' => $ids['delivery_note'],
             'unit' => $ids['item_unit'],
             'bankRule' => $ids['bank_rule'],
+            'recurringInvoice' => $ids['recurring_invoice'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

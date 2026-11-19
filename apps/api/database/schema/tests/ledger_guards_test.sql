@@ -4085,6 +4085,62 @@ BEGIN
   DELETE FROM bank_rules WHERE id = r;
   RAISE NOTICE 'PASS T102 a bank rule names the company''s own accounts and contact, with words and a sound amount range';
 END $$;
+
+-- T103: recurring invoices (077). A template is for a customer of the company, makes its invoices as the person who
+-- set it up, has lines and a sound schedule; an invoice made from it is for its company and customer; the due list
+-- answers nothing inside a company; another company never sees a template. Company A as f1, customer c1, supplier c8.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  f2 constant uuid := '00000000-0000-0000-0000-0000000000f2';
+  r constant uuid := '00000000-0000-0000-0000-000000000f10';
+  lines constant jsonb := '[{"description": "Retainer", "quantity": "1", "unit_price": "5000", "account_id": "00000000-0000-0000-0000-000000000a40"}]';
+BEGIN
+  BEGIN
+    INSERT INTO recurring_invoices (company_id, name, contact_id, currency, lines, frequency, next_on, posts_as)
+      VALUES (app_company_id(), 'T103 retainer', c8, 'ETB', lines, 'monthly', '2027-12-01', f1);
+    RAISE EXCEPTION 'FAIL T103a: a recurring invoice was made for a contact that is not a customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO recurring_invoices (company_id, name, contact_id, currency, lines, frequency, next_on, posts_as)
+      VALUES (app_company_id(), 'T103 retainer', c1, 'ETB', lines, 'monthly', '2027-12-01', f2);
+    RAISE EXCEPTION 'FAIL T103b: a recurring invoice was set up to make its invoices as someone else';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO recurring_invoices (company_id, name, contact_id, currency, lines, frequency, next_on, posts_as)
+      VALUES (app_company_id(), 'T103 retainer', c1, 'ETB', '[]', 'monthly', '2027-12-01', f1);
+    RAISE EXCEPTION 'FAIL T103c: a recurring invoice had no lines';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO recurring_invoices (company_id, name, contact_id, currency, lines, frequency, next_on, ends_on, posts_as)
+      VALUES (app_company_id(), 'T103 retainer', c1, 'ETB', lines, 'monthly', '2027-12-01', '2027-11-01', f1);
+    RAISE EXCEPTION 'FAIL T103d: a recurring invoice ended before its next date';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO recurring_invoices (id, company_id, name, contact_id, currency, lines, frequency, next_on, posts_as)
+    VALUES (r, app_company_id(), 'T103 retainer', c1, 'ETB', lines, 'monthly', '2027-12-01', f1);
+
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, recurring_invoice_id) VALUES (app_company_id(), 'invoice', c8, '2027-12-01', 'ETB', r);
+    RAISE EXCEPTION 'FAIL T103e: an invoice from a recurring invoice was for another contact';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, recurring_invoice_id) VALUES (app_company_id(), 'quote', c1, '2027-12-01', 'ETB', r);
+    RAISE EXCEPTION 'FAIL T103f: a quote was made from a recurring invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO documents (company_id, type, contact_id, issue_date, currency, recurring_invoice_id) VALUES (app_company_id(), 'invoice', c1, '2027-12-01', 'ETB', r);
+  IF EXISTS (SELECT 1 FROM recurring_invoices_due('2099-01-01')) THEN
+    RAISE EXCEPTION 'FAIL T103g: the due list answered inside a company';
+  END IF;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM recurring_invoices WHERE id = r) THEN
+    RAISE EXCEPTION 'FAIL T103h: company B saw company A''s recurring invoice';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T103 a recurring invoice is for a customer, made as its owner, and its invoices are its customer''s';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
