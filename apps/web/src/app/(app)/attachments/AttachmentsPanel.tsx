@@ -19,7 +19,7 @@ const FLAG: Record<string, { tone: "good" | "bad"; text: string }> = {
 const size = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 /**
- * SECURITY.md S7, Module 3: the files kept with an invoice, bill or expense (063), each opened through the API after the
+ * SECURITY.md S7, Module 3: the files kept with an invoice, bill, expense, expense claim or journal entry (063, 086), each opened through the API after the
  * document's permission, and a plain form to attach one (PDF, PNG, JPEG or WebP, up to 10 MB).
  */
 export async function AttachmentsPanel({ kind, documentId, flag, demo }: { kind: AttachmentKind; documentId: string; flag?: string; demo?: boolean }) {

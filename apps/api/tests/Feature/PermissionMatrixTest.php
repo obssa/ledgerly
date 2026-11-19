@@ -215,6 +215,8 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/invoices/{invoice}/batch' => 'invoices.create',
         'POST api/v1/sales-receipts/{salesReceipt}/credit-notes' => 'invoices.create',
         'POST api/v1/payments-made/batch' => 'payments.pay',
+        'GET api/v1/journal-entries/{entry}/attachments' => 'accounting.view',
+        'POST api/v1/journal-entries/{entry}/attachments' => 'journals.create',
         'GET api/v1/purchase-requisitions' => 'bills.request',
         'POST api/v1/purchase-requisitions' => 'bills.request',
         'GET api/v1/purchase-requisitions/{purchaseRequisition}' => 'bills.request',
