@@ -32,7 +32,9 @@ final class LandedCostController extends Controller
             ->get(['l.id', 'l.amount', 'l.method', 'l.applied_on', 'l.journal_entry_id', 'c.id as cost_bill_id', 'c.number as cost_bill_number',
                 'g.id as goods_bill_id', 'g.number as goods_bill_number']);
         $posted = $bill->type === 'bill' && in_array($bill->status, ['posted', 'part_paid', 'paid'], true);
-        $brought = DB::table('stock_moves')->where(['company_id' => $bill->company_id, 'kind' => 'purchase'])->whereNotNull('document_id')->distinct()->pluck('document_id');
+        $brought = DB::table('stock_moves')->where(['company_id' => $bill->company_id, 'kind' => 'purchase'])->whereNotNull('document_id')->distinct()->pluck('document_id')
+            // A bill that billed goods received on notes (069) brought them in too.
+            ->concat(DB::table('bill_receipt_matches')->where('company_id', $bill->company_id)->distinct()->pluck('bill_id'))->unique()->values();
         $isGoods = $brought->contains($bill->getKey());
 
         return response()->json([

@@ -40,6 +40,39 @@ final class LandedCosts
     }
 
     /** What is left of a cost bill to spread, in the base currency: its amount before tax, less what was spread. */
+    /**
+     * The goods a bill billed from goods received notes (069): for each match, the notes' moves of that order line's
+     * item, oldest first, up to the quantity matched (in the item's own unit), each at its own value per unit.
+     *
+     * @return list<object{item_id: string, warehouse_id: string, quantity: string, amount: string}>
+     */
+    private function receivedOnNotes(Document $bill, \App\Domain\Tenancy\Models\Company $company): array
+    {
+        $matches = DB::table('bill_receipt_matches as m')->join('document_lines as bl', 'bl.id', '=', 'm.bill_line_id')
+            ->join('document_lines as ol', 'ol.id', '=', 'm.order_line_id')->where(['m.company_id' => $company->getKey(), 'm.bill_id' => $bill->getKey()])
+            ->get(['bl.item_id', 'm.order_line_id', 'm.quantity', 'ol.unit_factor']);
+        $out = [];
+        foreach ($matches as $m) {
+            $need = DocumentStock::baseQuantity((object) ['quantity' => (string) $m->quantity, 'unit_factor' => $m->unit_factor]);
+            $notes = DB::table('goods_receipt_lines as gl')->join('goods_receipts as g', 'g.id', '=', 'gl.goods_receipt_id')
+                ->where(['gl.order_line_id' => $m->order_line_id, 'g.status' => 'posted'])->distinct()->pluck('gl.goods_receipt_id');
+            $moves = DB::table('stock_moves')->whereIn('goods_receipt_id', $notes)->where(['item_id' => $m->item_id, 'kind' => 'purchase'])
+                ->where('quantity', '>', 0)->orderBy('moved_on')->orderBy('seq')->get(['warehouse_id', 'quantity', 'amount']);
+            foreach ($moves as $mv) {
+                if (bccomp($need, '0', 2) <= 0) {
+                    break;
+                }
+                $take = bccomp((string) $mv->quantity, $need, 2) >= 0 ? $need : (string) $mv->quantity;
+                $amount = bccomp($take, (string) $mv->quantity, 2) === 0 ? (string) $mv->amount
+                    : bcdiv(bcmul((string) $mv->amount, $take, 8), (string) $mv->quantity, 2);
+                $out[] = (object) ['item_id' => (string) $m->item_id, 'warehouse_id' => (string) $mv->warehouse_id, 'quantity' => $take, 'amount' => $amount];
+                $need = bcsub($need, $take, 2);
+            }
+        }
+
+        return $out;
+    }
+
     public function left(Document $cost): Money
     {
         $base = $this->current->get()->base_currency;
@@ -61,11 +94,13 @@ final class LandedCosts
             if (! $posted($cost) || ! $posted($goods) || $cost->is($goods)) {
                 throw ValidationException::withMessages(['goods_bill_id' => ['A landed cost joins two posted bills: the cost bill and the bill that brought the goods in.']]);
             }
-            if (DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $cost->getKey(), 'kind' => 'purchase'])->exists()) {
+            if (DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $cost->getKey(), 'kind' => 'purchase'])->exists()
+                || DB::table('bill_receipt_matches')->where(['company_id' => $company->getKey(), 'bill_id' => $cost->getKey()])->exists()) {
                 throw ValidationException::withMessages(['bill' => ["{$cost->label()} brought goods in itself: a landed cost is a bill for freight, duty or clearing."]]);
             }
             $received = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $goods->getKey(), 'kind' => 'purchase'])
-                ->get(['item_id', 'warehouse_id', 'quantity', 'amount']);
+                ->get(['item_id', 'warehouse_id', 'quantity', 'amount'])
+                ->concat($this->receivedOnNotes($goods, $company));
             if ($received->isEmpty()) {
                 throw ValidationException::withMessages(['goods_bill_id' => ["{$goods->label()} brought no stock in."]]);
             }
