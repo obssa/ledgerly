@@ -4302,6 +4302,46 @@ BEGIN
   UPDATE contacts SET price_list_id = NULL WHERE id = c1;
   RAISE NOTICE 'PASS T106 a price list prices the company''s own items and is for its own customers';
 END $$;
+
+-- T107: goods delivered on notes come back on a credit note (081). An invoice that billed 4 delivered bags (moving no
+-- stock itself) has 4 to take back: 3 come back, 2 more are refused. Company A as f1, customer c1, item b1 in a1.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  so constant uuid := '00000000-0000-0000-0000-000000000f50';
+  sl constant uuid := '00000000-0000-0000-0000-000000000f51';
+  inv constant uuid := '00000000-0000-0000-0000-000000000f52';
+  il constant uuid := '00000000-0000-0000-0000-000000000f53';
+  dn constant uuid := '00000000-0000-0000-0000-000000000f54';
+  cn constant uuid := '00000000-0000-0000-0000-000000000f55';
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total) VALUES (so, app_company_id(), 'sales_order', c1, '2027-11-01', 'ETB', 1000);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (sl, app_company_id(), so, 1, 'Coffee', 10, 100, acc, 1000, item);
+  UPDATE documents SET status = 'accepted', number = 'SO-T107-1' WHERE id = so;
+  INSERT INTO delivery_notes (id, company_id, sales_order_id, number, delivered_on, warehouse_id, created_by) VALUES (dn, app_company_id(), so, 'DN-T107-1', '2027-11-02', wh, f1);
+  INSERT INTO delivery_note_lines (company_id, delivery_note_id, order_line_id, item_id, quantity) VALUES (app_company_id(), dn, sl, item, 4);
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id, total, amount_due) VALUES
+    (inv, app_company_id(), 'invoice', c1, '2027-11-03', 'ETB', so, 400, 400);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (il, app_company_id(), inv, 1, 'Coffee', 4, 100, acc, 400, item, sl);
+  INSERT INTO invoice_delivery_matches (company_id, invoice_id, invoice_line_id, order_line_id, quantity) VALUES (app_company_id(), inv, il, sl, 4);
+  UPDATE documents SET status = 'posted', number = 'INV-T107-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = inv;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, original_document_id, restock) VALUES
+    (cn, app_company_id(), 'credit_note', c1, '2027-11-04', 'ETB', inv, true);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), item, wh, '2027-11-04', 'sale_return', 3, 50, cn);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), item, wh, '2027-11-04', 'sale_return', 2, 50, cn);
+    RAISE EXCEPTION 'FAIL T107: more came back than the invoice billed from its delivery notes';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T107 goods delivered on notes come back on a credit note, never more than the invoice billed';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
