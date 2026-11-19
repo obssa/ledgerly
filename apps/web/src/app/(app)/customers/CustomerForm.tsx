@@ -14,7 +14,7 @@ function Message({ state }: { state: FormState | undefined }) {
 }
 
 /** New customer (no `customer`) or edit. Read-only when the role cannot edit; the API checks again. */
-export function CustomerForm({ customer, readOnly = false }: { customer?: Customer; readOnly?: boolean }) {
+export function CustomerForm({ customer, readOnly = false, priceLists = [] }: { customer?: Customer; readOnly?: boolean; priceLists?: { id: string; name: string; currency: string }[] }) {
   const [state, action, pending] = useActionState(customer ? saveCustomer : createCustomer, undefined);
   const bad = (name: string) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k === name || k.startsWith(`${name}.`)));
   const v = (name: keyof Customer) => (customer?.[name] as string | null | undefined) ?? "";
@@ -38,6 +38,16 @@ export function CustomerForm({ customer, readOnly = false }: { customer?: Custom
             {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
+        {(priceLists.length > 0 || customer?.price_list_id) && (
+          <div>
+            <SelectLabel id="price_list_id" label="Price list" />
+            <select className="field" id="price_list_id" name="price_list_id" defaultValue={customer?.price_list_id ?? ""}>
+              <option value="">None (each item&apos;s own price)</option>
+              {priceLists.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.currency})</option>)}
+              {customer?.price_list_id && !priceLists.some((l) => l.id === customer.price_list_id) && <option value={customer.price_list_id}>A list no longer in use</option>}
+            </select>
+          </div>
+        )}
       </fieldset>
 
       <h3 className="mb-3 mt-6 text-[15px] font-bold">Billing address</h3>

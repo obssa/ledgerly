@@ -121,6 +121,9 @@ trait CompanyFixtures
         $this->owner()->table('recurring_invoices')->insert(['id' => $ids['recurring_invoice'], 'company_id' => $company, 'name' => 'Fixture retainer',
             'contact_id' => $ids['contact'], 'currency' => 'ETB', 'frequency' => 'monthly', 'next_on' => '2027-01-01', 'is_active' => false, 'posts_as' => $user->getKey(),
             'lines' => json_encode([['description' => 'Retainer', 'quantity' => '1', 'unit_price' => '100', 'account_id' => $ids['sales']]])]);
+        // A price list with no prices and no customers (080), so no route's call changes what an invoice suggests.
+        $ids['price_list'] = (string) Str::uuid7();
+        $this->owner()->table('price_lists')->insert(['id' => $ids['price_list'], 'company_id' => $company, 'name' => 'Fixture list', 'currency' => 'ETB']);
         $ids['goods_receipt'] = (string) Str::uuid7();
         $this->owner()->table('goods_receipts')->insert(['id' => $ids['goods_receipt'], 'company_id' => $company, 'purchase_order_id' => $issued,
             'number' => 'GRN-FIXTURE-1', 'received_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
@@ -196,7 +199,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(303, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(309, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -241,6 +244,7 @@ trait CompanyFixtures
             'unit' => $ids['item_unit'],
             'bankRule' => $ids['bank_rule'],
             'recurringInvoice' => $ids['recurring_invoice'],
+            'priceList' => $ids['price_list'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

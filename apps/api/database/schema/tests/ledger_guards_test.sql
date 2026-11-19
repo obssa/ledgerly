@@ -4247,6 +4247,61 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T105 interest is charged on a posted invoice to its customer, from its due date, never twice for a day';
 END $$;
+
+-- T106: price lists (080). A list prices the company's own items, never below zero and once each; a customer is put on
+-- one of the company's lists in use, never a supplier; another company never sees a list or its prices. Company A as f1,
+-- customer c1, supplier c8, item b1; company B's item b8.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  b1 constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  b8 constant uuid := '00000000-0000-0000-0000-0000000000b8';
+  pl constant uuid := '00000000-0000-0000-0000-000000000f40';
+  old constant uuid := '00000000-0000-0000-0000-000000000f41';
+BEGIN
+  INSERT INTO price_lists (id, company_id, name, currency) VALUES (pl, app_company_id(), 'T106 wholesale', 'ETB'),
+    (old, app_company_id(), 'T106 old list', 'ETB');
+  UPDATE price_lists SET is_active = false WHERE id = old;
+
+  BEGIN
+    INSERT INTO price_list_prices (company_id, price_list_id, item_id, unit_price) VALUES (app_company_id(), pl, b8, 100);
+    RAISE EXCEPTION 'FAIL T106a: a price list priced another company''s item';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO price_list_prices (company_id, price_list_id, item_id, unit_price) VALUES (app_company_id(), pl, b1, -1);
+    RAISE EXCEPTION 'FAIL T106b: a price list had a negative price';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO price_list_prices (company_id, price_list_id, item_id, unit_price) VALUES (app_company_id(), pl, b1, 420);
+  BEGIN
+    INSERT INTO price_list_prices (company_id, price_list_id, item_id, unit_price) VALUES (app_company_id(), pl, b1, 400);
+    RAISE EXCEPTION 'FAIL T106c: an item was listed twice on one list';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+
+  BEGIN
+    UPDATE contacts SET price_list_id = pl WHERE id = c8;
+    RAISE EXCEPTION 'FAIL T106d: a supplier was put on a price list';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE contacts SET price_list_id = old WHERE id = c1;
+    RAISE EXCEPTION 'FAIL T106e: a customer was put on a price list no longer in use';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE contacts SET price_list_id = pl WHERE id = c1;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM price_lists WHERE id = pl) OR EXISTS (SELECT 1 FROM price_list_prices WHERE price_list_id = pl) THEN
+    RAISE EXCEPTION 'FAIL T106f: company B saw company A''s price list';
+  END IF;
+  BEGIN
+    UPDATE contacts SET price_list_id = pl WHERE company_id = app_company_id() AND is_customer;
+    IF FOUND THEN
+      RAISE EXCEPTION 'FAIL T106g: company B put its customers on company A''s price list';
+    END IF;
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  UPDATE contacts SET price_list_id = NULL WHERE id = c1;
+  RAISE NOTICE 'PASS T106 a price list prices the company''s own items and is for its own customers';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

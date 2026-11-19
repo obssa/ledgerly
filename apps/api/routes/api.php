@@ -30,6 +30,7 @@ use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
 use App\Http\Controllers\BadDebtController;
+use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\BatchInvoiceController;
 use App\Http\Controllers\LateInterestController;
 use App\Http\Controllers\BankRuleController;
@@ -420,6 +421,12 @@ Route::prefix('v1')->group(function () {
             Route::put('items/{item}', [ItemController::class, 'update']);
             Route::post('items/{item}/units', [ItemController::class, 'addUnit']);   // 072
             Route::put('items/{item}/components', [ItemController::class, 'setComponents']);   // 073
+            Route::get('price-lists', [PriceListController::class, 'index']);   // 080
+            Route::get('price-lists/prices', [PriceListController::class, 'prices']);
+            Route::post('price-lists', [PriceListController::class, 'store']);
+            Route::get('price-lists/{priceList}', [PriceListController::class, 'show'])->whereUuid('priceList');
+            Route::put('price-lists/{priceList}', [PriceListController::class, 'update'])->whereUuid('priceList');
+            Route::put('price-lists/{priceList}/prices', [PriceListController::class, 'setPrices'])->whereUuid('priceList');
             Route::post('items/{item}/units/{unit}/archive', [ItemController::class, 'archiveUnit'])->whereUuid('unit');
             Route::get('warehouses', [WarehouseController::class, 'index']);
             Route::post('warehouses', [WarehouseController::class, 'store']);

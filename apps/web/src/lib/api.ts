@@ -149,6 +149,8 @@ export interface Customer {
   currency: string | null;
   payment_terms_days: number;
   credit_limit: string | null;
+  /** 080: the price list (customer group) they buy at. */
+  price_list_id?: string | null;
   tax_exempt?: boolean;
   tax_exempt_reason?: string | null;
   address?: Address;
@@ -1281,6 +1283,13 @@ export interface CustomReport {
 export interface InvoiceRetention { id: string; amount: string; held_on: string; released_on: string | null }
 /** GET /invoices/{id}/write-offs: bad debts written off this invoice, and whether this role may write one off (078). */
 export interface InvoiceWriteOff { id: string; amount: string; written_off_on: string; reason: string; reversed_on: string | null; reversal_reason: string | null }
+/** GET /price-lists (080): a price list is a group of customers who pay its prices. */
+export interface PriceList { id: string; name: string; currency: string; notes: string | null; is_active: boolean; items: number; customers: number }
+export interface PriceListDetail extends Omit<PriceList, "items" | "customers"> {
+  prices: { item_id: string; name: string; sku: string | null; sale_price: string | null; unit_price: string }[];
+  customers: { id: string; name: string }[];
+  can: { manage: boolean };
+}
 /** GET /invoices/{id}/interest: what charging interest on late payment would make, and what was charged before (079). */
 export interface LateInterestPreview {
   rate: string | null; account_id: string | null; owed: string; currency: string; from: string | null; through: string; days: number; amount: string;
@@ -1778,6 +1787,15 @@ export const ledgerly = {
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/retention`, { ...ctx, method: "POST", body }),
   batchInvoice: (id: string, body: { contact_ids: string[]; issue_date: string; post: boolean }, ctx: RequestOptions) =>
     api<{ data: { id: string; number: string | null; status: string; contact: string; total: string }[] }>(`invoices/${encodeURIComponent(id)}/batch`, { ...ctx, method: "POST", body }),
+  priceLists: (ctx: RequestOptions) => api<{ data: PriceList[]; can: { manage: boolean } }>("price-lists", ctx),
+  priceList: (id: string, ctx: RequestOptions) => api<PriceListDetail>(`price-lists/${encodeURIComponent(id)}`, ctx),
+  priceListPrices: (ctx: RequestOptions) => api<{ data: { id: string; currency: string; prices: Record<string, string> }[] }>("price-lists/prices", ctx),
+  createPriceList: (body: { name: string; currency?: string; notes: string | null }, ctx: RequestOptions) =>
+    api<PriceListDetail>("price-lists", { ...ctx, method: "POST", body }),
+  updatePriceList: (id: string, body: { name: string; currency: string; notes: string | null; is_active: boolean }, ctx: RequestOptions) =>
+    api<PriceListDetail>(`price-lists/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  setPriceListPrices: (id: string, prices: { item_id: string; unit_price: string }[], ctx: RequestOptions) =>
+    api<PriceListDetail>(`price-lists/${encodeURIComponent(id)}/prices`, { ...ctx, method: "PUT", body: { prices } }),
   lateInterest: (id: string, ctx: RequestOptions) => api<LateInterestPreview>(`invoices/${encodeURIComponent(id)}/interest`, ctx),
   chargeInterest: (id: string, body: { through: string }, ctx: RequestOptions) =>
     api<{ id: string; number: string | null }>(`invoices/${encodeURIComponent(id)}/interest`, { ...ctx, method: "POST", body }),
