@@ -64,17 +64,19 @@ final class PurchaseRequisitionController extends Controller
     public function approve(Request $request, string $purchaseRequisition): JsonResponse
     {
         $this->authorizeCompany('bills.approve');
+        $id = $this->id($purchaseRequisition);   // another company's requisition is not found before anything is checked
         $note = $request->validate(['note' => ['nullable', 'string', 'max:500']])['note'] ?? null;
 
-        return response()->json($this->present($request, $this->requisitions->decide($this->id($purchaseRequisition), true, $note, $request->user()->getKey())));
+        return response()->json($this->present($request, $this->requisitions->decide($id, true, $note, $request->user()->getKey())));
     }
 
     public function reject(Request $request, string $purchaseRequisition): JsonResponse
     {
         $this->authorizeCompany('bills.approve');
+        $id = $this->id($purchaseRequisition);
         $note = $request->validate(['note' => ['required', 'string', 'min:3', 'max:500']], ['note.required' => 'Say why, for the person who asked.'])['note'];
 
-        return response()->json($this->present($request, $this->requisitions->decide($this->id($purchaseRequisition), false, $note, $request->user()->getKey())));
+        return response()->json($this->present($request, $this->requisitions->decide($id, false, $note, $request->user()->getKey())));
     }
 
     public function withdraw(Request $request, string $purchaseRequisition): JsonResponse
@@ -88,6 +90,7 @@ final class PurchaseRequisitionController extends Controller
     public function order(Request $request, string $purchaseRequisition): JsonResponse
     {
         $this->authorizeCompany('bills.create');
+        $id = $this->id($purchaseRequisition);
         $data = $request->validate([
             'contact_id' => ['required', 'uuid'],
             // What it is bought as: an expense account, a fixed asset or a prepayment of the company's own, in use.
@@ -98,7 +101,7 @@ final class PurchaseRequisitionController extends Controller
             'prices.*' => ['nullable', 'decimal:0,2', 'min:0'],
         ]);
 
-        return response()->json($this->present($request, $this->requisitions->order($this->id($purchaseRequisition), $data, $request->user()->getKey())));
+        return response()->json($this->present($request, $this->requisitions->order($id, $data, $request->user()->getKey())));
     }
 
     private function seesAll(): bool
