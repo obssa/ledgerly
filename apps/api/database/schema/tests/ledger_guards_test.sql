@@ -4375,6 +4375,52 @@ BEGIN
   UPDATE documents SET status = 'posted', number = 'CN-T108-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = cn;
   RAISE NOTICE 'PASS T108 a credit note corrects a posted cash sale of its customer, never beyond it';
 END $$;
+
+-- T109: expense claims (083). A staff payee is a supplier record for a member, once per company; a claim is a bill to
+-- the claimant's own payee, never posted by the claimant. Company A: f1 the owner (claimant), another user (c2) approving,
+-- f2 a member of company B only; supplier c8.
+DO $$
+DECLARE
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  f2 constant uuid := '00000000-0000-0000-0000-0000000000f2';
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  payee constant uuid := '00000000-0000-0000-0000-000000000f70';
+  claim constant uuid := '00000000-0000-0000-0000-000000000f71';
+BEGIN
+  BEGIN
+    INSERT INTO contacts (company_id, name, is_vendor, employee_user_id) VALUES (app_company_id(), 'T109 outsider', true, f2);
+    RAISE EXCEPTION 'FAIL T109a: a staff payee named someone who is not a member of the company';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO contacts (company_id, name, is_customer, employee_user_id) VALUES (app_company_id(), 'T109 not a supplier', true, f1);
+    RAISE EXCEPTION 'FAIL T109b: a staff payee was not a supplier record';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO contacts (id, company_id, name, is_vendor, employee_user_id) VALUES (payee, app_company_id(), 'T109 claimant', true, f1);
+  BEGIN
+    INSERT INTO contacts (company_id, name, is_vendor, employee_user_id) VALUES (app_company_id(), 'T109 twice', true, f1);
+    RAISE EXCEPTION 'FAIL T109c: a member was a staff payee twice';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, claimed_by) VALUES (app_company_id(), 'bill', c8, '2027-11-01', 'ETB', f1);
+    RAISE EXCEPTION 'FAIL T109d: a claim was a bill to someone other than the claimant';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, claimed_by) VALUES (app_company_id(), 'invoice', payee, '2027-11-01', 'ETB', f1);
+    RAISE EXCEPTION 'FAIL T109e: a claim was not a bill';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total, amount_due, claimed_by)
+    VALUES (claim, app_company_id(), 'bill', payee, '2027-11-01', 'ETB', 350, 350, f1);
+  BEGIN
+    UPDATE documents SET status = 'posted', number = 'BILL-T109-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = claim;
+    RAISE EXCEPTION 'FAIL T109f: the claimant posted their own claim';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- Someone else approves it.
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000c2', true);
+  UPDATE documents SET status = 'posted', number = 'BILL-T109-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = claim;
+  PERFORM set_config('app.user_id', f1::text, true);
+  RAISE NOTICE 'PASS T109 an expense claim is a bill to the claimant''s own staff payee, approved by someone else';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

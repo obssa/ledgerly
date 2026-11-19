@@ -1404,8 +1404,20 @@ export interface Attachment {
   added_by: string;
 }
 
-export type AttachmentKind = "invoice" | "bill" | "expense";
-export const attachmentPath = (kind: AttachmentKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses" })[kind];
+export type AttachmentKind = "invoice" | "bill" | "expense" | "expense_claim";
+export const attachmentPath = (kind: AttachmentKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses", expense_claim: "expense-claims" })[kind];
+
+/** GET /expense-claims (083): what a member paid out of their own pocket, claimed back as a bill payable to them. */
+export interface ExpenseClaim {
+  id: string; number: string | null; status: Invoice["status"]; issue_date: string; currency: string; total: string; amount_due: string;
+  claimed_by: string; notes: string | null; contact: { id: string; name: string };
+  lines?: InvoiceLine[];
+  can?: { submit: boolean; approve: boolean; attach: boolean };
+}
+export interface ExpenseClaimList {
+  data: ExpenseClaim[]; can: { see_all: boolean; approve: boolean };
+  options: { accounts: { id: string; code: string; name: string }[]; tax_rates: { id: string; code: string; name: string }[] };
+}
 
 /** GET public/quote (065): a quote as its customer sees it through the emailed link. */
 export interface PublicQuote {
@@ -1575,6 +1587,10 @@ export const ledgerly = {
     api<{ data: Bill[] }>("bills", { ...ctx, query: { contact_id: contactId, open: "1" } }),
   paymentsMade: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-made", ctx),
   /** Module 3: one payment per supplier for the bills given, all or none. */
+  expenseClaims: (ctx: RequestOptions) => api<ExpenseClaimList>("expense-claims", ctx),
+  expenseClaim: (id: string, ctx: RequestOptions) => api<ExpenseClaim>(`expense-claims/${encodeURIComponent(id)}`, ctx),
+  createExpenseClaim: (body: Record<string, unknown>, ctx: RequestOptions) => api<ExpenseClaim>("expense-claims", { ...ctx, method: "POST", body }),
+  submitExpenseClaim: (id: string, ctx: RequestOptions) => api<ExpenseClaim>(`expense-claims/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST", body: {} }),
   payBatch: (body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ batch_id: string; payments: { id: string; supplier: string; amount: string; withholding: string; bills: number }[] }>("payments-made/batch", { ...ctx, method: "POST", body }),
   paymentMade: (id: string, ctx: RequestOptions) =>

@@ -124,6 +124,12 @@ trait CompanyFixtures
         // A price list with no prices and no customers (080), so no route's call changes what an invoice suggests.
         $ids['price_list'] = (string) Str::uuid7();
         $this->owner()->table('price_lists')->insert(['id' => $ids['price_list'], 'company_id' => $company, 'name' => 'Fixture list', 'currency' => 'ETB']);
+        // A draft expense claim of the owner (083), written as the owner, with no ledger effect.
+        $ids['claim_payee'] = (string) Str::uuid7();
+        $this->owner()->table('contacts')->insert(['id' => $ids['claim_payee'], 'company_id' => $company, 'name' => "{$name} staff payee", 'is_vendor' => true, 'employee_user_id' => $user->getKey()]);
+        $ids['expense_claim'] = (string) Str::uuid7();
+        $this->owner()->table('documents')->insert(['id' => $ids['expense_claim'], 'company_id' => $company, 'type' => 'bill', 'contact_id' => $ids['claim_payee'],
+            'issue_date' => '2026-11-05', 'currency' => 'ETB', 'claimed_by' => $user->getKey(), 'created_by' => $user->getKey()]);
         $ids['goods_receipt'] = (string) Str::uuid7();
         $this->owner()->table('goods_receipts')->insert(['id' => $ids['goods_receipt'], 'company_id' => $company, 'purchase_order_id' => $issued,
             'number' => 'GRN-FIXTURE-1', 'received_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
@@ -199,7 +205,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(311, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(317, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -245,6 +251,7 @@ trait CompanyFixtures
             'bankRule' => $ids['bank_rule'],
             'recurringInvoice' => $ids['recurring_invoice'],
             'priceList' => $ids['price_list'],
+            'expenseClaim' => $ids['expense_claim'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

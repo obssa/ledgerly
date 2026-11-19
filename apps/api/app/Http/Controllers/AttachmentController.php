@@ -29,6 +29,7 @@ final class AttachmentController extends Controller
         'invoice' => ['invoices.view', 'invoices.create'], 'credit_note' => ['invoices.view', 'invoices.create'],
         'bill' => ['bills.view', 'bills.create'], 'vendor_credit' => ['bills.view', 'bills.create'],
         'expense' => ['expenses.view', 'expenses.create'],
+        'expense_claim' => ['expenses.claim', 'expenses.claim'],   // 083: the claimant's own claim only (see ownClaim)
     ];
 
     public function __construct(private readonly CurrentCompany $current, private readonly Attachments $files, private readonly AuditLogger $audit)
@@ -38,6 +39,7 @@ final class AttachmentController extends Controller
     public function index(Request $request, Document $document): JsonResponse
     {
         $this->authorizeCompany(self::PERMISSIONS[(string) $request->route('kind')][0]);
+        $this->ownClaim($request, $document);
 
         return response()->json([
             'data' => DB::table('attachments as a')->join('users as u', 'u.id', '=', 'a.created_by')
@@ -50,6 +52,7 @@ final class AttachmentController extends Controller
     public function store(Request $request, Document $document): JsonResponse
     {
         $this->authorizeCompany(self::PERMISSIONS[(string) $request->route('kind')][1]);
+        $this->ownClaim($request, $document);
         $request->validate(['file' => ['required', 'file', 'max:' . intdiv((int) config('attachments.max_bytes'), 1024)]],
             ['file.max' => 'A file of 10 MB at most.', 'file.required' => 'Choose the file to attach.']);
         $key = 'attachments:' . $request->user()->getKey();
@@ -95,10 +98,22 @@ final class AttachmentController extends Controller
     /** The permission an attachment needs (0 to see it, 1 to change it), by its document's kind; not found: invoices (then 404). */
     private function permissionFor(string $id, int $which): string
     {
-        $type = Str::isUuid($id) ? DB::table('attachments as a')->join('documents as d', 'd.id', '=', 'a.document_id')
-            ->where(['a.company_id' => $this->current->id(), 'a.id' => $id])->value('d.type') : null;
+        $doc = Str::isUuid($id) ? DB::table('attachments as a')->join('documents as d', 'd.id', '=', 'a.document_id')
+            ->where(['a.company_id' => $this->current->id(), 'a.id' => $id])->first(['d.type', 'd.claimed_by']) : null;
+        // 083: a receipt on one's own expense claim is the claimant's to see and remove.
+        if ($doc !== null && $doc->claimed_by !== null && $doc->claimed_by === auth()->id() && ! $this->current->membership()?->can(self::PERMISSIONS['bill'][$which])) {
+            return 'expenses.claim';
+        }
 
-        return (self::PERMISSIONS[$type] ?? self::PERMISSIONS['invoice'])[$which];
+        return (self::PERMISSIONS[$doc->type ?? null] ?? self::PERMISSIONS['invoice'])[$which];
+    }
+
+    /** 083: through the expense-claim routes, only the claimant's own claim is found. */
+    private function ownClaim(Request $request, Document $document): void
+    {
+        if ($request->route('kind') === 'expense_claim' && ($document->claimed_by === null || $document->claimed_by !== $request->user()->getKey())) {
+            abort(404);
+        }
     }
 
     private function live(string $id): object
