@@ -130,6 +130,11 @@ trait CompanyFixtures
         $ids['expense_claim'] = (string) Str::uuid7();
         $this->owner()->table('documents')->insert(['id' => $ids['expense_claim'], 'company_id' => $company, 'type' => 'bill', 'contact_id' => $ids['claim_payee'],
             'issue_date' => '2026-11-05', 'currency' => 'ETB', 'claimed_by' => $user->getKey(), 'created_by' => $user->getKey()]);
+        // A withdrawn requisition (084), written as the owner, so no route's call moves it on.
+        $ids['requisition'] = (string) Str::uuid7();
+        $this->owner()->table('purchase_requisitions')->insert(['id' => $ids['requisition'], 'company_id' => $company, 'requested_by' => $user->getKey(),
+            'reason' => 'Fixture request', 'lines' => json_encode([['description' => 'Cups', 'quantity' => '1']])]);
+        $this->owner()->table('purchase_requisitions')->where('id', $ids['requisition'])->update(['status' => 'withdrawn']);
         $ids['goods_receipt'] = (string) Str::uuid7();
         $this->owner()->table('goods_receipts')->insert(['id' => $ids['goods_receipt'], 'company_id' => $company, 'purchase_order_id' => $issued,
             'number' => 'GRN-FIXTURE-1', 'received_on' => '2026-11-06', 'warehouse_id' => $ids['store'], 'created_by' => $user->getKey()]);
@@ -205,7 +210,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(317, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(324, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -252,6 +257,7 @@ trait CompanyFixtures
             'recurringInvoice' => $ids['recurring_invoice'],
             'priceList' => $ids['price_list'],
             'expenseClaim' => $ids['expense_claim'],
+            'purchaseRequisition' => $ids['requisition'],
             'fixedAsset' => $ids['fixed_asset'],
             'savedReport' => $ids['saved_report'],
             'membership' => $ids['membership'],

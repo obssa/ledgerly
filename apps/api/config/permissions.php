@@ -9,6 +9,8 @@
 | invoices.approve   post an invoice; with settings.approval.invoice_above set, not your own above that amount
 | contacts.edit      change or archive a customer or supplier (sales and purchasing staff only view and add)
 | bills.create       enter a supplier's bill as a draft; bills.approve posts it (accountant, approver, owner, admin)
+| bills.request      ask for something to be bought (084): every role that works, not viewers; bills.approve approves or
+|                    rejects it (never one's own) and bills.create turns an approved one into a draft purchase order
 | payments.receive   record a payment received; payments.reverse reverses one (accountant, owner, admin)
 | payments.pay       pay suppliers' bills and refund customers (accountant via 'payments.*', owner, admin): money leaves the company
 |                    (a refund received from a supplier needs payments.receive)
@@ -64,10 +66,10 @@ return [
         'owner' => ['*'],
         'admin' => ['*'],
         'accountant' => ['company.view', 'periods.close', 'payments.*', 'accounting.*', 'journals.*', 'transactions.edit', 'invoices.*', 'bills.*', 'expenses.*', 'inventory.*', 'banking.*', 'reports.*', 'tax.*', 'contacts.*', 'projects.*', 'assets.*', 'audit.view'],
-        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'expenses.claim', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'inventory.deliver', 'banking.*', 'contacts.*', 'reports.view', 'projects.view', 'projects.time', 'assets.view'],
-        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view', 'inventory.deliver', 'projects.time', 'expenses.claim'],
-        'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'projects.time', 'expenses.claim'],
-        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review', 'projects.view', 'projects.time', 'assets.view', 'expenses.claim'],
+        'bookkeeper' => ['company.view', 'payments.view', 'payments.receive', 'accounting.view', 'invoices.view', 'invoices.create', 'transactions.edit', 'bills.view', 'bills.create', 'expenses.view', 'expenses.create', 'expenses.claim', 'bills.request', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'inventory.deliver', 'banking.*', 'contacts.*', 'reports.view', 'projects.view', 'projects.time', 'assets.view'],
+        'sales' => ['company.view', 'payments.view', 'invoices.view', 'invoices.create', 'contacts.view', 'contacts.create', 'payments.receive', 'inventory.view', 'inventory.deliver', 'projects.time', 'expenses.claim', 'bills.request'],
+        'purchasing' => ['company.view', 'bills.view', 'bills.create', 'contacts.view', 'contacts.create', 'inventory.view', 'inventory.items', 'inventory.transfer', 'inventory.receive', 'projects.time', 'expenses.claim', 'bills.request'],
+        'approver' => ['company.view', 'payments.view', 'invoices.view', 'invoices.approve', 'bills.view', 'bills.approve', 'expenses.view', 'inventory.view', 'payments.approve', 'accounting.view', 'journals.approve', 'journals.review', 'projects.view', 'projects.time', 'assets.view', 'expenses.claim', 'bills.request'],
         'viewer' => ['company.view', 'payments.view', 'accounting.view', 'invoices.view', 'bills.view', 'expenses.view', 'inventory.view', 'banking.view', 'reports.view', 'tax.view', 'projects.view', 'assets.view'],
         'custom' => [],
     ],
@@ -91,6 +93,7 @@ return [
         'bills.view' => 'Purchases: see bills',
         'bills.create' => 'Purchases: enter bills as drafts',
         'bills.approve' => 'Purchases: post bills',
+        'bills.request' => 'Purchases: ask for something to be bought',
         'expenses.view' => 'Expenses: see expenses',
         'expenses.create' => 'Expenses: record expenses',
         'expenses.claim' => 'Expenses: claim back what one paid',
