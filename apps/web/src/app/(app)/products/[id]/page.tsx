@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getItem, getItems, getWarehouses } from "@/lib/data";
+import { getItem, getItems, getSuppliers, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { AdjustStock, ItemForm } from "../ItemForms";
 import { ItemUnits } from "./ItemUnits";
@@ -12,7 +12,7 @@ export const metadata = { title: "Item" };
 /** One item: what is on hand in each warehouse (with its bin card), its details, and stock adjustments. */
 export default async function ItemPage({ params }: PageProps<"/products/[id]">) {
   const { id } = await params;
-  const [item, warehouses] = await Promise.all([getItem(id), getWarehouses()]);
+  const [item, warehouses, suppliers] = await Promise.all([getItem(id), getWarehouses(), getSuppliers({})]);
   if (!item) notFound();
   const stock = item.type === "inventory";
   const choices = item.type === "bundle" ? (await getItems({})).data.filter((i) => i.type !== "bundle" && i.id !== item.id) : [];
@@ -44,7 +44,7 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
           </Card>
         )}
         <Card className="min-w-0 flex-[2_1_520px]" label="Item details">
-          <ItemForm item={item} readOnly={!item.can?.edit} />
+          <ItemForm item={item} readOnly={!item.can?.edit} suppliers={suppliers.data.map((s) => ({ id: s.id, name: s.name }))} />
         </Card>
         {item.tracking === "batch" && (
           <Card className="min-w-0 flex-[1_1_300px]" label="Batches">

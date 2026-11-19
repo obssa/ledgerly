@@ -3,6 +3,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { getIssueOptions, getReorder, getStock, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { IssueToProject, NewWarehouse, TransferStock } from "../products/ItemForms";
+import { RunningLow } from "./RunningLow";
 
 export const metadata = { title: "Stock on hand" };
 
@@ -18,15 +19,7 @@ export default async function InventoryPage() {
         actions={<><Link href="/inventory/batches" className="btn">Batches and expiry</Link><Link href="/reports/inventory-valuation" className="btn">Valuation</Link><Link href="/products" className="btn">Products and services</Link></>} />
       {low.length > 0 && (
         <Card className="mb-4" label="Running low">
-          <h2 className="mb-2 text-[15px] font-bold text-warn">Running low</h2>
-          <ul className="text-sm">
-            {low.map((r) => (
-              <li key={r.item.id} className="flex justify-between gap-2 border-t border-line py-1.5">
-                <Link href={`/products/${encodeURIComponent(r.item.id)}`} className="font-semibold hover:underline">{r.item.name}</Link>
-                <span className="num">{formatAmount(r.on_hand)} on hand · reorder at {formatAmount(r.item.reorder_point)}</span>
-              </li>
-            ))}
-          </ul>
+          <RunningLow rows={low} warehouses={active.map((w) => ({ id: w.id, name: w.name }))} />
         </Card>
       )}
       {stock === null ? <Card><p className="text-sm text-muted">Not available in the demo.</p></Card> : (

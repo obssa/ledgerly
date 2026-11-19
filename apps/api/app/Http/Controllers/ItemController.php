@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 final class ItemController extends Controller
 {
     private const FIELDS = ['sku', 'name', 'type', 'unit', 'sale_price', 'purchase_price', 'income_account_id', 'expense_account_id',
-        'authority_item_code', 'reorder_point', 'is_active', 'costing', 'tracking'];
+        'authority_item_code', 'reorder_point', 'is_active', 'costing', 'tracking', 'max_level', 'preferred_supplier_id'];
 
     public function __construct(private readonly AuditLogger $audit, private readonly CurrentCompany $current)
     {
@@ -129,6 +129,9 @@ final class ItemController extends Controller
             'expense_account_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('accounts', 'id')->where(fn (Builder $q) => $q->whereIn('type', ['expense', 'asset']))],
             'authority_item_code' => ['sometimes', 'nullable', 'string', 'max:60'],
             'reorder_point' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0'],
+            // 075: what a suggested order brings it back up to, and who it goes to (one of the company's suppliers).
+            'max_level' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0'],
+            'preferred_supplier_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('contacts', 'id')->where('is_vendor', true)],
             'is_active' => [$item === null ? 'prohibited' : 'sometimes', 'boolean'],
             // Weighted average by default; FIFO, for a stock item, before its first move (064).
             'costing' => ['sometimes', Rule::in(['average', 'fifo'])],
@@ -137,6 +140,11 @@ final class ItemController extends Controller
         ], ['costing.in' => 'Weighted average or FIFO.']);
         if (($data['costing'] ?? 'average') === 'fifo' && ($data['type'] ?? $item?->type) !== 'inventory') {
             throw ValidationException::withMessages(['costing' => ['Only a stock item is costed FIFO.']]);
+        }
+        $min = array_key_exists('reorder_point', $data) ? $data['reorder_point'] : $item?->reorder_point;
+        $max = array_key_exists('max_level', $data) ? $data['max_level'] : $item?->max_level;
+        if ($min !== null && $max !== null && bccomp((string) $max, (string) $min, 2) < 0) {
+            throw ValidationException::withMessages(['max_level' => ['The maximum level is at least the reorder point.']]);
         }
         if (($data['tracking'] ?? 'none') === 'batch' && ($data['type'] ?? $item?->type) !== 'inventory') {
             throw ValidationException::withMessages(['tracking' => ['Only a stock item is tracked by batch.']]);

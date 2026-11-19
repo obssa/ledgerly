@@ -413,6 +413,7 @@ Route::prefix('v1')->group(function () {
             Route::post('stock/counts', [StockController::class, 'count']);
             Route::post('stock/transfers', [StockController::class, 'transfer']);
             Route::get('stock/reorder', [StockController::class, 'reorder']);
+            Route::post('stock/reorder/purchase-orders', [StockController::class, 'orderLow']);   // 075
             Route::get('stock/batches', [StockController::class, 'batches']);   // 074
 
             Route::get('bank-accounts', [BankAccountController::class, 'index']);
