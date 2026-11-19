@@ -49,6 +49,16 @@ final class Reservations
             ->selectRaw('l.item_id, sum(round((l.quantity - ' . self::done($type) . ') * l.unit_factor, 2))::numeric(18,2)::text AS quantity')   // 072: in the item's own unit
             ->pluck('quantity', 'item_id');
         $reserved = $left('sales_order');
+        // 073: a bundle on an open sales order holds its stock parts (what is still to deliver, times each part's quantity).
+        $parts = $this->open('sales_order')->join('items as b', 'b.id', '=', 'l.item_id')->where('b.type', 'bundle')
+            ->join('item_components as c', 'c.bundle_id', '=', 'l.item_id')->join('items as p', 'p.id', '=', 'c.component_id')->where('p.type', 'inventory')
+            ->when($itemIds !== null, fn (Builder $q) => $q->whereIn('c.component_id', $itemIds))
+            ->groupBy('c.component_id')
+            ->selectRaw('c.component_id AS item_id, sum(round((l.quantity - ' . self::done('sales_order') . ') * l.unit_factor * c.quantity, 2))::numeric(18,2)::text AS quantity')
+            ->pluck('quantity', 'item_id');
+        foreach ($parts as $id => $q) {
+            $reserved[$id] = bcadd((string) ($reserved[$id] ?? '0'), (string) $q, 2);
+        }
         $ordered = $left('purchase_order');
         $ids = $itemIds ?? $reserved->keys()->merge($ordered->keys())->unique()->values()->all();
         $onHand = StockBalance::query()->whereIn('item_id', $ids)->groupBy('item_id')
