@@ -61,6 +61,15 @@ describe("lines made from a sales order", () => {
     expect("source_line_id" in lines[1]).toBe(false);
   });
 
+  it("keeps a bill line's batch and expiry (074), the expiry only with a batch", () => {
+    const lines = parseLines(JSON.stringify([
+      { description: "Milk", quantity: "6", unit_price: "200", account_id: "a", tax_rate_id: null, batch_number: " L-2601 ", batch_expires_on: "2027-01-31" },
+      { description: "Milk", quantity: "1", unit_price: "200", account_id: "a", tax_rate_id: null, batch_number: "", batch_expires_on: "2027-01-31" },
+    ]));
+    expect(lines[0]).toMatchObject({ batch_number: "L-2601", batch_expires_on: "2027-01-31" });
+    expect("batch_number" in lines[1] || "batch_expires_on" in lines[1]).toBe(false);
+  });
+
   it("keeps a line's unit (072), and leaves it out when the line is in the item's own unit", () => {
     const lines = parseLines(JSON.stringify([
       { description: "Cartons", quantity: "2", unit_price: "600", account_id: "a", tax_rate_id: null, unit_id: " 0a1b2c3d-0000-4000-8000-000000000009 " },

@@ -361,7 +361,7 @@ export interface InvoiceOptions {
   /** For an expense: the bank, cash and wallet accounts it can be paid from. */
   moneyAccounts?: { id: string; code: string; name: string; currency: string | null }[];
   /** Items to pick on a line, and the warehouses stock lines use. */
-  items?: { id: string; name: string; type: string; unit: string; price: string | null; account_id: string | null; units?: { id: string; name: string; factor: string }[] }[];
+  items?: { id: string; name: string; type: string; unit: string; price: string | null; account_id: string | null; units?: { id: string; name: string; factor: string }[]; tracking?: string }[];
   warehouses?: { id: string; name: string }[];
   /** Active projects a line can be tagged with (job costing). */
   projects?: { id: string; code: string; name: string }[];
@@ -436,7 +436,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === "bill")?.mode === "manual",
-      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id, units: i.units ?? [] })),
+      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id, units: i.units ?? [], tracking: i.tracking ?? "none" })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       projects: await activeProjects(ctx),
       demo: false,
@@ -637,6 +637,13 @@ export async function getStock(): Promise<StockOnHand | null> {
   await connection();
   if (isDemoMode()) return null;
   return withApi((ctx) => ledgerly.stock(ctx));
+}
+
+/** 074: stock on hand by batch, the first to expire first; within_days keeps only what expires by then. */
+export async function getStockBatches(withinDays?: number) {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi((ctx) => ledgerly.stockBatches({ within_days: withinDays }, ctx));
 }
 
 export async function getReorder() {

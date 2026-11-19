@@ -16,7 +16,7 @@ class Item extends Model
     use HasUuids;
 
     protected $fillable = ['sku', 'name', 'type', 'unit', 'sale_price', 'purchase_price', 'income_account_id', 'expense_account_id',
-        'default_tax_code', 'authority_item_code', 'reorder_point', 'is_active', 'costing'];
+        'default_tax_code', 'authority_item_code', 'reorder_point', 'is_active', 'costing', 'tracking'];
 
     protected $hidden = ['company_id'];
 

@@ -50,12 +50,12 @@ final class GoodsReceiving
      * @param array<string, string> $quantities
      * @return array<string, mixed> the note
      */
-    public function receive(Document $order, array $quantities, string $date, ?string $warehouseId, ?string $reference, ?string $note, string $userId): array
+    public function receive(Document $order, array $quantities, string $date, ?string $warehouseId, ?string $reference, ?string $note, string $userId, array $batches = []): array
     {
         $company = $this->current->get();
         $base = $company->base_currency;
 
-        return DB::transaction(function () use ($order, $quantities, $date, $warehouseId, $reference, $note, $userId, $company, $base) {
+        return DB::transaction(function () use ($order, $quantities, $date, $warehouseId, $reference, $note, $userId, $company, $base, $batches) {
             $order = Document::query()->lockForUpdate()->with('lines')->findOrFail($order->getKey());
             if ($order->type !== 'purchase_order' || $order->status !== 'accepted') {
                 throw new LedgerException('Goods are received against an issued purchase order.');
@@ -139,7 +139,7 @@ final class GoodsReceiving
                 ]);
                 $own = DocumentStock::baseQuantity((object) ['quantity' => $quantity, 'unit_factor' => $line->unit_factor]);   // 072
                 $this->stock->move($company->getKey(), $base, (string) $line->item_id, $warehouse->getKey(), $at, 'purchase', $own, '0',
-                    $reference ?? $number, null, $userId, $values[$lineId]->toDecimalString(), goodsReceiptId: $id);
+                    $reference ?? $number, null, $userId, $values[$lineId]->toDecimalString(), goodsReceiptId: $id, batch: $batches[$lineId] ?? null);   // 074
             }
 
             $this->audit->record($company->getKey(), 'goods_received', 'purchase_order', $order->getKey(), null,
@@ -188,7 +188,7 @@ final class GoodsReceiving
             foreach ($in as $l) {
                 try {
                     $out = $this->stock->move($company->getKey(), $base, (string) $l->item_id, (string) $l->warehouse_id, $date, 'purchase_return',
-                        '-' . $l->quantity, '0', "Void of {$receipt->number}", null, $userId, goodsReceiptId: $receiptId);
+                        '-' . $l->quantity, '0', "Void of {$receipt->number}", null, $userId, goodsReceiptId: $receiptId, batchId: $l->batch_id);
                 } catch (QueryException $e) {
                     if (str_contains($e->getMessage(), 'Not enough stock')) {
                         throw ValidationException::withMessages(['goods_receipt' => ["The goods on {$receipt->number} are no longer all in stock: they cannot go out again."]]);

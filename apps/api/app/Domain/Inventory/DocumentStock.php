@@ -188,7 +188,8 @@ final class DocumentStock
                 continue;
             }
             $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'purchase',
-                self::baseQuantity($line), '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId, $share->toDecimalString());
+                self::baseQuantity($line), '0', $doc->reference ?? $doc->number, $doc->getKey(), $userId, $share->toDecimalString(),
+                batch: ['number' => $line->batch_number ?? null, 'expires_on' => $line->batch_expires_on?->format('Y-m-d') ?? null]);   // 074
         }
         if ($cleared !== []) {
             $this->clearReceived($doc, $cleared, $draft, $company, $date, $userId);
@@ -350,14 +351,14 @@ final class DocumentStock
             } elseif ($m->kind === 'purchase_return') {
                 // Goods sent back come in again at the cost they left with: the journal reversal puts back exactly that.
                 $this->stock->move($company->getKey(), $base, $m->item_id, $m->warehouse_id, $date, 'purchase',
-                    ltrim((string) $m->quantity, '-'), '0', "Void of {$doc->number}", $doc->getKey(), $userId, ltrim((string) $m->amount, '-'));
+                    ltrim((string) $m->quantity, '-'), '0', "Void of {$doc->number}", $doc->getKey(), $userId, ltrim((string) $m->amount, '-'), batchId: $m->batch_id);
             } elseif ($m->kind === 'sale') {
                 // Back in at the cost it left with: the journal reversal puts back exactly that.
                 $this->stock->move($company->getKey(), $base, $m->item_id, $m->warehouse_id, $date, 'sale_return',
-                    ltrim((string) $m->quantity, '-'), '0', "Void of {$doc->number}", $doc->getKey(), $userId, ltrim((string) $m->amount, '-'));
+                    ltrim((string) $m->quantity, '-'), '0', "Void of {$doc->number}", $doc->getKey(), $userId, ltrim((string) $m->amount, '-'), batchId: $m->batch_id);
             } else {
                 $out = $this->stock->move($company->getKey(), $base, $m->item_id, $m->warehouse_id, $date, $m->kind === 'sale_return' ? 'sale' : 'purchase_return',
-                    '-' . $m->quantity, '0', "Void of {$doc->number}", $doc->getKey(), $userId);
+                    '-' . $m->quantity, '0', "Void of {$doc->number}", $doc->getKey(), $userId, batchId: $m->batch_id);
                 // The reversal takes the bill's cost off the inventory account; the stock went out at today's average.
                 $difference = $difference->plus(Money::of((string) $m->amount, $base))->minus($out['amount']->negated());
             }
@@ -409,7 +410,8 @@ final class DocumentStock
                 ? Money::of(bcsub($soldCost, $backCost, 2), $base)
                 : Money::of($soldCost, $base)->multipliedBy($qty)->dividedBy($soldQty)->roundToCurrency();
             $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'sale_return',
-                $qty, '0', $doc->number, $doc->getKey(), $userId, $value->toDecimalString());
+                $qty, '0', $doc->number, $doc->getKey(), $userId, $value->toDecimalString(),
+                batch: ['number' => $line->batch_number ?? null, 'expires_on' => $line->batch_expires_on?->format('Y-m-d') ?? null]);   // 074: the batch it comes back as
             $cost = $cost->plus($value);
         }
         if (! $cost->isZero()) {

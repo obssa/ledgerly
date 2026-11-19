@@ -55,9 +55,11 @@ export function PurchaseOrderActions({ doc, today }: { doc: PurchaseOrderDetail;
                 <label htmlFor={`receive-${l.id}`} className="min-w-0 flex-1">{l.description} <span className="text-muted">({doc.arriving[l.id ?? ""]} to come)</span></label>
                 <input className="field num !w-[96px] text-right" id={`receive-${l.id}`} name={`receive_${l.id}`} defaultValue={doc.arriving[l.id ?? ""]}
                   inputMode="decimal" pattern="\d+(\.\d{1,2})?" aria-describedby="receive-help" />
+                <input className="field !w-[96px] text-[13px]" aria-label={`Batch of ${l.description}`} name={`batch_${l.id}`} placeholder="Batch" maxLength={60} />
+                <input className="field !w-[140px] text-[13px]" aria-label={`Expiry of ${l.description}`} name={`expires_${l.id}`} type="date" />
               </div>
             ))}
-            <p id="receive-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that did not come. Only stock items are received.</p>
+            <p id="receive-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that did not come. Only stock items are received. Batch and expiry: for items tracked by batch.</p>
           </fieldset>
           <label className="field-label mt-2" htmlFor="received-note">Note (optional)</label>
           <input className="field" id="received-note" name="note" maxLength={500} />

@@ -3948,6 +3948,74 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T99 a bundle''s parts are other items, fixed once it is used, and it holds no stock of its own';
 END $$;
+
+-- T100: batches (074). Tracking is chosen before an item's first stock move, for a stock item only; a batch belongs to
+-- a tracked item, its number never changes and it is kept; every move of a tracked item names one of its own batches,
+-- and no other move does; a batch's stock never goes below zero; another company never sees a batch. Company A as f1,
+-- item b1 (untracked, with moves) in warehouse a1.
+DO $$
+DECLARE
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  milk constant uuid := '00000000-0000-0000-0000-000000000ef0';
+  ba constant uuid := '00000000-0000-0000-0000-000000000ef1';
+  bb constant uuid := '00000000-0000-0000-0000-000000000ef2';
+  q numeric;
+BEGIN
+  BEGIN
+    UPDATE items SET tracking = 'batch' WHERE id = item;
+    RAISE EXCEPTION 'FAIL T100a: an item with stock moves changed its tracking';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO items (company_id, name, type, tracking) VALUES (app_company_id(), 'T100 service', 'service', 'batch');
+    RAISE EXCEPTION 'FAIL T100b: an item that is not stock was tracked by batch';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO items (id, company_id, name, type, tracking) VALUES (milk, app_company_id(), 'T100 milk powder', 'inventory', 'batch');
+  BEGIN
+    INSERT INTO stock_batches (company_id, item_id, number) VALUES (app_company_id(), item, 'X1');
+    RAISE EXCEPTION 'FAIL T100c: a batch was made for an item not tracked by batch';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_batches (id, company_id, item_id, number, expires_on) VALUES (ba, app_company_id(), milk, 'L-2401', '2028-01-31'), (bb, app_company_id(), milk, 'L-2402', '2028-03-31');
+
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), milk, wh, '2027-11-01', 'opening', 10, 40);
+    RAISE EXCEPTION 'FAIL T100d: a tracked item moved without naming its batch';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES (app_company_id(), item, wh, '2027-11-01', 'purchase', 1, 40, ba);
+    RAISE EXCEPTION 'FAIL T100e: an untracked item''s move named a batch';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES
+    (app_company_id(), milk, wh, '2027-11-01', 'opening', 10, 40, ba), (app_company_id(), milk, wh, '2027-11-01', 'opening', 5, 40, bb);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES (app_company_id(), milk, wh, '2027-11-02', 'sale', -11, 0, ba);
+    RAISE EXCEPTION 'FAIL T100f: a batch went below zero (there is enough of the item, not of the batch)';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES (app_company_id(), milk, wh, '2027-11-02', 'sale', -4, 0, ba);
+  SELECT quantity INTO q FROM batch_balances WHERE batch_id = ba AND warehouse_id = wh;
+  IF q <> 6 THEN
+    RAISE EXCEPTION 'FAIL T100g: batch stock is % after 10 in and 4 out', q;
+  END IF;
+  BEGIN
+    UPDATE stock_batches SET number = 'L-9999' WHERE id = ba;
+    RAISE EXCEPTION 'FAIL T100h: a batch''s number was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE batch_balances SET quantity = 100 WHERE batch_id = ba;
+    RAISE EXCEPTION 'FAIL T100i: the application wrote a batch''s stock';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    UPDATE items SET tracking = 'none' WHERE id = milk;
+    RAISE EXCEPTION 'FAIL T100j: a tracked item with moves stopped being tracked';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM stock_batches WHERE id = ba) OR EXISTS (SELECT 1 FROM batch_balances WHERE batch_id = ba) THEN
+    RAISE EXCEPTION 'FAIL T100k: company B saw company A''s batch';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T100 a tracked item''s every move names its own batch, and a batch never goes below zero';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

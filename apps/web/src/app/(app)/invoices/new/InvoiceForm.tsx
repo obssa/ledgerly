@@ -79,6 +79,9 @@ interface Line {
   sourceLineId?: string;
   /** 072: another unit of the item; empty is the item's own unit. */
   unitId?: string;
+  /** 074: the batch a bill line brings in (an item tracked by batch). */
+  batchNumber?: string;
+  batchExpires?: string;
 }
 
 const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
@@ -114,7 +117,8 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const projects = options.projects ?? [];
   const [lines, setLines] = useState<Line[]>(draft && draft.lines.length > 0
     ? draft.lines.map((l, i) => ({ key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
-        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", sourceLineId: l.source_line_id ?? undefined, unitId: l.unit_id ?? "" }))
+        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", sourceLineId: l.source_line_id ?? undefined, unitId: l.unit_id ?? "",
+        batchNumber: l.batch_number ?? "", batchExpires: l.batch_expires_on ?? "" }))
     : [{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const items = options.items ?? [];
   const withUnits = kind !== "expense" && items.some((i) => (i.units ?? []).length > 0);   // 072: the Unit column only when an item has units
@@ -151,7 +155,8 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
-  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, unit_id: l.unitId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}) })));
+  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, unit_id: l.unitId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}),
+    ...(l.batchNumber ? { batch_number: l.batchNumber, batch_expires_on: l.batchExpires || null } : {}) })));
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
   const bad = (name: string) => Boolean(state?.fields?.[name]);
 
@@ -276,7 +281,16 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                           </select>
                         </td>
                       )}
-                      <td><input aria-label="Description" className="field min-w-[180px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} /></td>
+                      <td>
+                        <input aria-label="Description" className="field min-w-[180px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} />
+                        {kind === "bill" && items.find((it) => it.id === l.itemId)?.tracking === "batch" && (
+                          // 074: a tracked item comes in with its batch, and its expiry when it has one.
+                          <div className="mt-1 flex gap-1">
+                            <input aria-label="Batch" className="field !w-[110px] text-[13px]" placeholder="Batch" value={l.batchNumber ?? ""} onChange={(e) => update(l.key, { batchNumber: e.target.value })} />
+                            <input aria-label="Expires on" type="date" className="field !w-[150px] text-[13px]" value={l.batchExpires ?? ""} onChange={(e) => update(l.key, { batchExpires: e.target.value })} />
+                          </div>
+                        )}
+                      </td>
                       <td><input aria-label="Quantity" inputMode="decimal" className="field num w-[72px] text-right" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} /></td>
                       {withUnits && (() => {
                         const item = items.find((it) => it.id === l.itemId);

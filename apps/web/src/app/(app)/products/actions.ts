@@ -25,7 +25,7 @@ const amount = (v: string | undefined) => (v ?? "").replace(/[,\s]/g, "");
 
 function itemBody(form: FormData): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  for (const name of ["name", "sku", "type", "unit", "costing"]) if (form.has(name)) body[name] = text(form, name) ?? (name === "sku" ? null : "");
+  for (const name of ["name", "sku", "type", "unit", "costing", "tracking"]) if (form.has(name)) body[name] = text(form, name) ?? (name === "sku" ? null : "");
   for (const name of ["sale_price", "purchase_price", "reorder_point"]) if (form.has(name)) body[name] = amount(text(form, name)) || null;
   return body;
 }
@@ -100,6 +100,9 @@ export async function adjustStock(_: FormState | undefined, form: FormData): Pro
     quantity: amount(text(form, "quantity")), reason: text(form, "reason") ?? "", opening: form.get("opening") === "on",
   };
   if (amount(text(form, "unit_cost")) !== "") body.unit_cost = amount(text(form, "unit_cost"));
+  // 074: the batch of an item tracked by batch (coming in, or taken out).
+  if (text(form, "batch")) body.batch = text(form, "batch");
+  if (text(form, "batch") && text(form, "expires_on")) body.expires_on = text(form, "expires_on");
   let result: { amount: string };
   try {
     result = await ledgerly.adjustStock(body, ctx);
