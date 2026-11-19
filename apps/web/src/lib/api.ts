@@ -1414,6 +1414,19 @@ export interface ExpenseClaim {
   lines?: InvoiceLine[];
   can?: { submit: boolean; approve: boolean; attach: boolean };
 }
+/** GET /purchase-requisitions (084): something a member asked to be bought. */
+export interface PurchaseRequisition {
+  id: string; status: "requested" | "approved" | "rejected" | "withdrawn" | "ordered"; reason: string; needed_by: string | null; created_at: string;
+  requested_by: string; requested_by_name: string; decided_by_name: string | null; decision_note: string | null;
+  purchase_order_id: string | null; purchase_order_number: string | null;
+  lines: { description: string; quantity: string; estimated_price?: string; item_id?: string }[];
+  can: { withdraw: boolean; decide: boolean; order: boolean };
+  options: { suppliers: { id: string; name: string }[]; accounts: { id: string; code: string; name: string }[] } | null;
+}
+export interface RequisitionList {
+  data: (Omit<PurchaseRequisition, "lines" | "can" | "options" | "decided_by_name" | "decision_note" | "purchase_order_number"> & { lines: number })[];
+  can: { see_all: boolean; approve: boolean; order: boolean };
+}
 export interface ExpenseClaimList {
   data: ExpenseClaim[]; can: { see_all: boolean; approve: boolean };
   options: { accounts: { id: string; code: string; name: string }[]; tax_rates: { id: string; code: string; name: string }[] };
@@ -1587,6 +1600,14 @@ export const ledgerly = {
     api<{ data: Bill[] }>("bills", { ...ctx, query: { contact_id: contactId, open: "1" } }),
   paymentsMade: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-made", ctx),
   /** Module 3: one payment per supplier for the bills given, all or none. */
+  requisitions: (ctx: RequestOptions) => api<RequisitionList>("purchase-requisitions", ctx),
+  requisition: (id: string, ctx: RequestOptions) => api<PurchaseRequisition>(`purchase-requisitions/${encodeURIComponent(id)}`, ctx),
+  createRequisition: (body: Record<string, unknown>, ctx: RequestOptions) => api<PurchaseRequisition>("purchase-requisitions", { ...ctx, method: "POST", body }),
+  decideRequisition: (id: string, decision: "approve" | "reject", note: string | null, ctx: RequestOptions) =>
+    api<PurchaseRequisition>(`purchase-requisitions/${encodeURIComponent(id)}/${decision}`, { ...ctx, method: "POST", body: { note } }),
+  withdrawRequisition: (id: string, ctx: RequestOptions) => api<PurchaseRequisition>(`purchase-requisitions/${encodeURIComponent(id)}/withdraw`, { ...ctx, method: "POST", body: {} }),
+  orderRequisition: (id: string, body: { contact_id: string; account_id: string; prices: (string | null)[] }, ctx: RequestOptions) =>
+    api<PurchaseRequisition>(`purchase-requisitions/${encodeURIComponent(id)}/order`, { ...ctx, method: "POST", body }),
   expenseClaims: (ctx: RequestOptions) => api<ExpenseClaimList>("expense-claims", ctx),
   expenseClaim: (id: string, ctx: RequestOptions) => api<ExpenseClaim>(`expense-claims/${encodeURIComponent(id)}`, ctx),
   createExpenseClaim: (body: Record<string, unknown>, ctx: RequestOptions) => api<ExpenseClaim>("expense-claims", { ...ctx, method: "POST", body }),

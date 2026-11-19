@@ -4421,6 +4421,70 @@ BEGIN
   PERFORM set_config('app.user_id', f1::text, true);
   RAISE NOTICE 'PASS T109 an expense claim is a bill to the claimant''s own staff payee, approved by someone else';
 END $$;
+
+-- T110: purchase requisitions (084). Asked for by the member asking, kept as asked; approved by someone else, who is
+-- the one recorded; moved only forward; ordered into a purchase order of the company; another company never sees one.
+-- Company A as f1 (the asker); another user (c2) deciding; supplier c8.
+DO $$
+DECLARE
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  c2 constant uuid := '00000000-0000-0000-0000-0000000000c2';
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  r constant uuid := '00000000-0000-0000-0000-000000000f80';
+  po constant uuid := '00000000-0000-0000-0000-000000000f81';
+  lines constant jsonb := '[{"description": "Paper cups, 1,000", "quantity": "4", "estimated_price": "350"}]';
+BEGIN
+  BEGIN
+    INSERT INTO purchase_requisitions (company_id, requested_by, reason, lines) VALUES (app_company_id(), c2, 'For the cafe', lines);
+    RAISE EXCEPTION 'FAIL T110a: a requisition was asked for in someone else''s name';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO purchase_requisitions (company_id, requested_by, reason, lines) VALUES (app_company_id(), f1, 'For the cafe', '[]');
+    RAISE EXCEPTION 'FAIL T110b: a requisition asked for nothing';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO purchase_requisitions (id, company_id, requested_by, reason, lines) VALUES (r, app_company_id(), f1, 'For the cafe', lines);
+  BEGIN
+    UPDATE purchase_requisitions SET lines = '[{"description": "More cups", "quantity": "40"}]' WHERE id = r;
+    RAISE EXCEPTION 'FAIL T110c: what a requisition asked for was changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE purchase_requisitions SET status = 'approved', decided_by = f1, decided_at = now() WHERE id = r;
+    RAISE EXCEPTION 'FAIL T110d: the asker approved their own requisition';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE purchase_requisitions SET status = 'ordered', purchase_order_id = po WHERE id = r;
+    RAISE EXCEPTION 'FAIL T110e: a requisition was ordered before it was approved';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  PERFORM set_config('app.user_id', c2::text, true);
+  BEGIN
+    UPDATE purchase_requisitions SET status = 'approved', decided_by = '00000000-0000-0000-0000-0000000000f2', decided_at = now() WHERE id = r;
+    RAISE EXCEPTION 'FAIL T110f: a requisition recorded someone else as the one who approved it';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE purchase_requisitions SET status = 'withdrawn' WHERE id = r;
+    RAISE EXCEPTION 'FAIL T110g: a requisition was withdrawn by someone other than the asker';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE purchase_requisitions SET status = 'approved', decided_by = c2, decided_at = now() WHERE id = r;
+  BEGIN
+    UPDATE purchase_requisitions SET status = 'ordered', purchase_order_id = '00000000-0000-0000-0000-00000000e001' WHERE id = r;
+    RAISE EXCEPTION 'FAIL T110h: an ordered requisition named something that is not a purchase order';
+  EXCEPTION WHEN check_violation OR foreign_key_violation THEN NULL; END;
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency) VALUES (po, app_company_id(), 'purchase_order', c8, '2027-11-05', 'ETB');
+  UPDATE purchase_requisitions SET status = 'ordered', purchase_order_id = po WHERE id = r;
+  BEGIN
+    UPDATE purchase_requisitions SET status = 'requested' WHERE id = r;
+    RAISE EXCEPTION 'FAIL T110i: an ordered requisition went back to requested';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  PERFORM set_config('app.user_id', f1::text, true);
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM purchase_requisitions WHERE id = r) THEN
+    RAISE EXCEPTION 'FAIL T110j: company B saw company A''s requisition';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', f1::text, true);
+  RAISE NOTICE 'PASS T110 a requisition is asked for by its member, decided by someone else and ordered once approved';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
