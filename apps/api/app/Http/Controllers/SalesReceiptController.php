@@ -33,7 +33,9 @@ final class SalesReceiptController extends Controller
     {
         return response()->json([
             ...$receipt->toArray(),
-            'can' => ['void' => $receipt->status !== 'void' && (bool) $this->current->membership()?->can('transactions.edit')],
+            'can' => ['void' => $receipt->status !== 'void' && (bool) $this->current->membership()?->can('transactions.edit'),
+                // 082: a registered cash sale is corrected with a credit note.
+                'credit' => in_array($receipt->status, ['posted', 'paid'], true) && (bool) $this->current->membership()?->can('invoices.create')],
         ], $status);
     }
 
@@ -53,7 +55,7 @@ final class SalesReceiptController extends Controller
     {
         $this->authorizeCompany('invoices.view');
 
-        return $this->present($salesReceipt->load(['lines', 'contact:id,name,tax_id,email', 'paidFrom:id,code,name']));
+        return $this->present($salesReceipt->load(['lines', 'contact:id,name,tax_id,email', 'paidFrom:id,code,name', 'einvoiceSubmissions']));
     }
 
     /** Saves and posts at once: the money has already been received. */

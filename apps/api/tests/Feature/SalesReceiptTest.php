@@ -23,7 +23,8 @@ final class SalesReceiptTest extends TestCase
 
     public function test_a_cash_sale_posts_to_the_money_account_and_takes_the_goods_out(): void
     {
-        config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
+        // No e-invoicing here: a registered cash sale is not voided (082), and these void one. CashSaleEInvoiceTest covers registration.
+        config(['einvoicing.force_sandbox' => false, 'einvoicing.countries' => [], 'queue.default' => 'sync']);
         $b = $this->companyWithRecords('b@example.test', 'Blue Nile Traders');
         $c = $this->companyWithRecords('owner@example.test', 'Abyssinia Coffee');   // 20 bags at 50.00 in the main store
         $h = ['X-Company-Id' => $c['company']];

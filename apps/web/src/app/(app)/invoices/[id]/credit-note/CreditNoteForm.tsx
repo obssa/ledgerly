@@ -2,7 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { Card } from "@/components/ui";
-import type { BillDetail, InvoiceDetail } from "@/lib/api";
+import type { BillDetail, InvoiceDetail, InvoiceLine, SalesReceipt } from "@/lib/api";
 import { documentAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { createSupplierCredit } from "../../../bills/actions";
@@ -20,7 +20,7 @@ const isDecimal = (v: string) => /^\d+(\.\d+)?$/.test(v.replace(/,/g, ""));
  * the credit comes off that project's income; it can be changed or cleared.
  */
 export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
-  invoice: InvoiceDetail | BillDetail;
+  invoice: InvoiceDetail | BillDetail | (SalesReceipt & { lines: InvoiceLine[] });
   taxRates: { id: string; name: string; rate: string }[];
   projects?: { id: string; code: string; name: string }[];
 }) {
@@ -47,6 +47,7 @@ export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
     <form action={action} noValidate className="flex flex-col gap-4">
       {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
       <input type="hidden" name="invoice_id" value={invoice.id} />
+      {invoice.type === "sales_receipt" && <input type="hidden" name="from" value="sales_receipt" />}
       <input type="hidden" name="lines" value={json} />
       <Card label={bill ? "Supplier credit" : "Credit note"}>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">

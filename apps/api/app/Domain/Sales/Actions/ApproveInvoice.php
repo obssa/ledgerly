@@ -109,7 +109,8 @@ final class ApproveInvoice
                 }
             }
 
-            if (in_array($invoice->type, ['invoice', 'credit_note'], true) && ($connector = $this->connectors->forCountry($company->country_code))) {
+            // A cash sale is registered like an invoice (082).
+            if (in_array($invoice->type, ['invoice', 'credit_note', 'sales_receipt'], true) && ($connector = $this->connectors->forCountry($company->country_code))) {
                 $submission = EInvoiceSubmission::query()->create([
                     'document_id' => $invoice->getKey(),
                     'authority' => $connector->authority(),

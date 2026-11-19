@@ -823,7 +823,9 @@ export interface SalesReceipt extends Invoice {
   fx_rate: string;
   notes: string | null;
   lines?: InvoiceLine[];
-  can?: { void: boolean };
+  /** 082: registered with the tax authority like an invoice; once registered it is corrected with a credit note. */
+  einvoice_submissions?: EInvoiceSubmission[];
+  can?: { void: boolean; credit?: boolean };
 }
 
 export interface InvoiceDetail extends Invoice {
@@ -1779,6 +1781,8 @@ export const ledgerly = {
   submitInvoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
   voidInvoice: (id: string, reason: string, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
+  createCashSaleCreditNote: (receiptId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<{ id: string }>(`sales-receipts/${encodeURIComponent(receiptId)}/credit-notes`, { ...ctx, method: "POST", body }),
   createCreditNote: (invoiceId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ id: string }>(`invoices/${encodeURIComponent(invoiceId)}/credit-notes`, { ...ctx, method: "POST", body }),
   creditNotes: (ctx: RequestOptions) =>

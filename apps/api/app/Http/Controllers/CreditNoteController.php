@@ -46,6 +46,26 @@ final class CreditNoteController extends Controller
         if ($invoice->type !== 'invoice') {
             throw new NotFoundHttpException();
         }
+
+        return $this->credit($request, $invoice, $save);
+    }
+
+    /**
+     * 082: a draft credit note for a cash sale, the way a registered one is corrected. It was paid on the spot, so the
+     * credit stays as the customer's, to refund or apply to an invoice.
+     */
+    public function storeForCashSale(Request $request, Document $salesReceipt, SaveInvoiceDraft $save): JsonResponse
+    {
+        $this->authorizeCompany('invoices.create');
+        if ($salesReceipt->type !== 'sales_receipt') {
+            throw new NotFoundHttpException();
+        }
+
+        return $this->credit($request, $salesReceipt, $save);
+    }
+
+    private function credit(Request $request, Document $invoice, SaveInvoiceDraft $save): JsonResponse
+    {
         if (! in_array($invoice->status, ['posted', 'part_paid', 'paid'], true)) {
             throw ValidationException::withMessages(['invoice' => ["{$invoice->label()} is not posted: change the draft instead."]]);
         }

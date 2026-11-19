@@ -71,7 +71,9 @@ export async function createCreditNote(_: FormState | undefined, form: FormData)
   const body = invoiceBody(form);
   let id: string;
   try {
-    id = (await ledgerly.createCreditNote(invoiceId, { issue_date: body.issue_date, notes: body.notes, lines: body.lines, restock: form.get("restock") === "1" }, ctx)).id;
+    const credit = { issue_date: body.issue_date, notes: body.notes, lines: body.lines, restock: form.get("restock") === "1" };
+    // 082: a cash sale is credited through its own route.
+    id = (await (form.get("from") === "sales_receipt" ? ledgerly.createCashSaleCreditNote(invoiceId, credit, ctx) : ledgerly.createCreditNote(invoiceId, credit, ctx))).id;
   } catch (error) {
     return refusal(error);
   }
