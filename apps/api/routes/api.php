@@ -389,6 +389,7 @@ Route::prefix('v1')->group(function () {
             Route::post('sales-receipts', [SalesReceiptController::class, 'store']);
             Route::get('sales-receipts/{salesReceipt}', [SalesReceiptController::class, 'show']);
             Route::post('sales-receipts/{salesReceipt}/void', [SalesReceiptController::class, 'void']);
+            Route::post('sales-receipts/{salesReceipt}/credit-notes', [CreditNoteController::class, 'storeForCashSale']);   // 082
 
             Route::get('expenses', [ExpenseController::class, 'index']);
             Route::post('expenses', [ExpenseController::class, 'store']);

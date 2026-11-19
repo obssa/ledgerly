@@ -15,6 +15,7 @@ export default async function SalesReceiptPage({ params }: PageProps<"/sales-rec
   const receipt = await getSalesReceipt(id);
   if (!receipt) notFound();
   const voided = receipt.status === "void";
+  const submission = receipt.einvoice_submissions?.[0];
 
   return (
     <>
@@ -58,7 +59,20 @@ export default async function SalesReceiptPage({ params }: PageProps<"/sales-rec
           {receipt.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{receipt.notes}</p>}
         </Card>
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
-          {!voided && receipt.can?.void && <VoidSalesReceipt id={receipt.id} />}
+          {!voided && receipt.can?.void && submission?.status !== "cleared" && <VoidSalesReceipt id={receipt.id} />}
+          {!voided && receipt.can?.credit && (
+            <Link href={`/sales-receipts/${encodeURIComponent(receipt.id)}/credit-note`} className="btn justify-center">Issue a credit note</Link>
+          )}
+          {submission && (
+            <Card label="E-invoice">
+              <h2 className="text-[17px] font-bold">E-invoice</h2>
+              <p className="mt-1.5 text-sm">
+                {submission.status === "cleared" ? <>Registered · <span className="num">{submission.clearance_number}</span></> :
+                  submission.status === "rejected" ? <span className="text-bad">Rejected: {submission.last_error}</span> : "Queued for the tax authority."}
+              </p>
+              {submission.status === "cleared" && <p className="mt-1 text-[13px] text-muted">Registered, it is corrected with a credit note rather than voided.</p>}
+            </Card>
+          )}
           {receipt.journal_entry_id && <Link href={`/journal/${encodeURIComponent(receipt.journal_entry_id)}`} className="btn justify-center">See its journal entry</Link>}
         </aside>
       </div>

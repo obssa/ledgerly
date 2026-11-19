@@ -4342,6 +4342,39 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T107 goods delivered on notes come back on a credit note, never more than the invoice billed';
 END $$;
+
+-- T108: a credit note corrects a cash sale (082): of the same customer and currency, once posted, never beyond its total;
+-- a supplier credit still corrects only a bill. Company A as f1, customer c1, supplier c8, bank account a10.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  sr constant uuid := '00000000-0000-0000-0000-000000000f60';
+  cn constant uuid := '00000000-0000-0000-0000-000000000f61';
+  bank constant uuid := '00000000-0000-0000-0000-000000000a10';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total, amount_due, paid_from_account_id, payment_method)
+    VALUES (sr, app_company_id(), 'sales_receipt', c1, '2027-11-10', 'ETB', 300, 0, bank, 'cash');
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, original_document_id) VALUES (app_company_id(), 'credit_note', c1, '2027-11-11', 'ETB', sr);
+    RAISE EXCEPTION 'FAIL T108a: a cash sale not yet posted was credited';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET status = 'posted', number = 'SR-T108-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = sr;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, original_document_id, total, amount_due)
+    VALUES (cn, app_company_id(), 'credit_note', c1, '2027-11-11', 'ETB', sr, 400, 400);
+  BEGIN
+    UPDATE documents SET status = 'posted', number = 'CN-T108-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = cn;
+    RAISE EXCEPTION 'FAIL T108b: a cash sale was credited by more than its total';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, original_document_id) VALUES (app_company_id(), 'vendor_credit', c8, '2027-11-11', 'ETB', sr);
+    RAISE EXCEPTION 'FAIL T108c: a supplier credit corrected a cash sale';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET total = 300, amount_due = 300 WHERE id = cn;
+  UPDATE documents SET status = 'posted', number = 'CN-T108-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = cn;
+  RAISE NOTICE 'PASS T108 a credit note corrects a posted cash sale of its customer, never beyond it';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
