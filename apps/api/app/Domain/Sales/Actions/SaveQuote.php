@@ -59,6 +59,7 @@ final class SaveQuote
             $data['lines'] = array_map(fn (array $l) => array_diff_key($l, ['source_line_id' => true]), $data['lines']);
 
             $data['salesperson_id'] = $type === 'purchase_order' ? null : $this->drafts->salesperson($data, $document);
+            SaveInvoiceDraft::refuseBundlesBought($type, $data['lines'] ?? []);   // 073
             $calc = $this->drafts->calculate($data);
             // Once it has gone to the customer (or been confirmed) its number stays; a draft takes a typed number in manual mode.
             $calc['header']['number'] = $document !== null && $document->status !== 'draft'

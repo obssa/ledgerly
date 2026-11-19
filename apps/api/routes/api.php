@@ -402,6 +402,7 @@ Route::prefix('v1')->group(function () {
             Route::get('items/{item}', [ItemController::class, 'show']);
             Route::put('items/{item}', [ItemController::class, 'update']);
             Route::post('items/{item}/units', [ItemController::class, 'addUnit']);   // 072
+            Route::put('items/{item}/components', [ItemController::class, 'setComponents']);   // 073
             Route::post('items/{item}/units/{unit}/archive', [ItemController::class, 'archiveUnit'])->whereUuid('unit');
             Route::get('warehouses', [WarehouseController::class, 'index']);
             Route::post('warehouses', [WarehouseController::class, 'store']);

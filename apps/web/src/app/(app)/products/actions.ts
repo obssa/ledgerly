@@ -52,6 +52,23 @@ export async function saveItem(_: FormState | undefined, form: FormData): Promis
   return { notice: "Saved." };
 }
 
+/** 073: a bundle's parts, the whole list at once (part_item_<n> and part_qty_<n>; an empty item is skipped). */
+export async function setBundleParts(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const parts: { item_id: string; quantity: string }[] = [];
+  for (const [key, value] of form.entries()) {
+    const m = /^part_item_(\d{1,2})$/.exec(key);
+    if (m && typeof value === "string" && value.trim() !== "") parts.push({ item_id: value.trim(), quantity: amount(text(form, `part_qty_${m[1]}`)) });
+  }
+  try {
+    await ledgerly.setItemComponents(text(form, "id") ?? "", parts, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Parts saved." };
+}
+
 /** 072: another unit the item is bought or sold in (a carton of 12); its name and size never change. */
 export async function addItemUnit(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

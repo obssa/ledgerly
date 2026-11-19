@@ -118,7 +118,8 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
     : [{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const items = options.items ?? [];
   const withUnits = kind !== "expense" && items.some((i) => (i.units ?? []).length > 0);   // 072: the Unit column only when an item has units
-  const stockLine = lines.some((l) => items.find((i) => i.id === l.itemId)?.type === "inventory");
+  // A bundle's stock parts leave too (073): it needs a warehouse as a stock item does.
+  const stockLine = lines.some((l) => ["inventory", "bundle"].includes(items.find((i) => i.id === l.itemId)?.type ?? ""));
   /** Picking an item fills the line from it; the person can still change what was filled. */
   const pickItem = (key: number, itemId: string) => {
     const item = items.find((i) => i.id === itemId);

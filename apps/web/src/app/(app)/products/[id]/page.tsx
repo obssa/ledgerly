@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getItem, getWarehouses } from "@/lib/data";
+import { getItem, getItems, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { AdjustStock, ItemForm } from "../ItemForms";
 import { ItemUnits } from "./ItemUnits";
+import { BundleParts } from "./BundleParts";
 
 export const metadata = { title: "Item" };
 
@@ -14,6 +15,7 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
   const [item, warehouses] = await Promise.all([getItem(id), getWarehouses()]);
   if (!item) notFound();
   const stock = item.type === "inventory";
+  const choices = item.type === "bundle" ? (await getItems({})).data.filter((i) => i.type !== "bundle" && i.id !== item.id) : [];
 
   return (
     <>
@@ -44,6 +46,11 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
         <Card className="min-w-0 flex-[2_1_520px]" label="Item details">
           <ItemForm item={item} readOnly={!item.can?.edit} />
         </Card>
+        {item.type === "bundle" && (
+          <Card className="min-w-0 flex-[1_1_360px]" label="Parts">
+            <BundleParts item={item} choices={choices.map((i) => ({ id: i.id, name: i.name, unit: i.unit, type: i.type }))} />
+          </Card>
+        )}
         {item.type !== "service" && (
           <Card className="min-w-0 flex-[1_1_300px]" label="Units">
             <ItemUnits item={item} />

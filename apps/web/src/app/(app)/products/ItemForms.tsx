@@ -12,7 +12,10 @@ function Message({ state }: { state: FormState | undefined }) {
   return null;
 }
 
-const TYPES: Record<string, string> = { inventory: "Stock item (kept in stock, with a bin card)", non_inventory: "Non-stock item", service: "Service" };
+const TYPES: Record<string, string> = {
+  inventory: "Stock item (kept in stock, with a bin card)", non_inventory: "Non-stock item", service: "Service",
+  bundle: "Bundle (sold as one, made of other items)",
+};
 
 /** New item, or the details of one. Type is fixed once the item has stock moves (the API says so). */
 export function ItemForm({ item, readOnly = false }: { item?: Item; readOnly?: boolean }) {
