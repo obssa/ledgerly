@@ -53,5 +53,4 @@ jobs:
         run: |
           # The inputs reach the server as quoted arguments, and staff.sh checks each against a fixed pattern.
           q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
-          printf '%s
-' "$OWNER_PASSWORD" | ssh target "PHP_BIN=$(q "$PHP_BIN") bash ~/ledgerly/deploy/staff.sh $(q "$EMAIL") $(q "$ACTION") $(q "$NAME") $(q "$BY")"
+          printf '%s\n' "$OWNER_PASSWORD" | ssh target "PHP_BIN=$(q "$PHP_BIN") bash ~/ledgerly/deploy/staff.sh $(q "$EMAIL") $(q "$ACTION") $(q "$NAME") $(q "$BY")"
