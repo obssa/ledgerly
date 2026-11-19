@@ -1129,6 +1129,8 @@ export interface ProfitAndLossRow {
 }
 
 export interface ProfitAndLoss {
+  /** Accrual (when invoiced or billed) or cash (when the money moved). */
+  basis?: "accrual" | "cash";
   sections: { income: ProfitAndLossRow[]; cost_of_sales: ProfitAndLossRow[]; expenses: ProfitAndLossRow[] };
   totals: Record<"income" | "cost_of_sales" | "gross_profit" | "expenses" | "net_profit", { current: string; previous: string | null }>;
 }
@@ -1784,6 +1786,6 @@ export const ledgerly = {
   subscription: (ctx: RequestOptions) => api<Subscription>("subscription", ctx),
   documentAnalysis: (side: "sales" | "purchases", q: { group: string; from?: string; to?: string }, ctx: RequestOptions) =>
     api<DocumentAnalysis>(`reports/${side}`, { ...ctx, query: q }),
-  profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string }, ctx: RequestOptions) =>
+  profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string; basis?: "accrual" | "cash" }, ctx: RequestOptions) =>
     api<ProfitAndLoss>("reports/profit-and-loss", { ...ctx, query: q }),
 };

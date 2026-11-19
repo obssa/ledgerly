@@ -28,9 +28,13 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
   // Against the period just before, or (compare=year) the same period last year.
   const lastYear = q.compare === "year";
   const before = lastYear ? samePeriodLastYear(period.from, period.to) : previousPeriod(period.from, period.to);
+  // Accrual (when invoiced or billed), or cash (basis=cash): when the money moved.
+  const cash = q.basis === "cash";
   const [pl, { companyName }, settings] = await Promise.all([
-    getProfitAndLoss({ ...period, compare_from: before.from, compare_to: before.to }), getShellContext(), getCompanySettings(),
+    getProfitAndLoss({ ...period, compare_from: before.from, compare_to: before.to, ...(cash ? { basis: "cash" as const } : {}) }), getShellContext(), getCompanySettings(),
   ]);
+  const link = (o: { year?: boolean; cash?: boolean }) =>
+    `/reports?from=${period.from}&to=${period.to}${(o.year ?? lastYear) ? "&compare=year" : ""}${(o.cash ?? cash) ? "&basis=cash" : ""}`;
   const currency = settings.base_currency;
   const t = pl.totals;
   // No income yet (a new company) means no margin, not a division by zero.
@@ -75,16 +79,20 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" actions={<ExportLink report="profit-and-loss" params={period} />} />
       <PeriodForm from={period.from} to={period.to} />
-      <nav aria-label="Compare with" className="mb-3 flex flex-wrap gap-2 text-[13px]">
-        <Link href={`/reports?from=${period.from}&to=${period.to}`} className={`btn !py-1 ${lastYear ? "" : "btn-primary"}`}>Against the period before</Link>
-        <Link href={`/reports?from=${period.from}&to=${period.to}&compare=year`} className={`btn !py-1 ${lastYear ? "btn-primary" : ""}`}>Against the same period last year</Link>
+      <nav aria-label="Compare with and basis" className="mb-3 flex flex-wrap gap-2 text-[13px]">
+        <Link href={link({ year: false })} className={`btn !py-1 ${lastYear ? "" : "btn-primary"}`}>Against the period before</Link>
+        <Link href={link({ year: true })} className={`btn !py-1 ${lastYear ? "btn-primary" : ""}`}>Against the same period last year</Link>
+        <span className="mx-1 self-center text-muted" aria-hidden="true">·</span>
+        <Link href={link({ cash: false })} className={`btn !py-1 ${cash ? "" : "btn-primary"}`}>Accrual</Link>
+        <Link href={link({ cash: true })} className={`btn !py-1 ${cash ? "btn-primary" : ""}`}>Cash basis</Link>
       </nav>
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports" />
         <Card className="min-w-0 flex-[4_1_560px]" label="Profit and loss statement">
           <div className="mb-3 text-center">
             <div className="text-[17px] font-extrabold">{companyName}</div>
-            <div className="text-[13px] text-muted">Profit and loss · {periodLabel(period.from, period.to)} · {currency}</div>
+            <div className="text-[13px] text-muted">Profit and loss{cash ? " on the cash basis" : ""} · {periodLabel(period.from, period.to)} · {currency}</div>
+            {cash && <div className="mt-1 text-[12px] text-muted">Income and expenses when the money moved: invoices and bills as they are paid, cash sales and expenses on their day.</div>}
           </div>
           <div className="overflow-x-auto">
             <table className="tbl">
