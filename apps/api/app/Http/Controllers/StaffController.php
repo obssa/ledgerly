@@ -36,7 +36,7 @@ final class StaffController extends Controller
             $row = DB::selectOne('SELECT staff_id, password, mfa_secret, mfa_last_step FROM staff_sign_in_find(?)', [$data['email']]);
             $step = null;
             if ($row !== null && Hash::check($data['password'], (string) $row->password)) {
-                $step = Totp::verify(Crypt::decryptString((string) $row->mfa_secret), $data['code'], $row->mfa_last_step === null ? null : (int) $row->mfa_last_step);
+                $step = Totp::verify(Crypt::decryptString((string) $row->mfa_secret), $data['code'], $row->mfa_last_step === null ? null : (int) $row->mfa_last_step, now()->getTimestamp());
             }
             if ($row === null || $step === null) {
                 return null;
@@ -95,7 +95,7 @@ final class StaffController extends Controller
             'secret' => ['required', 'string', 'regex:/^[A-Z2-7]{32}$/'],
             'code' => ['required', 'string', 'regex:/^[0-9]{6}$/'],
         ]);
-        $step = Totp::verify($data['secret'], $data['code'], null);
+        $step = Totp::verify($data['secret'], $data['code'], null, now()->getTimestamp());   // the app's clock, as for customers (Mfa)
         if ($step === null) {
             throw ValidationException::withMessages(['code' => ['That code does not match: scan the code again and type the six digits it shows.']]);
         }
