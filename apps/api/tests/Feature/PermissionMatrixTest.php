@@ -206,6 +206,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/stock/batches' => 'inventory.view',
         'POST api/v1/stock/reorder/purchase-orders' => 'bills.create',
         'POST api/v1/bank-accounts/{bankAccount}/apply-rules' => 'banking.review',
+        'POST api/v1/statement-lines/{statementLine}/split' => 'banking.review',
         'GET api/v1/bank-rules' => 'banking.view',
         'POST api/v1/bank-rules' => 'banking.review',
         'PUT api/v1/bank-rules/{bankRule}' => 'banking.review',

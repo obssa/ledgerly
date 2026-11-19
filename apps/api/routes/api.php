@@ -434,6 +434,7 @@ Route::prefix('v1')->group(function () {
             Route::post('bank-accounts/{bankAccount}/statements', [StatementController::class, 'import']);
             Route::post('statement-lines/{statementLine}/match', [StatementController::class, 'match']);
             Route::post('statement-lines/{statementLine}/categorise', [StatementController::class, 'categorise']);
+            Route::post('statement-lines/{statementLine}/split', [StatementController::class, 'split']);   // 077
             Route::post('statement-lines/{statementLine}/exclude', [StatementController::class, 'exclude']);
             Route::post('statement-lines/{statementLine}/undo', [StatementController::class, 'undo']);
             Route::post('bank-accounts/{bankAccount}/apply-rules', [StatementController::class, 'applyRules']);   // 076

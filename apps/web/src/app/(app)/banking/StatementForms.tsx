@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { Account, StatementLine } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
 import Link from "next/link";
@@ -38,6 +38,57 @@ export function ImportStatement({ accountId }: { accountId: string }) {
       </details>
       <div><button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Importing…" : "Import statement"}</button></div>
     </form>
+  );
+}
+
+/** 077: one statement line over several accounts, in one entry; the parts add up to the line. */
+function SplitLine({ line, accounts, action, pending, hidden, foreign }: {
+  line: StatementLine; accounts: Account[]; action: (form: FormData) => void; pending: boolean; hidden: React.ReactNode; foreign?: { currency: string; base: string };
+}) {
+  const [rows, setRows] = useState([0, 1]);
+  const [amounts, setAmounts] = useState<Record<number, string>>({});
+  const whole = line.amount.replace("-", "");
+  const sum = Object.values(amounts).reduce((s, v) => s + (Number(v.replace(/,/g, "")) || 0), 0);
+  const left = (Number(whole) - sum).toFixed(2);
+  return (
+    <details>
+      <summary className="cursor-pointer text-[13px] font-semibold text-brand">Split over several accounts</summary>
+      <form action={action} className="mt-2 grid gap-2">
+        {hidden}
+        {rows.map((r, i) => (
+          <div key={r} className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[180px] flex-1">
+              <label className="field-label" htmlFor={`part-account-${line.id}-${r}`}>Account {i + 1}</label>
+              <select className="field" id={`part-account-${line.id}-${r}`} name={`part_account_${r}`} defaultValue="">
+                <option value="" disabled>Choose…</option>
+                {accounts.map((a) => <option key={a.id} value={a.id}>{`${a.code} ${a.name}`}</option>)}
+              </select>
+            </div>
+            <div className="w-[120px]">
+              <label className="field-label" htmlFor={`part-amount-${line.id}-${r}`}>Amount</label>
+              <input className="field num text-right" id={`part-amount-${line.id}-${r}`} name={`part_amount_${r}`} inputMode="decimal"
+                onChange={(e) => setAmounts((m) => ({ ...m, [r]: e.target.value }))} />
+            </div>
+            <div className="min-w-[160px] flex-1">
+              <label className="field-label" htmlFor={`part-memo-${line.id}-${r}`}>Memo</label>
+              <input className="field" id={`part-memo-${line.id}-${r}`} name={`part_memo_${r}`} maxLength={255} />
+            </div>
+            {rows.length > 2 && <button type="button" className="btn !px-3" aria-label={`Remove part ${i + 1}`} onClick={() => setRows((rs) => rs.filter((x) => x !== r))}>×</button>}
+          </div>
+        ))}
+        {foreign && (
+          <div className="w-[150px]">
+            <label className="field-label" htmlFor={`split-rate-${line.id}`}>{`Rate (${foreign.base} per ${foreign.currency})`}</label>
+            <input className="field num" id={`split-rate-${line.id}`} name="fx_rate" inputMode="decimal" placeholder="The day's rate" />
+          </div>
+        )}
+        <p className={`text-[13px] ${left === "0.00" ? "text-good" : "text-muted"}`}>{left === "0.00" ? "The parts add up to the line." : `${left} of ${whole} still to share out.`}</p>
+        <div className="flex gap-2">
+          <button type="button" className="btn" disabled={rows.length >= 20} onClick={() => setRows((rs) => [...rs, Math.max(...rs) + 1])}>+ Add a part</button>
+          <button type="submit" className="btn btn-primary" disabled={pending}>Post the split</button>
+        </div>
+      </form>
+    </details>
   );
 }
 
@@ -147,6 +198,7 @@ export function ReviewLine({ line, accounts, canReview, foreign }: {
             className="mt-1 inline-block text-[13px] text-brand underline">Make a rule for lines like this</Link>
         )}
       </details>
+      <SplitLine line={line} accounts={accounts} action={action} pending={pending} hidden={hidden("split")} foreign={foreign} />
       <details>
         <summary className="cursor-pointer text-[13px] font-semibold text-brand">Exclude</summary>
         <form action={action} className="mt-2 flex flex-wrap items-end gap-2">

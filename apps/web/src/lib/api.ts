@@ -1672,7 +1672,7 @@ export const ledgerly = {
   deleteBankRule: (id: string, ctx: RequestOptions) => api<{ deleted: boolean }>(`bank-rules/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE" }),
   applyBankRules: (accountId: string, ctx: RequestOptions) =>
     api<{ categorised: number; skipped: { line_id: string; rule: string; reason: string }[] }>(`bank-accounts/${encodeURIComponent(accountId)}/apply-rules`, { ...ctx, method: "POST", body: {} }),
-  reviewStatementLine: (id: string, step: "match" | "categorise" | "exclude" | "undo", body: Record<string, unknown>, ctx: RequestOptions) =>
+  reviewStatementLine: (id: string, step: "match" | "categorise" | "split" | "exclude" | "undo", body: Record<string, unknown>, ctx: RequestOptions) =>
     api<StatementLine>(`statement-lines/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   depositReceipts: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ number: number }>("banking/deposits", { ...ctx, method: "POST", body }),
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),

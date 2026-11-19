@@ -106,17 +106,28 @@ export async function importStatement(_: FormState | undefined, form: FormData):
   return { notice: `Imported ${result.imported} line${result.imported === 1 ? "" : "s"} from ${result.from} to ${result.to}${skipped}.` };
 }
 
-const STEPS = { match: "Matched.", categorise: "Categorised and posted.", exclude: "Excluded.", undo: "Back to review." } as const;
+const STEPS = { match: "Matched.", categorise: "Categorised and posted.", split: "Split and posted in one entry.", exclude: "Excluded.", undo: "Back to review." } as const;
 
 /** One review step on a statement line; the step and its fields come from the form that was submitted. */
 export async function reviewStatementLine(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   const step = text(form, "step") as keyof typeof STEPS | undefined;
   if (!step || !(step in STEPS)) return { error: "Choose what to do with the line." };
-  const body: Record<string, string> = {};
+  const body: Record<string, unknown> = {};
   for (const field of ["journal_line_id", "account_id", "contact_id", "memo", "reason", "fx_rate"]) {
     const v = text(form, field);
     if (v) body[field] = v;
+  }
+  if (step === "split") {
+    // 077: the parts, part_account_<n>, part_amount_<n>, part_memo_<n>; a row without an account is left out.
+    const parts: Record<string, string>[] = [];
+    for (const [key, value] of form.entries()) {
+      const m = /^part_account_(\d{1,2})$/.exec(key);
+      if (!m || typeof value !== "string" || value === "") continue;
+      const memo = text(form, `part_memo_${m[1]}`);
+      parts.push({ account_id: value, amount: (text(form, `part_amount_${m[1]}`) ?? "").replace(/[,\s]/g, ""), ...(memo ? { memo } : {}) });
+    }
+    body.parts = parts;
   }
   try {
     await ledgerly.reviewStatementLine(text(form, "line_id") ?? "", step, body, ctx);
