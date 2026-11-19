@@ -65,6 +65,33 @@ final class PaymentMadeController extends Controller
         return response()->json([...$this->advice->for($this->current->get(), $supplier), 'cash_limit' => $this->advice->cashLimit($this->current->get())]);
     }
 
+    /** Module 3: batch payments. Several suppliers' bills paid in one run, one payment each, all or none (not by cheque). */
+    public function batch(Request $request, \App\Domain\Purchases\BatchPayments $batches): JsonResponse
+    {
+        $this->authorizeCompany('payments.pay');
+        $data = $request->validate([
+            'account_id' => ['required', 'uuid'],
+            'payment_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . app(CurrentCompany::class)->today()],
+            // A cheque carries its own number from the cheque book: those are written one by one.
+            'method' => ['required', Rule::in(array_values(array_diff(PaymentReceivedController::METHODS, ['cheque'])))],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'currency' => ['required', Rule::in(Currency::all())],
+            'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            'bills' => ['required', 'array', 'min:1', 'max:' . \App\Domain\Purchases\BatchPayments::MAX_BILLS],
+            'bills.*.bill_id' => ['required', 'uuid', 'distinct'],
+            'bills.*.amount' => ['nullable', 'decimal:0,2', 'gt:0'],
+            'withholding' => ['nullable', 'array', 'max:200'],
+            'withholding.*.contact_id' => ['required', 'uuid', 'distinct'],
+            'withholding.*.amount' => ['required', 'decimal:0,2', 'gt:0'],
+            'withholding.*.certificate' => ['required', 'string', 'max:60'],
+        ], [
+            'bills.*.bill_id.distinct' => 'Each bill appears once.',
+            'withholding.*.certificate.required' => 'Give the number of the withholding receipt handed to the supplier.',
+        ]);
+
+        return response()->json($batches->pay($data, $request->user()->getKey()), 201);
+    }
+
     public function store(Request $request, PayBills $pay): JsonResponse
     {
         $this->authorizeCompany('payments.pay');

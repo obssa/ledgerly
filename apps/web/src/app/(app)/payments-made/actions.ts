@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { paymentBody } from "@/lib/payments";
+import { batchBody } from "@/lib/batchPayments";
 import { getSession } from "@/lib/session";
 
 /* Server Functions behind the pay-bills screens. The API checks who may pay (payments.pay) and reverse (payments.reverse). */
@@ -23,6 +24,28 @@ function refusal(error: unknown): FormState {
     return { error: (error.body as { message?: string }).message ?? "Not possible right now." };
   }
   return formStateFromError(error);
+}
+
+/** Module 3: the pay run. One payment per supplier for the bills ticked; all are made or none. */
+export async function payBatch(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let suppliers: Record<string, string> = {};
+  try {
+    suppliers = JSON.parse(text(form, "suppliers") ?? "{}") as Record<string, string>;
+  } catch {
+    return { error: "Reload the page and try again." };
+  }
+  const { bills, withholding } = batchBody(form, suppliers);
+  if (bills.length === 0) return { error: "Tick at least one bill." };
+  try {
+    await ledgerly.payBatch({
+      account_id: text(form, "account_id") ?? "", payment_date: text(form, "payment_date") ?? "", method: text(form, "method") ?? "",
+      reference: text(form, "reference") || null, currency: text(form, "currency") ?? "", bills, withholding,
+    }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect("/payments-made");
 }
 
 export async function payBills(_: FormState | undefined, form: FormData): Promise<FormState> {
