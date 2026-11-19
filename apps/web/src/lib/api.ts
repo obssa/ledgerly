@@ -1277,6 +1277,9 @@ export interface CustomReport {
 }
 
 export interface InvoiceRetention { id: string; amount: string; held_on: string; released_on: string | null }
+/** GET /invoices/{id}/write-offs: bad debts written off this invoice, and whether this role may write one off (078). */
+export interface InvoiceWriteOff { id: string; amount: string; written_off_on: string; reason: string; reversed_on: string | null; reversal_reason: string | null }
+export interface InvoiceWriteOffs { data: InvoiceWriteOff[]; can: { write_off: boolean } }
 
 export interface InvoiceReminderSent { kind: "manual" | "scheduled"; step: number | null; sent_to: string; sent_at: string }
 
@@ -1765,6 +1768,11 @@ export const ledgerly = {
     api<{ data: (Invoice & { original?: { id: string; number: string | null } | null })[] }>("credit-notes", ctx),
   holdRetention: (id: string, body: { amount?: string; percent?: string; held_on: string }, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/retention`, { ...ctx, method: "POST", body }),
+  writeOffs: (id: string, ctx: RequestOptions) => api<InvoiceWriteOffs>(`invoices/${encodeURIComponent(id)}/write-offs`, ctx),
+  writeOff: (id: string, body: { amount?: string; date: string; reason: string }, ctx: RequestOptions) =>
+    api<InvoiceWriteOff>(`invoices/${encodeURIComponent(id)}/write-offs`, { ...ctx, method: "POST", body }),
+  reverseWriteOff: (id: string, body: { date: string; reason?: string }, ctx: RequestOptions) =>
+    api<InvoiceWriteOff>(`invoices/${encodeURIComponent(id)}/write-offs/reverse`, { ...ctx, method: "POST", body }),
   releaseRetention: (id: string, releasedOn: string, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/retention/release`, { ...ctx, method: "POST", body: { released_on: releasedOn } }),
   emailInvoice: (id: string, note: string | undefined, ctx: RequestOptions) =>

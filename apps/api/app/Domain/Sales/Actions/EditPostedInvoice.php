@@ -97,6 +97,10 @@ final class EditPostedInvoice
             if (DB::table('invoice_retentions')->where('document_id', $invoice->getKey())->whereNull('released_on')->exists()) {
                 throw new \App\Domain\Ledger\Exceptions\LedgerException("{$invoice->number} holds retention: release it before editing the invoice.");
             }
+            // A bad debt written off is not what the invoice says any more: reverse the write-off first (078).
+            if (DB::table('invoice_write_offs')->where('document_id', $invoice->getKey())->whereNull('reversed_on')->exists()) {
+                throw new \App\Domain\Ledger\Exceptions\LedgerException("{$invoice->number} has a bad debt written off: reverse the write-off before editing the invoice.");
+            }
             $paid = Money::of($invoice->total, $invoice->currency)->minus(Money::of($invoice->amount_due, $invoice->currency));
             if (! $paid->isZero() && $calc['header']['currency'] !== $invoice->currency) {
                 throw new LedgerException("{$invoice->number} is partly paid; its currency cannot change.");

@@ -126,6 +126,32 @@ export async function releaseRetention(_: FormState | undefined, form: FormData)
   return { notice: "Released: the customer owes it again." };
 }
 
+/** Module 2: writes off what this invoice still owes (or part of it) as a bad debt: Dr Bad debts, Cr Accounts receivable. */
+export async function writeOffBadDebt(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const amount = (text(form, "amount") ?? "").replace(/,/g, "");
+  try {
+    await ledgerly.writeOff(text(form, "id") ?? "", { ...(amount ? { amount } : {}), date: text(form, "date") ?? "", reason: text(form, "reason") ?? "" }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Written off: the invoice owes that much less." };
+}
+
+/** The customer paid after all: the latest write-off is reversed and the invoice is owed again. */
+export async function reverseBadDebt(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const reason = text(form, "reason");
+  try {
+    await ledgerly.reverseWriteOff(text(form, "id") ?? "", { date: text(form, "date") ?? "", ...(reason ? { reason } : {}) }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Reversed: the customer owes it again." };
+}
+
 /** Module 2: emails the customer a payment reminder for this invoice now (at most once a day). */
 export async function remindInvoice(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

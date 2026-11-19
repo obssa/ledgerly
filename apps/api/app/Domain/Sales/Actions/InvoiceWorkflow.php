@@ -57,6 +57,9 @@ final class InvoiceWorkflow
             if (DB::table('invoice_retentions')->where('document_id', $invoice->getKey())->whereNull('released_on')->exists()) {
                 throw new LedgerException("{$invoice->number} holds retention: release it before voiding the invoice.");
             }
+            if (DB::table('invoice_write_offs')->where('document_id', $invoice->getKey())->whereNull('reversed_on')->exists()) {   // 078
+                throw new LedgerException("{$invoice->number} has a bad debt written off: reverse the write-off before voiding the invoice.");
+            }
 
             $reversalId = null;
             if ($invoice->status === 'posted') {
