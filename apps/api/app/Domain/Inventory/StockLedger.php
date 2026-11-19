@@ -29,7 +29,8 @@ final class StockLedger
      */
     public function move(string $companyId, string $baseCurrency, string $itemId, string $warehouseId, DateTimeImmutable $date, string $kind,
         string $quantity, string $unitCost, ?string $reference, ?string $documentId, ?string $userId, ?string $amount = null, ?string $transferGroup = null,
-        ?string $projectId = null, ?string $goodsReceiptId = null, ?string $deliveryNoteId = null, ?string $batchId = null, ?array $batch = null): array
+        ?string $projectId = null, ?string $goodsReceiptId = null, ?string $deliveryNoteId = null, ?string $batchId = null, ?array $batch = null,
+        ?string $assemblyBuildId = null): array
     {
         $out = str_starts_with(trim($quantity), '-');
         // The database refuses stock going below zero (024); saying so here gives the person a clear answer.
@@ -54,6 +55,7 @@ final class StockLedger
             'goods_receipt_id' => $goodsReceiptId,   // the goods received note's own moves (069)
             'delivery_note_id' => $deliveryNoteId,   // the delivery note's own moves (071)
             'batch_id' => $b,   // 074
+            'assembly_build_id' => $assemblyBuildId,   // the build's own moves (087)
         ];
 
         if (! $tracked) {
