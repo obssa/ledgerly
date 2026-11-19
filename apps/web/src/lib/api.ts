@@ -1776,6 +1776,8 @@ export const ledgerly = {
     api<{ data: (Invoice & { original?: { id: string; number: string | null } | null })[] }>("credit-notes", ctx),
   holdRetention: (id: string, body: { amount?: string; percent?: string; held_on: string }, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/retention`, { ...ctx, method: "POST", body }),
+  batchInvoice: (id: string, body: { contact_ids: string[]; issue_date: string; post: boolean }, ctx: RequestOptions) =>
+    api<{ data: { id: string; number: string | null; status: string; contact: string; total: string }[] }>(`invoices/${encodeURIComponent(id)}/batch`, { ...ctx, method: "POST", body }),
   lateInterest: (id: string, ctx: RequestOptions) => api<LateInterestPreview>(`invoices/${encodeURIComponent(id)}/interest`, ctx),
   chargeInterest: (id: string, body: { through: string }, ctx: RequestOptions) =>
     api<{ id: string; number: string | null }>(`invoices/${encodeURIComponent(id)}/interest`, { ...ctx, method: "POST", body }),

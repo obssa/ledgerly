@@ -152,6 +152,22 @@ export async function reverseBadDebt(_: FormState | undefined, form: FormData): 
   return { notice: "Reversed: the customer owes it again." };
 }
 
+/** Module 2: batch invoices: this invoice's lines to each customer ticked, one invoice each, all or none. */
+export async function batchInvoice(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const contactIds = form.getAll("contact_ids").filter((v): v is string => typeof v === "string" && v !== "");
+  if (contactIds.length === 0) return { error: "Tick at least one customer." };
+  let made: { data: { number: string | null }[] };
+  try {
+    made = await ledgerly.batchInvoice(text(form, "id") ?? "", { contact_ids: contactIds, issue_date: text(form, "issue_date") ?? "", post: form.get("post") === "on" }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  const n = made.data.length;
+  return { notice: `${n} invoice${n === 1 ? "" : "s"} made${made.data.some((m) => m.number) ? `: ${made.data.map((m) => m.number).filter(Boolean).join(", ")}` : " as drafts"}.` };
+}
+
 /** Module 2: charges interest on late payment of this invoice on a new draft invoice, and opens it. */
 export async function chargeInterest(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

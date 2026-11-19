@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanySettings, getInvoice, getMoneyAccounts, getOpenInvoices, getLateInterest, getWriteOffs } from "@/lib/data";
+import { getCompanySettings, getInvoice, getMoneyAccounts, getOpenInvoices, getLateInterest, getWriteOffs, getCustomerChoices } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { ApplyCredit } from "./ApplyCredit";
@@ -9,6 +9,7 @@ import { Reminders } from "./Reminders";
 import { RetentionPanel } from "./RetentionPanel";
 import { BadDebtPanel } from "./BadDebtPanel";
 import { InterestPanel } from "./InterestPanel";
+import { BatchInvoice } from "./BatchInvoice";
 import { InvoiceActions } from "./InvoiceActions";
 import { PrintInvoice, SendInvoice } from "./SendInvoice";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
@@ -32,6 +33,8 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const [invoice, company] = await Promise.all([getInvoice(id), getCompanySettings()]);
   if (!invoice) notFound();
   const writeOffs = invoice.type === "invoice" && !invoice.demo && ["posted", "part_paid", "paid"].includes(invoice.status) ? await getWriteOffs(invoice.id) : null;
+  const batchable = invoice.type === "invoice" && !invoice.demo && invoice.can.credit && invoice.status !== "void";
+  const customers = batchable ? await getCustomerChoices() : [];
   const interest = invoice.type === "invoice" && !invoice.demo && ["posted", "part_paid", "paid"].includes(invoice.status) ? await getLateInterest(invoice.id) : null;
   const creditNote = invoice.type === "credit_note";
   const status = creditNote && invoice.status === "paid" ? { label: "Applied", tone: "good" as const }
@@ -146,6 +149,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
           {!creditNote && !invoice.demo && invoice.can.credit && invoice.status !== "void" && (
             <RepeatInvoice invoiceId={invoice.id} canPost={invoice.can.approve} />
           )}
+          {batchable && customers.length > 0 && <BatchInvoice invoiceId={invoice.id} customers={customers} canPost={invoice.can.approve} />}
           {interest && (interest.charged.length > 0 || (interest.rate !== null && interest.can.charge && Number(interest.amount) > 0)) && (
             <InterestPanel invoiceId={invoice.id} interest={interest} />
           )}

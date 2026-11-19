@@ -691,6 +691,20 @@ export async function getBinCard(q: { item_id: string; warehouse_id: string; fro
  * The suppliers a form offers to choose from (an item's preferred supplier, 075), or none for a role that may not read
  * contacts: the form still opens, and the API checks again on save.
  */
+/** Active customers to choose from, or none for a role that cannot list them (a 403 never breaks the page). */
+export async function getCustomerChoices(): Promise<{ id: string; name: string }[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return withApi(async (ctx) => {
+    try {
+      return (await ledgerly.customers({}, ctx)).data.map((c) => ({ id: c.id, name: c.name }));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) return [];
+      throw error;
+    }
+  });
+}
+
 export async function getSupplierChoices(): Promise<{ id: string; name: string }[]> {
   await connection();
   if (isDemoMode()) return [];
