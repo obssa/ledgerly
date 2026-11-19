@@ -4633,6 +4633,46 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', f1::text, true);
   RAISE NOTICE 'PASS T113 an assembly is built from its parts, moving their value and making none';
 END $$;
+
+-- T114: goods received on notes go back on a supplier credit (088). A bill that billed 4 received bags (moving no stock
+-- itself) has 4 to send back: 3 go back, 2 more are refused. Company A as f1, supplier c8, item b1 in a1.
+DO $$
+DECLARE
+  c8 constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  po constant uuid := '00000000-0000-0000-0000-000000000fb0';
+  pl constant uuid := '00000000-0000-0000-0000-000000000fb1';
+  bill constant uuid := '00000000-0000-0000-0000-000000000fb2';
+  bl constant uuid := '00000000-0000-0000-0000-000000000fb3';
+  gr constant uuid := '00000000-0000-0000-0000-000000000fb4';
+  vc constant uuid := '00000000-0000-0000-0000-000000000fb5';
+  item constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total) VALUES (po, app_company_id(), 'purchase_order', c8, '2027-11-01', 'ETB', 400);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (pl, app_company_id(), po, 1, 'Coffee', 10, 40, acc, 400, item);
+  UPDATE documents SET status = 'accepted', number = 'PO-T114-1' WHERE id = po;
+  INSERT INTO goods_receipts (id, company_id, purchase_order_id, number, received_on, warehouse_id, created_by) VALUES (gr, app_company_id(), po, 'GRN-T114-1', '2027-11-02', wh, f1);
+  INSERT INTO goods_receipt_lines (company_id, goods_receipt_id, order_line_id, item_id, quantity, amount) VALUES (app_company_id(), gr, pl, item, 4, 160);
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id, total, amount_due) VALUES
+    (bill, app_company_id(), 'bill', c8, '2027-11-03', 'ETB', po, 160, 160);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (bl, app_company_id(), bill, 1, 'Coffee', 4, 40, acc, 160, item, pl);
+  INSERT INTO bill_receipt_matches (company_id, bill_id, bill_line_id, order_line_id, quantity, amount) VALUES (app_company_id(), bill, bl, pl, 4, 160);
+  UPDATE documents SET status = 'posted', number = 'BILL-T114-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = bill;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, original_document_id, restock) VALUES
+    (vc, app_company_id(), 'vendor_credit', c8, '2027-11-04', 'ETB', bill, true);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), item, wh, '2027-11-04', 'purchase_return', -3, 0, vc);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), item, wh, '2027-11-04', 'purchase_return', -2, 0, vc);
+    RAISE EXCEPTION 'FAIL T114: more went back than the bill billed from its goods received notes';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T114 goods received on notes go back on a supplier credit, never more than the bill billed';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

@@ -462,7 +462,13 @@ final class DocumentStock
         $warehouse = $this->warehouseFor($doc);
         $bill = Document::query()->findOrFail($doc->original_document_id);
         $received = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $bill->getKey(), 'kind' => 'purchase'])
-            ->get(['item_id', 'quantity'])->groupBy('item_id');
+            ->get(['item_id', 'quantity'])
+            // 088: goods the bill billed from goods received notes came in on the notes; they count as brought in by it.
+            ->concat(DB::table('bill_receipt_matches as m')->join('document_lines as bl', 'bl.id', '=', 'm.bill_line_id')
+                ->join('document_lines as ol', 'ol.id', '=', 'm.order_line_id')->where(['m.company_id' => $company->getKey(), 'm.bill_id' => $bill->getKey()])
+                ->get(['bl.item_id', 'm.quantity', 'ol.unit_factor'])
+                ->map(fn ($r) => (object) ['item_id' => $r->item_id, 'quantity' => self::baseQuantity((object) ['quantity' => (string) $r->quantity, 'unit_factor' => $r->unit_factor])]))
+            ->groupBy('item_id');
         $gone = DB::table('stock_moves as m')->join('documents as c', 'c.id', '=', 'm.document_id')
             ->where(['m.company_id' => $company->getKey(), 'c.type' => 'vendor_credit', 'c.original_document_id' => $bill->getKey()])
             ->whereIn('m.kind', ['purchase_return', 'purchase'])->get(['m.item_id', 'm.quantity'])->groupBy('item_id');
