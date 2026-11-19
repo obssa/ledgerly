@@ -127,6 +127,54 @@ export async function reviewStatementLine(_: FormState | undefined, form: FormDa
   return { notice: STEPS[step] };
 }
 
+/** 076: every line to review that a bank rule fits is categorised by it. */
+export async function applyBankRules(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let result: { categorised: number; skipped: { rule: string; reason: string }[] };
+  try {
+    result = await ledgerly.applyBankRules(text(form, "account_id") ?? "", ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  const skipped = result.skipped.length > 0 ? ` ${result.skipped.length} left to review: ${result.skipped[0].reason}` : "";
+  return { notice: `${result.categorised} line${result.categorised === 1 ? "" : "s"} categorised by the rules.${skipped}` };
+}
+
+/** 076: a new bank rule, or a change to one (id given). */
+export async function saveBankRule(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const body: Record<string, unknown> = {};
+  for (const f of ["name", "contains", "target_account_id", "direction", "memo"]) if (text(form, f)) body[f] = text(form, f);
+  for (const f of ["bank_account_id", "contact_id"]) body[f] = text(form, f) || null;
+  for (const f of ["amount_min", "amount_max"]) body[f] = (text(form, f) ?? "").replace(/[,\s]/g, "") || null;
+  if (text(form, "priority")) body.priority = Number(text(form, "priority"));
+  const id = text(form, "id");
+  try {
+    if (id) await ledgerly.updateBankRule(id, body, ctx);
+    else await ledgerly.createBankRule(body, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: id ? "Rule saved." : "Rule added. Lines to review that it fits show it as a suggestion." };
+}
+
+/** 076: a rule archived (it fits nothing), brought back, or deleted. */
+export async function bankRuleStep(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const id = text(form, "id") ?? "";
+  const step = text(form, "step");
+  try {
+    if (step === "delete") await ledgerly.deleteBankRule(id, ctx);
+    else await ledgerly.updateBankRule(id, { is_active: step === "restore" }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: step === "delete" ? "Rule deleted." : step === "restore" ? "Rule back in use." : "Rule archived: it fits nothing now." };
+}
+
 export async function startReconciliation(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   const accountId = text(form, "account_id") ?? "";

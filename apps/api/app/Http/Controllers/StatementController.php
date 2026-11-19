@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
+use App\Domain\Banking\BankRules;
 use App\Domain\Banking\Models\BankTransaction;
 use App\Domain\Banking\StatementCsv;
 use App\Domain\Ledger\ExchangeRates;
@@ -44,6 +45,7 @@ final class StatementController extends Controller
         private readonly PostingService $posting,
         private readonly StatementCsv $csv,
         private readonly ExchangeRates $rates,
+        private readonly BankRules $rules,
     ) {
     }
 
@@ -62,6 +64,7 @@ final class StatementController extends Controller
 
         $explained = $this->entriesFor($lines->pluck('journal_line_id')->filter()->values()->all());
         $suggestions = $this->suggestions($bankAccount, $lines->where('status', 'imported'));
+        $rules = $this->rules->active();   // 076: the bank rule that fits each line to review
 
         return response()->json([
             'account' => ['id' => $bankAccount->getKey(), 'code' => $bankAccount->code, 'name' => $bankAccount->name, 'currency' => $this->currencyOf($bankAccount)],
@@ -71,6 +74,7 @@ final class StatementController extends Controller
                 ...$this->present($t),
                 'entry' => $t->journal_line_id ? ($explained[$t->journal_line_id] ?? null) : null,
                 'suggestions' => $suggestions[$t->getKey()] ?? [],
+                'rule' => $t->status === 'imported' && ($r = $this->rules->fit($t, $rules)) !== null ? BankRules::present($r) : null,
             ])->values(),
             'can' => ['review' => (bool) $this->current->membership()?->can('banking.review')],
         ]);
@@ -151,11 +155,59 @@ final class StatementController extends Controller
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],   // a foreign-currency account's line: base per unit; else the day's rate
         ]);
         $this->assertToReview($statementLine);
+        $target = Account::query()->where('is_active', true)->find($data['account_id'])
+            ?? throw ValidationException::withMessages(['account_id' => ['Choose another active account of this company.']]);
+        $contact = isset($data['contact_id']) ? Contact::query()->find($data['contact_id']) : null;
+        if (isset($data['contact_id']) && $contact === null) {
+            throw ValidationException::withMessages(['contact_id' => ['Choose a customer or supplier of this company.']]);
+        }
+        $this->categoriseLine($statementLine, $target, $contact, $data['memo'] ?? null, $data['fx_rate'] ?? null, $request->user()->getKey());
+
+        return $this->show($statementLine);
+    }
+
+    /**
+     * 076: every line to review on the account that a bank rule fits is categorised by it, each through the same entry as
+     * categorising it by hand. A line the rule cannot categorise (no rate for its currency, an account no longer usable)
+     * stays to review, with the reason.
+     */
+    public function applyRules(Request $request, Account $bankAccount): JsonResponse
+    {
+        $this->authorizeCompany('banking.review');
+        $rules = $this->rules->active();
+        $lines = BankTransaction::query()->where(['account_id' => $bankAccount->getKey(), 'status' => 'imported'])->orderBy('posted_on')->orderBy('id')->limit(500)->get();
+        $done = 0;
+        $skipped = [];
+        foreach ($lines as $line) {
+            $r = $this->rules->fit($line, $rules);
+            if ($r === null) {
+                continue;
+            }
+            $target = Account::query()->where('is_active', true)->find($r->target_account_id);
+            $contact = $r->contact_id ? Contact::query()->find($r->contact_id) : null;
+            try {
+                if ($target === null) {
+                    throw ValidationException::withMessages(['account_id' => ["{$r->target_name} is no longer an active account."]]);
+                }
+                $this->categoriseLine($line, $target, $contact, $r->memo, null, $request->user()->getKey(), (string) $r->name);
+                $done++;
+            } catch (ValidationException $e) {
+                $skipped[] = ['line_id' => $line->getKey(), 'rule' => $r->name, 'reason' => collect($e->errors())->flatten()->first()];
+            } catch (\App\Domain\Ledger\Exceptions\LedgerException $e) {
+                $skipped[] = ['line_id' => $line->getKey(), 'rule' => $r->name, 'reason' => $e->getMessage()];   // a closed period, say
+            }
+        }
+
+        return response()->json(['categorised' => $done, 'skipped' => $skipped]);
+    }
+
+    /** One line categorised: a new entry, Dr or Cr the bank, the other side to the account given (027). */
+    private function categoriseLine(BankTransaction $statementLine, Account $target, ?Contact $contact, ?string $memoGiven, ?string $fxRate, string $userId, ?string $rule = null): void
+    {
         $company = $this->current->get();
         $bank = Account::query()->findOrFail($statementLine->account_id);
         $currency = $this->currencyOf($bank);
-        $target = Account::query()->where('is_active', true)->find($data['account_id']);
-        if ($target === null || $target->getKey() === $bank->getKey()) {
+        if ($target->getKey() === $bank->getKey()) {
             throw ValidationException::withMessages(['account_id' => ['Choose another active account of this company.']]);
         }
         // A bank, cash or wallet account without a currency of its own is in the base currency; other accounts take any.
@@ -166,16 +218,12 @@ final class StatementController extends Controller
         if (in_array($target->subtype, self::NOT_FOR_CATEGORISING, true)) {
             throw ValidationException::withMessages(['account_id' => ["{$target->name} is kept by its own documents: record a payment, bill or stock entry and match the line to it instead."]]);
         }
-        $contact = isset($data['contact_id']) ? Contact::query()->find($data['contact_id']) : null;
-        if (isset($data['contact_id']) && $contact === null) {
-            throw ValidationException::withMessages(['contact_id' => ['Choose a customer or supplier of this company.']]);
-        }
 
         // A foreign-currency account's line is in its currency, entered at the day's rate (or the one given).
         $base = $company->base_currency;
-        $rate = $currency === $base ? '1' : $this->rates->forDocument($company, $currency, substr((string) $statementLine->posted_on, 0, 10), $data['fx_rate'] ?? null);
+        $rate = $currency === $base ? '1' : $this->rates->forDocument($company, $currency, substr((string) $statementLine->posted_on, 0, 10), $fxRate);
         $amount = Money::of($this->decimal($statementLine->amount), $currency);
-        $memo = $data['memo'] ?? $statementLine->description;
+        $memo = $memoGiven ?? $statementLine->description;
         $draft = new JournalDraft($company->getKey(), new DateTimeImmutable($statementLine->posted_on), $base, $currency,
             $rate, mb_substr($memo, 0, 255), 'bank_transaction', $statementLine->getKey());
         $in = ! $amount->isNegative();
@@ -186,17 +234,14 @@ final class StatementController extends Controller
         $draft->add($in ? JournalLineDraft::credit($target->getKey(), $size, $txn, $memo, $contact?->getKey())
             : JournalLineDraft::debit($target->getKey(), $size, $txn, $memo, $contact?->getKey()));
 
-        $userId = $request->user()->getKey();
-        DB::transaction(function () use ($draft, $userId, $statementLine, $bank, $target, $amount, $size) {
+        DB::transaction(function () use ($draft, $userId, $statementLine, $bank, $target, $amount, $size, $rule) {
             $entry = $this->posting->post($draft, $userId);
             $bankLine = DB::table('journal_lines')->where(['company_id' => $entry->company_id, 'journal_entry_id' => $entry->getKey(), 'account_id' => $bank->getKey()])->value('id');
             $this->explain($statementLine, 'categorised', $bankLine);
             $this->audit->record($this->current->id(), 'statement_line_categorised', 'bank_transaction', $statementLine->getKey(), null,
                 ['account' => "{$target->code} {$target->name}", 'amount' => $amount->toDecimalString(), 'currency' => $amount->currency,
-                    'base' => $size->toDecimalString(), 'journal_entry' => $entry->number], userId: $userId);
+                    'base' => $size->toDecimalString(), 'journal_entry' => $entry->number, ...($rule !== null ? ['rule' => $rule] : [])], userId: $userId);
         });
-
-        return $this->show($statementLine);
     }
 
     /** Leave the line out of the books, saying why: a duplicate, a line of another account, a hold the bank released. */

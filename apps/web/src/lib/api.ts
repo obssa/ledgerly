@@ -219,6 +219,15 @@ export interface StatementLine {
   source: string;
   entry: { id: string; number: number; date: string; memo: string | null; source_type: string; status: string } | null;
   suggestions?: { journal_line_id: string; entry: number; date: string; memo: string | null; description: string | null; contact: string | null; source_type: string; days_apart: number }[];
+  /** 076: the bank rule that fits a line to review: where it would categorise it. */
+  rule?: { rule_id: string; name: string; account: { id: string; code: string; name: string }; contact: { id: string; name: string } | null; memo: string | null } | null;
+}
+
+/** A bank rule (076): how a kind of statement line is categorised. */
+export interface BankRule {
+  id: string; name: string; bank_account_id: string | null; bank_account: string | null; direction: "in" | "out" | "any"; contains: string;
+  amount_min: string | null; amount_max: string | null; target_account_id: string; target_code: string; target_name: string;
+  contact_id: string | null; contact_name: string | null; memo: string | null; priority: number; is_active: boolean;
 }
 
 export interface StatementLines {
@@ -1657,6 +1666,12 @@ export const ledgerly = {
     api<{ discarded: boolean }>(`reconciliations/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE", body: { reason } }),
   importStatement: (id: string, body: { csv: string; file_name?: string }, ctx: RequestOptions) =>
     api<{ imported: number; skipped: number; from: string; to: string }>(`bank-accounts/${encodeURIComponent(id)}/statements`, { ...ctx, method: "POST", body }),
+  bankRules: (ctx: RequestOptions) => api<{ data: BankRule[]; can: { manage: boolean } }>("bank-rules", ctx),
+  createBankRule: (body: Record<string, unknown>, ctx: RequestOptions) => api<BankRule>("bank-rules", { ...ctx, method: "POST", body }),
+  updateBankRule: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<BankRule>(`bank-rules/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  deleteBankRule: (id: string, ctx: RequestOptions) => api<{ deleted: boolean }>(`bank-rules/${encodeURIComponent(id)}`, { ...ctx, method: "DELETE" }),
+  applyBankRules: (accountId: string, ctx: RequestOptions) =>
+    api<{ categorised: number; skipped: { line_id: string; rule: string; reason: string }[] }>(`bank-accounts/${encodeURIComponent(accountId)}/apply-rules`, { ...ctx, method: "POST", body: {} }),
   reviewStatementLine: (id: string, step: "match" | "categorise" | "exclude" | "undo", body: Record<string, unknown>, ctx: RequestOptions) =>
     api<StatementLine>(`statement-lines/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   depositReceipts: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ number: number }>("banking/deposits", { ...ctx, method: "POST", body }),

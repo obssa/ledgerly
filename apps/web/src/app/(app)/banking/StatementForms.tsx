@@ -3,7 +3,8 @@
 import { useActionState } from "react";
 import type { Account, StatementLine } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
-import { importStatement, reviewStatementLine } from "./actions";
+import Link from "next/link";
+import { applyBankRules, importStatement, reviewStatementLine } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-2 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -36,6 +37,19 @@ export function ImportStatement({ accountId }: { accountId: string }) {
         <textarea className="field min-h-[120px] font-mono text-[13px]" id="csv" name="csv" placeholder={"Date,Description,Reference,Debit,Credit,Balance\n05/11/2026,Service charge,,15.00,,14987.45"} />
       </details>
       <div><button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Importing…" : "Import statement"}</button></div>
+    </form>
+  );
+}
+
+/** 076: categorise every line to review that a bank rule fits. */
+export function ApplyRules({ accountId }: { accountId: string }) {
+  const [state, action, pending] = useActionState(applyBankRules, undefined);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="account_id" value={accountId} />
+      <button type="submit" className="btn" disabled={pending}>{pending ? "Applying…" : "Apply the rules"}</button>
+      <Link href="/banking/rules" className="text-[13px] text-brand underline">Bank rules</Link>
+      <Message state={state} />
     </form>
   );
 }
@@ -81,6 +95,17 @@ export function ReviewLine({ line, accounts, canReview, foreign }: {
   return (
     <div className="grid gap-2">
       <Message state={state} />
+      {line.rule && (
+        // 076: the bank rule that fits, one press to categorise by it.
+        <form action={action} className="flex flex-wrap items-center gap-2 rounded-lg bg-brand-tint px-2 py-1.5 text-[13px]">
+          {hidden("categorise")}
+          <input type="hidden" name="account_id" value={line.rule.account.id} />
+          {line.rule.contact && <input type="hidden" name="contact_id" value={line.rule.contact.id} />}
+          {line.rule.memo && <input type="hidden" name="memo" value={line.rule.memo} />}
+          <span className="min-w-0 flex-1">Rule <span className="font-semibold">{line.rule.name}</span>: to <span className="num">{line.rule.account.code}</span> {line.rule.account.name}{line.rule.contact ? ` · ${line.rule.contact.name}` : ""}</span>
+          <button type="submit" className="btn !py-1" disabled={pending}>Categorise by the rule</button>
+        </form>
+      )}
       {(line.suggestions ?? []).length > 0 ? (
         <form action={action} className="grid gap-1.5">
           {hidden("match")}
@@ -117,6 +142,10 @@ export function ReviewLine({ line, accounts, canReview, foreign }: {
           )}
           <button type="submit" className="btn btn-primary" disabled={pending}>Post</button>
         </form>
+        {!line.rule && (
+          <Link href={`/banking/rules?contains=${encodeURIComponent(line.description.slice(0, 120))}&account=${encodeURIComponent(line.account_id)}&direction=${line.amount.startsWith("-") ? "out" : "in"}`}
+            className="mt-1 inline-block text-[13px] text-brand underline">Make a rule for lines like this</Link>
+        )}
       </details>
       <details>
         <summary className="cursor-pointer text-[13px] font-semibold text-brand">Exclude</summary>

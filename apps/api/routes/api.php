@@ -29,6 +29,7 @@ use App\Http\Controllers\QuoteLinkController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
+use App\Http\Controllers\BankRuleController;
 use App\Http\Controllers\DeliveryNoteController;
 use App\Http\Controllers\GoodsReceiptController;
 use App\Http\Controllers\PurchaseOrderController;
@@ -435,6 +436,11 @@ Route::prefix('v1')->group(function () {
             Route::post('statement-lines/{statementLine}/categorise', [StatementController::class, 'categorise']);
             Route::post('statement-lines/{statementLine}/exclude', [StatementController::class, 'exclude']);
             Route::post('statement-lines/{statementLine}/undo', [StatementController::class, 'undo']);
+            Route::post('bank-accounts/{bankAccount}/apply-rules', [StatementController::class, 'applyRules']);   // 076
+            Route::get('bank-rules', [BankRuleController::class, 'index']);
+            Route::post('bank-rules', [BankRuleController::class, 'store']);
+            Route::put('bank-rules/{bankRule}', [BankRuleController::class, 'update'])->whereUuid('bankRule');
+            Route::delete('bank-rules/{bankRule}', [BankRuleController::class, 'destroy'])->whereUuid('bankRule');
             Route::get('bank-accounts/{bankAccount}/reconciliations', [ReconciliationController::class, 'index']);
             Route::post('bank-accounts/{bankAccount}/reconciliations', [ReconciliationController::class, 'store']);
             Route::get('reconciliations/{reconciliation}', [ReconciliationController::class, 'show']);

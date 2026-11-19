@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCompanySettings, getStatement } from "@/lib/data";
 import { STATEMENT_TABS, categorisable, signed, statementTab } from "@/lib/statements";
-import { ImportStatement, ReviewLine } from "../../StatementForms";
+import { ApplyRules, ImportStatement, ReviewLine } from "../../StatementForms";
 
 export const metadata = { title: "Statement" };
 
@@ -37,6 +37,9 @@ export default async function StatementPage({ params, searchParams }: PageProps<
           );
         })}
       </nav>
+      {lines.can.review && tab === "imported" && lines.data.some((l) => l.rule) && (
+        <div className="mb-3"><ApplyRules accountId={id} /></div>
+      )}
       <Card className="!p-2" label="Lines">
         <div className="overflow-x-auto">
           <table className="tbl">
