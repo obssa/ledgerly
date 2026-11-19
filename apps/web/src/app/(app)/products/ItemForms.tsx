@@ -29,6 +29,7 @@ export function ItemForm({ item, readOnly = false, suppliers = [] }: { item?: It
         <legend className="sr-only">Item</legend>
         <Field name="name" label="Name" defaultValue={item?.name} invalid={bad("name")} />
         <Field name="sku" label="SKU or code" defaultValue={item?.sku ?? ""} invalid={bad("sku")} />
+        <Field name="barcode" label="Barcode (optional)" defaultValue={item?.barcode ?? ""} invalid={bad("barcode")} />
         <div>
           <label className="field-label" htmlFor="type">Type</label>
           <select className={`field ${bad("type") ? "!border-bad" : ""}`} id="type" name="type" defaultValue={item?.type ?? "inventory"}>

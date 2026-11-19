@@ -26,6 +26,7 @@ const amount = (v: string | undefined) => (v ?? "").replace(/[,\s]/g, "");
 function itemBody(form: FormData): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   for (const name of ["name", "sku", "type", "unit", "costing", "tracking"]) if (form.has(name)) body[name] = text(form, name) ?? (name === "sku" ? null : "");
+  if (form.has("barcode")) body.barcode = text(form, "barcode") || null;   // 085
   for (const name of ["sale_price", "purchase_price", "reorder_point", "max_level"]) if (form.has(name)) body[name] = amount(text(form, name)) || null;
   if (form.has("preferred_supplier_id")) body.preferred_supplier_id = text(form, "preferred_supplier_id") || null;   // 075
   return body;
@@ -74,7 +75,7 @@ export async function setBundleParts(_: FormState | undefined, form: FormData): 
 export async function addItemUnit(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   try {
-    await ledgerly.addItemUnit(text(form, "id") ?? "", { name: text(form, "name") ?? "", factor: amount(text(form, "factor")) }, ctx);
+    await ledgerly.addItemUnit(text(form, "id") ?? "", { name: text(form, "name") ?? "", factor: amount(text(form, "factor")), barcode: text(form, "barcode") || null }, ctx);
   } catch (error) {
     return refusal(error);
   }

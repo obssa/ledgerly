@@ -636,7 +636,9 @@ export interface Item {
   value?: string;
   balances?: { warehouse: { id: string; name: string }; quantity: string; value: string }[];
   /** 072: other units it is bought or sold in, each a fixed number of its own (archived ones on the item's own page only). */
-  units?: { id: string; name: string; factor: string; is_active?: boolean }[];
+  units?: { id: string; name: string; factor: string; is_active?: boolean; barcode?: string | null }[];
+  /** 085: the barcode printed on it. */
+  barcode?: string | null;
   /** 073: a bundle's parts, each with its quantity per bundle in its own unit. */
   components?: { item_id: string; name: string; type: string; unit: string; quantity: string }[] | null;
   can?: { edit: boolean; adjust: boolean; components?: boolean };
@@ -1695,7 +1697,7 @@ export const ledgerly = {
   updateItem: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   setItemComponents: (id: string, components: { item_id: string; quantity: string }[], ctx: RequestOptions) =>
     api<Item>(`items/${encodeURIComponent(id)}/components`, { ...ctx, method: "PUT", body: { components } }),
-  addItemUnit: (id: string, body: { name: string; factor: string }, ctx: RequestOptions) =>
+  addItemUnit: (id: string, body: { name: string; factor: string; barcode?: string | null }, ctx: RequestOptions) =>
     api<Item>(`items/${encodeURIComponent(id)}/units`, { ...ctx, method: "POST", body }),
   archiveItemUnit: (id: string, unitId: string, ctx: RequestOptions) =>
     api<Item>(`items/${encodeURIComponent(id)}/units/${encodeURIComponent(unitId)}/archive`, { ...ctx, method: "POST", body: {} }),

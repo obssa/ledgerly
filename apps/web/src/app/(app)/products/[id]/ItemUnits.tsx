@@ -30,7 +30,7 @@ export function ItemUnits({ item }: { item: Item }) {
         <ul className="mt-2 text-sm">
           {units.map((u) => (
             <li key={u.id} className="flex items-center justify-between gap-2 border-t border-line py-1.5">
-              <span>{u.name} <span className="num text-muted">= {Number(u.factor)} {item.unit}</span>{u.is_active === false && <span className="ml-1 text-muted">(archived)</span>}</span>
+              <span>{u.name} <span className="num text-muted">= {Number(u.factor)} {item.unit}</span>{u.barcode && <span className="num ml-1 text-[12px] text-muted">· {u.barcode}</span>}{u.is_active === false && <span className="ml-1 text-muted">(archived)</span>}</span>
               {edit && u.is_active !== false && (
                 <form action={archive}>
                   <input type="hidden" name="id" value={item.id} />
@@ -53,6 +53,10 @@ export function ItemUnits({ item }: { item: Item }) {
             <div>
               <label className="field-label" htmlFor="unit-factor">{item.unit} in one</label>
               <input className="field num" id="unit-factor" name="factor" inputMode="decimal" placeholder="12" required />
+            </div>
+            <div className="col-span-2">
+              <label className="field-label" htmlFor="unit-barcode">Its barcode (optional)</label>
+              <input className="field num" id="unit-barcode" name="barcode" maxLength={64} />
             </div>
           </div>
           {flash(added)}
