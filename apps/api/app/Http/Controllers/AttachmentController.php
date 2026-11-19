@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Files\Attachments;
+use App\Domain\Ledger\Models\JournalEntry;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Http\JsonResponse;
@@ -30,10 +31,38 @@ final class AttachmentController extends Controller
         'bill' => ['bills.view', 'bills.create'], 'vendor_credit' => ['bills.view', 'bills.create'],
         'expense' => ['expenses.view', 'expenses.create'],
         'expense_claim' => ['expenses.claim', 'expenses.claim'],   // 083: the claimant's own claim only (see ownClaim)
+        'journal' => ['accounting.view', 'journals.create'],   // 086: a journal entry's files
     ];
 
     public function __construct(private readonly CurrentCompany $current, private readonly Attachments $files, private readonly AuditLogger $audit)
     {
+    }
+
+    /** 086: the files kept with a journal entry. */
+    public function indexJournal(JournalEntry $entry): JsonResponse
+    {
+        $this->authorizeCompany(self::PERMISSIONS['journal'][0]);
+
+        return response()->json([
+            'data' => DB::table('attachments as a')->join('users as u', 'u.id', '=', 'a.created_by')
+                ->where(['a.company_id' => $entry->company_id, 'a.journal_entry_id' => $entry->getKey()])->whereNull('a.removed_at')
+                ->orderBy('a.created_at')->get(['a.id', 'a.file_name', 'a.content_type', 'a.size_bytes', 'a.created_at', 'u.name as added_by']),
+            'can' => ['add' => (bool) $this->current->membership()?->can(self::PERMISSIONS['journal'][1])],
+        ]);
+    }
+
+    public function storeJournal(Request $request, JournalEntry $entry): JsonResponse
+    {
+        $this->authorizeCompany(self::PERMISSIONS['journal'][1]);
+        $request->validate(['file' => ['required', 'file', 'max:' . intdiv((int) config('attachments.max_bytes'), 1024)]],
+            ['file.max' => 'A file of 10 MB at most.', 'file.required' => 'Choose the file to attach.']);
+        $key = 'attachments:' . $request->user()->getKey();
+        if (RateLimiter::tooManyAttempts($key, (int) config('attachments.per_hour'))) {
+            throw ValidationException::withMessages(['file' => ['Many files were attached in the last hour: try again later.']]);
+        }
+        RateLimiter::hit($key, 3600);
+
+        return response()->json($this->files->store($entry, $request->file('file'), $request->user()->getKey()), 201);
     }
 
     public function index(Request $request, Document $document): JsonResponse
@@ -98,8 +127,11 @@ final class AttachmentController extends Controller
     /** The permission an attachment needs (0 to see it, 1 to change it), by its document's kind; not found: invoices (then 404). */
     private function permissionFor(string $id, int $which): string
     {
-        $doc = Str::isUuid($id) ? DB::table('attachments as a')->join('documents as d', 'd.id', '=', 'a.document_id')
-            ->where(['a.company_id' => $this->current->id(), 'a.id' => $id])->first(['d.type', 'd.claimed_by']) : null;
+        $doc = Str::isUuid($id) ? DB::table('attachments as a')->leftJoin('documents as d', 'd.id', '=', 'a.document_id')
+            ->where(['a.company_id' => $this->current->id(), 'a.id' => $id])->first(['d.type', 'd.claimed_by', 'a.journal_entry_id']) : null;
+        if ($doc !== null && $doc->journal_entry_id !== null) {
+            return self::PERMISSIONS['journal'][$which];   // 086
+        }
         // 083: a receipt on one's own expense claim is the claimant's to see and remove.
         if ($doc !== null && $doc->claimed_by !== null && $doc->claimed_by === auth()->id() && ! $this->current->membership()?->can(self::PERMISSIONS['bill'][$which])) {
             return 'expenses.claim';
@@ -118,9 +150,11 @@ final class AttachmentController extends Controller
 
     private function live(string $id): object
     {
-        $a = Str::isUuid($id) ? DB::table('attachments as a')->join('documents as d', 'd.id', '=', 'a.document_id')
+        $a = Str::isUuid($id) ? DB::table('attachments as a')->leftJoin('documents as d', 'd.id', '=', 'a.document_id')
             ->where(['a.company_id' => $this->current->id(), 'a.id' => $id])->whereNull('a.removed_at')
-            ->first(['a.id', 'a.company_id', 'a.document_id', 'a.file_name', 'a.content_type', 'a.storage_key', 'd.type']) : null;
+            // 086: a journal entry's file names the entry where a document's names the document.
+            ->selectRaw("a.id, a.company_id, coalesce(a.document_id, a.journal_entry_id) AS document_id, a.file_name, a.content_type, a.storage_key, coalesce(d.type, 'journal_entry') AS type")
+            ->first() : null;
         if ($a === null) {
             abort(404);
         }

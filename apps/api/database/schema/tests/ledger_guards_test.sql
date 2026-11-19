@@ -4525,6 +4525,52 @@ BEGIN
   UPDATE items SET barcode = NULL WHERE id = b1;
   RAISE NOTICE 'PASS T111 a barcode names one item or one unit within a company';
 END $$;
+
+-- T112: attachments on journal entries (086). An attachment belongs to exactly one thing of the company, a document or a
+-- journal entry; another company's entry is refused; a journal entry keeps at most 20; another company sees none.
+-- Company A as f1, entry e001.
+DO $$
+DECLARE
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  e1 constant uuid := '00000000-0000-0000-0000-00000000e001';
+  eb uuid;
+  i int;
+BEGIN
+  eb := gen_random_uuid();   -- not one of company A's entries (another company's, or none)
+  BEGIN
+    INSERT INTO attachments (company_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), 'nothing.pdf', 'application/pdf', 10, repeat('a', 64), repeat('1', 40), f1);
+    RAISE EXCEPTION 'FAIL T112a: an attachment belonged to nothing';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO attachments (company_id, document_id, journal_entry_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), (SELECT id FROM documents WHERE company_id = app_company_id() LIMIT 1), e1, 'both.pdf', 'application/pdf', 10, repeat('a', 64), repeat('2', 40), f1);
+    RAISE EXCEPTION 'FAIL T112b: an attachment belonged to a document and a journal entry';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO attachments (company_id, journal_entry_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), eb, 'theirs.pdf', 'application/pdf', 10, repeat('a', 64), repeat('3', 40), f1);
+    RAISE EXCEPTION 'FAIL T112c: an attachment was put on a journal entry that is not the company''s';
+  EXCEPTION WHEN check_violation OR foreign_key_violation THEN NULL; END;
+
+  FOR i IN 1..20 LOOP
+    INSERT INTO attachments (company_id, journal_entry_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), e1, 'minute-' || i || '.pdf', 'application/pdf', 10, repeat('a', 64), lpad(to_hex(4000 + i), 40, 'b'), f1);
+  END LOOP;
+  BEGIN
+    INSERT INTO attachments (company_id, journal_entry_id, file_name, content_type, size_bytes, sha256, storage_key, created_by)
+      VALUES (app_company_id(), e1, 'minute-21.pdf', 'application/pdf', 10, repeat('a', 64), repeat('c', 40), f1);
+    RAISE EXCEPTION 'FAIL T112d: a journal entry kept more than 20 attachments';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE attachments SET removed_at = now(), removed_by = f1 WHERE journal_entry_id = e1 AND removed_at IS NULL;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM attachments WHERE journal_entry_id = e1) THEN
+    RAISE EXCEPTION 'FAIL T112e: company B saw company A''s journal attachments';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', f1::text, true);
+  RAISE NOTICE 'PASS T112 an attachment belongs to one document or journal entry of the company, at most 20 each';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

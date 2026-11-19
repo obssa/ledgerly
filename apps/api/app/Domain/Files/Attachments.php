@@ -66,7 +66,7 @@ final class Attachments
     }
 
     /** @return array<string, mixed> the attachment as listed */
-    public function store(Document $document, UploadedFile $file, string $userId): array
+    public function store(Document|\App\Domain\Ledger\Models\JournalEntry $document, UploadedFile $file, string $userId): array
     {
         $max = (int) config('attachments.max_bytes');
         $size = (int) $file->getSize();
@@ -95,7 +95,9 @@ final class Attachments
         @chmod($path, 0600);
 
         $id = (string) Str::uuid7();
-        $row = ['id' => $id, 'company_id' => $document->company_id, 'document_id' => $document->getKey(), 'file_name' => self::cleanName($file->getClientOriginalName(), $type),
+        // 086: a journal entry's files are kept as a document's are.
+        $journal = $document instanceof \App\Domain\Ledger\Models\JournalEntry;
+        $row = ['id' => $id, 'company_id' => $document->company_id, ($journal ? 'journal_entry_id' : 'document_id') => $document->getKey(), 'file_name' => self::cleanName($file->getClientOriginalName(), $type),
             'content_type' => $type, 'size_bytes' => strlen($bytes), 'sha256' => hash('sha256', $bytes), 'storage_key' => $key, 'created_by' => $userId];
         try {
             DB::table('attachments')->insert($row);
@@ -106,7 +108,7 @@ final class Attachments
             }
             throw $e;
         }
-        $this->audit->record($document->company_id, 'attachment_added', (string) $document->type, $document->getKey(), null,
+        $this->audit->record($document->company_id, 'attachment_added', $journal ? 'journal_entry' : (string) $document->type, $document->getKey(), null,
             ['attachment' => $id, 'file_name' => $row['file_name'], 'content_type' => $type, 'size_bytes' => $row['size_bytes'], 'sha256' => $row['sha256']], userId: $userId);
 
         return ['id' => $id, 'file_name' => $row['file_name'], 'content_type' => $type, 'size_bytes' => $row['size_bytes']];

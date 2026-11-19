@@ -5,6 +5,7 @@ import type { JournalDetail } from "@/lib/api";
 import { getJournalEntry } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ReverseJournal } from "../JournalForms";
+import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
 
 export const metadata = { title: "Journal entry" };
 
@@ -21,8 +22,9 @@ function sourceHref(e: JournalDetail): string | null {
 }
 
 /** Module 6: one entry of the books, its lines and dimensions, where it came from, and its reversal. */
-export default async function JournalEntryPage({ params }: PageProps<"/journal/[id]">) {
+export default async function JournalEntryPage({ params, searchParams }: PageProps<"/journal/[id]">) {
   const { id } = await params;
+  const { attachment } = await searchParams;
   const e = await getJournalEntry(id);
   if (!e) notFound();
   const from = sourceHref(e);
@@ -63,6 +65,8 @@ export default async function JournalEntryPage({ params }: PageProps<"/journal/[
           </table>
         </div>
       </Card>
+      {/* 086: the files behind the entry: a board minute, a loan schedule, the bank's letter. */}
+      <div className="mb-4 max-w-[600px]"><AttachmentsPanel kind="journal" documentId={e.id} flag={typeof attachment === "string" ? attachment : undefined} /></div>
       {e.can.reverse && (
         <Card className="max-w-[900px]" label="Reverse">
           <h2 className="mb-1 text-[15px] font-bold">Reverse this entry</h2>

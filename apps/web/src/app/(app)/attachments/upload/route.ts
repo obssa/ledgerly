@@ -7,7 +7,7 @@ import { getSession } from "@/lib/session";
  * taken (the session cookie is SameSite=Lax, and the Origin is checked). The API decides the file's type by its content
  * and checks the permission. The page is opened again with a fixed flag, never text from the request.
  */
-const PAGE: Record<AttachmentKind, string> = { invoice: "/invoices", bill: "/bills", expense: "/expenses", expense_claim: "/expense-claims" };
+const PAGE: Record<AttachmentKind, string> = { invoice: "/invoices", bill: "/bills", expense: "/expenses", expense_claim: "/expense-claims", journal: "/journal" };
 
 export async function POST(request: Request): Promise<Response> {
   const origin = request.headers.get("origin");
@@ -20,7 +20,7 @@ export async function POST(request: Request): Promise<Response> {
   const kind = form.get("kind");
   const id = form.get("document_id");
   const file = form.get("file");
-  if ((kind !== "invoice" && kind !== "bill" && kind !== "expense" && kind !== "expense_claim") || typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) {
+  if ((kind !== "invoice" && kind !== "bill" && kind !== "expense" && kind !== "expense_claim" && kind !== "journal") || typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) {
     return new Response("Not found.", { status: 404 });
   }
   const back = (flag: string) => new Response(null, { status: 303, headers: { Location: `${PAGE[kind]}/${encodeURIComponent(id)}?attachment=${flag}` } });

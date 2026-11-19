@@ -194,6 +194,7 @@ Route::prefix('v1')->group(function () {
                     Route::post("{$path}/{{$param}}/attachments", [AttachmentController::class, 'store'])->defaults('kind', $kind);
                 }
                 Route::post('sales-orders/{salesOrder}/email', [QuoteController::class, 'email']);
+                Route::post('journal-entries/{entry}/attachments', [AttachmentController::class, 'storeJournal']);   // 086
             });
             Route::put('company', [CompanySettingsController::class, 'update']);
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);
@@ -341,6 +342,7 @@ Route::prefix('v1')->group(function () {
             foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense'], 'expense-claims' => ['expenseClaim', 'expense_claim']] as $path => [$param, $kind]) {
                 Route::get("{$path}/{{$param}}/attachments", [AttachmentController::class, 'index'])->defaults('kind', $kind);
             }
+            Route::get('journal-entries/{entry}/attachments', [AttachmentController::class, 'indexJournal']);   // 086
             Route::get('attachments/{attachment}', [AttachmentController::class, 'download'])->whereUuid('attachment');
             Route::post('attachments/{attachment}/remove', [AttachmentController::class, 'remove'])->whereUuid('attachment');
             Route::post('quotes/{quote}/decline', [QuoteController::class, 'decline']);

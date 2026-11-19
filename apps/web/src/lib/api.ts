@@ -1406,8 +1406,8 @@ export interface Attachment {
   added_by: string;
 }
 
-export type AttachmentKind = "invoice" | "bill" | "expense" | "expense_claim";
-export const attachmentPath = (kind: AttachmentKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses", expense_claim: "expense-claims" })[kind];
+export type AttachmentKind = "invoice" | "bill" | "expense" | "expense_claim" | "journal";
+export const attachmentPath = (kind: AttachmentKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses", expense_claim: "expense-claims", journal: "journal-entries" })[kind];
 
 /** GET /expense-claims (083): what a member paid out of their own pocket, claimed back as a bill payable to them. */
 export interface ExpenseClaim {
