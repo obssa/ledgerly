@@ -1437,6 +1437,12 @@ export interface RequisitionList {
   data: (Omit<PurchaseRequisition, "lines" | "can" | "options" | "decided_by_name" | "decision_note" | "purchase_order_number"> & { lines: number })[];
   can: { see_all: boolean; approve: boolean; order: boolean };
 }
+/** GET /items/{id}/assembly (087): what one is made of, and the builds. */
+export interface ItemAssembly {
+  parts: { part_id: string; name: string; unit: string; quantity: string }[];
+  builds: { id: string; quantity: string; built_on: string; reference: string | null; value: string | null; warehouse: string; built_by: string }[];
+  can: { set_parts: boolean; build: boolean };
+}
 export interface ExpenseClaimList {
   data: ExpenseClaim[]; can: { see_all: boolean; approve: boolean };
   options: { accounts: { id: string; code: string; name: string }[]; tax_rates: { id: string; code: string; name: string }[] };
@@ -1703,6 +1709,11 @@ export const ledgerly = {
   item: (id: string, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, ctx),
   createItem: (body: Record<string, unknown>, ctx: RequestOptions) => api<Item>("items", { ...ctx, method: "POST", body }),
   updateItem: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<Item>(`items/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  itemAssembly: (id: string, ctx: RequestOptions) => api<ItemAssembly>(`items/${encodeURIComponent(id)}/assembly`, ctx),
+  setAssemblyParts: (id: string, parts: { item_id: string; quantity: string }[], ctx: RequestOptions) =>
+    api<{ parts: ItemAssembly["parts"] }>(`items/${encodeURIComponent(id)}/assembly`, { ...ctx, method: "PUT", body: { parts } }),
+  buildAssembly: (id: string, body: { warehouse_id: string; quantity: string; built_on: string; reference: string | null }, ctx: RequestOptions) =>
+    api<{ id: string; value: string }>(`items/${encodeURIComponent(id)}/builds`, { ...ctx, method: "POST", body }),
   setItemComponents: (id: string, components: { item_id: string; quantity: string }[], ctx: RequestOptions) =>
     api<Item>(`items/${encodeURIComponent(id)}/components`, { ...ctx, method: "PUT", body: { components } }),
   addItemUnit: (id: string, body: { name: string; factor: string; barcode?: string | null }, ctx: RequestOptions) =>

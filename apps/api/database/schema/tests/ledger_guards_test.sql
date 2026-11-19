@@ -4571,6 +4571,68 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', f1::text, true);
   RAISE NOTICE 'PASS T112 an attachment belongs to one document or journal entry of the company, at most 20 each';
 END $$;
+
+-- T113: assemblies (087). An assembly is a stock item made of other stock items; a build is of an assembly of the
+-- company and kept as made; its production moves name it and add up to no value; another company sees none of it.
+-- Company A as f1, warehouse a1; stock item b1 is a part.
+DO $$
+DECLARE
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  b1 constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  kit constant uuid := '00000000-0000-0000-0000-000000000fa0';
+  svc constant uuid := '00000000-0000-0000-0000-000000000fa1';
+  build constant uuid := '00000000-0000-0000-0000-000000000fa2';
+  out_value numeric;
+BEGIN
+  INSERT INTO items (id, company_id, name, type) VALUES (kit, app_company_id(), 'T113 gift box', 'inventory'), (svc, app_company_id(), 'T113 wrapping', 'service');
+  BEGIN
+    INSERT INTO assembly_builds (company_id, item_id, warehouse_id, quantity, built_on, created_by) VALUES (app_company_id(), kit, wh, 1, '2027-11-10', f1);
+    RAISE EXCEPTION 'FAIL T113a: something was built that has no parts';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_assembly_parts (company_id, assembly_id, part_id, quantity) VALUES (app_company_id(), kit, svc, 1);
+    RAISE EXCEPTION 'FAIL T113b: a service was a part of an assembly';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_assembly_parts (company_id, assembly_id, part_id, quantity) VALUES (app_company_id(), svc, b1, 1);
+    RAISE EXCEPTION 'FAIL T113c: a service was assembled';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO item_assembly_parts (company_id, assembly_id, part_id, quantity) VALUES (app_company_id(), kit, b1, 2);
+
+  INSERT INTO assembly_builds (id, company_id, item_id, warehouse_id, quantity, built_on, created_by) VALUES (build, app_company_id(), kit, wh, 1, '2027-11-10', f1);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), kit, wh, '2027-11-10', 'production', 1, 0);
+    RAISE EXCEPTION 'FAIL T113d: a production move named no build';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- The parts out at their cost, the box in at the sum of it.
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, assembly_build_id)
+    VALUES (app_company_id(), b1, wh, '2027-11-10', 'production', -2, 0, build);
+  SELECT -amount INTO out_value FROM stock_moves WHERE assembly_build_id = build AND quantity < 0;
+  -- Checked when the transaction commits; asked for now (pending checks run when the mode turns immediate).
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, amount, assembly_build_id)
+      VALUES (app_company_id(), kit, wh, '2027-11-10', 'production', 1, out_value + 1, out_value + 1, build);
+    SET CONSTRAINTS assembly_builds_balanced IMMEDIATE;
+    RAISE EXCEPTION 'FAIL T113e: a build made value out of nothing';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  SET CONSTRAINTS assembly_builds_balanced DEFERRED;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, amount, assembly_build_id)
+    VALUES (app_company_id(), kit, wh, '2027-11-10', 'production', 1, out_value, out_value, build);
+  SET CONSTRAINTS assembly_builds_balanced IMMEDIATE;   -- the balanced build passes
+  SET CONSTRAINTS assembly_builds_balanced DEFERRED;
+  BEGIN
+    UPDATE assembly_builds SET quantity = 2 WHERE id = build;
+    RAISE EXCEPTION 'FAIL T113f: a build was changed';
+  EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL; END;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM assembly_builds WHERE id = build) OR EXISTS (SELECT 1 FROM item_assembly_parts WHERE assembly_id = kit) THEN
+    RAISE EXCEPTION 'FAIL T113g: company B saw company A''s assembly';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', f1::text, true);
+  RAISE NOTICE 'PASS T113 an assembly is built from its parts, moving their value and making none';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

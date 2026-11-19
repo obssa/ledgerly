@@ -71,6 +71,38 @@ export async function setBundleParts(_: FormState | undefined, form: FormData): 
   return { notice: "Parts saved." };
 }
 
+/** 087: an assembly's parts, how many of each go into one. */
+export async function setAssemblyParts(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const parts: { item_id: string; quantity: string }[] = [];
+  for (const [key, value] of form.entries()) {
+    const m = /^part_item_(\d{1,2})$/.exec(key);
+    if (m && typeof value === "string" && value.trim() !== "") parts.push({ item_id: value.trim(), quantity: amount(text(form, `part_qty_${m[1]}`)) });
+  }
+  try {
+    await ledgerly.setAssemblyParts(text(form, "id") ?? "", parts, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Parts saved." };
+}
+
+/** 087: builds some of the assembly from its parts, at their cost. */
+export async function buildAssembly(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let value: string;
+  try {
+    value = (await ledgerly.buildAssembly(text(form, "id") ?? "", {
+      warehouse_id: text(form, "warehouse_id") ?? "", quantity: amount(text(form, "quantity")), built_on: text(form, "built_on") ?? "", reference: text(form, "reference") || null,
+    }, ctx)).value;
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: `Built, at a cost of ${value}.` };
+}
+
 /** 072: another unit the item is bought or sold in (a carton of 12); its name and size never change. */
 export async function addItemUnit(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

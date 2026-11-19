@@ -210,7 +210,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(327, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(330, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getItem, getItems, getSupplierChoices, getWarehouses } from "@/lib/data";
+import { getItem, getItemAssembly, getItems, getSupplierChoices, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { AdjustStock, ItemForm } from "../ItemForms";
 import { ItemUnits } from "./ItemUnits";
 import { BundleParts } from "./BundleParts";
+import { AssemblyPanel } from "./AssemblyPanel";
 
 export const metadata = { title: "Item" };
 
@@ -16,6 +17,9 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
   if (!item) notFound();
   const stock = item.type === "inventory";
   const choices = item.type === "bundle" ? (await getItems({})).data.filter((i) => i.type !== "bundle" && i.id !== item.id) : [];
+  // 087: a stock item counted without batches may be assembled from other stock items.
+  const assembled = stock && (item.tracking ?? "none") === "none";
+  const [assembly, stockItems] = assembled ? await Promise.all([getItemAssembly(item.id), getItems({ })]) : [null, null];
 
   return (
     <>
@@ -64,6 +68,13 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
         {item.type === "bundle" && (
           <Card className="min-w-0 flex-[1_1_360px]" label="Parts">
             <BundleParts item={item} choices={choices.map((i) => ({ id: i.id, name: i.name, unit: i.unit, type: i.type }))} />
+          </Card>
+        )}
+        {assembly && (assembly.parts.length > 0 || assembly.can.set_parts) && (
+          <Card className="min-w-0 flex-[1_1_360px]" label="Assembly">
+            <AssemblyPanel itemId={item.id} itemName={item.name} assembly={assembly}
+              choices={(stockItems?.data ?? []).filter((i) => i.type === "inventory" && i.id !== item.id).map((i) => ({ id: i.id, name: i.name, unit: i.unit }))}
+              warehouses={warehouses.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name }))} />
           </Card>
         )}
         {item.type !== "service" && (
