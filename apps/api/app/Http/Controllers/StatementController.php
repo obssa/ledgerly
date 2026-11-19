@@ -7,7 +7,7 @@ namespace App\Http\Controllers;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Banking\BankRules;
 use App\Domain\Banking\Models\BankTransaction;
-use App\Domain\Banking\StatementCsv;
+use App\Domain\Banking\StatementFormats;
 use App\Domain\Ledger\ExchangeRates;
 use App\Domain\Ledger\JournalDraft;
 use App\Domain\Ledger\JournalLineDraft;
@@ -43,7 +43,7 @@ final class StatementController extends Controller
         private readonly CurrentCompany $current,
         private readonly AuditLogger $audit,
         private readonly PostingService $posting,
-        private readonly StatementCsv $csv,
+        private readonly StatementFormats $formats,
         private readonly ExchangeRates $rates,
         private readonly BankRules $rules,
     ) {
@@ -80,7 +80,10 @@ final class StatementController extends Controller
         ]);
     }
 
-    /** Import a statement exported as CSV. Lines already imported (the same statement twice, overlapping months) are skipped. */
+    /**
+     * Import a statement exported as CSV, OFX or QFX, MT940 or camt.053 (the form is told by the text). Lines already imported
+     * (the same statement twice, overlapping months) are skipped.
+     */
     public function import(Request $request, Account $bankAccount): JsonResponse
     {
         $this->authorizeCompany('banking.review');
@@ -92,7 +95,7 @@ final class StatementController extends Controller
             throw ValidationException::withMessages(['csv' => ["{$bankAccount->name} has no statement of its own: import into the active bank, wallet or cash account the money is in."]]);
         }
 
-        $parsed = $this->csv->parse($data['csv'], $this->current->today());
+        $parsed = $this->formats->parse($data['csv'], $this->current->today());   // CSV, OFX/QFX, MT940 or camt.053
         $lines = collect($parsed['lines']);
         $known = BankTransaction::query()->where('account_id', $bankAccount->getKey())
             ->whereIn('external_id', $lines->pluck('external_id')->all())->pluck('external_id')->flip();
@@ -110,7 +113,7 @@ final class StatementController extends Controller
         });
 
         $summary = [
-            'file_name' => $data['file_name'] ?? null, 'imported' => $new->count(), 'skipped' => $lines->count() - $new->count(),
+            'file_name' => $data['file_name'] ?? null, 'format' => $parsed['format'], 'imported' => $new->count(), 'skipped' => $lines->count() - $new->count(),
             'from' => $lines->min('posted_on'), 'to' => $lines->max('posted_on'), 'columns' => $parsed['columns'],
         ];
         $this->audit->record($this->current->id(), 'statement_imported', 'bank_account', $bankAccount->getKey(), null,

@@ -42,7 +42,7 @@ export async function statementFrom(form: FormData): Promise<{ csv: string; file
     if (pasted.length > MAX_STATEMENT_BYTES) return { error: "The statement is larger than 900 KB: paste one month at a time." };
     return { csv: pasted };
   }
-  return { error: "Choose the statement file your bank or wallet exported (CSV), or paste its lines." };
+  return { error: "Choose the statement file your bank or wallet exported (CSV, OFX, MT940 or camt.053), or paste its lines." };
 }
 
 /** "+1,250.00" for money in, "−250.00" for money out, as a statement shows them. */

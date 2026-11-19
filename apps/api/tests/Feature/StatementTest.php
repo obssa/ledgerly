@@ -52,6 +52,25 @@ final class StatementTest extends TestCase
         $this->assertSame(3, $this->owner()->table('bank_transactions')->where('company_id', $this->c['company'])->count());
     }
 
+    public function test_an_ofx_statement_is_imported_once_by_the_banks_own_ids(): void
+    {
+        // Statement formats: the form is told by the text; the bank's FITID makes the second import add nothing.
+        $ofx = "OFXHEADER:100
+DATA:OFXSGML
+
+<OFX><BANKTRANLIST>
+<STMTTRN><DTPOSTED>20261110<TRNAMT>-45.00<FITID>OFX-1<NAME>Internet bill
+"
+            . "<STMTTRN><DTPOSTED>20261111<TRNAMT>300.00<FITID>OFX-2<NAME>Cash deposit
+</BANKTRANLIST></OFX>";
+        $this->postJson("/api/v1/bank-accounts/{$this->c['bank']}/statements", ['file_name' => 'cbe.ofx', 'csv' => $ofx], $this->h)
+            ->assertCreated()->assertJsonPath('format', 'ofx')->assertJsonPath('imported', 2)->assertJsonPath('from', '2026-11-10');
+        $this->postJson("/api/v1/bank-accounts/{$this->c['bank']}/statements", ['csv' => $ofx], $this->h)
+            ->assertCreated()->assertJsonPath('imported', 0)->assertJsonPath('skipped', 2);
+        $this->assertSame(['-45.00', '300.00'], $this->owner()->table('bank_transactions')->where('company_id', $this->c['company'])
+            ->whereIn('external_id', ['ofx:OFX-1', 'ofx:OFX-2'])->orderBy('external_id')->pluck('amount')->map(fn ($a) => (string) $a)->all());
+    }
+
     public function test_a_line_is_matched_to_the_entry_already_in_the_books(): void
     {
         $lines = collect($this->getJson("/api/v1/bank-accounts/{$this->c['bank']}/statement-lines", $this->h)->json('data'))->keyBy('id');
