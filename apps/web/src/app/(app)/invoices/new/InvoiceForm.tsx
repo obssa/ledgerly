@@ -124,12 +124,18 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const withUnits = kind !== "expense" && items.some((i) => (i.units ?? []).length > 0);   // 072: the Unit column only when an item has units
   // A bundle's stock parts leave too (073): it needs a warehouse as a stock item does.
   const stockLine = lines.some((l) => ["inventory", "bundle"].includes(items.find((i) => i.id === l.itemId)?.type ?? ""));
+  /** 080: the customer's price list price for the item in this currency, else the item's own price. */
+  const priceOf = (item: { id: string; price: string | null }) => {
+    const listId = options.customers.find((c) => c.id === customerId)?.price_list_id;
+    const list = listId ? options.priceLists?.find((p) => p.id === listId && p.currency === currency) : undefined;
+    return list?.prices[item.id] ?? item.price;
+  };
   /** Picking an item fills the line from it; the person can still change what was filled. */
   const pickItem = (key: number, itemId: string) => {
     const item = items.find((i) => i.id === itemId);
     setLines((ls) => ls.map((l) => (l.key !== key ? l : {
       ...l, itemId, unitId: "",
-      ...(item ? { description: item.name, unitPrice: item.price ?? l.unitPrice, accountId: item.account_id && options.accounts.some((a) => a.id === item.account_id) ? item.account_id : l.accountId } : {}),
+      ...(item ? { description: item.name, unitPrice: priceOf(item) ?? l.unitPrice, accountId: item.account_id && options.accounts.some((a) => a.id === item.account_id) ? item.account_id : l.accountId } : {}),
     })));
   };
   /** 072: another unit of the item; the price follows from the item's own price times the unit's size. */
@@ -139,7 +145,8 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
       const item = items.find((i) => i.id === l.itemId);
       const unit = item?.units?.find((u) => u.id === unitId);
       const factor = unit ? Number(unit.factor) : 1;
-      return { ...l, unitId, ...(item?.price ? { unitPrice: (Number(item.price) * factor).toFixed(2) } : {}) };
+      const price = item ? priceOf(item) : null;
+      return { ...l, unitId, ...(price ? { unitPrice: (Number(price) * factor).toFixed(2) } : {}) };
     }));
   };
 

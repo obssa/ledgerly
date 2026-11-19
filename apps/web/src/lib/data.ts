@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
-import type { InvoiceWriteOffs, LateInterestPreview } from "./api";
+import type { InvoiceWriteOffs, LateInterestPreview, PriceList, PriceListDetail } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
@@ -352,7 +352,9 @@ export async function getCustomer(id: string): Promise<(Customer & { demo: boole
 
 export interface InvoiceOptions {
   /** The customers for an invoice, the suppliers for a bill. */
-  customers: { id: string; name: string; tax_id: string | null; currency: string | null; payment_terms_days: number; default_account_id?: string | null }[];
+  customers: { id: string; name: string; tax_id: string | null; currency: string | null; payment_terms_days: number; default_account_id?: string | null; price_list_id?: string | null }[];
+  /** 080: the active price lists, each in its currency, with a price per item it lists. */
+  priceLists?: { id: string; currency: string; prices: Record<string, string> }[];
   accounts: { id: string; code: string; name: string }[];
   taxRates: { id: string; code: string; name: string; rate: string }[];
   currencies: string[];
@@ -398,7 +400,11 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
     ]);
     return {
       people: people.data,
-      customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days })),
+      customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days, price_list_id: c.price_list_id ?? null })),
+      priceLists: await ledgerly.priceListPrices(ctx).then((r) => r.data, (error) => {
+        if (error instanceof ApiError && error.status === 403) return [];
+        throw error;
+      }),
       accounts: accounts.data.filter((a) => a.type === "income" && a.is_active).map((a) => ({ id: a.id, code: a.code, name: a.name })),
       taxRates: rates.data
         .filter((r) => r.kind !== "withholding" && r.effective_from <= today && (r.effective_to === null || r.effective_to >= today))
@@ -692,6 +698,41 @@ export async function getBinCard(q: { item_id: string; warehouse_id: string; fro
  * contacts: the form still opens, and the API checks again on save.
  */
 /** Active customers to choose from, or none for a role that cannot list them (a 403 never breaks the page). */
+/** The price lists (080); none in the demo. */
+export async function getPriceLists(): Promise<{ data: PriceList[]; can: { manage: boolean } }> {
+  await connection();
+  if (isDemoMode()) return { data: [], can: { manage: false } };
+  return withApi((ctx) => ledgerly.priceLists(ctx));
+}
+
+/** One price list, or null when it is not one of this company's. */
+export async function getPriceList(id: string): Promise<PriceListDetail | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi(async (ctx) => {
+    try {
+      return await ledgerly.priceList(id, ctx);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  });
+}
+
+/** Price lists in use to put a customer on, or none for a role that cannot see them (a 403 never breaks the page). */
+export async function getPriceListChoices(): Promise<{ id: string; name: string; currency: string }[]> {
+  await connection();
+  if (isDemoMode()) return [];
+  return withApi(async (ctx) => {
+    try {
+      return (await ledgerly.priceLists(ctx)).data.filter((l) => l.is_active).map((l) => ({ id: l.id, name: l.name, currency: l.currency }));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) return [];
+      throw error;
+    }
+  });
+}
+
 export async function getCustomerChoices(): Promise<{ id: string; name: string }[]> {
   await connection();
   if (isDemoMode()) return [];

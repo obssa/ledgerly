@@ -26,3 +26,10 @@ describe("customerBody", () => {
     expect(customerBody(form([[EXEMPT_SHOWN, "1"], ["tax_exempt", "on"], ["tax_exempt_reason", "Embassy"]]))).toEqual({ tax_exempt: true, tax_exempt_reason: "Embassy" });
   });
 });
+
+describe("price list", () => {
+  it("sends the list chosen, and none as null", () => {
+    expect(customerBody(form([["price_list_id", "pl-1"]]))).toEqual({ price_list_id: "pl-1" });
+    expect(customerBody(form([["price_list_id", ""]]))).toEqual({ price_list_id: null });
+  });
+});

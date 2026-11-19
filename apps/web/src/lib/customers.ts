@@ -3,7 +3,7 @@
  * addresses are sent as objects without empty parts; amounts keep their decimal string, thousands separators removed.
  */
 
-const OPTIONAL = ["tax_id", "email", "phone", "website", "currency", "notes", "tax_exempt_reason"] as const;
+const OPTIONAL = ["tax_id", "email", "phone", "website", "currency", "notes", "tax_exempt_reason", "price_list_id"] as const;
 const ADDRESS = ["line1", "line2", "city", "region", "postal_code", "country"] as const;
 
 /** A checkbox sends nothing when unticked, so the form carries this marker to say it was shown. */

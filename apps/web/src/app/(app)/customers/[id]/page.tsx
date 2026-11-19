@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCustomer } from "@/lib/data";
+import { getCustomer, getPriceListChoices } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { ArchiveCustomer, CustomerForm } from "../CustomerForm";
 
@@ -10,7 +10,7 @@ export const metadata = { title: "Customer" };
 /** One customer: what they owe, their recent posted invoices, and their details. */
 export default async function CustomerPage({ params }: PageProps<"/customers/[id]">) {
   const { id } = await params;
-  const customer = await getCustomer(id);
+  const [customer, priceLists] = await Promise.all([getCustomer(id), getPriceListChoices()]);
   if (!customer) notFound();
   const editable = Boolean(customer.can?.edit) && !customer.demo;
   const over = customer.credit_limit !== null && Number(customer.open_balance) > Number(customer.credit_limit);
@@ -47,7 +47,7 @@ export default async function CustomerPage({ params }: PageProps<"/customers/[id
           )}
         </Card>
         <Card className="min-w-0 flex-[2_1_560px]" label="Customer details">
-          <CustomerForm customer={customer} readOnly={!editable} />
+          <CustomerForm customer={customer} readOnly={!editable} priceLists={priceLists} />
           {!editable && !customer.demo && <p className="mt-4 text-sm text-muted">Only an accountant, bookkeeper, owner or admin can change a customer.</p>}
         </Card>
       </div>

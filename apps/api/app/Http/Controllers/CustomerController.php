@@ -28,7 +28,7 @@ final class CustomerController extends Controller
     use ContactRules;
 
     private const FIELDS = ['name', 'tax_id', 'email', 'phone', 'website', 'currency', 'payment_terms_days', 'credit_limit',
-        'tax_exempt', 'tax_exempt_reason', 'address', 'delivery_address', 'notes', 'is_active'];
+        'tax_exempt', 'tax_exempt_reason', 'address', 'delivery_address', 'notes', 'is_active', 'price_list_id'];
 
     public function __construct(private readonly AuditLogger $audit)
     {
@@ -49,7 +49,7 @@ final class CustomerController extends Controller
                 ->where('name', 'ilike', '%' . addcslashes($s, '%_\\') . '%')
                 ->orWhere('tax_id', $s)))
             ->orderByRaw('lower(name)')->limit(500)
-            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'credit_limit', 'is_active']);
+            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'credit_limit', 'is_active', 'price_list_id']);
 
         $balances = $this->balances($customers->pluck('id')->all());
 
@@ -139,6 +139,8 @@ final class CustomerController extends Controller
             'tax_exempt_reason' => ['sometimes', 'nullable', 'string', 'max:300'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'is_active' => [$creating ? 'prohibited' : 'sometimes', 'boolean'],
+            // 080: the price list (customer group) they buy at; one of the company's lists in use (row-level security scopes the lookup).
+            'price_list_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('price_lists', 'id')->where('is_active', true)],
             ...self::addressRules('address'),
             ...self::addressRules('delivery_address'),
         ]);
