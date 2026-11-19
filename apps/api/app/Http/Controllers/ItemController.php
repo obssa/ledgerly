@@ -196,14 +196,72 @@ final class ItemController extends Controller
                 ->get(['b.id', 'b.number', 'b.expires_on', 'w.name as warehouse', 'bb.quantity'])
             : null;
 
+        // 089: its variants (each an item of its own), or the item it is a variant of.
+        $variants = $item->parent_item_id === null
+            ? Item::query()->where('parent_item_id', $item->getKey())->orderBy('variant_label')->get(['id', 'name', 'sku', 'barcode', 'variant_label', 'sale_price', 'is_active'])
+            : [];
+        $parent = $item->parent_item_id !== null ? Item::query()->whereKey($item->parent_item_id)->first(['id', 'name']) : null;
+
         return [...$item->toArray(), 'balances' => $balances, 'units' => $units, 'components' => $components, 'batches' => $batches,
-            'can' => [...$this->can(), 'components' => $item->type === 'bundle' && ! $used && (bool) $this->current->membership()?->can('inventory.items')]];
+            'variants' => $variants, 'parent' => $parent,
+            'can' => [...$this->can(), 'components' => $item->type === 'bundle' && ! $used && (bool) $this->current->membership()?->can('inventory.items'),
+                'variants' => $item->parent_item_id === null && $item->type !== 'bundle' && (bool) $this->current->membership()?->can('inventory.items')]];
     }
 
     /**
      * 073: sets a bundle's parts, the whole list at once: other items of the company (never a bundle), each with its
      * quantity per bundle in its own unit. Refused once the bundle is on a document: archive it and make a new one.
      */
+    /**
+     * 089: makes the variants of an item from its options (Size: S, M, L; Colour: Red, Blue): one item for each
+     * combination not made yet, of the item's type, unit, prices and accounts, named "Shirt — M / Red". Each is then an
+     * item of its own (its stock, SKU, barcode, price). At most 100 at a time.
+     */
+    public function makeVariants(Request $request, Item $item): JsonResponse
+    {
+        $this->authorizeCompany('inventory.items');
+        $data = $request->validate([
+            'options' => ['required', 'array', 'min:1', 'max:3'],
+            'options.*.name' => ['required', 'string', 'max:40'],
+            'options.*.values' => ['required', 'array', 'min:1', 'max:30'],
+            'options.*.values.*' => ['required', 'string', 'max:40'],
+        ]);
+        if ($item->parent_item_id !== null || $item->type === 'bundle') {
+            throw ValidationException::withMessages(['options' => ["{$item->name} is " . ($item->type === 'bundle' ? 'a bundle' : 'a variant itself') . ': variants are made of a plain item.']]);
+        }
+        $labels = [''];
+        foreach ($data['options'] as $o) {
+            $next = [];
+            foreach ($labels as $l) {
+                foreach (array_unique(array_map('trim', $o['values'])) as $v) {
+                    $next[] = $l === '' ? trim($v) : "{$l} / " . trim($v);
+                }
+            }
+            $labels = $next;
+        }
+        if (count($labels) > 100) {
+            throw ValidationException::withMessages(['options' => ['At most 100 variants at a time: ' . count($labels) . ' would be made.']]);
+        }
+        $have = Item::query()->where('parent_item_id', $item->getKey())->pluck('variant_label')->map(fn ($l) => mb_strtolower(trim((string) $l)))->all();
+        $made = [];
+        DB::transaction(function () use ($item, $labels, $have, $request, &$made) {
+            foreach ($labels as $label) {
+                if (in_array(mb_strtolower($label), $have, true)) {
+                    continue;
+                }
+                $variant = new Item(['name' => mb_substr("{$item->name} — {$label}", 0, 200), 'type' => $item->type, 'unit' => $item->unit,
+                    'sale_price' => $item->sale_price, 'purchase_price' => $item->purchase_price, 'income_account_id' => $item->income_account_id,
+                    'expense_account_id' => $item->expense_account_id, 'costing' => $item->costing, 'tracking' => $item->tracking]);
+                $variant->forceFill(['company_id' => $item->company_id, 'parent_item_id' => $item->getKey(), 'variant_label' => $label])->save();
+                $made[] = ['id' => $variant->getKey(), 'name' => $variant->name, 'variant_label' => $label];
+            }
+            $this->audit->record($this->current->id(), 'variants_made', 'item', $item->getKey(), null,
+                ['variants' => array_column($made, 'variant_label')], userId: $request->user()->getKey());
+        });
+
+        return response()->json(['made' => $made, 'item' => $this->present($item->refresh())], 201);
+    }
+
     public function setComponents(Request $request, Item $item): JsonResponse
     {
         $this->authorizeCompany('inventory.items');

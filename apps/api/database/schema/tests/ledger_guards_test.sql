@@ -4673,6 +4673,42 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T114 goods received on notes go back on a supplier credit, never more than the bill billed';
 END $$;
+
+-- T115: variants (089). A variant belongs to another item of the company, of its type, one level deep, with a label used
+-- once under its parent; a parent keeps its type; another company's item is never a parent. Company A, B's item b8.
+DO $$
+DECLARE
+  shirt constant uuid := '00000000-0000-0000-0000-000000000fc0';
+  medium constant uuid := '00000000-0000-0000-0000-000000000fc1';
+BEGIN
+  INSERT INTO items (id, company_id, name, type) VALUES (shirt, app_company_id(), 'T115 shirt', 'inventory');
+  INSERT INTO items (id, company_id, name, type, parent_item_id, variant_label) VALUES (medium, app_company_id(), 'T115 shirt M', 'inventory', shirt, 'M');
+  BEGIN
+    INSERT INTO items (company_id, name, type, parent_item_id, variant_label) VALUES (app_company_id(), 'T115 shirt m', 'inventory', shirt, ' m ');
+    RAISE EXCEPTION 'FAIL T115a: a parent had two variants with one label';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO items (company_id, name, type, parent_item_id, variant_label) VALUES (app_company_id(), 'T115 shirt L', 'service', shirt, 'L');
+    RAISE EXCEPTION 'FAIL T115b: a variant was of another type than its parent';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO items (company_id, name, type, parent_item_id, variant_label) VALUES (app_company_id(), 'T115 shirt M slim', 'inventory', medium, 'Slim');
+    RAISE EXCEPTION 'FAIL T115c: a variant had variants of its own';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO items (company_id, name, type, parent_item_id) VALUES (app_company_id(), 'T115 no label', 'inventory', shirt);
+    RAISE EXCEPTION 'FAIL T115d: a variant had no label';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO items (company_id, name, type, parent_item_id, variant_label) VALUES (app_company_id(), 'T115 theirs', 'inventory', '00000000-0000-0000-0000-0000000000b8', 'X');
+    RAISE EXCEPTION 'FAIL T115e: another company''s item was a parent';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE items SET type = 'non_inventory' WHERE id = shirt;
+    RAISE EXCEPTION 'FAIL T115f: a parent with variants changed its type';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  RAISE NOTICE 'PASS T115 a variant is an item of its parent''s type, one level deep, its label used once';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

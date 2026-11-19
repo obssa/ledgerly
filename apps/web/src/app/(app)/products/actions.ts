@@ -71,6 +71,22 @@ export async function setBundleParts(_: FormState | undefined, form: FormData): 
   return { notice: "Parts saved." };
 }
 
+/** 089: the item's variants, from up to three options with values separated by commas. */
+export async function makeVariants(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const options = [0, 1, 2].map((i) => ({ name: text(form, `option_name_${i}`) ?? "", values: (text(form, `option_values_${i}`) ?? "").split(",").map((v) => v.trim()).filter(Boolean) }))
+    .filter((o) => o.name !== "" && o.values.length > 0);
+  if (options.length === 0) return { error: "Give at least one option and its values, such as Size: S, M, L." };
+  let made: number;
+  try {
+    made = (await ledgerly.makeVariants(text(form, "id") ?? "", options, ctx)).made.length;
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: made === 0 ? "Those variants are made already." : `${made} variant${made === 1 ? "" : "s"} made.` };
+}
+
 /** 087: an assembly's parts, how many of each go into one. */
 export async function setAssemblyParts(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
