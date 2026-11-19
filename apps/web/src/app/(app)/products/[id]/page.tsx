@@ -7,6 +7,7 @@ import { AdjustStock, ItemForm } from "../ItemForms";
 import { ItemUnits } from "./ItemUnits";
 import { BundleParts } from "./BundleParts";
 import { AssemblyPanel } from "./AssemblyPanel";
+import { VariantsPanel } from "./VariantsPanel";
 
 export const metadata = { title: "Item" };
 
@@ -68,6 +69,11 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
         {item.type === "bundle" && (
           <Card className="min-w-0 flex-[1_1_360px]" label="Parts">
             <BundleParts item={item} choices={choices.map((i) => ({ id: i.id, name: i.name, unit: i.unit, type: i.type }))} />
+          </Card>
+        )}
+        {item.type !== "bundle" && (item.parent || (item.variants ?? []).length > 0 || item.can?.variants) && (
+          <Card className="min-w-0 flex-[1_1_320px]" label="Variants">
+            <VariantsPanel item={item} />
           </Card>
         )}
         {assembly && (assembly.parts.length > 0 || assembly.can.set_parts) && (
