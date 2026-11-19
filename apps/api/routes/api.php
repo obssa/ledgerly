@@ -465,6 +465,7 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/profit-and-loss', [LedgerController::class, 'profitAndLoss']);
             Route::get('reports/cash-flow', [FinancialStatementController::class, 'cashFlow']);
             Route::get('reports/cash-forecast', [FinancialStatementController::class, 'cashForecast']);
+            Route::get('reports/kpis', [FinancialStatementController::class, 'kpis']);
             Route::get('reports/changes-in-equity', [FinancialStatementController::class, 'changesInEquity']);
             Route::get('reports/financial-health', [FinancialStatementController::class, 'health']);
             Route::get('reports/profit-by-dimension', [AnalysisReportController::class, 'profitByDimension']);

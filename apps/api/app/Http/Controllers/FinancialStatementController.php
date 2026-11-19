@@ -67,4 +67,13 @@ final class FinancialStatementController extends Controller
 
         return response()->json($forecast->weeks($this->current->id(), $this->current->today(), (int) ($q['weeks'] ?? 13)));
     }
+
+    /** Module 10: the home page's key figures: cash, what customers owe and what is owed, this month against last. */
+    public function kpis(\App\Domain\Reports\Kpis $kpis): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $company = $this->current->get();
+
+        return response()->json($kpis->figures($company->getKey(), $company->base_currency, $this->current->today()));
+    }
 }

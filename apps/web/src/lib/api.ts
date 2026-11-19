@@ -231,6 +231,15 @@ export interface CashForecast {
   data: { week: number; from: string; to: string; receivables: string; payables: string; cheques_in: string; cheques_out: string; in: string; out: string; net: string; closing: string }[];
 }
 
+/** GET /reports/kpis: the home page's key figures, from the books as they stand. */
+export interface Kpis {
+  as_of: string; currency: string;
+  cash: { now: string; month_ago: string; change: string };
+  receivable: { balance: string; overdue: string; overdue_count: number };
+  payable: { balance: string; due_this_week: string; due_this_week_count: number };
+  month: { from: string; to: string; last_from: string; last_to: string; sales: string; sales_last: string | null; net_profit: string; net_profit_last: string | null };
+}
+
 /** A bank rule (076): how a kind of statement line is categorised. */
 export interface BankRule {
   id: string; name: string; bank_account_id: string | null; bank_account: string | null; direction: "in" | "out" | "any"; contains: string;
@@ -1770,6 +1779,7 @@ export const ledgerly = {
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
   balanceSheet: (asOf: string, ctx: RequestOptions) => api<BalanceSheet>("reports/balance-sheet", { ...ctx, query: { as_of: asOf } }),
   cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),
+  kpis: (ctx: RequestOptions) => api<Kpis>("reports/kpis", ctx),
   cashForecast: (weeks: number, ctx: RequestOptions) => api<CashForecast>("reports/cash-forecast", { ...ctx, query: { weeks: String(weeks) } }),
   changesInEquity: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<ChangesInEquity>("reports/changes-in-equity", { ...ctx, query: q }),
   financialHealth: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<FinancialHealth>("reports/financial-health", { ...ctx, query: q }),
