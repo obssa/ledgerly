@@ -17,6 +17,7 @@ export const APPROVAL_LIMITS = ["invoice_above", "bill_above", "journal_above"] 
 export const VAT_SHOWN = "vat_registered_shown";
 export const REMINDERS_SHOWN = "reminders_shown";
 export const TAX_REMINDERS_SHOWN = "tax_reminders_shown";
+export const INTEREST_SHOWN = "late_interest_shown";
 /** Marks that the invoice template fields were on the form (so empty texts clear them). */
 export const TEMPLATE_SHOWN = "invoice_template_shown";
 
@@ -46,6 +47,10 @@ export function settingsBody(form: FormData): Record<string, unknown> {
   }
 
   if (form.has(TAX_REMINDERS_SHOWN)) body.tax_reminders = form.get("tax_reminders") === "on";
+  if (form.has(INTEREST_SHOWN)) {
+    const rate = value("late_interest.rate").replace(/[%\s]/g, "");
+    body.late_interest = rate === "" ? { rate: null, account_id: null } : { rate, account_id: value("late_interest.account_id") || null };
+  }
   if (form.has(TEMPLATE_SHOWN)) {
     const value = (n: string) => (typeof form.get(n) === "string" ? String(form.get(n)).trim() : "");
     body.invoice_template = {

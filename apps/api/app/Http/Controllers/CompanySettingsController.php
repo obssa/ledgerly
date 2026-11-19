@@ -91,6 +91,10 @@ final class CompanySettingsController extends Controller
             'reminders.enabled' => ['required_with:reminders', 'boolean'],
             'reminders.days' => ['required_with:reminders', 'array', 'min:1', 'max:3'],
             'reminders.days.*' => ['integer', 'between:1,365', 'distinct'],
+            // Interest on late payment (079): an annual rate and the income account it goes to; none charges nothing.
+            'late_interest' => ['sometimes', 'array:rate,account_id'],
+            'late_interest.rate' => ['nullable', 'decimal:0,4', 'gt:0', 'max:100'],
+            'late_interest.account_id' => ['nullable', 'uuid', 'required_with:late_interest.rate'],
             // Reminders of tax returns due (054): on unless turned off.
             'tax_reminders' => ['sometimes', 'boolean'],
             // How invoices look on paper and as PDF files: an accent colour, how to pay, a footer line.
@@ -123,6 +127,16 @@ final class CompanySettingsController extends Controller
         if (array_key_exists('invoice_template', $data)) {
             $company->settings = [...($company->settings ?? []), 'invoice_template' => self::template([...self::template($company->settings['invoice_template'] ?? []), ...$data['invoice_template']])];
             unset($data['invoice_template']);
+        }
+        if (array_key_exists('late_interest', $data)) {
+            $li = $data['late_interest'];
+            // The company's own income account, still in use (company-scoped load).
+            if (! empty($li['account_id']) && ! \App\Domain\Ledger\Models\Account::query()->whereKey($li['account_id'])->where(['type' => 'income', 'is_active' => true])->exists()) {
+                throw ValidationException::withMessages(['late_interest.account_id' => ['Interest goes to one of the company\'s income accounts.']]);
+            }
+            $company->settings = [...($company->settings ?? []), 'late_interest' => empty($li['rate'])
+                ? ['rate' => null, 'account_id' => null] : ['rate' => (string) $li['rate'], 'account_id' => (string) $li['account_id']]];
+            unset($data['late_interest']);
         }
         if (array_key_exists('tax_reminders', $data)) {
             $company->settings = [...($company->settings ?? []), 'tax_reminders' => (bool) $data['tax_reminders']];
@@ -237,6 +251,9 @@ final class CompanySettingsController extends Controller
                 'tax_id_label' => $pack->taxIdLabel,
                 'calendars' => array_values(array_unique(['gregorian', ...$pack->calendars])),
                 'legal_forms' => self::LEGAL_FORMS,
+                // Where interest on late payment may go (079): the company's own income accounts in use.
+                'income_accounts' => \App\Domain\Ledger\Models\Account::query()->where(['type' => 'income', 'is_active' => true])->orderBy('code')
+                    ->get(['id', 'code', 'name'])->map(fn ($a) => ['id' => $a->getKey(), 'code' => $a->code, 'name' => $a->name])->all(),
             ],
         ];
     }
@@ -258,6 +275,7 @@ final class CompanySettingsController extends Controller
         $fields['approval'] = array_intersect_key($company->settings['approval'] ?? [], array_flip(self::APPROVAL_LIMITS));
         $fields['reminders'] = \App\Domain\Sales\InvoiceReminders::settingsOf($company);
         $fields['tax_reminders'] = (bool) ($company->settings['tax_reminders'] ?? true);
+        $fields['late_interest'] = \App\Domain\Sales\LateInterest::settingsOf($company);
         $fields['invoice_template'] = self::template($company->settings['invoice_template'] ?? []);
 
         return $fields;

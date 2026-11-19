@@ -4187,6 +4187,66 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T104 a bad debt is written off a posted invoice, within what it owes, with its own entry';
 END $$;
+
+-- T105: interest on late payment (079). An interest invoice names a posted invoice of the company for the same customer
+-- and currency, a period from its due date on, and never days already charged by a live one (a void one frees them);
+-- another company never sees one. Company A as f1, customers c1 and c4.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  c4 constant uuid := '00000000-0000-0000-0000-0000000000c4';
+  src constant uuid := '00000000-0000-0000-0000-000000000f30';
+  i1 constant uuid := '00000000-0000-0000-0000-000000000f31';
+  i2 constant uuid := '00000000-0000-0000-0000-000000000f32';
+BEGIN
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, due_date, currency, total, amount_due)
+    VALUES (src, app_company_id(), 'invoice', c1, '2027-09-01', '2027-10-01', 'ETB', 1000, 1000);
+
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, interest_on_document_id, interest_from, interest_through)
+      VALUES (app_company_id(), 'invoice', c1, '2027-11-01', 'ETB', src, '2027-10-01', '2027-11-01');
+    RAISE EXCEPTION 'FAIL T105a: interest was charged on a draft invoice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE documents SET status = 'posted', number = 'INV-T105-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = src;
+
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, interest_on_document_id, interest_from, interest_through)
+      VALUES (app_company_id(), 'invoice', c4, '2027-11-01', 'ETB', src, '2027-10-01', '2027-11-01');
+    RAISE EXCEPTION 'FAIL T105b: interest was charged to another customer';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, interest_on_document_id, interest_from, interest_through)
+      VALUES (app_company_id(), 'invoice', c1, '2027-11-01', 'ETB', src, '2027-09-15', '2027-11-01');
+    RAISE EXCEPTION 'FAIL T105c: interest ran from before the invoice fell due';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, interest_on_document_id, interest_from, interest_through)
+      VALUES (app_company_id(), 'invoice', c1, '2027-11-01', 'ETB', src, '2027-11-01', '2027-10-01');
+    RAISE EXCEPTION 'FAIL T105d: an interest period ended before it began';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, interest_on_document_id, interest_from, interest_through)
+    VALUES (i1, app_company_id(), 'invoice', c1, '2027-11-01', 'ETB', src, '2027-10-01', '2027-11-01');
+  BEGIN
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, interest_on_document_id, interest_from, interest_through)
+      VALUES (app_company_id(), 'invoice', c1, '2027-11-15', 'ETB', src, '2027-10-20', '2027-11-15');
+    RAISE EXCEPTION 'FAIL T105e: the same days were charged twice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- The next period starts where the last one ended.
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, interest_on_document_id, interest_from, interest_through)
+    VALUES (i2, app_company_id(), 'invoice', c1, '2027-12-01', 'ETB', src, '2027-11-01', '2027-12-01');
+  -- A void charge frees its days.
+  UPDATE documents SET status = 'void' WHERE id = i1;
+  INSERT INTO documents (company_id, type, contact_id, issue_date, currency, interest_on_document_id, interest_from, interest_through)
+    VALUES (app_company_id(), 'invoice', c1, '2027-11-01', 'ETB', src, '2027-10-01', '2027-11-01');
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM documents WHERE interest_on_document_id = src) THEN
+    RAISE EXCEPTION 'FAIL T105f: company B saw company A''s interest invoices';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T105 interest is charged on a posted invoice to its customer, from its due date, never twice for a day';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

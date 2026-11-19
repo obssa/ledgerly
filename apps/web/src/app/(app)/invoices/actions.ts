@@ -152,6 +152,18 @@ export async function reverseBadDebt(_: FormState | undefined, form: FormData): 
   return { notice: "Reversed: the customer owes it again." };
 }
 
+/** Module 2: charges interest on late payment of this invoice on a new draft invoice, and opens it. */
+export async function chargeInterest(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let made: { id: string };
+  try {
+    made = await ledgerly.chargeInterest(text(form, "id") ?? "", { through: text(form, "through") ?? "" }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  redirect(`/invoices/${encodeURIComponent(made.id)}`);
+}
+
 /** Module 2: emails the customer a payment reminder for this invoice now (at most once a day). */
 export async function remindInvoice(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();

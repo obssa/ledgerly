@@ -54,10 +54,12 @@ export interface CompanySettings {
   reminders?: { enabled: boolean; days: number[] };
   /** Email reminders of tax returns due (054): on unless turned off. */
   tax_reminders?: boolean;
+  /** Interest on late payment (079): an annual rate and the income account it goes to. */
+  late_interest?: { rate: string | null; account_id: string | null };
   /** How invoices look on paper and as PDF files. */
   invoice_template?: { accent: string | null; payment_details: string | null; footer: string | null };
   can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean; manage_dimensions: boolean };
-  options: { tax_id_label: string; calendars: string[]; legal_forms: string[] };
+  options: { tax_id_label: string; calendars: string[]; legal_forms: string[]; income_accounts?: { id: string; code: string; name: string }[] };
 }
 
 /** GET /currencies: the base currency and the foreign currencies a company works in, with each one's latest rate. */
@@ -1279,6 +1281,12 @@ export interface CustomReport {
 export interface InvoiceRetention { id: string; amount: string; held_on: string; released_on: string | null }
 /** GET /invoices/{id}/write-offs: bad debts written off this invoice, and whether this role may write one off (078). */
 export interface InvoiceWriteOff { id: string; amount: string; written_off_on: string; reason: string; reversed_on: string | null; reversal_reason: string | null }
+/** GET /invoices/{id}/interest: what charging interest on late payment would make, and what was charged before (079). */
+export interface LateInterestPreview {
+  rate: string | null; account_id: string | null; owed: string; currency: string; from: string | null; through: string; days: number; amount: string;
+  charged: { id: string; number: string | null; status: string; from: string; through: string; total: string }[];
+  can: { charge: boolean };
+}
 export interface InvoiceWriteOffs { data: InvoiceWriteOff[]; can: { write_off: boolean } }
 
 export interface InvoiceReminderSent { kind: "manual" | "scheduled"; step: number | null; sent_to: string; sent_at: string }
@@ -1768,6 +1776,9 @@ export const ledgerly = {
     api<{ data: (Invoice & { original?: { id: string; number: string | null } | null })[] }>("credit-notes", ctx),
   holdRetention: (id: string, body: { amount?: string; percent?: string; held_on: string }, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/retention`, { ...ctx, method: "POST", body }),
+  lateInterest: (id: string, ctx: RequestOptions) => api<LateInterestPreview>(`invoices/${encodeURIComponent(id)}/interest`, ctx),
+  chargeInterest: (id: string, body: { through: string }, ctx: RequestOptions) =>
+    api<{ id: string; number: string | null }>(`invoices/${encodeURIComponent(id)}/interest`, { ...ctx, method: "POST", body }),
   writeOffs: (id: string, ctx: RequestOptions) => api<InvoiceWriteOffs>(`invoices/${encodeURIComponent(id)}/write-offs`, ctx),
   writeOff: (id: string, body: { amount?: string; date: string; reason: string }, ctx: RequestOptions) =>
     api<InvoiceWriteOff>(`invoices/${encodeURIComponent(id)}/write-offs`, { ...ctx, method: "POST", body }),

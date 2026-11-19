@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
-import type { InvoiceWriteOffs } from "./api";
+import type { InvoiceWriteOffs, LateInterestPreview } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
@@ -1217,6 +1217,20 @@ export async function getWriteOffs(invoiceId: string): Promise<InvoiceWriteOffs 
   return withApi(async (ctx) => {
     try {
       return await ledgerly.writeOffs(invoiceId, ctx);
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 403 || error.status === 404)) return null;
+      throw error;
+    }
+  });
+}
+
+/** Interest on late payment for an invoice (079); null in the demo or for a role that cannot see it. */
+export async function getLateInterest(invoiceId: string): Promise<LateInterestPreview | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi(async (ctx) => {
+    try {
+      return await ledgerly.lateInterest(invoiceId, ctx);
     } catch (error) {
       if (error instanceof ApiError && (error.status === 403 || error.status === 404)) return null;
       throw error;
