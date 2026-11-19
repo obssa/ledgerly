@@ -317,6 +317,7 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/reports/ar-ageing' => 'reports.view',
         'GET api/v1/reports/profit-and-loss' => 'reports.view',
         'GET api/v1/reports/cash-flow' => 'reports.view',
+        'GET api/v1/reports/cash-forecast' => 'reports.view',
         'GET api/v1/reports/changes-in-equity' => 'reports.view',
         'GET api/v1/reports/financial-health' => 'reports.view',
         'GET api/v1/reports/profit-by-dimension' => 'reports.view',
