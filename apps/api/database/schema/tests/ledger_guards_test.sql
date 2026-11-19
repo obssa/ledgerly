@@ -4047,6 +4047,44 @@ BEGIN
   UPDATE items SET reorder_point = NULL, max_level = NULL, preferred_supplier_id = NULL WHERE id = item;
   RAISE NOTICE 'PASS T101 a maximum level is never below the reorder point, and the preferred supplier is the company''s own supplier';
 END $$;
+
+-- T102: bank rules (076). A rule is for one of the company's money accounts, categorises to an active account of the
+-- company, names a contact of the company, has words to look for and an amount range the right way round; another
+-- company never sees it. Company A as f1: petty cash a57, expense account a40, customer c1.
+DO $$
+DECLARE
+  cash constant uuid := '00000000-0000-0000-0000-000000000a57';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  r uuid;
+BEGIN
+  BEGIN
+    INSERT INTO bank_rules (company_id, name, bank_account_id, contains, target_account_id) VALUES (app_company_id(), 'T102', acc, 'FEE', cash);
+    RAISE EXCEPTION 'FAIL T102a: a bank rule was for an account that holds no money';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO bank_rules (company_id, name, contains, target_account_id) VALUES (app_company_id(), 'T102', '  ', acc);
+    RAISE EXCEPTION 'FAIL T102b: a bank rule had no words to look for';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO bank_rules (company_id, name, contains, target_account_id, amount_min, amount_max) VALUES (app_company_id(), 'T102', 'FEE', acc, 50, 10);
+    RAISE EXCEPTION 'FAIL T102c: a bank rule''s amount range was the wrong way round';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO bank_rules (company_id, name, contains, target_account_id) VALUES (app_company_id(), 'T102', 'FEE', gen_random_uuid());
+    RAISE EXCEPTION 'FAIL T102d: a bank rule categorised to an account that is not the company''s';
+  EXCEPTION WHEN check_violation OR foreign_key_violation THEN NULL; END;
+  INSERT INTO bank_rules (company_id, name, bank_account_id, direction, contains, target_account_id, contact_id, amount_max)
+    VALUES (app_company_id(), 'T102 fees', cash, 'out', 'SERVICE FEE', acc, c1, 100) RETURNING id INTO r;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM bank_rules WHERE id = r) THEN
+    RAISE EXCEPTION 'FAIL T102e: company B saw company A''s bank rule';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  DELETE FROM bank_rules WHERE id = r;
+  RAISE NOTICE 'PASS T102 a bank rule names the company''s own accounts and contact, with words and a sound amount range';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
