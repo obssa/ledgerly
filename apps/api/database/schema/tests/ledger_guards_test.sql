@@ -5127,6 +5127,95 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T122 a serialised item moves one unit of one serial at a time, and a serial is in stock once at most';
 END $$;
+
+-- T123: bundles delivered on notes (097). A gift box of 2 bags and a card leaves on a delivery note; a box of a card
+-- only (no stock part) does not. The order's invoice bills the boxes and cannot take their bags out again; its credit
+-- note brings back the 4 bags of the 2 boxes billed, never a fifth. A box whose bags another order's invoice took out
+-- is not delivered on that order's note. Company A as f1, customer c1, bags b1 in a1, income account a40.
+DO $$
+DECLARE
+  c1 constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  f1 constant uuid := '00000000-0000-0000-0000-0000000000f1';
+  bags constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  acc constant uuid := '00000000-0000-0000-0000-000000000a40';
+  card constant uuid := '00000000-0000-0000-0000-000000001230';
+  box constant uuid := '00000000-0000-0000-0000-000000001231';
+  plain constant uuid := '00000000-0000-0000-0000-000000001232';
+  so constant uuid := '00000000-0000-0000-0000-000000001233';
+  l1 constant uuid := '00000000-0000-0000-0000-000000001234';
+  l2 constant uuid := '00000000-0000-0000-0000-000000001235';
+  dn constant uuid := '00000000-0000-0000-0000-000000001236';
+  inv constant uuid := '00000000-0000-0000-0000-000000001237';
+  il constant uuid := '00000000-0000-0000-0000-000000001238';
+  cn constant uuid := '00000000-0000-0000-0000-000000001239';
+  so2 constant uuid := '00000000-0000-0000-0000-00000000123a';
+  l3 constant uuid := '00000000-0000-0000-0000-00000000123b';
+  inv2 constant uuid := '00000000-0000-0000-0000-00000000123c';
+  dn2 constant uuid := '00000000-0000-0000-0000-00000000123d';
+BEGIN
+  INSERT INTO items (id, company_id, name, type) VALUES (card, app_company_id(), 'T123 card', 'non_inventory'),
+    (box, app_company_id(), 'T123 gift box', 'bundle'), (plain, app_company_id(), 'T123 card box', 'bundle');
+  INSERT INTO item_components (company_id, bundle_id, component_id, quantity) VALUES
+    (app_company_id(), box, bags, 2), (app_company_id(), box, card, 1), (app_company_id(), plain, card, 1);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), bags, wh, '2027-11-20', 'purchase', 20, 50);
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total) VALUES (so, app_company_id(), 'sales_order', c1, '2027-11-20', 'ETB', 4600);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (l1, app_company_id(), so, 1, 'Gift box', 3, 1500, acc, 4500, box), (l2, app_company_id(), so, 2, 'Card box', 1, 100, acc, 100, plain);
+  UPDATE documents SET status = 'accepted', number = 'SO-T123-1' WHERE id = so;
+  INSERT INTO delivery_notes (id, company_id, sales_order_id, number, delivered_on, warehouse_id, created_by) VALUES (dn, app_company_id(), so, 'DN-T123-1', '2027-11-21', wh, f1);
+  INSERT INTO delivery_note_lines (company_id, delivery_note_id, order_line_id, item_id, quantity) VALUES (app_company_id(), dn, l1, box, 2);
+  BEGIN
+    INSERT INTO delivery_note_lines (company_id, delivery_note_id, order_line_id, item_id, quantity) VALUES (app_company_id(), dn, l2, plain, 1);
+    RAISE EXCEPTION 'FAIL T123a: a bundle with no stock part was delivered on a note';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO delivery_note_lines (company_id, delivery_note_id, order_line_id, item_id, quantity) VALUES (app_company_id(), dn, l1, box, 2);
+    RAISE EXCEPTION 'FAIL T123b: more boxes were delivered than were ordered';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, delivery_note_id) VALUES (app_company_id(), bags, wh, '2027-11-21', 'sale', -4, 0, dn);
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id, total, amount_due) VALUES
+    (inv, app_company_id(), 'invoice', c1, '2027-11-22', 'ETB', so, 3000, 3000);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id, source_line_id) VALUES
+    (il, app_company_id(), inv, 1, 'Gift box', 2, 1500, acc, 3000, box, l1);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), bags, wh, '2027-11-22', 'sale', -4, 0, inv);
+    RAISE EXCEPTION 'FAIL T123c: the invoice took out again the bags of boxes delivered on a note';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO invoice_delivery_matches (company_id, invoice_id, invoice_line_id, order_line_id, quantity) VALUES (app_company_id(), inv, il, l1, 2);
+  UPDATE documents SET status = 'posted', number = 'INV-T123-1', journal_entry_id = '00000000-0000-0000-0000-00000000e001' WHERE id = inv;
+
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, original_document_id, restock) VALUES
+    (cn, app_company_id(), 'credit_note', c1, '2027-11-23', 'ETB', inv, true);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), bags, wh, '2027-11-23', 'sale_return', 4, 50, cn);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), bags, wh, '2027-11-23', 'sale_return', 1, 50, cn);
+    RAISE EXCEPTION 'FAIL T123d: more bags came back than the boxes billed from the note held';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  -- Another order: its invoice took the bags of a box out itself, so that box is not delivered on a note as well.
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, total) VALUES (so2, app_company_id(), 'sales_order', c1, '2027-11-20', 'ETB', 1500);
+  INSERT INTO document_lines (id, company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, item_id) VALUES
+    (l3, app_company_id(), so2, 1, 'Gift box', 2, 1500, acc, 3000, box);
+  UPDATE documents SET status = 'accepted', number = 'SO-T123-2' WHERE id = so2;
+  INSERT INTO documents (id, company_id, type, contact_id, issue_date, currency, source_document_id, total, amount_due) VALUES
+    (inv2, app_company_id(), 'invoice', c1, '2027-11-22', 'ETB', so2, 1500, 1500);
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, document_id) VALUES (app_company_id(), bags, wh, '2027-11-22', 'sale', -2, 0, inv2);
+  INSERT INTO delivery_notes (id, company_id, sales_order_id, number, delivered_on, warehouse_id, created_by) VALUES (dn2, app_company_id(), so2, 'DN-T123-2', '2027-11-22', wh, f1);
+  BEGIN
+    INSERT INTO delivery_note_lines (company_id, delivery_note_id, order_line_id, item_id, quantity) VALUES (app_company_id(), dn2, l3, box, 1);
+    RAISE EXCEPTION 'FAIL T123e: a box was delivered whose bags an invoice of the order took out';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM delivery_note_lines WHERE item_id = box) THEN
+    RAISE EXCEPTION 'FAIL T123f: company B saw company A''s delivered bundles';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T123 a bundle leaves on a delivery note as its stock parts, billed without moving them again, and comes back within them';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

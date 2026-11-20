@@ -237,14 +237,17 @@ final class QuoteController extends Controller
             $notes = DB::table('delivery_notes as d')->join('warehouses as w', 'w.id', '=', 'd.warehouse_id')
                 ->where('d.sales_order_id', $document->getKey())->orderBy('d.delivered_on')->orderBy('d.number')
                 ->get(['d.id', 'd.number', 'd.delivered_on', 'd.reference', 'd.status', 'w.name as warehouse']);
-            $stock = DB::table('items')->whereIn('id', $document->lines->pluck('item_id')->filter())->where('type', 'inventory')->pluck('id')->map(fn ($id) => (string) $id)->all();
+            $kinds = DB::table('items')->whereIn('id', $document->lines->pluck('item_id')->filter())->whereIn('type', ['inventory', 'bundle'])->pluck('type', 'id');
+            $parts = app(DeliveredGoods::class)->stockParts($kinds->filter(fn ($t) => $t === 'bundle')->keys()->map(fn ($id) => (string) $id)->values()->all());   // 097
             $invoicedOut = DB::table('stock_moves as m')->join('documents as i', 'i.id', '=', 'm.document_id')
                 ->where(['m.kind' => 'sale', 'i.type' => 'invoice', 'i.source_document_id' => $document->getKey()])->where('i.status', '<>', 'void')
                 ->distinct()->pluck('m.item_id')->map(fn ($id) => (string) $id)->all();
             foreach ($document->lines as $line) {
                 $id = (string) $line->getKey();
                 $shipped = $byNote[$id]['delivered'] ?? '0.00';
-                if (in_array((string) $line->item_id, $stock, true) && ! in_array((string) $line->item_id, $invoicedOut, true)) {
+                $kind = $kinds[(string) $line->item_id] ?? null;
+                $taken = $kind === 'bundle' ? array_column($parts[(string) $line->item_id] ?? [], 'item_id') : [(string) $line->item_id];
+                if ($kind !== null && $taken !== [] && array_intersect($taken, $invoicedOut) === []) {
                     $toGo = bcsub((string) $line->quantity, $shipped, 2);
                     if (bccomp($toGo, '0', 2) > 0) {
                         $leaving[$id] = $toGo;
