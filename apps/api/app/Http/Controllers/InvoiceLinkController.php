@@ -26,7 +26,9 @@ final class InvoiceLinkController extends Controller
     public function show(Request $request): JsonResponse
     {
         return $this->withInvoice($request, fn (Company $company, Document $invoice, object $link) => response()->json([
-            'company' => ['name' => (string) ($company->trading_name ?: $company->legal_name), 'tin' => $company->tin, 'email' => $company->email, 'phone' => $company->phone],
+            'company' => ['name' => (string) ($company->trading_name ?: $company->legal_name), 'tin' => $company->tin, 'email' => $company->email, 'phone' => $company->phone,
+                'logo' => app(\App\Domain\Tenancy\CompanyLogo::class)->dataUri((string) $company->getKey()),
+                'payment_details' => CompanySettingsController::template($company->settings['invoice_template'] ?? [])['payment_details'] ?? null],
             'customer' => $invoice->contact?->name,
             'invoice' => [
                 'number' => $invoice->number, 'issue_date' => $invoice->issue_date->format('Y-m-d'), 'due_date' => $invoice->due_date?->format('Y-m-d'),

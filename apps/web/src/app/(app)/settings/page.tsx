@@ -2,6 +2,7 @@ import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCompanySettings, getCurrencies, getDimensions, getNumbering, getSubscription } from "@/lib/data";
 import { subscriptionStatus } from "@/lib/subscription";
 import { CompanyProfileForm, CurrenciesPanel, DimensionsPanel, NumberingPanel, PeriodLockForm } from "./SettingsForms";
+import { LogoCard } from "./LogoCard";
 
 export const metadata = { title: "Company settings" };
 
@@ -9,7 +10,8 @@ export const metadata = { title: "Company settings" };
  * Module 1, company profile and fiscal settings. Every member can read them; an owner or admin changes them; an
  * accountant closes periods. What a role cannot change is shown read-only (the API refuses it anyway).
  */
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
+  const { logo } = await searchParams;
   const [settings, currencies, numbering, dimensions, subscription] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering(), getDimensions(), getSubscription()]);
   const year = settings.fiscal_years.at(-1);
 
@@ -32,6 +34,8 @@ export default async function SettingsPage() {
         </Card>
 
         <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+          <LogoCard hasLogo={Boolean(settings.has_logo)} manage={settings.can.manage} flag={typeof logo === "string" ? logo : undefined} />
+
           <Card label="Period lock">
             <h2 className="text-[19px] font-bold">Closed periods</h2>
             <p className="mt-1.5 text-sm text-muted">

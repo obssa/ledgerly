@@ -36,6 +36,8 @@ async function Invoice({ searchParams }: Pick<PageProps<"/invoice">, "searchPara
 
   return (
     <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI from the API, the company's own logo */}
+      {view.company.logo && <img src={view.company.logo} alt="" className="mb-2 max-h-[56px] max-w-[200px] object-contain" />}
       <p className="text-[13px] text-muted">An invoice from</p>
       <h1 className="text-[22px] font-extrabold tracking-tight">{view.company.name}</h1>
       {view.company.tin && <p className="num text-[12px] text-muted">TIN {view.company.tin}</p>}
@@ -60,6 +62,9 @@ async function Invoice({ searchParams }: Pick<PageProps<"/invoice">, "searchPara
         <div className="mt-1 flex justify-between text-[16px] font-extrabold"><dt>{i.paid ? "Paid" : "Still due"}</dt><dd className="num">{i.paid ? "In full" : formatMoney(i.amount_due, i.currency)}</dd></div>
       </dl>
       {i.notes && <p className="mt-3 whitespace-pre-line text-[13px]">{i.notes}</p>}
+      {!i.paid && view.company.payment_details && (
+        <div className="mt-3 rounded-lg border border-line p-3 text-[13px]"><strong>How to pay</strong><p className="mt-1 whitespace-pre-line">{view.company.payment_details}</p></div>
+      )}
       <a className="btn btn-primary mt-4 w-full justify-center" href={`/invoice/pdf?token=${token}`}>Download the PDF</a>
       <p className="mt-3 text-[12px] text-muted">
         To pay, or with a question, contact {view.company.name}{view.company.phone ? ` on ${view.company.phone}` : ""}{view.company.email ? ` or at ${view.company.email}` : ""}.

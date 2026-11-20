@@ -18,6 +18,9 @@ use Illuminate\Support\Facades\DB;
  */
 final class InvoicePdf
 {
+    /** 100: whether the logo is drawn (images need PHP's GD); null asks the host. Set only by tests of the page itself. */
+    public static ?bool $drawImages = null;
+
     public function render(Company $company, Document $invoice): string
     {
         $options = new Options();
@@ -48,6 +51,8 @@ final class InvoicePdf
         // The company's invoice template: its accent colour (validated as #RRGGBB when saved), how to pay, a footer line.
         $template = \App\Http\Controllers\CompanySettingsController::template($company->settings['invoice_template'] ?? []);
         $accent = $template['accent'] ?? '#111111';
+        // 100: the logo, from the company's own row, as a data: URI (nothing is fetched); only where images can be drawn.
+        $logo = (self::$drawImages ?? extension_loaded('gd')) ? app(\App\Domain\Tenancy\CompanyLogo::class)->dataUri((string) $company->getKey()) : null;
 
         $rows = '';
         foreach ($invoice->lines as $l) {
@@ -64,6 +69,7 @@ final class InvoicePdf
             . 'h1{color:' . $accent . '}thead th{border-bottom:1pt solid ' . $accent . '}.footer{margin-top:18pt;font-size:9pt;color:#555;text-align:center}'
             . '</style></head><body>'
             . '<table style="margin:0"><tr><td style="border:none;vertical-align:top">'
+            . ($logo ? '<img src="' . $e($logo) . '" style="max-height:48pt;max-width:160pt;margin-bottom:4pt"><br>' : '')
             . '<h1>' . $e((string) ($company->trading_name ?: $company->legal_name)) . '</h1>'
             . ($company->trading_name ? '<div>' . $e($company->legal_name) . '</div>' : '')
             . ($company->tin ? '<div>TIN ' . $e($company->tin) . ($company->vat_number ? ' · VAT ' . $e($company->vat_number) : '') . '</div>' : '')

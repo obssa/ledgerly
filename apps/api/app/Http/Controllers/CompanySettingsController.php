@@ -236,6 +236,7 @@ final class CompanySettingsController extends Controller
             ...$this->editable($company),
             'books_closed_until' => $company->books_closed_until?->format('Y-m-d'),
             'books_started' => $booksStarted,
+            'has_logo' => DB::table('company_logos')->where('company_id', $company->getKey())->exists(),   // 100
             'locked_fields' => $booksStarted ? self::FOUNDATION : [],
             'fiscal_years' => DB::table('fiscal_years')->where('company_id', $company->getKey())
                 ->orderBy('starts_on')->get(['starts_on', 'ends_on', 'status']),
