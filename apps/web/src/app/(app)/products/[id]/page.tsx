@@ -55,9 +55,9 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
         <Card className="min-w-0 flex-[2_1_520px]" label="Item details">
           <ItemForm item={item} readOnly={!item.can?.edit} suppliers={suppliers} />
         </Card>
-        {item.tracking === "batch" && (
-          <Card className="min-w-0 flex-[1_1_300px]" label="Batches">
-            <h2 className="text-[15px] font-bold">Batches</h2>
+        {(item.tracking === "batch" || item.tracking === "serial") && (
+          <Card className="min-w-0 flex-[1_1_300px]" label={item.tracking === "serial" ? "Serial numbers" : "Batches"}>
+            <h2 className="text-[15px] font-bold">{item.tracking === "serial" ? "Serial numbers in stock" : "Batches"}</h2>
             {(item.batches ?? []).length === 0 ? <p className="mt-2 text-sm text-muted">None yet. Each delivery names its batch as it comes in.</p> : (
               <ul className="mt-2 text-sm">
                 {item.batches!.map((b) => (

@@ -314,6 +314,11 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                       )}
                       <td>
                         <input aria-label="Description" className="field min-w-[180px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} />
+                        {items.find((it) => it.id === l.itemId)?.tracking === "serial" && (
+                          // 096: a serialised item lists the serial number of each unit (going out, empty takes the oldest).
+                          <input aria-label="Serial numbers" className="field mt-1 text-[13px]" placeholder="Serial numbers, one per unit, by commas"
+                            value={l.batchNumber ?? ""} onChange={(e) => update(l.key, { batchNumber: e.target.value })} />
+                        )}
                         {kind === "bill" && items.find((it) => it.id === l.itemId)?.tracking === "batch" && (
                           // 074: a tracked item comes in with its batch, and its expiry when it has one.
                           <div className="mt-1 flex gap-1">

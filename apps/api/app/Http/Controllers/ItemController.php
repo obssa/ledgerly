@@ -140,7 +140,7 @@ final class ItemController extends Controller
             // Weighted average by default; FIFO, for a stock item, before its first move (064).
             'costing' => ['sometimes', Rule::in(['average', 'fifo'])],
             // Tracked by batch (074), for a stock item, before its first move.
-            'tracking' => ['sometimes', Rule::in(['none', 'batch'])],
+            'tracking' => ['sometimes', Rule::in(['none', 'batch', 'serial'])],
             'barcode' => ['sometimes', ...self::BARCODE],   // 085: the barcode printed on it
         ], ['costing.in' => 'Weighted average or FIFO.', 'barcode.regex' => 'A barcode is 4 to 64 letters, digits or symbols.']);
         if (($data['costing'] ?? 'average') === 'fifo' && ($data['type'] ?? $item?->type) !== 'inventory') {
@@ -152,7 +152,7 @@ final class ItemController extends Controller
             throw ValidationException::withMessages(['max_level' => ['The maximum level is at least the reorder point.']]);
         }
         if (($data['tracking'] ?? 'none') === 'batch' && ($data['type'] ?? $item?->type) !== 'inventory') {
-            throw ValidationException::withMessages(['tracking' => ['Only a stock item is tracked by batch.']]);
+            throw ValidationException::withMessages(['tracking' => ['Only a stock item is tracked by batch or serial number.']]);
         }
         if (! empty($data['barcode'])) {
             $this->assertBarcodeFree((string) $data['barcode'], $item?->getKey(), null);

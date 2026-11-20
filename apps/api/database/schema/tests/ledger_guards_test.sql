@@ -5084,6 +5084,49 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T121 a lease is paid in order, a finance lease split by the effective interest to the cent and cleared, each payment kept';
 END $$;
+-- T122: serial numbers (096). An item tracked by serial number moves one unit of one serial at a time; a serial is in
+-- stock once at most; one sold can come back; its moves name a serial of its own. Company A as f1, warehouse a1.
+DO $$
+DECLARE
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  phone constant uuid := '00000000-0000-0000-0000-000000000ef5';
+  s1 constant uuid := '00000000-0000-0000-0000-000000000ef6';
+  s2 constant uuid := '00000000-0000-0000-0000-000000000ef7';
+  q numeric;
+BEGIN
+  INSERT INTO items (id, company_id, name, type, tracking) VALUES (phone, app_company_id(), 'T122 handset', 'inventory', 'serial');
+  INSERT INTO stock_batches (id, company_id, item_id, number) VALUES (s1, app_company_id(), phone, 'IMEI-350001'), (s2, app_company_id(), phone, 'IMEI-350002');
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES (app_company_id(), phone, wh, '2027-11-01', 'purchase', 2, 300, s1);
+    RAISE EXCEPTION 'FAIL T122a: two units moved under one serial number';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost) VALUES (app_company_id(), phone, wh, '2027-11-01', 'purchase', 1, 300);
+    RAISE EXCEPTION 'FAIL T122b: a serialised item moved without its serial number';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES
+    (app_company_id(), phone, wh, '2027-11-01', 'purchase', 1, 300, s1), (app_company_id(), phone, wh, '2027-11-01', 'purchase', 1, 300, s2);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES (app_company_id(), phone, wh, '2027-11-02', 'purchase', 1, 300, s1);
+    RAISE EXCEPTION 'FAIL T122c: a serial number came into stock twice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES (app_company_id(), phone, wh, '2027-11-03', 'sale', -1, 0, s1);
+  BEGIN
+    INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES (app_company_id(), phone, wh, '2027-11-03', 'sale', -1, 0, s1);
+    RAISE EXCEPTION 'FAIL T122d: a serial number sold twice';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO stock_moves (company_id, item_id, warehouse_id, moved_on, kind, quantity, unit_cost, batch_id) VALUES (app_company_id(), phone, wh, '2027-11-04', 'sale_return', 1, 300, s1);
+  SELECT sum(quantity) INTO q FROM batch_balances WHERE item_id = phone;
+  IF q <> 2 THEN
+    RAISE EXCEPTION 'FAIL T122e: the handsets in stock are % (expected 2: one returned, one never sold)', q;
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM stock_batches WHERE item_id = phone) THEN
+    RAISE EXCEPTION 'FAIL T122f: company B saw company A''s serial numbers';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T122 a serialised item moves one unit of one serial at a time, and a serial is in stock once at most';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

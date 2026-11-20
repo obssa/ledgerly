@@ -663,7 +663,7 @@ export interface Item {
   /** Weighted average (default) or FIFO, chosen before the item's first stock move (064). */
   costing?: "average" | "fifo";
   /** 074: tracked by batch (with expiry), chosen before the first stock move. */
-  tracking?: "none" | "batch";
+  tracking?: "none" | "batch" | "serial";
   /** 075: what a suggested order brings it back up to, and who it goes to. */
   max_level?: string | null;
   preferred_supplier_id?: string | null;

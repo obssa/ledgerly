@@ -67,7 +67,7 @@ final class StockController extends Controller
             'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
             'quantity' => ['required', 'decimal:0,2', 'gt:0'],
             'reference' => ['nullable', 'string', 'max:60'],
-            'batch' => ['nullable', 'string', 'max:60'],   // 074: move this batch; none moves the first expiring
+            'batch' => ['nullable', 'string', 'max:2000'],   // 074: move this batch; none moves the first expiring
         ]);
 
         return DB::transaction(function () use ($data, $stock, $audit, $request) {
@@ -275,7 +275,7 @@ final class StockController extends Controller
             'counted' => ['required', 'array', 'min:1', 'max:1000'],
             'counted.*.item_id' => ['required', 'uuid', 'distinct'],
             'counted.*.quantity' => ['required', 'decimal:0,2', 'min:0'],
-            'counted.*.batch' => ['nullable', 'string', 'max:60'],   // 074: the batch found over, for an item tracked by batch
+            'counted.*.batch' => ['nullable', 'string', 'max:2000'],   // 074: the batch found over, for an item tracked by batch
             'counted.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
             'note' => ['nullable', 'string', 'max:300'],
         ]);
@@ -345,7 +345,7 @@ final class StockController extends Controller
             'unit_cost' => ['required_if:opening,true', 'nullable', 'decimal:0,6', 'min:0'],   // for stock coming in
             'opening' => ['sometimes', 'boolean'],
             'reason' => ['required', 'string', 'min:3', 'max:300'],
-            'batch' => ['nullable', 'string', 'max:60'],   // 074: the batch coming in (or going out) for an item tracked by batch
+            'batch' => ['nullable', 'string', 'max:2000'],   // 074: the batch coming in (or going out) for an item tracked by batch
             'expires_on' => ['nullable', 'date_format:Y-m-d'],
         ]);
         $opening = (bool) ($data['opening'] ?? false);

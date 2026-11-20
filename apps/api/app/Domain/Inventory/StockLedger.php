@@ -18,7 +18,9 @@ use Illuminate\Validation\ValidationException;
  *
  * 074: an item tracked by batch moves by batch. A move in names its batch: an existing one ($batchId) or one given by
  * number and expiry ($batch), made the first time it is seen. A move out takes the batch named, or else the batches that
- * expire first, as many moves as it takes (one per batch); what is returned is their total.
+ * expire first, as many moves as it takes (one per batch); what is returned is their total. 096: an item tracked by
+ * serial number is a batch of one per unit: a move of several units lists their serial numbers (one move each), and
+ * goods out without them take the oldest in stock.
  */
 final class StockLedger
 {
@@ -44,7 +46,7 @@ final class StockLedger
         }
 
         $item = DB::table('items')->where(['company_id' => $companyId, 'id' => $itemId])->first(['name', 'tracking']);
-        $tracked = ($item->tracking ?? 'none') === 'batch' && bccomp(ltrim($quantity, '-'), '0', 2) !== 0;
+        $tracked = in_array($item->tracking ?? 'none', ['batch', 'serial'], true) && bccomp(ltrim($quantity, '-'), '0', 2) !== 0;
         $row = fn (?string $b, string $q, ?string $a) => [
             'company_id' => $companyId, 'item_id' => $itemId, 'warehouse_id' => $warehouseId,
             'moved_on' => $date->format('Y-m-d'), 'kind' => $kind, 'quantity' => $q, 'unit_cost' => $unitCost,
@@ -60,6 +62,32 @@ final class StockLedger
 
         if (! $tracked) {
             return $this->write([$row(null, $quantity, $amount)], $companyId, $baseCurrency);
+        }
+        if ($item->tracking === 'serial' && $batchId === null) {
+            $units = ltrim($quantity, '-');
+            if (bccomp($units, bcadd($units, '0', 0), 2) !== 0) {
+                throw ValidationException::withMessages(['quantity' => ["{$item->name} is tracked by serial number: it moves in whole units."]]);
+            }
+            $numbers = self::serials($batch['number'] ?? null);
+            if ($numbers === [] && ! $out) {
+                throw ValidationException::withMessages(['batch' => ["{$item->name} is tracked by serial number: give the serial number of each unit that comes in."]]);
+            }
+            if ($numbers !== []) {
+                if (count($numbers) !== (int) $units) {
+                    throw ValidationException::withMessages(['batch' => [count($numbers) . " serial numbers for {$units} units of {$item->name}: one each."]]);
+                }
+                // Coming in at a known value: shared by unit, the last taking what rounding leaves.
+                $share = $amount === null ? null : bcdiv($amount, (string) count($numbers), 2);
+                $rows = [];
+                foreach ($numbers as $i => $n) {
+                    $id = $this->serialFor($companyId, $itemId, (string) $item->name, $n, $out);
+                    $part = $share === null ? null : ($i === count($numbers) - 1 ? bcsub($amount, bcmul($share, (string) (count($numbers) - 1), 2), 2) : $share);
+                    $rows[] = $row($id, $out ? '-1' : '1', $part);
+                }
+
+                return $this->write($rows, $companyId, $baseCurrency);
+            }
+            // Out without serial numbers: the oldest in stock, one unit each (below).
         }
         if (! $out) {
             return $this->write([$row($batchId ?? $this->batchFor($companyId, $itemId, (string) $item->name, $batch), $quantity, $amount)], $companyId, $baseCurrency);
@@ -80,7 +108,7 @@ final class StockLedger
         $rows = [];
         $available = DB::table('batch_balances as bb')->join('stock_batches as b', 'b.id', '=', 'bb.batch_id')
             ->where(['bb.company_id' => $companyId, 'bb.item_id' => $itemId, 'bb.warehouse_id' => $warehouseId])->where('bb.quantity', '>', 0)
-            ->orderByRaw('b.expires_on ASC NULLS LAST')->orderBy('b.created_at')->get(['bb.batch_id', 'bb.quantity']);
+            ->orderByRaw('b.expires_on ASC NULLS LAST')->orderBy('b.created_at')->orderBy('b.id')->get(['bb.batch_id', 'bb.quantity']);   // ids are time-ordered: the first made first
         foreach ($available as $a) {
             if (bccomp($need, '0', 2) <= 0) {
                 break;
@@ -95,6 +123,45 @@ final class StockLedger
         }
 
         return $this->write($rows, $companyId, $baseCurrency);
+    }
+
+    /** 096: the serial numbers a line lists, by comma, semicolon or new line, each once. @return list<string> */
+    public static function serials(?string $listed): array
+    {
+        $numbers = array_values(array_filter(array_map('trim', preg_split('/[,;\n\r]+/', (string) $listed) ?: []), fn ($n) => $n !== ''));
+        $seen = [];
+        foreach ($numbers as $n) {
+            if (mb_strlen($n) > 60) {
+                throw ValidationException::withMessages(['batch' => ["Serial number {$n} is longer than 60 characters."]]);
+            }
+            if (isset($seen[mb_strtoupper($n)])) {
+                throw ValidationException::withMessages(['batch' => ["Serial number {$n} is listed twice."]]);
+            }
+            $seen[mb_strtoupper($n)] = true;
+        }
+
+        return $numbers;
+    }
+
+    /** 096: a serial of the item: one in stock to go out, or (coming in) one not in stock, made the first time it is seen. */
+    private function serialFor(string $companyId, string $itemId, string $name, string $number, bool $out): string
+    {
+        $id = DB::table('stock_batches')->where(['company_id' => $companyId, 'item_id' => $itemId])
+            ->whereRaw('upper(btrim(number)) = ?', [mb_strtoupper($number)])->value('id');   // bound, as 074's lookup
+        $held = $id === null ? '0' : (string) DB::table('batch_balances')->where(['company_id' => $companyId, 'batch_id' => $id])->sum('quantity');
+        if ($out && bccomp($held, '0', 2) <= 0) {
+            throw ValidationException::withMessages(['batch' => ["{$name} {$number} is not in stock."]]);
+        }
+        if (! $out && bccomp($held, '0', 2) > 0) {
+            throw ValidationException::withMessages(['batch' => ["{$name} {$number} is in stock already."]]);
+        }
+        if ($id !== null) {
+            return (string) $id;
+        }
+        $id = (string) Str::uuid7();
+        DB::table('stock_batches')->insert(['id' => $id, 'company_id' => $companyId, 'item_id' => $itemId, 'number' => $number]);
+
+        return $id;
     }
 
     /**
