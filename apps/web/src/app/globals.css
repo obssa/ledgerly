@@ -122,6 +122,25 @@ a {
   .side-row-active {
     @apply bg-side-hover font-semibold text-white;
   }
+  /* Segmented tabs: a tray of button-like pills; the open one is raised and white. */
+  .seg {
+    @apply inline-flex max-w-full items-center gap-1 rounded-xl border border-line bg-[#eef2f0] p-1;
+  }
+  .seg-item {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[13.5px] font-semibold text-muted no-underline transition-all duration-150 hover:bg-white/70 hover:text-ink;
+  }
+  .seg-item-active {
+    @apply bg-surface text-brand shadow-[0_1px_2px_rgba(14,26,23,0.08),0_1px_1px_rgba(14,26,23,0.04)] ring-1 ring-line hover:bg-surface hover:text-brand;
+  }
+  .seg-sm .seg-item {
+    @apply px-3 py-1 text-[13px];
+  }
+  .seg-count {
+    @apply rounded-full bg-line-soft px-1.5 [font-variant-numeric:tabular-nums] text-[11.5px] font-semibold text-muted;
+  }
+  .seg-item-active .seg-count {
+    @apply bg-brand-tint text-brand;
+  }
 }
 
 /* The menu's arrows nudge toward the list when a section is pointed at, so it reads as something to open. */

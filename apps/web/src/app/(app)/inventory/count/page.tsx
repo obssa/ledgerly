@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, PageTitle } from "@/components/ui";
+import { Card, PageTitle, Segmented } from "@/components/ui";
 import { getBins, getItems, getStock, getWarehouses } from "@/lib/data";
 import { CountForm } from "./CountForm";
 
@@ -35,20 +35,15 @@ export default async function CountStockPage({ searchParams }: PageProps<"/inven
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/inventory" className="hover:underline">Inventory</Link> / Count</>} title={`Count stock: ${warehouse.name}${bin ? `, bin ${bin.code}` : ""}`}
-        actions={<Link href="/inventory/bins" className="btn">Bins</Link>} />
+      <PageTitle eyebrow={<><Link href="/inventory" className="hover:underline">Inventory</Link> / Count</>} title={`Count stock: ${warehouse.name}${bin ? `, bin ${bin.code}` : ""}`} />
       {active.length > 1 && (
-        <nav className="mb-4 flex flex-wrap gap-2" aria-label="Warehouse">
-          {active.map((w) => <Link key={w.id} href={href(w.id)} aria-current={w.id === warehouse.id ? "page" : undefined}
-            className={`btn ${w.id === warehouse.id ? "btn-primary" : ""}`}>{w.name}</Link>)}
-        </nav>
+        <Segmented label="Warehouse" items={active.map((w) => ({ key: w.id, href: href(w.id), label: w.name, active: w.id === warehouse.id }))} />
       )}
       {here.length > 0 && (
-        <nav className="mb-4 flex flex-wrap gap-2" aria-label="Bin">
-          <Link href={href(warehouse.id)} aria-current={!bin ? "page" : undefined} className={`btn ${!bin ? "btn-primary" : ""}`}>Whole warehouse</Link>
-          {here.map((b) => <Link key={b.id} href={href(warehouse.id, b.id)} aria-current={b.id === bin?.id ? "page" : undefined}
-            className={`btn num ${b.id === bin?.id ? "btn-primary" : ""}`}>{b.code}</Link>)}
-        </nav>
+        <Segmented label="Bin" size="sm" items={[
+          { key: "all", href: href(warehouse.id), label: "Whole warehouse", active: !bin },
+          ...here.map((b) => ({ key: b.id, href: href(warehouse.id, b.id), label: <span className="num">{b.code}</span>, active: b.id === bin?.id })),
+        ]} />
       )}
       <Card className="!p-2" label="Count sheet">
         {lines.length === 0 ? <p className="p-3 text-sm text-muted">{bin ? `Nothing is kept in bin ${bin.code} yet: give it its items on the bins page.` : "No stock items to count."}</p>

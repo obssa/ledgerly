@@ -29,6 +29,27 @@ export function Pill({ tone = "neutral", children }: { tone?: keyof typeof pillT
   );
 }
 
+export type SegmentedItem = { href: string; label: ReactNode; active: boolean; count?: ReactNode; key?: string };
+
+/**
+ * Segmented tabs: views of the same page, or pages of one place, as a tray of button-like pills. The open one is
+ * raised (and marked aria-current). Plain links, so they work without JavaScript and keep the address shareable.
+ */
+export function Segmented({ items, label, size = "md", className = "" }: { items: SegmentedItem[]; label: string; size?: "sm" | "md"; className?: string }) {
+  return (
+    <nav aria-label={label} className={`mb-4 max-w-full overflow-x-auto print:hidden ${className}`}>
+      <div className={`seg ${size === "sm" ? "seg-sm" : ""}`}>
+        {items.map((i) => (
+          <Link key={i.key ?? i.href} href={i.href} aria-current={i.active ? "page" : undefined} className={`seg-item ${i.active ? "seg-item-active" : ""}`}>
+            {i.label}
+            {i.count !== undefined && <span className="seg-count">{i.count}</span>}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 export function PageTitle({ eyebrow, title, actions, description }: { eyebrow?: ReactNode; title: ReactNode; actions?: ReactNode; description?: ReactNode }) {
   return (
     <div className="mb-5 mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">

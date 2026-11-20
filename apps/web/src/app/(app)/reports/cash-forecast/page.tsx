@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Card, PageTitle, Pill } from "@/components/ui";
+import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCashForecast } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ReportsNav } from "../ReportsNav";
@@ -21,11 +20,7 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
   return (
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Cash forecast" />
-      <nav aria-label="Weeks" className="mb-3 flex flex-wrap gap-2 text-[13px]">
-        {SPANS.map((w) => (
-          <Link key={w} href={`/reports/cash-forecast?weeks=${w}`} className={`btn !py-1 ${span === w ? "btn-primary" : ""}`}>{w} weeks</Link>
-        ))}
-      </nav>
+      <Segmented label="Weeks" size="sm" items={SPANS.map((w) => ({ key: String(w), href: `/reports/cash-forecast?weeks=${w}`, label: `${w} weeks`, active: span === w }))} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/cash-forecast" />
         {!f ? <p className="text-[14px] text-muted">Not available in the demo or for your role.</p> : (

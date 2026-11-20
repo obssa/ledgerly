@@ -16,7 +16,7 @@ export default async function InventoryPage() {
   return (
     <>
       <PageTitle eyebrow="Operations" title="Stock on hand"
-        actions={<><Link href="/inventory/bins" className="btn">Bins</Link><Link href="/inventory/batches" className="btn">Batches and expiry</Link><Link href="/reports/inventory-valuation" className="btn">Valuation</Link><Link href="/products" className="btn">Products and services</Link></>} />
+        actions={<Link href="/reports/inventory-valuation" className="btn">Valuation</Link>} />
       {low.length > 0 && (
         <Card className="mb-4" label="Running low">
           <RunningLow rows={low} warehouses={active.map((w) => ({ id: w.id, name: w.name }))} />

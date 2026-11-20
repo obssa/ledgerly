@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ADMIN, SECTIONS, firstPage, locate, type NavSection } from "@/lib/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { ADMIN, SECTIONS, activeHref, firstPage, locate, type NavSection } from "@/lib/navigation";
 import { Icon } from "./Icon";
 
 /** Opens and closes the menu on a phone; the button is in the top bar (MenuButton). */
@@ -66,13 +66,14 @@ export function Sidebar({ company }: { company: ReactNode }) {
 
 function CurrentSections({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   useEffect(() => {
     onNavigate(); // close the drawer when a page opens
   }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps -- only on a new page
-  return <Sections pathname={pathname} onNavigate={onNavigate} />;
+  return <Sections pathname={pathname} search={search} onNavigate={onNavigate} />;
 }
 
-function Sections({ pathname, onNavigate }: { pathname: string | null; onNavigate: () => void }) {
+function Sections({ pathname, search = "", onNavigate }: { pathname: string | null; search?: string; onNavigate: () => void }) {
   const here = pathname === null ? null : locate(pathname);
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
   const isOpen = (s: NavSection) => toggled[s.id] ?? here?.section.id === s.id;
@@ -131,7 +132,7 @@ function Sections({ pathname, onNavigate }: { pathname: string | null; onNavigat
         <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`} inert={!open}>
           <ul id={`menu-${s.id}`} className="ml-[21px] min-h-0 overflow-hidden border-l border-[#23493f] pl-2.5">
             {s.items.map((item, i) => {
-              const active = here?.item.href === item.href;
+              const active = pathname !== null && here?.section.id === s.id && activeHref(s.items, pathname, search) === item.href;
               return (
                 <li key={item.href} style={{ transitionDelay: open ? `${Math.min(i, 8) * 25}ms` : "0ms" }}
                   className={`transition-[opacity,transform] duration-300 ease-out first:pt-0.5 last:pb-1.5 ${open ? "translate-x-0 opacity-100" : "-translate-x-1 opacity-0"}`}>

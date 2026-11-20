@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountTabs } from "../AccountTabs";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getReconciliations, getCompanyToday } from "@/lib/data";
@@ -24,8 +25,8 @@ export default async function ReconcilePage({ params }: PageProps<"/banking/[id]
         eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / <Link href={`/banking/${encodeURIComponent(id)}`} className="hover:underline">
           <span className="num">{account.code}</span> {account.name}</Link> / Reconcile</>}
         title="Reconcile"
-        actions={<Link href={`/banking/${encodeURIComponent(id)}/statement`} className="btn">Statement lines</Link>}
       />
+      <AccountTabs id={id} current="reconcile" />
       <p className="mb-4 text-[14px] text-muted">
         {list.reconciled_through ? <>Reconciled through <span className="num font-semibold text-ink">{list.reconciled_through}</span>; entries on or before that date are locked.</> : "Not reconciled yet."}
       </p>

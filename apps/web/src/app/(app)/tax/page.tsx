@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, PageTitle, Pill } from "@/components/ui";
+import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getTaxCentre } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { FileReturn } from "./TaxForms";
@@ -23,6 +23,7 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
   return (
     <>
       <PageTitle eyebrow="Compliance" title="Tax centre" />
+      <Segmented label="Return" items={KINDS.map(([v, l]) => ({ key: v, href: v === "vat" ? "/tax" : `/tax?kind=${v}`, label: l, active: kind === v }))} />
       {!centre ? (
         <p className="text-[14px] text-muted">
           {kind === "tot" ? <>This company has no turnover tax: add a TOT rate under Tax rates if your country has one (your tax adviser confirms the rate). <a href="/tax" className="font-semibold text-brand hover:underline">Back to VAT</a></> : "Not available in the demo, or for your role."}
@@ -30,10 +31,7 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
       ) : (
         <>
           <form className="mb-4 flex flex-wrap items-end gap-2.5">
-            <div>
-              <label className="field-label" htmlFor="kind">Return</label>
-              <select className="field" id="kind" name="kind" defaultValue={kind}>{KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-            </div>
+            <input type="hidden" name="kind" value={kind} />
             <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={centre.sheet.from} /></div>
             <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={centre.sheet.to} /></div>
             <button type="submit" className="btn">Show</button>

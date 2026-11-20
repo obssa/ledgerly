@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { AccountTabs } from "../AccountTabs";
 import { notFound } from "next/navigation";
-import { Card, PageTitle, Pill } from "@/components/ui";
+import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCompanySettings, getStatement } from "@/lib/data";
 import { STATEMENT_TABS, categorisable, signed, statementTab } from "@/lib/statements";
 import { ApplyRules, ImportStatement, ReviewLine } from "../../StatementForms";
@@ -28,15 +29,11 @@ export default async function StatementPage({ params, searchParams }: PageProps<
           <span className="num">{lines.account.code}</span> {lines.account.name}</Link> / Statement</>}
         title="Statement"
       />
-      <nav aria-label="Statement lines" className="mb-4 flex flex-wrap gap-2">
-        {STATEMENT_TABS.map((t) => {
-          const n = t.status === "all" ? total : lines.counts[t.status];
-          return (
-            <Link key={t.status} href={href(t.status)} aria-current={tab === t.status ? "page" : undefined}
-              className={`btn ${tab === t.status ? "btn-primary" : ""}`}>{t.label} <span className="num">{n}</span></Link>
-          );
-        })}
-      </nav>
+      <AccountTabs id={id} current="statement" />
+      <Segmented label="Statement lines" items={STATEMENT_TABS.map((t) => ({
+        key: t.status, href: href(t.status), label: t.label, active: tab === t.status,
+        count: t.status === "all" ? total : lines.counts[t.status],
+      }))} />
       {lines.can.review && tab === "imported" && lines.data.some((l) => l.rule) && (
         <div className="mb-3"><ApplyRules accountId={id} /></div>
       )}

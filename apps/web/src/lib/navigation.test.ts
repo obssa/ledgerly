@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ADMIN, CREATE, SECTIONS, firstPage, locate, pathOf, searchEntries } from "./navigation";
+import { ADMIN, CREATE, SECTIONS, activeHref, firstPage, locate, pathOf, searchEntries } from "./navigation";
 
 const APP = join(__dirname, "..", "app", "(app)");
 const pageExists = (href: string) => existsSync(join(APP, ...pathOf(href).split("/").filter(Boolean), "page.tsx"));
@@ -39,6 +39,15 @@ describe("navigation", () => {
     // A prefix of a word is not a match: /payments is not under /payments-made.
     expect(locate("/payments")?.item.label).toBe("Payments received");
     expect(locate("/no-access")).toBeNull();
+  });
+
+  it("marks an entry with a query open only on its own query", () => {
+    const tax = SECTIONS.find((s) => s.id === "tax")!.items;
+    expect(activeHref(tax, "/tax", "")).toBe("/tax");
+    expect(activeHref(tax, "/tax", "kind=withholding")).toBe("/tax?kind=withholding");
+    expect(activeHref(tax, "/tax", "kind=withholding&from=2026-01-01")).toBe("/tax?kind=withholding");
+    expect(activeHref(tax, "/tax", "kind=vat")).toBe("/tax");
+    expect(activeHref(tax, "/fixed-assets/tax", "")).toBe("/fixed-assets/tax");
   });
 
   it("finds pages and forms by what people call them", () => {

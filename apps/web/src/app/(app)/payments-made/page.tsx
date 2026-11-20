@@ -11,7 +11,7 @@ export default async function PaymentsMadePage() {
 
   return (
     <>
-      <PageTitle eyebrow="Money out" title="Payments made" actions={<><Link href="/refunds" className="btn">Refunds</Link><Link href="/payments-made/batch" className="btn">Pay in a batch</Link><Link href="/payments-made/bank-file" className="btn">Bank file</Link><Link href="/payments-made/new" className="btn btn-primary">+ Pay bills</Link></>} />
+      <PageTitle eyebrow="Money out" title="Payments made" actions={<><Link href="/refunds" className="btn">Refunds</Link><Link href="/payments-made/bank-file" className="btn">Bank file</Link><Link href="/payments-made/new" className="btn btn-primary">+ Pay bills</Link></>} />
       <Card className="!p-2" label="Payments made">
         <div className="overflow-x-auto">
           <table className="tbl">

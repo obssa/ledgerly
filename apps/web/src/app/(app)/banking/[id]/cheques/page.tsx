@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { AccountTabs } from "../AccountTabs";
 import { notFound } from "next/navigation";
-import { Card, PageTitle, Pill } from "@/components/ui";
+import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCheques } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
@@ -29,10 +30,11 @@ export default async function ChequesPage({ params, searchParams }: PageProps<"/
           <span className="num">{a.code}</span> {a.name}</Link> / Cheques</>}
         title="Cheques"
       />
-      <nav aria-label="Cheques" className="mb-4 flex flex-wrap gap-2">
-        <Link href={base} aria-current={direction === "out" ? "page" : undefined} className={`btn ${direction === "out" ? "btn-primary" : ""}`}>Written</Link>
-        <Link href={`${base}?direction=in`} aria-current={direction === "in" ? "page" : undefined} className={`btn ${direction === "in" ? "btn-primary" : ""}`}>Received</Link>
-      </nav>
+      <AccountTabs id={id} current="cheques" kind="bank" />
+      <Segmented label="Cheques" items={[
+        { href: base, label: "Written", active: direction === "out" },
+        { href: `${base}?direction=in`, label: "Received", active: direction === "in" },
+      ]} />
       {direction === "out" && (
         <p className="mb-4 text-[14px] text-muted">
           {register.next_number ? <>Next cheque number: <span className="num font-semibold text-ink">{register.next_number}</span>. </> : null}

@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { CREATE, locate } from "@/lib/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { CREATE, activeHref, locate } from "@/lib/navigation";
 import { Icon } from "./Icon";
 
 /** Where this page sits: Sales › Invoices. */
@@ -43,31 +43,63 @@ export function SectionTabs() {
 
 function CurrentTabs() {
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   const here = locate(pathname);
   const tabs = here?.section.items.filter((i) => !i.soon && !i.tabHidden) ?? [];
+  const open = activeHref(tabs, pathname, search);
+  const scroller = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+
+  // Arrows show only while the row is wider than the screen and there is more to see that way.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const measure = () => setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+    const frame = requestAnimationFrame(measure);
+    el.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      el.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, [pathname, tabs.length]);
+
   // Braces: newer browsers return a promise from scrollIntoView, and an effect's return value is its cleanup.
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [pathname]);
+    activeRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [pathname, search]);
+
   if (!here || tabs.length < 2) return null;
+  const nudge = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * Math.max(200, (scroller.current?.clientWidth ?? 400) * 0.6), behavior: "smooth" });
+  const arrow = (dir: 1 | -1) => (
+    <button type="button" onClick={() => { nudge(dir); }} aria-label={dir < 0 ? "Earlier pages" : "More pages"} tabIndex={-1}
+      className={`absolute inset-y-0 z-10 flex w-12 items-center ${dir < 0 ? "left-0 justify-start bg-gradient-to-r" : "right-0 justify-end bg-gradient-to-l"} from-canvas via-canvas/85 to-transparent`}>
+      <span className="grid size-7 place-items-center rounded-full border border-line bg-surface text-ink shadow-card hover:border-brand/40 hover:text-brand">
+        <Icon name="chevron" className={`size-4 ${dir < 0 ? "rotate-180" : ""}`} />
+      </span>
+    </button>
+  );
   return (
-    <nav aria-label={`${here.section.label} pages`} className="tab-scroll -mx-1 mt-4 overflow-x-auto print:hidden">
-      <ul className="flex min-w-max gap-1 border-b border-line px-1">
-        {tabs.map((t) => {
-          const active = here.item.href === t.href;
-          return (
-            <li key={t.href}>
-              <Link ref={active ? activeRef : undefined} href={t.href} aria-current={active ? "page" : undefined}
-                className={`relative block whitespace-nowrap px-3 pb-2.5 pt-1.5 text-[13.5px] font-semibold no-underline transition-colors ${
-                  active ? "text-brand after:absolute after:inset-x-2 after:-bottom-px after:h-[2px] after:rounded-full after:bg-brand" : "text-muted hover:text-ink"
-                }`}>
-                {t.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+    <nav aria-label={`${here.section.label} pages`} className="relative mt-3 print:hidden">
+      {edges.left && arrow(-1)}
+      <div ref={scroller} className="tab-scroll overflow-x-auto">
+        <ul className="seg min-w-max">
+          {tabs.map((t) => {
+            const active = open === t.href;
+            return (
+              <li key={t.href}>
+                <Link ref={active ? activeRef : undefined} href={t.href} aria-current={active ? "page" : undefined}
+                  className={`seg-item ${active ? "seg-item-active" : ""}`}>
+                  {t.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      {edges.right && arrow(1)}
     </nav>
   );
 }

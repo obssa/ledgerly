@@ -196,6 +196,17 @@ export function locate(pathname: string): { section: NavSection; item: NavItem }
   return best;
 }
 
+/**
+ * The entry that is open among `items`: one whose query matches the address exactly wins (Withholding on
+ * /tax?kind=withholding); otherwise the page's place in the menu (locate).
+ */
+export function activeHref(items: NavItem[], pathname: string, search: string): string | null {
+  const params = new URLSearchParams(search);
+  const exact = items.find((i) => i.href.includes("?") && pathOf(i.href) === pathname
+    && [...new URLSearchParams(i.href.split("?")[1])].every(([k, v]) => params.get(k) === v));
+  return exact?.href ?? locate(pathname)?.item.href ?? null;
+}
+
 /** Everything the Ctrl+K search can open: every page, and every quick-create form. */
 export type SearchEntry = { href: string; label: string; context: string; terms: string; kind: "page" | "create" };
 

@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Card, PageTitle, Pill } from "@/components/ui";
+import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCashFlow, getDirectCashFlow, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel } from "@/lib/reports";
@@ -57,10 +56,10 @@ export default async function CashFlowPage({ searchParams }: PageProps<"/reports
 
 function MethodLinks({ link, direct }: { link: (method: string) => string; direct: boolean }) {
   return (
-    <nav aria-label="Method" className="mb-4 flex flex-wrap gap-2">
-      <Link href={link("indirect")} className={`btn !py-1 ${direct ? "" : "btn-primary"}`}>Indirect (from the profit)</Link>
-      <Link href={link("direct")} className={`btn !py-1 ${direct ? "btn-primary" : ""}`}>Direct (cash received and paid)</Link>
-    </nav>
+    <Segmented label="Method" size="sm" items={[
+      { key: "indirect", href: link("indirect"), label: "Indirect (from the profit)", active: !direct },
+      { key: "direct", href: link("direct"), label: "Direct (cash received and paid)", active: direct },
+    ]} />
   );
 }
 

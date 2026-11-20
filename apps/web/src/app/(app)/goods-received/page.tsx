@@ -13,7 +13,7 @@ export default async function GoodsReceivedPage() {
       <PageTitle
         eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / Goods received</>}
         title="Goods received"
-        actions={<><Link href="/goods-received/unbilled" className="btn">Received, not billed</Link><Link href="/purchase-orders" className="btn">Purchase orders</Link></>}
+        actions={<Link href="/goods-received/unbilled" className="btn">Received, not billed</Link>}
       />
       <Card className="!p-2" label="Goods received notes">
         {rows.length === 0 ? (
