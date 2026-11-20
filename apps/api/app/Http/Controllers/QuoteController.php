@@ -217,7 +217,7 @@ final class QuoteController extends Controller
     /** The document, its customer and lines, what it came from and what was made from it, and what the member may do now. */
     private function present(Document $document, int $status = 200): JsonResponse
     {
-        $document->load(['lines', 'contact:id,name,tax_id,email']);
+        $document->load(['lines', 'contact:id,name,tax_id,email,phone']);
         $write = (bool) $this->current->membership()?->can('invoices.create');
         $quote = $document->type === 'quote';
         $s = $document->status;

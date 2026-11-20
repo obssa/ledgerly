@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import type { QuoteDetail } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
 import { convertQuote, deliverGoods, emailQuote, quoteStep } from "./actions";
+import { ShareWhatsApp } from "@/components/ShareWhatsApp";
 
 /** What can be done with this quote or sales order now, for this role. The API checks again on every call. */
 export function QuoteActions({ doc }: { doc: QuoteDetail }) {
@@ -138,6 +139,10 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
           <input className="field" id="quote-note" name="note" maxLength={500} />
           <button type="submit" className="btn mt-2" disabled={mailing || !doc.contact.email}>{mailing ? "Sending…" : "Send"}</button>
         </form>
+      )}
+
+      {doc.can.email && quote && ["draft", "sent"].includes(doc.status) && (
+        <ShareWhatsApp kind="quote" id={doc.id} phone={doc.contact.phone ?? null} draft={doc.status === "draft"} />
       )}
 
       {doc.can.extend && (

@@ -5276,6 +5276,51 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T124 a bin is its warehouse''s, kept and archived only when empty; an item is kept in one active bin of the warehouse';
 END $$;
+
+-- T125: invoice links (099). Made only for a posted invoice of the company, for up to 90 days, never written by the
+-- application directly, several at once; looked up only outside a company; another company never sees them. Company
+-- A as f1: the posted invoice and the draft invoice of T123.
+DO $$
+DECLARE
+  posted constant uuid := '00000000-0000-0000-0000-000000001237';
+  draft  constant uuid := '00000000-0000-0000-0000-00000000123c';
+  h1     constant text := repeat('cd', 32);
+  h2     constant text := repeat('ef', 32);
+  got    record;
+BEGIN
+  BEGIN
+    PERFORM invoice_link_issue(draft, h1, now() + interval '10 days');
+    RAISE EXCEPTION 'FAIL T125a: a link was made for an invoice not posted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    PERFORM invoice_link_issue(posted, h1, now() + interval '91 days');
+    RAISE EXCEPTION 'FAIL T125b: an invoice link lasted more than 90 days';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO invoice_links (company_id, document_id, token_hash, expires_at, created_by) VALUES (app_company_id(), posted, h1, now() + interval '1 day', app_user_id());
+    RAISE EXCEPTION 'FAIL T125c: the application wrote an invoice link itself';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM invoice_link_issue(posted, h1, now() + interval '10 days');
+  PERFORM invoice_link_issue(posted, h2, now() + interval '30 days');
+  IF EXISTS (SELECT 1 FROM invoice_link_lookup(h1)) THEN
+    RAISE EXCEPTION 'FAIL T125d: an invoice link was looked up inside a company';
+  END IF;
+
+  PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+  SELECT * INTO got FROM invoice_link_lookup(h1);
+  IF got.document_id IS DISTINCT FROM posted OR NOT EXISTS (SELECT 1 FROM invoice_link_lookup(h2)) THEN
+    RAISE EXCEPTION 'FAIL T125e: the links did not both lead to their invoice';
+  END IF;
+  IF EXISTS (SELECT 1 FROM invoice_link_lookup(repeat('00', 32))) THEN
+    RAISE EXCEPTION 'FAIL T125f: a token never issued led somewhere';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM invoice_links) THEN
+    RAISE EXCEPTION 'FAIL T125g: company B saw company A''s invoice links';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T125 invoice links are made for posted invoices only, looked up outside any company, and seen only by their own';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

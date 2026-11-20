@@ -81,7 +81,7 @@ final class InvoiceController extends Controller
     {
         $this->authorizeCompany('invoices.view');
 
-        return $this->present($invoice->load(['lines', 'contact:id,name,tax_id,email', 'einvoiceSubmissions', 'original:id,number']));
+        return $this->present($invoice->load(['lines', 'contact:id,name,tax_id,email,phone', 'einvoiceSubmissions', 'original:id,number']));
     }
 
     public function store(SaveInvoiceRequest $request, SaveInvoiceDraft $save): JsonResponse

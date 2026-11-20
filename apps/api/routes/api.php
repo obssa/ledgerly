@@ -26,7 +26,9 @@ use App\Http\Controllers\FinancialStatementController;
 use App\Http\Controllers\FixedAssetController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\StaffController;
+use App\Http\Controllers\InvoiceLinkController;
 use App\Http\Controllers\QuoteLinkController;
+use App\Http\Controllers\ShareController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
 use App\Http\Controllers\LandedCostController;
@@ -152,6 +154,8 @@ Route::prefix('v1')->group(function () {
     // A quote seen and answered by the customer through its emailed link (065): no account, the token's hash checked.
     Route::get('public/quote', [QuoteLinkController::class, 'show'])->middleware('throttle:auth');
     Route::post('public/quote/answer', [QuoteLinkController::class, 'answer'])->middleware('throttle:auth');
+    Route::get('public/invoice', [InvoiceLinkController::class, 'show'])->middleware('throttle:auth');   // 099: an invoice shared as a link
+    Route::get('public/invoice/pdf', [InvoiceLinkController::class, 'pdf'])->middleware('throttle:auth');
     Route::get('auth/demo', [DemoController::class, 'index']);
     Route::post('auth/demo', [DemoController::class, 'login'])->middleware('throttle:auth');
 
@@ -193,6 +197,8 @@ Route::prefix('v1')->group(function () {
                 Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind']);
                 Route::post('invoices/{invoice}/email', [InvoiceController::class, 'email']);
                 Route::post('quotes/{quote}/email', [QuoteController::class, 'email']);
+                Route::post('invoices/{invoice}/share', [ShareController::class, 'invoice']);   // by WhatsApp: a link and the message (099)
+                Route::post('quotes/{quote}/share', [ShareController::class, 'quote']);
                 // Files attached to documents (063): not stored for the shared demo accounts.
                 foreach (['invoices' => ['invoice', 'invoice'], 'bills' => ['bill', 'bill'], 'expenses' => ['expense', 'expense'], 'expense-claims' => ['expenseClaim', 'expense_claim']] as $path => [$param, $kind]) {
                     Route::post("{$path}/{{$param}}/attachments", [AttachmentController::class, 'store'])->defaults('kind', $kind);

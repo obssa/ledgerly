@@ -896,7 +896,7 @@ export interface InvoiceDetail extends Invoice {
   restock?: boolean;
   fx_rate: string;
   notes: string | null;
-  contact: Contact & { email?: string | null };
+  contact: Contact & { email?: string | null; phone?: string | null };
   lines: InvoiceLine[];
   warnings: { type: string; message: string }[];
   can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean; refund?: boolean; remind?: boolean; email?: boolean; retain?: boolean };
@@ -1551,6 +1551,18 @@ export interface ExpenseClaimList {
 }
 
 /** GET public/quote (065): a quote as its customer sees it through the emailed link. */
+/** 099: an invoice seen through a shared link, without an account. */
+export interface PublicInvoice {
+  company: { name: string; tin: string | null; email: string | null; phone: string | null };
+  customer: string | null;
+  invoice: {
+    number: string; issue_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; total: string; amount_due: string; paid: boolean;
+    notes: string | null; lines: { description: string; quantity: string; unit_price: string; amount: string }[];
+  };
+  expires_at: string;
+}
+/** An invoice or quote sent by WhatsApp: its link, the message, and the WhatsApp link that opens the chat with it written. */
+export interface SharedDocument { url: string; message: string; expires_at: string; to: string | null; whatsapp_url: string; status: string }
 export interface PublicQuote {
   company: { name: string; tin: string | null; email: string | null; phone: string | null };
   customer: string | null;
@@ -1610,6 +1622,9 @@ export const ledgerly = {
   forgotPassword: (email: string) => api<{ message: string }>("auth/password/forgot", { method: "POST", body: { email } }),
   invitation: (token: string) => api<Invitation>("auth/invitation", { query: { token } }),
   publicQuote: (token: string) => api<PublicQuote>("public/quote", { query: { token } }),
+  publicInvoice: (token: string) => api<PublicInvoice>("public/invoice", { query: { token } }),
+  shareDocument: (kind: "invoice" | "quote", id: string, ctx: RequestOptions) =>
+    api<SharedDocument>(`${kind === "quote" ? "quotes" : "invoices"}/${encodeURIComponent(id)}/share`, { ...ctx, method: "POST", body: {} }),
   answerPublicQuote: (body: { token: string; answer: "accepted" | "declined"; name: string; note?: string }) =>
     api<{ answer: string; status: string }>("public/quote/answer", { method: "POST", body }),
   acceptInvitation: (body: { token: string; name?: string; password?: string }) =>
