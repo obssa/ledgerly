@@ -61,7 +61,7 @@ final class SaveInvoiceRequest extends FormRequest
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')],
             'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')->where('is_active', true)],
             'lines.*.unit_id' => ['nullable', 'uuid', Rule::exists('item_units', 'id')->where('is_active', true)],   // 072
-            'lines.*.batch_number' => ['nullable', 'string', 'max:60'],   // 074: the batch coming in (a bill) or back (a credit note)
+            'lines.*.batch_number' => ['nullable', 'string', 'max:2000'],   // 074: the batch coming in (a bill) or back (a credit note)
             'lines.*.batch_expires_on' => ['nullable', 'date_format:Y-m-d'],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
             // The sales order line an invoice line delivers (067): kept through edits; the database checks it is its order's.

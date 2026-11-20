@@ -150,7 +150,8 @@ final class DocumentStock
             $lines = $this->matchDelivered($doc, $lines, $company);
             foreach ($lines as ['line' => $line, 'item' => $item]) {
                 $move = $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'sale',
-                    '-' . self::baseQuantity($line), '0', $doc->number, $doc->getKey(), $userId);
+                    '-' . self::baseQuantity($line), '0', $doc->number, $doc->getKey(), $userId,
+                    batch: ['number' => $line->batch_number ?? null]);   // 096: the serial numbers (or batch) named, else the oldest / first to expire
                 $cost = $cost->plus($move['amount']->negated());
             }
             if (! $cost->isZero()) {
