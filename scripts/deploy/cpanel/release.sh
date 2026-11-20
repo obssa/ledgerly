@@ -75,8 +75,18 @@ echo "== Cache configuration and routes"
 "$PHP" artisan config:cache --no-interaction
 "$PHP" artisan route:cache --no-interaction
 
-echo "== Switch"
+echo "== Keep the script files of earlier releases"
+# A browser tab opened before this release still runs the old app, and asks for the old build's script files
+# when it opens a page it has not loaded yet. Without them it shows "This page couldn't load" until refreshed.
+# The files are named by their content, so the old ones sit beside the new ones without clashing; they keep
+# their own dates (-p) and are dropped 14 days after their build.
 PREVIOUS="$(readlink "$ROOT/current" 2>/dev/null || true)"
+if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS/web/.next/static" ] && [ -d "$REL/web/.next/static" ]; then
+  cp -Rnp "$PREVIOUS/web/.next/static/." "$REL/web/.next/static/" || echo "WARNING: earlier script files were not copied"
+  find "$REL/web/.next/static" -type f -mtime +14 -delete || true
+fi
+
+echo "== Switch"
 ln -sfn "$REL" "$ROOT/current.next" && mv -Tf "$ROOT/current.next" "$ROOT/current"
 [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$REL" ] && printf '%s\n' "$PREVIOUS" > "$ROOT/shared/previous-release"
 mkdir -p "$WEB_APP_ROOT/tmp" && touch "$WEB_APP_ROOT/tmp/restart.txt"   # the Node.js app restarts on its next request
