@@ -232,7 +232,7 @@ export interface CashForecast {
   as_of: string; weeks: number; opening: string; closing: string; goes_below_zero: boolean;
   overdue: { receivables: string; payables: string };
   lowest: { week: number; from: string; closing: string } | null;
-  data: { week: number; from: string; to: string; receivables: string; payables: string; cheques_in: string; cheques_out: string; recurring_in?: string; recurring_out?: string; in: string; out: string; net: string; closing: string }[];
+  data: { week: number; from: string; to: string; receivables: string; payables: string; cheques_in: string; cheques_out: string; recurring_in?: string; recurring_out?: string; orders_in?: string; orders_out?: string; in: string; out: string; net: string; closing: string }[];
 }
 
 /** GET /reports/kpis: the home page's key figures, from the books as they stand. */

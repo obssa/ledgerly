@@ -11,7 +11,7 @@ const SPANS = [4, 8, 13, 26] as const;
 /**
  * Module 5: the cash forecast, week by week from today: what the bank, cash and wallet accounts hold, what customers
  * owe and what is owed to suppliers by due date (overdue in the first week), the post-dated cheques held, and what the
- * recurring journals and invoices will move on their dates.
+ * recurring journals and invoices will move on their dates, and what confirmed orders will bring in or pay out.
  */
 export default async function CashForecastPage({ searchParams }: PageProps<"/reports/cash-forecast">) {
   const { weeks } = await searchParams;
@@ -46,9 +46,9 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
               <table className="tbl">
                 <thead>
                   <tr><th scope="col">Week</th><th scope="col" className="!text-right">From customers</th><th scope="col" className="!text-right">Cheques in</th>
-                    <th scope="col" className="!text-right">Recurring in</th>
+                    <th scope="col" className="!text-right">Recurring in</th><th scope="col" className="!text-right">Sales orders</th>
                     <th scope="col" className="!text-right">To suppliers</th><th scope="col" className="!text-right">Cheques out</th>
-                    <th scope="col" className="!text-right">Recurring out</th>
+                    <th scope="col" className="!text-right">Recurring out</th><th scope="col" className="!text-right">Purchase orders</th>
                     <th scope="col" className="!text-right">Net</th><th scope="col" className="!text-right">Cash at the end</th></tr>
                 </thead>
                 <tbody>
@@ -58,9 +58,11 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
                       <td className="num text-right">{formatAmount(w.receivables)}</td>
                       <td className="num text-right">{formatAmount(w.cheques_in)}</td>
                       <td className="num text-right">{formatAmount(w.recurring_in ?? "0")}</td>
+                      <td className="num text-right">{formatAmount(w.orders_in ?? "0")}</td>
                       <td className="num text-right">{formatAmount(w.payables)}</td>
                       <td className="num text-right">{formatAmount(w.cheques_out)}</td>
                       <td className="num text-right">{formatAmount(w.recurring_out ?? "0")}</td>
+                      <td className="num text-right">{formatAmount(w.orders_out ?? "0")}</td>
                       <td className={`num text-right ${Number(w.net) < 0 ? "text-bad" : ""}`}>{formatAmount(w.net)}</td>
                       <td className={`num text-right font-semibold ${Number(w.closing) < 0 ? "text-bad" : ""}`}>{formatAmount(w.closing)}</td>
                     </tr>
@@ -68,7 +70,7 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-[13px] text-muted">Read from the books as they stand: posted invoices and bills still owed, by due date, post-dated cheques held, and active recurring entries: a recurring journal&rsquo;s bank and cash lines on each date, a recurring invoice&rsquo;s total by the customer&rsquo;s terms after each date. Drafts and orders are not counted.</p>
+            <p className="mt-3 text-[13px] text-muted">Read from the books as they stand: posted invoices and bills still owed, by due date, post-dated cheques held, and active recurring entries: a recurring journal&rsquo;s bank and cash lines on each date, a recurring invoice&rsquo;s total by the customer&rsquo;s terms after each date; and confirmed sales and purchase orders, for what is not yet on a posted invoice or bill, by the date wanted plus the contact&rsquo;s terms. Drafts are not counted.</p>
           </Card>
         )}
       </div>
