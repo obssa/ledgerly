@@ -111,4 +111,54 @@ final class CashForecastTest extends TestCase
         $this->actingAs(User::query()->findOrFail($b['user']), 'sanctum');
         $this->assertSame($theirsBefore['data'], $forecast(['X-Company-Id' => $b['company']])['data']);
     }
+
+    public function test_confirmed_orders_count_for_what_is_not_yet_invoiced_or_billed(): void
+    {
+        config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
+        $b = $this->companyWithRecords('b@example.test', 'Blue Nile Traders');
+        $c = $this->companyWithRecords('owner@example.test', 'Abyssinia Coffee');
+        $h = ['X-Company-Id' => $c['company']];
+        $forecast = fn (array $hh = []) => $this->getJson('/api/v1/reports/cash-forecast', $hh ?: $h)->assertOk()->json();
+        $sum = fn (array $f, string $key) => array_reduce($f['data'], fn (string $s, array $w) => bcadd($s, $w[$key], 2), '0.00');
+
+        $this->actingAs(User::query()->findOrFail($b['user']), 'sanctum');
+        $theirsBefore = $forecast(['X-Company-Id' => $b['company']]);
+        $this->actingAs(User::query()->findOrFail($c['user']), 'sanctum');
+        $f = $forecast();
+        $on = fn (int $days) => (new \DateTimeImmutable($f['as_of']))->modify("+{$days} days")->format('Y-m-d');
+        $weekOf = fn (string $date) => intdiv((int) (new \DateTimeImmutable($f['as_of']))->diff(new \DateTimeImmutable($date))->format('%a'), 7);
+        $terms = fn (string $contact) => (int) $this->owner()->table('contacts')->where('id', $contact)->value('payment_terms_days');
+
+        // A confirmed order for 10 bags, wanted in 10 days: its total comes in by the customer's terms after that.
+        $so = $this->postJson('/api/v1/sales-orders', ['contact_id' => $c['contact'], 'issue_date' => $f['as_of'], 'due_date' => $on(10), 'currency' => 'ETB',
+            'lines' => [['description' => 'Coffee bags', 'quantity' => '10', 'unit_price' => '100', 'account_id' => $c['sales']]]], $h)->assertCreated()->json();
+        $this->assertSame($f['data'], $forecast()['data'], 'a draft order is not counted');
+        $this->postJson("/api/v1/sales-orders/{$so['id']}/accept", [], $h)->assertOk();
+        $week = $weekOf($on(10 + $terms($c['contact'])));
+        $after = $forecast();
+        $this->assertSame(bcadd($f['data'][$week]['orders_in'], $so['total'], 2), $after['data'][$week]['orders_in']);
+        $this->assertSame(bcadd($f['closing'], $so['total'], 2), $after['closing']);
+
+        // Four bags invoiced and posted: they move from the order to what the customer owes, counted once.
+        $invoice = $this->postJson("/api/v1/sales-orders/{$so['id']}/convert", ['to' => 'invoice', 'lines' => [['line_id' => $so['lines'][0]['id'], 'quantity' => '4']]], $h)
+            ->assertCreated()->json('id');
+        $this->assertSame($after['data'], $forecast()['data'], 'a draft invoice leaves the order as it was');
+        $total = $this->postJson("/api/v1/invoices/{$invoice}/approve", [], $h)->assertOk()->json('total');
+        $then = $forecast();
+        $this->assertSame(bcsub(bcadd($sum($f, 'orders_in'), $so['total'], 2), $total, 2), $sum($then, 'orders_in'));
+        $this->assertSame(bcadd($sum($f, 'receivables'), $total, 2), $sum($then, 'receivables'));
+        $this->assertSame($after['closing'], $then['closing']);
+
+        // An issued purchase order goes out by the supplier's terms after the date wanted.
+        $po = $this->postJson('/api/v1/purchase-orders', ['contact_id' => $c['supplier'], 'issue_date' => $f['as_of'], 'due_date' => $on(7), 'currency' => 'ETB', 'reference' => 'PO-F1',
+            'lines' => [['description' => 'Packaging', 'quantity' => '1', 'unit_price' => '600', 'account_id' => $c['rent']]]], $h)->assertCreated()->json();
+        $this->postJson("/api/v1/purchase-orders/{$po['id']}/issue", [], $h)->assertOk();
+        $out = $forecast();
+        $this->assertSame(bcadd($then['data'][$weekOf($on(7 + $terms($c['supplier'])))]['orders_out'], $po['total'], 2),
+            $out['data'][$weekOf($on(7 + $terms($c['supplier'])))]['orders_out']);
+        $this->assertSame(bcsub($then['closing'], $po['total'], 2), $out['closing']);
+
+        $this->actingAs(User::query()->findOrFail($b['user']), 'sanctum');
+        $this->assertSame($theirsBefore['data'], $forecast(['X-Company-Id' => $b['company']])['data']);
+    }
 }

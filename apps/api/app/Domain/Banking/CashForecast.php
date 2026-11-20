@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\DB;
  * hold today (the ledger, in the base currency) and adds what is expected in and out each week: what customers still
  * owe on posted invoices by their due date, what is still owed on posted bills by theirs, and the post-dated cheques
  * held, by their cheque date; and what the recurring journals (their cash lines, on each date) and recurring invoices
- * (their total, by the customer's terms after each date) will bring in or pay out. Anything already overdue is in the first week. Foreign-currency documents count at their
+ * (their total, by the customer's terms after each date) will bring in or pay out; and confirmed sales and purchase
+ * orders, for what is not yet on a posted invoice or bill, by the date wanted plus the contact's terms. Anything already overdue is in the first week. Foreign-currency documents count at their
  * own rate. Nothing is stored: it is read from the books as they stand, and it posts nothing.
  */
 final class CashForecast
@@ -46,7 +47,7 @@ final class CashForecast
         for ($w = 0; $w < $weeks; $w++) {
             $from = $start->modify('+' . ($w * 7) . ' days');
             $rows[] = ['week' => $w + 1, 'from' => $from->format('Y-m-d'), 'to' => $from->modify('+6 days')->format('Y-m-d'),
-                'receivables' => '0.00', 'payables' => '0.00', 'cheques_in' => '0.00', 'cheques_out' => '0.00', 'recurring_in' => '0.00', 'recurring_out' => '0.00', 'in' => '0.00', 'out' => '0.00', 'net' => '0.00', 'closing' => '0.00'];
+                'receivables' => '0.00', 'payables' => '0.00', 'cheques_in' => '0.00', 'cheques_out' => '0.00', 'recurring_in' => '0.00', 'recurring_out' => '0.00', 'orders_in' => '0.00', 'orders_out' => '0.00', 'in' => '0.00', 'out' => '0.00', 'net' => '0.00', 'closing' => '0.00'];
         }
         $weekOf = function (?string $date) use ($start, $weeks): int {
             if ($date === null) {
@@ -135,11 +136,32 @@ final class CashForecast
             }
         }
 
+        // Confirmed orders: what is not yet on a posted invoice or bill made from them (those are counted above, by their due
+        // date), expected on the date the order wants (else its date) plus the customer's or supplier's terms.
+        $made = DB::table('documents')->where('company_id', $companyId)->whereIn('type', ['invoice', 'bill'])->whereIn('status', ['posted', 'part_paid', 'paid'])
+            ->whereNotNull('source_document_id')->groupBy('source_document_id')->select('source_document_id')
+            ->selectRaw('sum(total)::numeric(20,2)::text AS total')->pluck('total', 'source_document_id');
+        foreach (DB::table('documents as o')->join('contacts as c', 'c.id', '=', 'o.contact_id')->where(['o.company_id' => $companyId, 'o.status' => 'accepted'])
+            ->whereIn('o.type', ['sales_order', 'purchase_order'])->get(['o.id', 'o.type', 'o.issue_date', 'o.due_date', 'o.total', 'o.currency', 'c.payment_terms_days']) as $o) {
+            $left = bcsub((string) $o->total, (string) ($made[$o->id] ?? '0'), 2);
+            if (bccomp($left, '0', 2) <= 0) {
+                continue;
+            }
+            $terms = (int) ($o->payment_terms_days ?? 0);
+            $paid = (new DateTimeImmutable(substr((string) ($o->due_date ?? $o->issue_date), 0, 10)))->modify("+{$terms} days")->format('Y-m-d');
+            if ($paid > $end) {
+                continue;
+            }
+            $i = $weekOf(max($paid, $today));
+            $key = $o->type === 'sales_order' ? 'orders_in' : 'orders_out';
+            $rows[$i][$key] = bcadd($rows[$i][$key], bcmul($left, $rateOf((string) $o->currency), 2), 2);
+        }
+
         $balance = $opening;
         $lowest = null;
         foreach ($rows as &$r) {
-            $r['in'] = bcadd(bcadd($r['receivables'], $r['cheques_in'], 2), $r['recurring_in'], 2);
-            $r['out'] = bcadd(bcadd($r['payables'], $r['cheques_out'], 2), $r['recurring_out'], 2);
+            $r['in'] = bcadd(bcadd(bcadd($r['receivables'], $r['cheques_in'], 2), $r['recurring_in'], 2), $r['orders_in'], 2);
+            $r['out'] = bcadd(bcadd(bcadd($r['payables'], $r['cheques_out'], 2), $r['recurring_out'], 2), $r['orders_out'], 2);
             $r['net'] = bcsub($r['in'], $r['out'], 2);
             $balance = bcadd($balance, $r['net'], 2);
             $r['closing'] = $balance;
