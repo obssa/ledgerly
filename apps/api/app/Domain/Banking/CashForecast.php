@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domain\Banking;
 
+use App\Domain\Ledger\Money;
+use App\Domain\Ledger\RecurringJournals;
+use App\Domain\Sales\RecurringInvoices;
+use App\Domain\Tax\TaxCalculator;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -11,7 +15,8 @@ use Illuminate\Support\Facades\DB;
  * Module 5: the cash forecast, week by week (13 by default). It starts from what the bank, cash and wallet accounts
  * hold today (the ledger, in the base currency) and adds what is expected in and out each week: what customers still
  * owe on posted invoices by their due date, what is still owed on posted bills by theirs, and the post-dated cheques
- * held, by their cheque date. Anything already overdue is in the first week. Foreign-currency documents count at their
+ * held, by their cheque date; and what the recurring journals (their cash lines, on each date) and recurring invoices
+ * (their total, by the customer's terms after each date) will bring in or pay out. Anything already overdue is in the first week. Foreign-currency documents count at their
  * own rate. Nothing is stored: it is read from the books as they stand, and it posts nothing.
  */
 final class CashForecast
@@ -41,7 +46,7 @@ final class CashForecast
         for ($w = 0; $w < $weeks; $w++) {
             $from = $start->modify('+' . ($w * 7) . ' days');
             $rows[] = ['week' => $w + 1, 'from' => $from->format('Y-m-d'), 'to' => $from->modify('+6 days')->format('Y-m-d'),
-                'receivables' => '0.00', 'payables' => '0.00', 'cheques_in' => '0.00', 'cheques_out' => '0.00', 'in' => '0.00', 'out' => '0.00', 'net' => '0.00', 'closing' => '0.00'];
+                'receivables' => '0.00', 'payables' => '0.00', 'cheques_in' => '0.00', 'cheques_out' => '0.00', 'recurring_in' => '0.00', 'recurring_out' => '0.00', 'in' => '0.00', 'out' => '0.00', 'net' => '0.00', 'closing' => '0.00'];
         }
         $weekOf = function (?string $date) use ($start, $weeks): int {
             if ($date === null) {
@@ -74,11 +79,67 @@ final class CashForecast
             $rows[$i][$key] = bcadd($rows[$i][$key], $base, 2);
         }
 
+        // What the recurring entries will move, each time they come due in the window: a recurring journal's lines on the
+        // cash accounts on its date; a recurring invoice's total, received by the customer's terms after its date.
+        $rateOf = fn (string $currency) => $currency === $baseCurrency ? '1'
+            : (string) (DB::table('exchange_rates')->where(['company_id' => $companyId, 'currency' => $currency])->where('rate_date', '<=', $today)
+                ->orderByDesc('rate_date')->value('rate') ?? '0');
+        $cash = DB::table('accounts')->where('company_id', $companyId)->whereIn('subtype', self::MONEY)->pluck('id')->flip();
+        $occurrences = function (object $t, callable $advance) use ($end): array {
+            $dates = [];
+            for ($on = substr((string) $t->next_on, 0, 10); $on <= $end && ($t->ends_on === null || $on <= substr((string) $t->ends_on, 0, 10)) && count($dates) < 60; $on = $advance($on, (string) $t->frequency)) {
+                $dates[] = $on;
+            }
+
+            return $dates;
+        };
+        foreach (DB::table('recurring_journals')->where(['company_id' => $companyId, 'is_active' => true])->where('next_on', '<=', $end)->get() as $t) {
+            $net = '0';
+            foreach (json_decode((string) $t->lines, true, 512, JSON_THROW_ON_ERROR) as $l) {
+                if (isset($cash[$l['account_id'] ?? ''])) {
+                    $net = bcadd($net, bcsub((string) ($l['debit'] ?? '0'), (string) ($l['credit'] ?? '0'), 2), 2);
+                }
+            }
+            if (bccomp($net, '0', 2) === 0) {
+                continue;
+            }
+            foreach ($occurrences($t, RecurringJournals::advance(...)) as $on) {
+                $i = $weekOf(max($on, $today));
+                $key = bccomp($net, '0', 2) > 0 ? 'recurring_in' : 'recurring_out';
+                $rows[$i][$key] = bcadd($rows[$i][$key], ltrim($net, '-'), 2);
+            }
+        }
+        $tax = new TaxCalculator();
+        $taxRates = DB::table('tax_rates')->where('company_id', $companyId)->pluck('rate', 'id');
+        foreach (DB::table('recurring_invoices as r')->join('contacts as c', 'c.id', '=', 'r.contact_id')
+            ->where(['r.company_id' => $companyId, 'r.is_active' => true])->where('r.next_on', '<=', $end)
+            ->get(['r.next_on', 'r.ends_on', 'r.frequency', 'r.lines', 'r.currency', 'r.prices_include_tax', 'c.payment_terms_days']) as $t) {
+            // Totalled the way the invoice it makes will be (SaveInvoiceDraft::calculate).
+            $amounts = [];
+            foreach (json_decode((string) $t->lines, true, 512, JSON_THROW_ON_ERROR) as $l) {
+                $amounts[] = $tax->line(Money::of((string) $l['unit_price'], (string) $t->currency), (string) $l['quantity'],
+                    (string) ($l['discount_rate'] ?? '0'), (string) ($taxRates[$l['tax_rate_id'] ?? ''] ?? '0'), (bool) $t->prices_include_tax);
+            }
+            $total = $tax->document($amounts, (string) $t->currency)->total->toDecimalString();
+            $base = bcmul($total, $rateOf((string) $t->currency), 2);
+            if (bccomp($base, '0', 2) <= 0) {
+                continue;
+            }
+            $terms = (int) ($t->payment_terms_days ?? 0);
+            foreach ($occurrences($t, RecurringInvoices::advance(...)) as $on) {
+                $paid = (new DateTimeImmutable($on))->modify("+{$terms} days")->format('Y-m-d');
+                if ($paid <= $end) {
+                    $i = $weekOf($paid);
+                    $rows[$i]['recurring_in'] = bcadd($rows[$i]['recurring_in'], $base, 2);
+                }
+            }
+        }
+
         $balance = $opening;
         $lowest = null;
         foreach ($rows as &$r) {
-            $r['in'] = bcadd($r['receivables'], $r['cheques_in'], 2);
-            $r['out'] = bcadd($r['payables'], $r['cheques_out'], 2);
+            $r['in'] = bcadd(bcadd($r['receivables'], $r['cheques_in'], 2), $r['recurring_in'], 2);
+            $r['out'] = bcadd(bcadd($r['payables'], $r['cheques_out'], 2), $r['recurring_out'], 2);
             $r['net'] = bcsub($r['in'], $r['out'], 2);
             $balance = bcadd($balance, $r['net'], 2);
             $r['closing'] = $balance;
