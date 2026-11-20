@@ -55,9 +55,12 @@ final class FixedAssets
             ->where('depreciation_starts_on', '<=', $periodEnd)->orderBy('code')->get();
         $soFar = DB::table('asset_depreciation')->where('company_id', $id)->whereIn('asset_id', $assets->pluck('id')->all())
             ->groupBy('asset_id')->select('asset_id')->selectRaw('sum(amount)::numeric(20,2)::text AS total')->pluck('total', 'asset_id');
+        $months = DB::table('asset_depreciation')->where('company_id', $id)->whereIn('asset_id', $assets->pluck('id')->all())
+            ->groupBy('asset_id')->select('asset_id')->selectRaw('count(*) AS n')->pluck('n', 'asset_id');
+        $impaired = $this->impaired($id, $assets->pluck('id')->all());
         $out = [];
         foreach ($assets as $a) {
-            $amount = $this->charge($a, (string) ($soFar[$a->id] ?? '0'));
+            $amount = $this->charge($a, (string) ($soFar[$a->id] ?? '0'), (string) ($impaired[$a->id] ?? '0'), (int) ($months[$a->id] ?? 0));
             if ($amount->isPositive()) {
                 $out[] = ['asset' => $a, 'amount' => (string) $amount];
             }
@@ -66,19 +69,26 @@ final class FixedAssets
         return $out;
     }
 
-    /** One asset's charge for a month, given what it has been charged so far. */
-    public function charge(object $a, string $soFar): BigDecimal
+    /**
+     * One asset's charge for a month, given what it has been charged so far. 091: an impaired asset's lower carrying
+     * amount is depreciated over its remaining life (straight line: what is left over the months still to go), as
+     * IFRS for SMEs 27 asks; an asset never impaired is charged as before.
+     */
+    public function charge(object $a, string $soFar, string $impaired = '0', int $monthsCharged = 0): BigDecimal
     {
         $cost = BigDecimal::of((string) $a->cost);
         $residual = BigDecimal::of((string) $a->residual_value);
-        $depreciated = BigDecimal::of((string) $a->opening_depreciation)->plus($soFar);
+        $depreciated = BigDecimal::of((string) $a->opening_depreciation)->plus($soFar)->plus($impaired);
         $left = $cost->minus($residual)->minus($depreciated);
         if (! $left->isPositive()) {
             return BigDecimal::zero()->toScale(2);
         }
-        $monthly = $a->method === 'straight_line'
-            ? $cost->minus($residual)->dividedBy((int) $a->useful_life_months, 2, Rounding::halfUp())
-            : $cost->minus($depreciated)->multipliedBy((string) $a->annual_rate)->dividedBy(12, 2, Rounding::halfUp());
+        $writtenDown = BigDecimal::of($impaired)->isPositive();
+        $monthly = match (true) {
+            $a->method === 'straight_line' && $writtenDown => $left->dividedBy(max(1, (int) $a->useful_life_months - $monthsCharged), 2, Rounding::halfUp()),
+            $a->method === 'straight_line' => $cost->minus($residual)->dividedBy((int) $a->useful_life_months, 2, Rounding::halfUp()),
+            default => $cost->minus($depreciated)->multipliedBy((string) $a->annual_rate)->dividedBy(12, 2, Rounding::halfUp()),
+        };
 
         return ($monthly->isGreaterThan($left) ? $left : $monthly)->toScale(2);
     }
@@ -149,7 +159,8 @@ final class FixedAssets
                 throw ValidationException::withMessages(['date' => ["Depreciation of {$a->code} is posted to {$lastCharged}: date the disposal after that."]]);
             }
             $charged = (string) DB::table('asset_depreciation')->where(['company_id' => $id, 'asset_id' => $a->id])->sum('amount');
-            $accumulated = Money::of(BigDecimal::of((string) $a->opening_depreciation)->plus($charged ?: '0'), $base);
+            $impaired = (string) DB::table('asset_impairments')->where(['company_id' => $id, 'asset_id' => $a->id])->sum('amount');   // 091
+            $accumulated = Money::of(BigDecimal::of((string) $a->opening_depreciation)->plus($charged ?: '0')->plus($impaired ?: '0'), $base);
             $cost = Money::of((string) $a->cost, $base);
             $received = Money::of($proceeds, $base);
             $book = $cost->minus($accumulated);
@@ -194,6 +205,52 @@ final class FixedAssets
      *
      * @return array{posted: list<array<string, string>>, ahead: list<array<string, string>>, depreciated: string, book_value: string}
      */
+    /** @param list<string> $assetIds @return array<string, string> what each asset has been written down by (091) */
+    public function impaired(string $companyId, array $assetIds): array
+    {
+        return DB::table('asset_impairments')->where('company_id', $companyId)->whereIn('asset_id', $assetIds)->groupBy('asset_id')
+            ->select('asset_id')->selectRaw('sum(amount)::numeric(20,2)::text AS total')->pluck('total', 'asset_id')->all();
+    }
+
+    /**
+     * 091: writes an asset down by $amount on $date (Dr its depreciation and impairment expense, Cr its accumulated
+     * depreciation), never below its residual value; later depreciation spreads what is left over the remaining life.
+     *
+     * @return array<string, mixed> the impairment
+     */
+    public function impair(Company $company, string $assetId, string $date, string $amount, string $reason, string $userId): array
+    {
+        return DB::transaction(function () use ($company, $assetId, $date, $amount, $reason, $userId) {
+            $id = $company->getKey();
+            $base = $company->base_currency;
+            $a = DB::table('fixed_assets')->where(['company_id' => $id, 'id' => $assetId])->lockForUpdate()->first() ?? abort(404);
+            if ($a->status !== 'active') {
+                throw ValidationException::withMessages(['amount' => ["{$a->code} was disposed of: it is not written down."]]);
+            }
+            if ($date < (string) $a->acquired_on) {
+                throw ValidationException::withMessages(['date' => ["{$a->code} was acquired on {$a->acquired_on}."]]);
+            }
+            $charged = (string) DB::table('asset_depreciation')->where(['company_id' => $id, 'asset_id' => $a->id])->sum('amount');
+            $impaired = (string) ($this->impaired($id, [(string) $a->id])[$a->id] ?? '0');
+            $left = BigDecimal::of((string) $a->cost)->minus((string) $a->residual_value)->minus((string) $a->opening_depreciation)->minus($charged ?: '0')->minus($impaired);
+            if (BigDecimal::of($amount)->isGreaterThan($left)) {
+                throw ValidationException::withMessages(['amount' => ["{$a->code} can be written down by {$left->toScale(2)} at most: its carrying amount above the residual value."]]);
+            }
+            $impairmentId = (string) Str::uuid7();
+            $label = "{$a->code} {$a->name}";
+            $dims = $a->location_id ? ['location_id' => $a->location_id] : [];
+            $money = Money::of($amount, $base);
+            $draft = new JournalDraft($id, new DateTimeImmutable($date), $base, $base, '1', mb_substr("Impairment of {$label}", 0, 255), 'asset_impairment', $impairmentId);
+            $draft->add(JournalLineDraft::debit($a->expense_account_id, $money, null, "Impairment of {$label}", null, $dims));
+            $draft->add(JournalLineDraft::credit($a->depreciation_account_id, $money, null, "Impairment of {$label}", null, $dims));
+            $entry = $this->posting->post($draft, $userId);
+            DB::table('asset_impairments')->insert(['id' => $impairmentId, 'company_id' => $id, 'asset_id' => $a->id, 'impaired_on' => $date,
+                'amount' => $money->toDecimalString(), 'reason' => trim($reason), 'entry_id' => $entry->getKey(), 'created_by' => $userId]);
+
+            return ['id' => $impairmentId, 'amount' => $money->toDecimalString(), 'impaired_on' => $date, 'entry' => ['id' => $entry->getKey(), 'number' => (int) $entry->number]];
+        });
+    }
+
     public function schedule(object $a, int $ahead = 12): array
     {
         $posted = DB::table('asset_depreciation as d')->join('depreciation_runs as r', 'r.id', '=', 'd.run_id')
@@ -204,8 +261,9 @@ final class FixedAssets
         $month = self::monthEnd(max((string) $a->depreciation_starts_on, $last ? (new DateTimeImmutable($last))->modify('+1 day')->format('Y-m-d') : '0000-01-01'));
         $future = [];
         $running = $soFar;
+        $impaired = (string) ($this->impaired((string) $a->company_id, [(string) $a->id])[$a->id] ?? '0');
         for ($i = 0; $i < $ahead && $a->status === 'active'; $i++) {
-            $charge = $this->charge($a, (string) $running);
+            $charge = $this->charge($a, (string) $running, $impaired, $posted->count() + $i);
             if (! $charge->isPositive()) {
                 break;
             }
@@ -213,10 +271,13 @@ final class FixedAssets
             $future[] = ['period_end' => $month, 'amount' => (string) $charge];
             $month = self::monthEnd((new DateTimeImmutable($month))->modify('+1 day')->format('Y-m-d'));
         }
-        $depreciated = BigDecimal::of((string) $a->opening_depreciation)->plus($soFar)->toScale(2);
+        $depreciated = BigDecimal::of((string) $a->opening_depreciation)->plus($soFar)->plus($impaired)->toScale(2);
 
         return [
             'posted' => $posted->map(fn ($r) => ['period_end' => $r->period_end, 'amount' => (string) $r->amount, 'entry_id' => $r->journal_entry_id])->values()->all(),
+            'impairments' => DB::table('asset_impairments')->where(['company_id' => $a->company_id, 'asset_id' => $a->id])->orderBy('impaired_on')
+                ->get(['id', 'impaired_on', 'amount', 'reason', 'entry_id'])->map(fn ($r) => (array) $r)->all(),
+            'impaired' => (string) BigDecimal::of($impaired)->toScale(2),
             'ahead' => $future,
             'depreciated' => (string) $depreciated,
             'book_value' => (string) BigDecimal::of((string) $a->cost)->minus($depreciated)->toScale(2),

@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { Account, Dimension, FixedAsset } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
-import { disposeAsset, runDepreciation, saveAsset } from "./actions";
+import { disposeAsset, impairAsset, runDepreciation, saveAsset } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -97,6 +97,25 @@ export function AssetForm({ asset, options, locked }: { asset?: FixedAsset; opti
         <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : asset ? "Save changes" : "Register asset"}</button>
         {locked && <span className="text-[13px] text-muted">It has been depreciated: how it wears out stays as it was.</span>}
       </div>
+    </form>
+  );
+}
+
+/** 091: write an asset down when it is worth less than its carrying amount (damaged, idle, obsolete). */
+export function ImpairAsset({ id, bookValue }: { id: string; bookValue: string }) {
+  const [state, action, pending] = useActionState(impairAsset, undefined);
+  const today = todayIn();
+  return (
+    <form action={action} noValidate className="grid gap-3">
+      <Message state={state} />
+      <input type="hidden" name="id" value={id} />
+      <p className="text-[13px] text-muted">Carried at {bookValue}. If it is worth less (damaged, idle, obsolete), write it down by the difference.</p>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+        <div><label className="field-label" htmlFor="imp-date">Date</label><input className="field num" id="imp-date" name="date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="imp-amount">Write down by</label><input className="field num" id="imp-amount" name="amount" inputMode="decimal" /></div>
+      </div>
+      <div><label className="field-label" htmlFor="imp-reason">Why it is worth less</label><input className="field" id="imp-reason" name="reason" maxLength={500} placeholder="Dropped; board replaced" /></div>
+      <button type="submit" className="btn self-start" disabled={pending}>{pending ? "Posting…" : "Write it down"}</button>
     </form>
   );
 }

@@ -54,6 +54,20 @@ export async function disposeAsset(_: FormState | undefined, form: FormData): Pr
   }
 }
 
+/** 091: writes the asset down when it is worth less than its carrying amount. */
+export async function impairAsset(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.impairFixedAsset(text(form, "id") ?? "", {
+      date: text(form, "date") ?? "", amount: (text(form, "amount") ?? "").replace(/[,\s]/g, ""), reason: text(form, "reason") ?? "",
+    }, ctx);
+    refresh();
+    return { notice: "Written down: the entry is posted, and later depreciation spreads what is left over the remaining life." };
+  } catch (error) {
+    return refusal(error, "write assets down");
+  }
+}
+
 export async function runDepreciation(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   try {

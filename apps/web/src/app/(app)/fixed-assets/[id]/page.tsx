@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getAssetOptions, getBankAccounts, getFixedAsset } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { AssetForm, DisposeAsset } from "../AssetForms";
+import { AssetForm, DisposeAsset, ImpairAsset } from "../AssetForms";
 
 export const metadata = { title: "Fixed asset" };
 
@@ -52,6 +52,25 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
           </table>
         </div>
       </Card>
+      {(a.impairments ?? []).length > 0 && (
+        <Card className="mb-4" label="Impairments">
+          <h2 className="mb-2 text-[15px] font-bold">Written down</h2>
+          <ul className="text-sm">
+            {a.impairments!.map((i) => (
+              <li key={i.id} className="flex justify-between gap-2 border-t border-line py-1.5">
+                <span><Link href={`/journal/${encodeURIComponent(i.entry_id)}`} className="num hover:underline">{i.impaired_on}</Link> · {i.reason}</span>
+                <span className="num">{formatAmount(i.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      {a.can.manage && a.status === "active" && (
+        <Card className="mb-4" label="Write down">
+          <h2 className="mb-3 text-[15px] font-bold">Write it down (impairment)</h2>
+          <ImpairAsset id={a.id} bookValue={formatAmount(a.book_value)} />
+        </Card>
+      )}
       {a.can.manage && a.status === "active" && (
         <Card className="mb-4" label="Dispose">
           <h2 className="mb-3 text-[15px] font-bold">Sell or scrap it</h2>

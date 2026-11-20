@@ -271,6 +271,7 @@ Route::prefix('v1')->group(function () {
             Route::get('fixed-assets/{fixedAsset}', [FixedAssetController::class, 'show'])->whereUuid('fixedAsset');
             Route::put('fixed-assets/{fixedAsset}', [FixedAssetController::class, 'update'])->whereUuid('fixedAsset');
             Route::post('fixed-assets/{fixedAsset}/dispose', [FixedAssetController::class, 'dispose'])->whereUuid('fixedAsset');
+            Route::post('fixed-assets/{fixedAsset}/impair', [FixedAssetController::class, 'impair'])->whereUuid('fixedAsset');   // 091
             Route::get('depreciation/preview', [FixedAssetController::class, 'preview']);
             Route::post('depreciation-runs', [FixedAssetController::class, 'run']);
             Route::get('projects', [ProjectController::class, 'index']);
