@@ -66,7 +66,9 @@ export function Sidebar({ company }: { company: ReactNode }) {
 
 function CurrentSections({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
-  useEffect(onNavigate, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps -- close the drawer when a page opens
+  useEffect(() => {
+    onNavigate(); // close the drawer when a page opens
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps -- only on a new page
   return <Sections pathname={pathname} onNavigate={onNavigate} />;
 }
 

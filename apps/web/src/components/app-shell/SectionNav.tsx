@@ -46,7 +46,10 @@ function CurrentTabs() {
   const here = locate(pathname);
   const tabs = here?.section.items.filter((i) => !i.soon && !i.tabHidden) ?? [];
   const activeRef = useRef<HTMLAnchorElement>(null);
-  useEffect(() => activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" }), [pathname]);
+  // Braces: newer browsers return a promise from scrollIntoView, and an effect's return value is its cleanup.
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [pathname]);
   if (!here || tabs.length < 2) return null;
   return (
     <nav aria-label={`${here.section.label} pages`} className="tab-scroll -mx-1 mt-4 overflow-x-auto print:hidden">
