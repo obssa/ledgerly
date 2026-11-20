@@ -69,6 +69,8 @@ export interface ImportResult {
   ignored_columns: string[];
   /** Account codes already in the chart, left as they are. */
   skipped?: string[];
+  /** 096: rows of another program's chart that belong elsewhere here (a bank, the receivable), with where. */
+  left_out?: { row: number; name: string | null; reason: string }[];
 }
 
 /** What the result says, in a sentence. */
@@ -88,5 +90,7 @@ export function importSummary(r: ImportResult): string {
     return r.checked ? `All ${r.rows} lines are fine. Import them to enter the opening balances.` : `Opening balances entered: ${r.added} accounts.`;
   }
   const skipped = r.skipped && r.skipped.length > 0 ? ` ${r.skipped.length} already in the chart, left as they are (${r.skipped.join(", ")}).` : "";
-  return (r.checked ? `All ${r.rows} rows are fine. Import them to add the ${what}.` : `${r.added} ${what} added.`) + skipped;
+  const left = r.left_out && r.left_out.length > 0 ? ` ${r.left_out.length} left out: they belong elsewhere here (listed below).` : "";
+  const fine = r.left_out?.length ? `All ${r.rows - r.left_out.length} rows to add are fine.` : `All ${r.rows} rows are fine.`;
+  return (r.checked ? `${fine} Import them to add the ${what}.` : `${r.added} ${what} added.`) + skipped + left;
 }

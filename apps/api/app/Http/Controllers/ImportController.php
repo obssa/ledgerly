@@ -37,19 +37,20 @@ final class ImportController extends Controller
 
     /** The headings each kind reads (lower case, spaces as underscores), with a few common other names. */
     private const COLUMNS = [
-        'customers' => ['name' => 'name', 'tax_id' => 'tax_id', 'tin' => 'tax_id', 'email' => 'email', 'phone' => 'phone', 'website' => 'website',
+        // 096: with the headings of QuickBooks, Sage and Tally exports as well.
+        'customers' => ['customer' => 'name', 'customer_name' => 'name', 'display_name' => 'name', 'full_name' => 'name', 'company_name' => 'name', 'ledger_name' => 'name', 'phone_number' => 'phone', 'telephone' => 'phone', 'mobile' => 'phone', 'e_mail' => 'email', 'email_address' => 'email', 'tax_registration_number' => 'tax_id', 'tax_number' => 'tax_id', 'vat_reg_no' => 'tax_id', 'vat_registration_number' => 'tax_id', 'vat_number' => 'tax_id', 'billing_address' => 'address.line1', 'billing_street' => 'address.line1', 'billing_city' => 'address.city', 'billing_state' => 'address.region', 'billing_zip' => 'address.postal_code', 'street1' => 'address.line1', 'street2' => 'address.line2', 'town' => 'address.city', 'county' => 'address.region', 'state' => 'address.region', 'post_code' => 'address.postal_code', 'postcode' => 'address.postal_code', 'pin_code' => 'address.postal_code', 'payment_terms' => 'payment_terms_days', 'credit_terms' => 'payment_terms_days', 'name' => 'name', 'tax_id' => 'tax_id', 'tin' => 'tax_id', 'email' => 'email', 'phone' => 'phone', 'website' => 'website',
             'currency' => 'currency', 'payment_terms_days' => 'payment_terms_days', 'terms' => 'payment_terms_days', 'credit_limit' => 'credit_limit',
             'notes' => 'notes', 'address' => 'address.line1', 'address_line1' => 'address.line1', 'address_line2' => 'address.line2',
             'city' => 'address.city', 'region' => 'address.region', 'postal_code' => 'address.postal_code'],
-        'suppliers' => ['name' => 'name', 'tax_id' => 'tax_id', 'tin' => 'tax_id', 'email' => 'email', 'phone' => 'phone', 'website' => 'website',
+        'suppliers' => ['vendor' => 'name', 'vendor_name' => 'name', 'supplier' => 'name', 'supplier_name' => 'name', 'display_name' => 'name', 'full_name' => 'name', 'company_name' => 'name', 'ledger_name' => 'name', 'phone_number' => 'phone', 'telephone' => 'phone', 'mobile' => 'phone', 'e_mail' => 'email', 'email_address' => 'email', 'tax_registration_number' => 'tax_id', 'tax_number' => 'tax_id', 'vat_reg_no' => 'tax_id', 'vat_registration_number' => 'tax_id', 'vat_number' => 'tax_id', 'billing_address' => 'address.line1', 'billing_street' => 'address.line1', 'billing_city' => 'address.city', 'billing_state' => 'address.region', 'billing_zip' => 'address.postal_code', 'street1' => 'address.line1', 'street2' => 'address.line2', 'town' => 'address.city', 'county' => 'address.region', 'state' => 'address.region', 'post_code' => 'address.postal_code', 'postcode' => 'address.postal_code', 'pin_code' => 'address.postal_code', 'payment_terms' => 'payment_terms_days', 'credit_terms' => 'payment_terms_days', 'name' => 'name', 'tax_id' => 'tax_id', 'tin' => 'tax_id', 'email' => 'email', 'phone' => 'phone', 'website' => 'website',
             'currency' => 'currency', 'payment_terms_days' => 'payment_terms_days', 'terms' => 'payment_terms_days', 'notes' => 'notes',
             'address' => 'address.line1', 'address_line1' => 'address.line1', 'address_line2' => 'address.line2', 'city' => 'address.city',
             'region' => 'address.region', 'postal_code' => 'address.postal_code'],
-        'items' => ['name' => 'name', 'sku' => 'sku', 'code' => 'sku', 'type' => 'type', 'unit' => 'unit', 'sale_price' => 'sale_price', 'price' => 'sale_price',
+        'items' => ['product/service_name' => 'name', 'product/service' => 'name', 'item_name' => 'name', 'item' => 'name', 'stock_item' => 'name', 'item_code' => 'sku', 'stock_code' => 'sku', 'sales_price_/_rate' => 'sale_price', 'sales_price' => 'sale_price', 'selling_price' => 'sale_price', 'rate' => 'sale_price', 'purchase_cost' => 'purchase_price', 'cost_price' => 'purchase_price', 'item_type' => 'type', 'name' => 'name', 'sku' => 'sku', 'code' => 'sku', 'type' => 'type', 'unit' => 'unit', 'sale_price' => 'sale_price', 'price' => 'sale_price',
             'purchase_price' => 'purchase_price', 'cost' => 'purchase_price', 'reorder_point' => 'reorder_point', 'authority_item_code' => 'authority_item_code'],
         // The chart: a parent is named by its code, above its accounts in the file.
         'accounts' => ['code' => 'code', 'account_code' => 'code', 'number' => 'code', 'account_number' => 'code', 'name' => 'name', 'account_name' => 'name',
-            'account' => 'name', 'type' => 'type', 'account_type' => 'type', 'kind' => 'kind', 'parent' => 'parent', 'parent_code' => 'parent'],
+            'account' => 'name', 'type' => 'type', 'account_type' => 'type', 'account_#' => 'code', 'account_no' => 'code', 'a/c' => 'code', 'ref' => 'code', 'nominal_code' => 'code', 'category' => 'type', 'group' => 'type', 'under' => 'type', 'kind' => 'kind', 'parent' => 'parent', 'parent_code' => 'parent'],
         // A customer or supplier is named as in Ledgerly; dates as 2026-06-30 or 30/06/2026; the amount is what was still open.
         'open-invoices' => ['customer' => 'contact', 'customer_name' => 'contact', 'name' => 'contact', 'number' => 'number', 'invoice_number' => 'number',
             'invoice' => 'number', 'date' => 'issue_date', 'issue_date' => 'issue_date', 'invoice_date' => 'issue_date', 'due_date' => 'due_date', 'due' => 'due_date',
@@ -80,6 +81,36 @@ final class ImportController extends Controller
         'capital' => 'equity', 'income' => 'income', 'revenue' => 'income', 'revenues' => 'income', 'sales' => 'income', 'expense' => 'expense',
         'expenses' => 'expense', 'cost' => 'expense', 'costs' => 'expense'];
 
+    /**
+     * 096: the account types (and groups) other books use, as the type and kind they are here; null where the row is
+     * left out, and why. Bank, cash and wallet accounts are opened under Banking with their details; the receivable and
+     * payable are the one control account each that the documents keep.
+     *
+     * @var array<string, array{0: ?string, 1: ?string, 2?: string}>
+     */
+    private const FOREIGN_TYPES = [
+        // QuickBooks
+        'bank' => [null, null, 'a bank account: open it under Banking'], 'accounts_receivable_(a/r)' => [null, null, 'the receivable: Ledgerly keeps one, from invoices'],
+        'accounts_receivable' => [null, null, 'the receivable: Ledgerly keeps one, from invoices'], 'other_current_assets' => ['asset', null], 'fixed_assets' => ['asset', 'fixed_asset'],
+        'other_assets' => ['asset', null], 'accounts_payable_(a/p)' => [null, null, 'the payable: Ledgerly keeps one, from bills'],
+        'accounts_payable' => [null, null, 'the payable: Ledgerly keeps one, from bills'], 'credit_card' => ['liability', null], 'other_current_liabilities' => ['liability', null],
+        'long_term_liabilities' => ['liability', 'loan'], 'other_income' => ['income', 'other_income'], 'cost_of_goods_sold' => ['expense', 'cogs'],
+        'other_expense' => ['expense', 'operating'],
+        // Sage
+        'purchases' => ['expense', 'cogs'], 'direct_expenses' => ['expense', 'cogs'], 'overheads' => ['expense', 'operating'], 'current_assets' => ['asset', null],
+        'current_liabilities' => ['liability', null], 'capital_&_reserves' => ['equity', null], 'cost_of_sales' => ['expense', 'cogs'],
+        // Tally groups
+        'bank_accounts' => [null, null, 'a bank account: open it under Banking'], 'bank_od_a/c' => [null, null, 'a bank account: open it under Banking'],
+        'cash_in_hand' => [null, null, 'a cash account: open it under Banking'], 'sundry_debtors' => [null, null, 'a customer: import it as a customer'],
+        'sundry_creditors' => [null, null, 'a supplier: import it as a supplier'], 'investments' => ['asset', null], 'deposits_(asset)' => ['asset', 'deposit'],
+        'loans_&_advances_(asset)' => ['asset', null], 'stock_in_hand' => [null, null, 'stock: it comes from the items and their opening quantities'],
+        'duties_&_taxes' => ['liability', 'tax_payable'], 'provisions' => ['liability', 'accrual'], 'loans_(liability)' => ['liability', 'loan'],
+        'secured_loans' => ['liability', 'loan'], 'unsecured_loans' => ['liability', 'loan'], 'capital_account' => ['equity', 'capital'],
+        'reserves_&_surplus' => ['equity', 'reserve'], 'sales_accounts' => ['income', 'sales'], 'direct_incomes' => ['income', 'other_income'],
+        'indirect_incomes' => ['income', 'other_income'], 'purchase_accounts' => ['expense', 'cogs'], 'indirect_expenses' => ['expense', 'operating'],
+        'suspense_a/c' => [null, null, 'a suspense account: clear it in the old books first'],
+    ];
+
     private const NUMERIC = ['payment_terms_days', 'credit_limit', 'sale_price', 'purchase_price', 'reorder_point', 'amount', 'fx_rate'];
 
     public function store(Request $request, string $kind): JsonResponse
@@ -108,6 +139,7 @@ final class ImportController extends Controller
         $errors = [];
         $added = 0;
         $skipped = [];
+        $leftOut = [];   // 096: rows of another book's that belong elsewhere here
         DB::beginTransaction();   // a savepoint inside the request's own transaction
         try {
             foreach ($rows as $n => $cells) {
@@ -118,16 +150,30 @@ final class ImportController extends Controller
                         continue;
                     }
                     $field = $columns[$h];
+                    if ($field === 'payment_terms_days' && ! ctype_digit($value)) {
+                        // 096: terms as other books write them: "Net 30", "30 days", "Due on receipt".
+                        $value = preg_match('/(\d+)/', $value, $m) ? $m[1] : (preg_match('/receipt|immediate|cash/i', $value) ? '0' : $value);
+                    }
                     if (in_array($field, self::NUMERIC, true)) {
                         $value = str_replace([',', ' '], '', $value);
                     }
                     data_set($fields, $field, $field === 'type' ? strtolower(str_replace([' ', '-'], '_', $value)) : $value);
+                }
+                if ($kind === 'items' && isset($fields['type'])) {
+                    // 096: QuickBooks' Non-inventory and Inventory, Sage's Stock and Non-stock, Tally's stock items.
+                    $fields['type'] = ['non_inventory' => 'non_inventory', 'noninventory' => 'non_inventory', 'non_stock' => 'non_inventory', 'stock' => 'inventory',
+                        'stock_item' => 'inventory', 'inventory_part' => 'inventory', 'inventory' => 'inventory', 'service' => 'service', 'services' => 'service',
+                        'bundle' => 'bundle', 'group' => 'bundle'][$fields['type']] ?? $fields['type'];
                 }
                 if ($kind === 'items' && ! isset($fields['type'])) {
                     $fields['type'] = 'service';
                 }
                 if ($kind === 'accounts') {
                     $fields = $this->accountRow($fields);
+                    if (isset($fields['left_out'])) {
+                        $leftOut[] = ['row' => $n + 2, 'name' => $fields['name'] ?? $fields['code'], 'reason' => "Left out: {$fields['left_out']}."];
+                        continue;
+                    }
                     if (isset($fields['code']) && Account::query()->where('code', $fields['code'])->exists()) {
                         $skipped[] = $fields['code'];   // already in the chart (the country pack's, or an earlier import)
                         continue;
@@ -165,6 +211,7 @@ final class ImportController extends Controller
 
         return response()->json([
             'kind' => $kind, 'checked' => $check, 'rows' => count($rows), 'added' => $keep ? $added : 0, 'errors' => $errors, 'skipped' => $skipped,
+            'left_out' => $leftOut,
             'columns' => array_values(array_unique(array_map(fn ($h) => $columns[$h], $used))),
             'ignored_columns' => array_values(array_filter($headings, fn ($h) => $h !== '' && ! isset($columns[$h]))),
         ], $keep ? 201 : 200);
@@ -380,7 +427,19 @@ final class ImportController extends Controller
     {
         $key = fn (string $v) => strtolower(trim(preg_replace('/[\s-]+/', '_', $v) ?? ''));
         if (isset($fields['type'])) {
-            $fields['type'] = self::TYPES[$key($fields['type'])] ?? $key($fields['type']);
+            $t = $key($fields['type']);
+            if (! isset(self::TYPES[$t]) && isset(self::FOREIGN_TYPES[$t])) {
+                [$type, $kind] = self::FOREIGN_TYPES[$t];
+                if ($type === null) {
+                    return ['left_out' => self::FOREIGN_TYPES[$t][2], 'name' => $fields['name'] ?? null, 'code' => $fields['code'] ?? null];
+                }
+                $fields['type'] = $type;
+                if ($kind !== null && ! isset($fields['kind'])) {
+                    $fields['kind'] = $kind;
+                }
+            } else {
+                $fields['type'] = self::TYPES[$t] ?? $t;
+            }
         }
         if (isset($fields['kind'])) {
             $fields['kind'] = $key($fields['kind']);

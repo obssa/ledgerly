@@ -46,7 +46,7 @@ final class ImportTest extends TestCase
         $this->assertSame('12500.00', (string) $this->owner()->table('items')->where(['company_id' => $c['company'], 'sku' => 'GB-60'])->value('sale_price'));
 
         $this->postJson('/api/v1/imports/suppliers', ['csv' => "Name,Phone\nAddis Packaging,+251 911 000 000\n"], $h)->assertCreated()->assertJsonPath('added', 1);
-        $this->postJson('/api/v1/imports/customers', ['csv' => "Customer,Email\nSomeone,x@example.test\n"], $h)->assertUnprocessable()->assertJsonValidationErrors('csv');
+        $this->postJson('/api/v1/imports/customers', ['csv' => "Client,Email\nSomeone,x@example.test\n"], $h)->assertUnprocessable()->assertJsonValidationErrors('csv');
 
         $viewer = $this->createUser('Viewer', 'viewer@example.test');
         $this->owner()->table('memberships')->insert(['company_id' => $c['company'], 'user_id' => $viewer->getKey(), 'role' => 'viewer', 'status' => 'active']);
