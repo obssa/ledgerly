@@ -448,6 +448,9 @@ export interface FixedAssetDetail extends FixedAsset {
   depreciated: string;
   book_value: string;
   depreciated_by_runs: boolean;
+  /** 091: write-downs when it was worth less than its carrying amount. */
+  impairments?: { id: string; impaired_on: string; amount: string; reason: string; entry_id: string }[];
+  impaired?: string;
   can: { manage: boolean };
 }
 
@@ -1570,6 +1573,8 @@ export const ledgerly = {
     api<FixedAssetDetail>(id ? `fixed-assets/${encodeURIComponent(id)}` : "fixed-assets", { ...ctx, method: id ? "PUT" : "POST", body }),
   disposeFixedAsset: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}/dispose`, { ...ctx, method: "POST", body }),
+  impairFixedAsset: (id: string, body: { date: string; amount: string; reason: string }, ctx: RequestOptions) =>
+    api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}/impair`, { ...ctx, method: "POST", body }),
   depreciationPreview: (periodEnd: string | undefined, ctx: RequestOptions) =>
     api<{ period_end: string; lines: { asset_id: string; code: string; name: string; amount: string }[]; total: string }>("depreciation/preview", { ...ctx, query: { period_end: periodEnd } }),
   runDepreciation: (periodEnd: string, ctx: RequestOptions) =>

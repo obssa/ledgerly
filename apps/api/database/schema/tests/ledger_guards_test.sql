@@ -4739,6 +4739,47 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T116 a bin location is for a stock item and warehouse of the company, once each';
 END $$;
+
+-- T117: impairment of fixed assets (091). An impairment is of an active asset of the company, never more than its
+-- carrying amount left above the residual value, with its own entry, and kept. Company A, user f1, a roaster on T69's
+-- accounts (cost 10,000, residual 1,000: 9,000 left).
+DO $$
+DECLARE
+  van constant uuid := '00000000-0000-0000-0000-000000000fe1';
+  imp constant uuid := '00000000-0000-0000-0000-000000000fe0';
+  e constant uuid := '00000000-0000-0000-0000-00000000e917';
+BEGIN
+  INSERT INTO fixed_assets (id, company_id, code, name, asset_account_id, depreciation_account_id, expense_account_id, acquired_on, cost, residual_value, method, useful_life_months, depreciation_starts_on, created_by) VALUES
+    (van, app_company_id(), 'ROAST-117', 'T117 roaster', '00000000-0000-0000-0000-0000000069a1', '00000000-0000-0000-0000-0000000069a2', '00000000-0000-0000-0000-0000000069a3',
+     '2027-08-01', 10000, 1000, 'straight_line', 60, '2027-09-01', '00000000-0000-0000-0000-0000000000f1');
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    (e, app_company_id(), 9917, '2027-09-15', 'ETB', 'asset_impairment', imp);
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), e, 1, '00000000-0000-0000-0000-0000000069a3', 5000, 0, 5000),
+    (app_company_id(), e, 2, '00000000-0000-0000-0000-0000000069a2', 0, 5000, -5000);
+  BEGIN
+    INSERT INTO asset_impairments (company_id, asset_id, impaired_on, amount, reason, entry_id, created_by)
+      VALUES (app_company_id(), van, '2027-09-15', 9000.01, 'Crashed', e, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T117a: an asset was written down below its residual value';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO asset_impairments (company_id, asset_id, impaired_on, amount, reason, entry_id, created_by)
+      VALUES (app_company_id(), van, '2027-09-15', 5000, 'Crashed', '00000000-0000-0000-0000-00000000e692', '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T117b: an impairment named an entry that is not its own';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO asset_impairments (id, company_id, asset_id, impaired_on, amount, reason, entry_id, created_by)
+    VALUES (imp, app_company_id(), van, '2027-09-15', 5000, 'Crashed', e, '00000000-0000-0000-0000-0000000000f1');
+  BEGIN
+    UPDATE asset_impairments SET amount = 1000 WHERE id = imp;
+    RAISE EXCEPTION 'FAIL T117c: an impairment was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM asset_impairments WHERE id = imp) THEN
+    RAISE EXCEPTION 'FAIL T117d: company B saw company A''s impairment';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T117 an impairment writes an asset down no further than its residual value, with its own entry, and is kept';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

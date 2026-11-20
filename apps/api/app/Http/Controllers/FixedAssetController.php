@@ -35,13 +35,14 @@ final class FixedAssetController extends Controller
         $rows = $this->query()->orderBy('a.status')->orderBy('a.code')->limit(2000)->get();
         $charged = DB::table('asset_depreciation')->where('company_id', $companyId)->groupBy('asset_id')->select('asset_id')
             ->selectRaw('sum(amount)::numeric(20,2)::text AS total')->pluck('total', 'asset_id');
+        $impaired = $this->assets->impaired($companyId, $rows->pluck('id')->all());   // 091
         $runs = DB::table('depreciation_runs as r')->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'r.company_id')->on('e.id', '=', 'r.journal_entry_id'))
             ->where('r.company_id', $companyId)->orderByDesc('r.period_end')->limit(24)->get(['r.id', 'r.period_end', 'r.total', 'e.id as entry_id', 'e.number']);
         $membership = $this->current->membership();
 
         return response()->json([
-            'data' => $rows->map(function ($a) use ($charged) {
-                $depreciated = BigDecimal::of((string) $a->opening_depreciation)->plus((string) ($charged[$a->id] ?? '0'))->toScale(2);
+            'data' => $rows->map(function ($a) use ($charged, $impaired) {
+                $depreciated = BigDecimal::of((string) $a->opening_depreciation)->plus((string) ($charged[$a->id] ?? '0'))->plus((string) ($impaired[$a->id] ?? '0'))->toScale(2);
 
                 return [...$this->row($a), 'depreciated' => (string) $depreciated, 'book_value' => (string) BigDecimal::of((string) $a->cost)->minus($depreciated)->toScale(2)];
             })->values(),
@@ -105,6 +106,23 @@ final class FixedAssetController extends Controller
     }
 
     /** What the run for a month end would post, asset by asset. */
+    /** 091: writes the asset down when it is worth less than its carrying amount (damaged, idle, obsolete). */
+    public function impair(Request $request, string $fixedAsset): JsonResponse
+    {
+        $this->authorizeCompany('assets.manage');
+        $a = $this->load($fixedAsset);   // the company's own, or not found
+        $data = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
+            'amount' => ['required', 'decimal:0,2', 'gt:0'],
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+        ], ['reason.required' => 'Say why it is worth less: damaged, idle, obsolete.']);
+        $done = $this->assets->impair($this->current->get(), (string) $a->id, $data['date'], (string) $data['amount'], $data['reason'], $request->user()->getKey());
+        $this->audit->record($this->current->id(), 'asset_impaired', 'fixed_asset', (string) $a->id, null,
+            ['amount' => $done['amount'], 'date' => $data['date'], 'journal_entry' => $done['entry']['number']], $data['reason'], $request->user()->getKey());
+
+        return $this->show((string) $a->id)->setStatusCode(201);
+    }
+
     public function preview(Request $request): JsonResponse
     {
         $this->authorizeCompany('assets.view');
