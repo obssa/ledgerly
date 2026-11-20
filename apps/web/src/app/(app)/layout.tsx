@@ -52,7 +52,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         }
       />
       <div className="min-w-0 flex-1">
-        <div className="z-30 border-b border-line/70 bg-canvas/90 px-4 pt-3 backdrop-blur-md sm:px-6 md:sticky md:top-0 lg:px-8 print:hidden">
+        <div className="z-30 border-b border-line/70 bg-canvas/90 px-4 py-3 backdrop-blur-md sm:px-6 md:sticky md:top-0 lg:px-8 print:hidden">
           <div className="mx-auto max-w-[1440px]">
             <Topbar
               user={

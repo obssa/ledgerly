@@ -11,8 +11,7 @@ export const metadata = { title: "Bins" };
  */
 export default async function BinsPage() {
   const [bins, warehouses, items] = await Promise.all([getBins(), getWarehouses(), getItems({})]);
-  const title = <PageTitle eyebrow={<><Link href="/inventory" className="hover:underline">Inventory</Link> / Bins</>} title="Bins"
-    actions={<Link href="/inventory/count" className="btn">Count stock</Link>} />;
+  const title = <PageTitle eyebrow={<><Link href="/inventory" className="hover:underline">Inventory</Link> / Bins</>} title="Bins" />;
   if (!bins || items.demo) return <>{title}<p className="text-[14px] text-muted">Not available in the demo.</p></>;
   const active = warehouses.filter((w) => w.is_active);
   const stock = items.data.filter((i) => i.type === "inventory" && i.is_active).map((i) => ({ id: i.id, name: i.name, sku: i.sku }));

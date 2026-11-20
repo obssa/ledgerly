@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, PageTitle } from "@/components/ui";
+import { Card, PageTitle, Segmented } from "@/components/ui";
 import { IMPORT_KINDS, importKind, importRequires } from "@/lib/imports";
 import { MIGRATION_SOURCES, migrationSource, type MigrationSource } from "@/lib/migration";
 import { ImportForm } from "./ImportForm";
@@ -21,12 +21,9 @@ export default async function ImportPage({ searchParams }: PageProps<"/import">)
   return (
     <>
       <PageTitle eyebrow="Setup" title="Import from a spreadsheet" />
-      <nav className="mb-4 flex flex-wrap gap-2" aria-label="What to import">
-        {(Object.keys(IMPORT_KINDS) as (keyof typeof IMPORT_KINDS)[]).map((key) => (
-          <Link key={key} href={link(key)} aria-current={key === kind ? "page" : undefined}
-            className={`btn ${key === kind ? "btn-primary" : ""}`}>{IMPORT_KINDS[key].label}</Link>
-        ))}
-      </nav>
+      <Segmented label="What to import" items={(Object.keys(IMPORT_KINDS) as (keyof typeof IMPORT_KINDS)[]).map((key) => (
+        { key, href: link(key), label: IMPORT_KINDS[key].label, active: key === kind }
+      ))} />
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_520px]" label={`Import ${k.label.toLowerCase()}`}>
           <h2 className="mb-3 text-[17px] font-bold">{k.label}</h2>
@@ -41,13 +38,9 @@ export default async function ImportPage({ searchParams }: PageProps<"/import">)
       </div>
       <Card className="mt-4 max-w-[1000px]" label="Moving from another program">
         <h2 className="text-[15px] font-bold">Moving from another program?</h2>
-        <nav className="mt-2 flex flex-wrap gap-2" aria-label="Moving from">
-          {(Object.keys(MIGRATION_SOURCES) as MigrationSource[]).map((s) => (
-            <Link key={s} href={`/import?kind=${kind}&from=${s}`} aria-current={s === from ? "page" : undefined} className={`btn !py-1 ${s === from ? "btn-primary" : ""}`}>
-              {MIGRATION_SOURCES[s].name}
-            </Link>
-          ))}
-        </nav>
+        <Segmented label="Moving from" size="sm" className="mt-2 !mb-0" items={(Object.keys(MIGRATION_SOURCES) as MigrationSource[]).map((s) => (
+          { key: s, href: `/import?kind=${kind}&from=${s}`, label: MIGRATION_SOURCES[s].name, active: s === from }
+        ))} />
         {guide ? (
           <>
             <p className="mt-3 text-[13px] text-muted">{guide.note}</p>

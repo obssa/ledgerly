@@ -28,7 +28,6 @@ export async function PurchaseOrderList() {
     <>
       <PageTitle eyebrow={eyebrow()} title="Purchase orders" actions={<>
         <Link href="/purchase-orders/open" className="btn">Still to come</Link>
-        <Link href="/goods-received" className="btn">Goods received</Link>
         <Link href="/purchase-orders/new" className="btn btn-primary">+ New purchase order</Link>
       </>} />
       <Card className="!p-2" label="Purchase orders">

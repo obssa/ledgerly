@@ -10,7 +10,7 @@ export default async function PriceListsPage() {
   const [lists, settings] = await Promise.all([getPriceLists(), getCompanySettings()]);
   return (
     <>
-      <PageTitle eyebrow="Money in / Products and services" title="Price lists" actions={<Link href="/products" className="btn">Products and services</Link>} />
+      <PageTitle eyebrow="Money in / Products and services" title="Price lists" />
       <div className="flex max-w-[1100px] flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_520px]" label="Price lists">
           <p className="mb-3 text-sm text-muted">

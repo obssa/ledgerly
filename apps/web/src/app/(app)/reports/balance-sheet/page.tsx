@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Card, PageTitle, Pill } from "@/components/ui";
+import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getBalanceSheet, getCompanySettings, getCompanyToday } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { isDate, yearEarlier } from "@/lib/reports";
@@ -42,10 +41,10 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Balance sheet" actions={<ExportLink report="balance-sheet" params={{ as_of: asOf }} />} />
       <PeriodForm to={asOf} single />
-      <nav aria-label="Compare with" className="mb-3 flex flex-wrap gap-2 text-[13px]">
-        <Link href={`/reports/balance-sheet?as_of=${asOf}`} className={`btn !py-1 ${lastYear ? "" : "btn-primary"}`}>This date only</Link>
-        <Link href={`/reports/balance-sheet?as_of=${asOf}&compare=year`} className={`btn !py-1 ${lastYear ? "btn-primary" : ""}`}>Against {before}</Link>
-      </nav>
+      <Segmented label="Compare with" size="sm" items={[
+        { key: "one", href: `/reports/balance-sheet?as_of=${asOf}`, label: "This date only", active: !lastYear },
+        { key: "year", href: `/reports/balance-sheet?as_of=${asOf}&compare=year`, label: `Against ${before}`, active: lastYear },
+      ]} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/balance-sheet" />
         {!bs ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (

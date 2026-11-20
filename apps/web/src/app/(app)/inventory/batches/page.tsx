@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, PageTitle, Pill } from "@/components/ui";
+import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getStockBatches } from "@/lib/data";
 
 export const metadata = { title: "Batches and expiry" };
@@ -16,12 +16,10 @@ export default async function BatchesPage({ searchParams }: PageProps<"/inventor
   return (
     <>
       <PageTitle eyebrow={<><Link href="/inventory" className="hover:underline">Stock on hand</Link> / Batches</>} title="Batches and expiry" />
-      <nav aria-label="Expiring within" className="mb-3 flex flex-wrap gap-2 text-[13px]">
-        <Link href="/inventory/batches" className={`btn !py-1 ${days === undefined ? "btn-primary" : ""}`}>All on hand</Link>
-        {WINDOWS.map((d) => (
-          <Link key={d} href={`/inventory/batches?within=${d}`} className={`btn !py-1 ${days === d ? "btn-primary" : ""}`}>Expiring within {d} days</Link>
-        ))}
-      </nav>
+      <Segmented label="Expiring within" size="sm" items={[
+        { key: "all", href: "/inventory/batches", label: "All on hand", active: days === undefined },
+        ...WINDOWS.map((d) => ({ key: String(d), href: `/inventory/batches?within=${d}`, label: `Expiring within ${d} days`, active: days === d })),
+      ]} />
       <Card className="!p-2" label="Batches">
         {rows.length === 0 ? (
           <p className="p-3 text-sm text-muted">{days === undefined ? "No stock held by batch. Set an item to be tracked by batch before its first stock move." : `Nothing on hand expires within ${days} days.`}</p>

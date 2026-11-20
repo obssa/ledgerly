@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Card, PageTitle } from "@/components/ui";
+import { Card, PageTitle, Segmented } from "@/components/ui";
 import type { ProfitAndLossRow } from "@/lib/api";
 import { parse } from "@/lib/decimal";
 import { getCompanySettings, getProfitAndLoss, getReportPeriod, getShellContext } from "@/lib/data";
@@ -79,13 +78,16 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" actions={<ExportLink report="profit-and-loss" params={period} />} />
       <PeriodForm from={period.from} to={period.to} />
-      <nav aria-label="Compare with and basis" className="mb-3 flex flex-wrap gap-2 text-[13px]">
-        <Link href={link({ year: false })} className={`btn !py-1 ${lastYear ? "" : "btn-primary"}`}>Against the period before</Link>
-        <Link href={link({ year: true })} className={`btn !py-1 ${lastYear ? "btn-primary" : ""}`}>Against the same period last year</Link>
-        <span className="mx-1 self-center text-muted" aria-hidden="true">·</span>
-        <Link href={link({ cash: false })} className={`btn !py-1 ${cash ? "" : "btn-primary"}`}>Accrual</Link>
-        <Link href={link({ cash: true })} className={`btn !py-1 ${cash ? "btn-primary" : ""}`}>Cash basis</Link>
-      </nav>
+      <div className="mb-4 flex flex-wrap gap-x-3">
+        <Segmented label="Compare with" size="sm" className="!mb-2" items={[
+          { key: "before", href: link({ year: false }), label: "Against the period before", active: !lastYear },
+          { key: "year", href: link({ year: true }), label: "Against the same period last year", active: lastYear },
+        ]} />
+        <Segmented label="Basis" size="sm" className="!mb-2" items={[
+          { key: "accrual", href: link({ cash: false }), label: "Accrual", active: !cash },
+          { key: "cash", href: link({ cash: true }), label: "Cash basis", active: cash },
+        ]} />
+      </div>
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports" />
         <Card className="min-w-0 flex-[4_1_560px]" label="Profit and loss statement">

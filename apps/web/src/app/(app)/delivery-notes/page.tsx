@@ -12,7 +12,7 @@ export default async function DeliveryNotesPage() {
       <PageTitle
         eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / Delivery notes</>}
         title="Delivery notes"
-        actions={<><Link href="/delivery-notes/uninvoiced" className="btn">Delivered, not invoiced</Link><Link href="/sales-orders" className="btn">Sales orders</Link></>}
+        actions={<Link href="/delivery-notes/uninvoiced" className="btn">Delivered, not invoiced</Link>}
       />
       <Card className="!p-2" label="Delivery notes">
         {rows.length === 0 ? (
