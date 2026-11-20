@@ -103,6 +103,10 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                 {keyRow("Gross profit", t.gross_profit)}
                 {section("Expenses", pl.sections.expenses, t.expenses)}
                 {keyRow("Net profit before tax", t.net_profit, true)}
+                {t.other_comprehensive_income && t.total_comprehensive_income && (Number(t.other_comprehensive_income.current) !== 0 || Number(t.other_comprehensive_income.previous ?? 0) !== 0) && <>
+                  {keyRow("Other comprehensive income: revaluation surplus", t.other_comprehensive_income)}
+                  {keyRow("Total comprehensive income", t.total_comprehensive_income, true)}
+                </>}
               </tbody>
             </table>
           </div>

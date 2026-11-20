@@ -4780,6 +4780,106 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T117 an impairment writes an asset down no further than its residual value, with its own entry, and is kept';
 END $$;
+-- T118: revaluation of fixed assets (092). A press on T69's accounts (cost 10,000, residual 1,000) is revalued up to
+-- 12,000 (2,000 to the surplus), down to 7,000 (2,000 off the surplus, 3,000 through profit or loss), then up to 8,000
+-- (1,000 back through profit or loss). The split is exact, the carrying amount is the books', the surplus an equity
+-- account, each names its own entry and is kept; impairment then stops at the revalued carrying amount.
+DO $$
+DECLARE
+  press constant uuid := '00000000-0000-0000-0000-000000000fe2';
+  surplus constant uuid := '00000000-0000-0000-0000-0000000118a1';
+  r1 constant uuid := '00000000-0000-0000-0000-0000000118b1';
+  r2 constant uuid := '00000000-0000-0000-0000-0000000118b2';
+  r3 constant uuid := '00000000-0000-0000-0000-0000000118b3';
+  e1 constant uuid := '00000000-0000-0000-0000-0000000118e1';
+  e2 constant uuid := '00000000-0000-0000-0000-0000000118e2';
+  e3 constant uuid := '00000000-0000-0000-0000-0000000118e3';
+  u constant uuid := '00000000-0000-0000-0000-0000000000f1';
+BEGIN
+  INSERT INTO accounts (id, company_id, code, name, type) VALUES (surplus, app_company_id(), '3118', 'T118 revaluation surplus', 'equity');
+  INSERT INTO fixed_assets (id, company_id, code, name, asset_account_id, depreciation_account_id, expense_account_id, acquired_on, cost, residual_value, method, useful_life_months, depreciation_starts_on, created_by) VALUES
+    (press, app_company_id(), 'PRESS-118', 'T118 press', '00000000-0000-0000-0000-0000000069a1', '00000000-0000-0000-0000-0000000069a2', '00000000-0000-0000-0000-0000000069a3',
+     '2027-08-01', 10000, 1000, 'straight_line', 60, '2027-09-01', u);
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    (e1, app_company_id(), 9918, '2027-09-30', 'ETB', 'asset_revaluation', r1),
+    (e2, app_company_id(), 9919, '2027-10-31', 'ETB', 'asset_revaluation', r2),
+    (e3, app_company_id(), 9920, '2027-11-30', 'ETB', 'asset_revaluation', r3);
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), e1, 1, '00000000-0000-0000-0000-0000000069a1', 2000, 0, 2000), (app_company_id(), e1, 2, surplus, 0, 2000, -2000),
+    (app_company_id(), e2, 1, surplus, 2000, 0, 2000), (app_company_id(), e2, 2, '00000000-0000-0000-0000-0000000069a3', 3000, 0, 3000),
+    (app_company_id(), e2, 3, '00000000-0000-0000-0000-0000000069a2', 0, 5000, -5000),
+    (app_company_id(), e3, 1, '00000000-0000-0000-0000-0000000069a1', 1000, 0, 1000), (app_company_id(), e3, 2, '00000000-0000-0000-0000-0000000069a3', 0, 1000, -1000);
+  BEGIN
+    INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+      VALUES (r1, app_company_id(), press, '2027-09-30', 12000, 10000, 1500, 500, surplus, 'Valuer report', e1, u);
+    RAISE EXCEPTION 'FAIL T118a: a first increase went through profit or loss';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+      VALUES (r1, app_company_id(), press, '2027-09-30', 12000, 9000, 3000, 0, surplus, 'Valuer report', e1, u);
+    RAISE EXCEPTION 'FAIL T118b: a revaluation started from a carrying amount the books do not have';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+      VALUES (r1, app_company_id(), press, '2027-09-30', 12000, 10000, 2000, 0, '00000000-0000-0000-0000-0000000069a3', 'Valuer report', e1, u);
+    RAISE EXCEPTION 'FAIL T118c: the surplus went to an expense account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+      VALUES (r1, app_company_id(), press, '2027-09-30', 500, 10000, 0, -9500, surplus, 'Valuer report', e1, u);
+    RAISE EXCEPTION 'FAIL T118d: an asset was revalued below its residual value';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+      VALUES (r1, app_company_id(), press, '2027-09-30', 12000, 10000, 2000, 0, surplus, 'Valuer report', e2, u);
+    RAISE EXCEPTION 'FAIL T118e: a revaluation named an entry that is not its own';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+    VALUES (r1, app_company_id(), press, '2027-09-30', 12000, 10000, 2000, 0, surplus, 'Valuer report', e1, u);
+  BEGIN
+    INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+      VALUES (r2, app_company_id(), press, '2027-10-31', 7000, 12000, -5000, 0, surplus, 'Market fell', e2, u);
+    RAISE EXCEPTION 'FAIL T118f: a decrease took more off the surplus than the asset had there';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+    VALUES (r2, app_company_id(), press, '2027-10-31', 7000, 12000, -2000, -3000, surplus, 'Market fell', e2, u);
+  INSERT INTO asset_revaluations (id, company_id, asset_id, revalued_on, fair_value, carrying_before, to_surplus, to_profit, surplus_account_id, reason, entry_id, created_by)
+    VALUES (r3, app_company_id(), press, '2027-11-30', 8000, 7000, 0, 1000, surplus, 'Partial recovery', e3, u);
+END $$;
+DO $$
+DECLARE
+  press constant uuid := '00000000-0000-0000-0000-000000000fe2';
+  imp constant uuid := '00000000-0000-0000-0000-0000000118c1';
+  e4 constant uuid := '00000000-0000-0000-0000-0000000118e4';
+BEGIN
+  BEGIN
+    PERFORM asset_carrying_amount(app_company_id(), press);
+    RAISE EXCEPTION 'FAIL T118g: the application role called the carrying amount function itself';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    (e4, app_company_id(), 9921, '2027-12-01', 'ETB', 'asset_impairment', imp);
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), e4, 1, '00000000-0000-0000-0000-0000000069a3', 7000.01, 0, 7000.01),
+    (app_company_id(), e4, 2, '00000000-0000-0000-0000-0000000069a2', 0, 7000.01, -7000.01);
+  IF (SELECT count(*) FROM asset_revaluations WHERE asset_id = press) <> 3 THEN
+    RAISE EXCEPTION 'FAIL T118h: the three revaluations were not all kept';
+  END IF;
+  BEGIN
+    INSERT INTO asset_impairments (id, company_id, asset_id, impaired_on, amount, reason, entry_id, created_by)
+      VALUES (imp, app_company_id(), press, '2027-12-01', 7000.01, 'Crashed', e4, '00000000-0000-0000-0000-0000000000f1');
+    RAISE EXCEPTION 'FAIL T118i: an impairment went past the revalued carrying amount above the residual value (7,000.00)';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE asset_revaluations SET fair_value = 9000 WHERE asset_id = press;
+    RAISE EXCEPTION 'FAIL T118j: a revaluation was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM asset_revaluations WHERE asset_id = press) THEN
+    RAISE EXCEPTION 'FAIL T118k: company B saw company A''s revaluations';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T118 a revaluation moves an asset to fair value through the surplus or profit or loss, exactly, and is kept';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

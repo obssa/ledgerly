@@ -222,6 +222,7 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/items/{item}/variants' => 'inventory.items',
         'PUT api/v1/items/{item}/locations' => 'inventory.items',
         'POST api/v1/fixed-assets/{fixedAsset}/impair' => 'assets.manage',
+        'POST api/v1/fixed-assets/{fixedAsset}/revalue' => 'assets.manage',
         'GET api/v1/items/{item}/assembly' => 'inventory.view',
         'PUT api/v1/items/{item}/assembly' => 'inventory.items',
         'POST api/v1/items/{item}/builds' => 'inventory.transfer',

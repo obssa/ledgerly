@@ -71,6 +71,11 @@ final class ReportService
             'previous' => $compareFrom ? (is_callable($v) ? $v('previous') : $v['previous'])->toDecimalString() : null,
         ];
 
+        // 092: other comprehensive income, what revaluations put in (or took from) the surplus; none on the cash basis.
+        $surplus = fn (?string $f, ?string $t) => Money::of($basis === 'cash' || $f === null ? '0'
+            : (string) DB::table('asset_revaluations')->where('company_id', $companyId)->whereBetween('revalued_on', [$f, $t])->sum('to_surplus'), $currency);
+        $oci = ['current' => $surplus($from, $to), 'previous' => $surplus($compareFrom, $compareTo)];
+
         return [
             'basis' => $basis,
             'sections' => $sections,
@@ -80,6 +85,8 @@ final class ReportService
                 'gross_profit' => $out($gross),
                 'expenses' => $out($totals['expenses']),
                 'net_profit' => $out($net),
+                'other_comprehensive_income' => $out($oci),
+                'total_comprehensive_income' => $out(fn (string $k) => $net($k)->plus($oci[$k])),
             ],
         ];
     }

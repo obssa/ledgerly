@@ -49,6 +49,10 @@ export default async function NotesPackPage({ searchParams }: PageProps<"/report
               {row("Gross profit", pl.totals.gross_profit.current, true)}
               {row("Operating expenses", pl.totals.expenses.current)}
               {row("Profit for the period", pl.totals.net_profit.current, true)}
+              {pl.totals.other_comprehensive_income && Number(pl.totals.other_comprehensive_income.current) !== 0 && <>
+                {row("Other comprehensive income: revaluation surplus", pl.totals.other_comprehensive_income.current)}
+                {row("Total comprehensive income", pl.totals.total_comprehensive_income?.current ?? pl.totals.net_profit.current, true)}
+              </>}
             </tbody></table>
           </Card>
         )}
@@ -103,17 +107,19 @@ export default async function NotesPackPage({ searchParams }: PageProps<"/report
             <li>The statements are prepared under {notes.policies.framework}, on the {notes.policies.basis} basis, in {cur}.</li>
             <li>The financial year starts in {MONTHS[(notes.policies.fiscal_year_start_month || 1) - 1]}.</li>
             <li>Inventory is measured at the lower of cost and estimated selling price less costs to complete and sell; cost is {notes.policies.inventory.toLowerCase()}.</li>
-            <li>Property, plant and equipment is carried at cost less accumulated depreciation{notes.policies.depreciation_methods.length > 0 ? `, depreciated by the ${notes.policies.depreciation_methods.map((m) => METHOD[m] ?? m).join(" or ")} method over its useful life` : ""}.</li>
+            <li>Property, plant and equipment is carried at {notes.policies.revaluation ? "cost, or for revalued assets their fair value when revalued," : "cost"} less accumulated depreciation{notes.policies.depreciation_methods.length > 0 ? `, depreciated by the ${notes.policies.depreciation_methods.map((m) => METHOD[m] ?? m).join(" or ")} method over its useful life` : ""}.</li>
           </ul>
 
           <h3 className="mt-4 text-[15px] font-bold">2. Property, plant and equipment</h3>
           <table className="tbl mt-1"><tbody>
             {row("Cost at the start", notes.ppe.cost.opening)}
             {row("Additions", notes.ppe.cost.additions)}
+            {Number(notes.ppe.cost.revaluations ?? 0) !== 0 && row("Revaluation increases", notes.ppe.cost.revaluations ?? "0")}
             {row("Disposals", notes.ppe.cost.disposals)}
             {row("Cost at the end", notes.ppe.cost.closing, true)}
             {row("Accumulated depreciation at the start", notes.ppe.depreciation.opening)}
             {row("Charged for the period", notes.ppe.depreciation.charged)}
+            {Number(notes.ppe.depreciation.revaluations ?? 0) !== 0 && row("Revaluation decreases", notes.ppe.depreciation.revaluations ?? "0")}
             {row("Released on disposals", notes.ppe.depreciation.released)}
             {row("Accumulated depreciation at the end", notes.ppe.depreciation.closing, true)}
             {row("Carrying amount at the start", notes.ppe.carrying_opening)}

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getAssetOptions, getBankAccounts, getFixedAsset } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { AssetForm, DisposeAsset, ImpairAsset } from "../AssetForms";
+import { AssetForm, DisposeAsset, ImpairAsset, RevalueAsset } from "../AssetForms";
 
 export const metadata = { title: "Fixed asset" };
 
@@ -63,6 +63,28 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+      {(a.revaluations ?? []).length > 0 && (
+        <Card className="mb-4" label="Revaluations">
+          <h2 className="mb-2 text-[15px] font-bold">Revalued</h2>
+          <ul className="text-sm">
+            {a.revaluations!.map((r) => (
+              <li key={r.id} className="flex flex-wrap justify-between gap-2 border-t border-line py-1.5">
+                <span><Link href={`/journal/${encodeURIComponent(r.entry_id)}`} className="num hover:underline">{r.revalued_on}</Link> · {r.reason}</span>
+                <span className="num">{formatAmount(r.carrying_before)} → {formatAmount(r.fair_value)}
+                  <span className="ml-2 text-[12px] text-muted">surplus {formatAmount(r.to_surplus)} · profit or loss {formatAmount(r.to_profit)}</span></span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[13px] text-muted">Surplus on this asset: <span className="num">{formatAmount(a.surplus ?? "0")}</span></p>
+        </Card>
+      )}
+      {a.can.manage && a.status === "active" && (
+        <Card className="mb-4" label="Revalue">
+          <h2 className="mb-3 text-[15px] font-bold">Revalue to fair value</h2>
+          <RevalueAsset id={a.id} bookValue={formatAmount(a.book_value)} accounts={a.surplus_accounts ?? []}
+            kept={a.revaluations?.[0]?.surplus_account_id} />
         </Card>
       )}
       {a.can.manage && a.status === "active" && (

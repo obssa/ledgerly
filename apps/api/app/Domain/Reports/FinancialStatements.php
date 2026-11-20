@@ -27,7 +27,7 @@ final class FinancialStatements
      *
      * @return list<object{id: string, code: string, name: string, type: string, subtype: ?string, system_key: ?string, amount: string}>
      */
-    private function movements(string $companyId, ?string $from, string $to): array
+    private function movements(string $companyId, ?string $from, string $to, bool $withoutRevaluations = false): array
     {
         return DB::table('journal_lines as l')
             ->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'l.company_id')->on('e.id', '=', 'l.journal_entry_id'))
@@ -35,6 +35,7 @@ final class FinancialStatements
             ->where('l.company_id', $companyId)->where('l.entry_date', '<=', $to)
             ->when($from, fn ($q, $v) => $q->where('l.entry_date', '>=', $v))
             ->where('e.source_type', '<>', 'closing')
+            ->when($withoutRevaluations, fn ($q) => $q->where('e.source_type', '<>', 'asset_revaluation'))   // 092: no cash in them
             ->whereNotExists(fn ($q) => $q->from('journal_entries as c')->whereColumn('c.company_id', 'e.company_id')->whereColumn('c.id', 'e.source_id')
                 ->where('e.source_type', 'reversal')->where('c.source_type', 'closing'))
             ->groupBy('a.id', 'a.code', 'a.name', 'a.type', 'a.subtype', 'a.system_key')->orderBy('a.code')
@@ -62,10 +63,17 @@ final class FinancialStatements
      */
     public function cashFlow(string $companyId, string $from, string $to): array
     {
-        $rows = $this->movements($companyId, $from, $to);
-        $profit = BigDecimal::zero();
+        // 092: a revaluation moves no cash: its entries are left out, and what it put through profit or loss is added
+        // back as not cash, so the profit shown is still the period's.
+        $rows = $this->movements($companyId, $from, $to, true);
+        $revaluedProfit = BigDecimal::of((string) DB::table('asset_revaluations')->where('company_id', $companyId)
+            ->whereBetween('revalued_on', [$from, $to])->sum('to_profit'));
+        $profit = $revaluedProfit;
         $cashChange = BigDecimal::zero();
         $sections = ['operating' => [], 'investing' => [], 'financing' => []];
+        if (! $revaluedProfit->isZero()) {
+            $sections['operating'][] = ['code' => null, 'name' => 'Revaluation of fixed assets (not cash)', 'amount' => (string) $revaluedProfit->negated()->toScale(2)];
+        }
         foreach ($rows as $a) {
             $amount = BigDecimal::of($a->amount);
             if (in_array($a->type, ['income', 'expense'], true)) {
@@ -127,13 +135,18 @@ final class FinancialStatements
         $isPpe = fn ($a) => $a->type === 'asset' && $a->subtype === 'fixed_asset';
         $isDep = fn ($a) => self::isDepreciation($a);
         // Additions and disposals at cost: the debits and credits to the cost accounts in the period.
-        $ppeMoves = DB::table('journal_lines as l')->join('accounts as a', 'a.id', '=', 'l.account_id')
+        $notRevaluation = fn ($q) => $q->whereNotExists(fn ($s) => $s->from('journal_entries as e')->whereColumn('e.company_id', 'l.company_id')
+            ->whereColumn('e.id', 'l.journal_entry_id')->where('e.source_type', 'asset_revaluation'));
+        $ppeMoves = DB::table('journal_lines as l')->join('accounts as a', 'a.id', '=', 'l.account_id')->where($notRevaluation)
             ->where('l.company_id', $companyId)->whereBetween('l.entry_date', [$from, $to])->where('a.type', 'asset')->where('a.subtype', 'fixed_asset')
             ->selectRaw('coalesce(sum(l.debit), 0)::numeric(20,2)::text AS additions, coalesce(sum(l.credit), 0)::numeric(20,2)::text AS disposals')->first();
-        $depMoves = DB::table('journal_lines as l')->join('accounts as a', 'a.id', '=', 'l.account_id')
+        $depMoves = DB::table('journal_lines as l')->join('accounts as a', 'a.id', '=', 'l.account_id')->where($notRevaluation)
             ->where('l.company_id', $companyId)->whereBetween('l.entry_date', [$from, $to])->where('a.type', 'asset')->where('a.subtype', 'contra_asset')
             ->where(fn ($q) => $q->whereNull('a.system_key')->orWhere('a.system_key', '<>', 'doubtful_debts_allowance'))
             ->selectRaw('coalesce(sum(l.credit), 0)::numeric(20,2)::text AS charged, coalesce(sum(l.debit), 0)::numeric(20,2)::text AS released')->first();
+        $revaluedIn = DB::table('asset_revaluations')->where('company_id', $companyId)->whereBetween('revalued_on', [$from, $to])->get(['to_surplus', 'to_profit']);
+        $up = $revaluedIn->reduce(fn (BigDecimal $t, $r) => ($c = BigDecimal::of((string) $r->to_surplus)->plus((string) $r->to_profit))->isPositive() ? $t->plus($c) : $t, BigDecimal::zero());
+        $down = $revaluedIn->reduce(fn (BigDecimal $t, $r) => ($c = BigDecimal::of((string) $r->to_surplus)->plus((string) $r->to_profit))->isNegative() ? $t->minus($c) : $t, BigDecimal::zero());
         $costOpen = $sum($opening, $isPpe);
         $costClose = $sum($closing, $isPpe);
         $depOpen = $sum($opening, $isDep)->negated();
@@ -151,10 +164,11 @@ final class FinancialStatements
                 'framework' => 'IFRS for SMEs', 'basis' => $company->accounting_basis ?? 'accrual', 'fiscal_year_start_month' => (int) $company->fiscal_year_start_month,
                 'inventory' => $fifo > 0 ? "Weighted average cost; {$fifo} items first in, first out" : 'Weighted average cost',
                 'depreciation_methods' => $methods,
+                'revaluation' => DB::table('asset_revaluations')->where('company_id', $companyId)->where('revalued_on', '<=', $to)->exists(),   // 092
             ],
             'ppe' => [
-                'cost' => ['opening' => $str($costOpen), 'additions' => (string) $ppeMoves->additions, 'disposals' => (string) $ppeMoves->disposals, 'closing' => $str($costClose)],
-                'depreciation' => ['opening' => $str($depOpen), 'charged' => (string) $depMoves->charged, 'released' => (string) $depMoves->released, 'closing' => $str($depClose)],
+                'cost' => ['opening' => $str($costOpen), 'additions' => (string) $ppeMoves->additions, 'revaluations' => $str($up), 'disposals' => (string) $ppeMoves->disposals, 'closing' => $str($costClose)],
+                'depreciation' => ['opening' => $str($depOpen), 'charged' => (string) $depMoves->charged, 'revaluations' => $str($down), 'released' => (string) $depMoves->released, 'closing' => $str($depClose)],
                 'carrying_opening' => $str($costOpen->minus($depOpen)), 'carrying_closing' => $str($costClose->minus($depClose)),
             ],
             'receivables' => ['lines' => $lines(fn ($a) => in_array($a->system_key, ['accounts_receivable', 'doubtful_debts_allowance', 'withholding_receivable'], true) || $a->subtype === 'receivable'),

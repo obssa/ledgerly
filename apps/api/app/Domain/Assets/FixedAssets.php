@@ -58,9 +58,12 @@ final class FixedAssets
         $months = DB::table('asset_depreciation')->where('company_id', $id)->whereIn('asset_id', $assets->pluck('id')->all())
             ->groupBy('asset_id')->select('asset_id')->selectRaw('count(*) AS n')->pluck('n', 'asset_id');
         $impaired = $this->impaired($id, $assets->pluck('id')->all());
+        $revalued = $this->revalued($id, $assets->pluck('id')->all());   // 092
         $out = [];
         foreach ($assets as $a) {
-            $amount = $this->charge($a, (string) ($soFar[$a->id] ?? '0'), (string) ($impaired[$a->id] ?? '0'), (int) ($months[$a->id] ?? 0));
+            $writtenDown = BigDecimal::of((string) ($impaired[$a->id] ?? '0'))->minus((string) ($revalued[$a->id]['net'] ?? '0'));
+            $amount = $this->charge($a, (string) ($soFar[$a->id] ?? '0'), (string) $writtenDown, (int) ($months[$a->id] ?? 0),
+                isset($impaired[$a->id]) || isset($revalued[$a->id]));
             if ($amount->isPositive()) {
                 $out[] = ['asset' => $a, 'amount' => (string) $amount];
             }
@@ -72,9 +75,11 @@ final class FixedAssets
     /**
      * One asset's charge for a month, given what it has been charged so far. 091: an impaired asset's lower carrying
      * amount is depreciated over its remaining life (straight line: what is left over the months still to go), as
-     * IFRS for SMEs 27 asks; an asset never impaired is charged as before.
+     * IFRS for SMEs 27 asks; an asset never impaired is charged as before. 092: $impaired is the net write-down
+     * (impairments less revaluations, so below zero for an asset revalued up), and a revalued asset is charged the same
+     * way on its revalued amount ($remeasured).
      */
-    public function charge(object $a, string $soFar, string $impaired = '0', int $monthsCharged = 0): BigDecimal
+    public function charge(object $a, string $soFar, string $impaired = '0', int $monthsCharged = 0, bool $remeasured = false): BigDecimal
     {
         $cost = BigDecimal::of((string) $a->cost);
         $residual = BigDecimal::of((string) $a->residual_value);
@@ -83,7 +88,7 @@ final class FixedAssets
         if (! $left->isPositive()) {
             return BigDecimal::zero()->toScale(2);
         }
-        $writtenDown = BigDecimal::of($impaired)->isPositive();
+        $writtenDown = $remeasured || ! BigDecimal::of($impaired)->isZero();
         $monthly = match (true) {
             $a->method === 'straight_line' && $writtenDown => $left->dividedBy(max(1, (int) $a->useful_life_months - $monthsCharged), 2, Rounding::halfUp()),
             $a->method === 'straight_line' => $cost->minus($residual)->dividedBy((int) $a->useful_life_months, 2, Rounding::halfUp()),
@@ -160,8 +165,9 @@ final class FixedAssets
             }
             $charged = (string) DB::table('asset_depreciation')->where(['company_id' => $id, 'asset_id' => $a->id])->sum('amount');
             $impaired = (string) DB::table('asset_impairments')->where(['company_id' => $id, 'asset_id' => $a->id])->sum('amount');   // 091
-            $accumulated = Money::of(BigDecimal::of((string) $a->opening_depreciation)->plus($charged ?: '0')->plus($impaired ?: '0'), $base);
-            $cost = Money::of((string) $a->cost, $base);
+            $revalued = $this->revalued($id, [(string) $a->id])[$a->id] ?? ['up' => '0', 'down' => '0'];   // 092
+            $accumulated = Money::of(BigDecimal::of((string) $a->opening_depreciation)->plus($charged ?: '0')->plus($impaired ?: '0')->plus($revalued['down']), $base);
+            $cost = Money::of(BigDecimal::of((string) $a->cost)->plus($revalued['up']), $base);
             $received = Money::of($proceeds, $base);
             $book = $cost->minus($accumulated);
             $gain = $received->minus($book);
@@ -205,6 +211,113 @@ final class FixedAssets
      *
      * @return array{posted: list<array<string, string>>, ahead: list<array<string, string>>, depreciated: string, book_value: string}
      */
+    /**
+     * 092: each asset's revaluations: up (debited to its cost account), down (credited to its accumulated depreciation),
+     * net (up less down), and what is in its surplus.
+     *
+     * @param list<string> $assetIds
+     * @return array<string, array{up: string, down: string, net: string, surplus: string, profit: string}>
+     */
+    public function revalued(string $companyId, array $assetIds): array
+    {
+        $out = [];
+        foreach (DB::table('asset_revaluations')->where('company_id', $companyId)->whereIn('asset_id', $assetIds)->get(['asset_id', 'to_surplus', 'to_profit']) as $r) {
+            $t = $out[$r->asset_id] ?? ['up' => BigDecimal::zero(), 'down' => BigDecimal::zero(), 'surplus' => BigDecimal::zero(), 'profit' => BigDecimal::zero()];
+            $change = BigDecimal::of((string) $r->to_surplus)->plus((string) $r->to_profit);
+            $t[$change->isPositive() ? 'up' : 'down'] = $t[$change->isPositive() ? 'up' : 'down']->plus($change->abs());
+            $t['surplus'] = $t['surplus']->plus((string) $r->to_surplus);
+            $t['profit'] = $t['profit']->plus((string) $r->to_profit);
+            $out[$r->asset_id] = $t;
+        }
+
+        return array_map(fn (array $t) => ['up' => (string) $t['up']->toScale(2), 'down' => (string) $t['down']->toScale(2),
+            'net' => (string) $t['up']->minus($t['down'])->toScale(2), 'surplus' => (string) $t['surplus']->toScale(2), 'profit' => (string) $t['profit']->toScale(2)], $out);
+    }
+
+    /** What an asset is carried at as the books stand: cost less depreciation and impairments, plus revaluations. */
+    public function carrying(object $a): BigDecimal
+    {
+        $charged = (string) DB::table('asset_depreciation')->where(['company_id' => $a->company_id, 'asset_id' => $a->id])->sum('amount');
+        $impaired = (string) ($this->impaired((string) $a->company_id, [(string) $a->id])[$a->id] ?? '0');
+        $revalued = (string) ($this->revalued((string) $a->company_id, [(string) $a->id])[$a->id]['net'] ?? '0');
+
+        return BigDecimal::of((string) $a->cost)->minus((string) $a->opening_depreciation)->minus($charged ?: '0')->minus($impaired)->plus($revalued)->toScale(2);
+    }
+
+    /**
+     * 092: revalues an asset to its fair value on $date (IFRS for SMEs 17.15B to 17.15D). An increase is Dr its cost
+     * account, Cr profit or loss (its depreciation and impairment expense) as far as it reverses earlier revaluation
+     * decreases charged there, the rest Cr the surplus; a decrease is Dr the surplus as far as the asset has one there,
+     * the rest Dr profit or loss, Cr its accumulated depreciation. Later depreciation spreads the revalued amount over
+     * the remaining life.
+     *
+     * @return array<string, mixed> the revaluation
+     */
+    public function revalue(Company $company, string $assetId, string $date, string $fairValue, string $surplusAccountId, string $reason, string $userId): array
+    {
+        return DB::transaction(function () use ($company, $assetId, $date, $fairValue, $surplusAccountId, $reason, $userId) {
+            $id = $company->getKey();
+            $base = $company->base_currency;
+            $a = DB::table('fixed_assets')->where(['company_id' => $id, 'id' => $assetId])->lockForUpdate()->first() ?? abort(404);
+            if ($a->status !== 'active') {
+                throw ValidationException::withMessages(['fair_value' => ["{$a->code} was disposed of: it is not revalued."]]);
+            }
+            if ($date < (string) $a->acquired_on) {
+                throw ValidationException::withMessages(['date' => ["{$a->code} was acquired on {$a->acquired_on}."]]);
+            }
+            $fair = BigDecimal::of($fairValue)->toScale(2);
+            if ($fair->isLessThan((string) $a->residual_value)) {
+                throw ValidationException::withMessages(['fair_value' => ["{$a->code} is revalued to no less than its residual value ({$a->residual_value})."]]);
+            }
+            $carrying = $this->carrying($a);
+            $change = $fair->minus($carrying);
+            if ($change->isZero()) {
+                throw ValidationException::withMessages(['fair_value' => ["{$a->code} is already carried at {$carrying}."]]);
+            }
+            $earlier = DB::table('asset_revaluations')->where(['company_id' => $id, 'asset_id' => $a->id])->value('surplus_account_id');
+            if ($earlier !== null && $earlier !== $surplusAccountId) {
+                throw ValidationException::withMessages(['surplus_account_id' => ["{$a->code}'s surplus is kept on the account its earlier revaluations used."]]);
+            }
+            $so = $this->revalued($id, [(string) $a->id])[$a->id] ?? ['surplus' => '0', 'profit' => '0'];
+            // An increase reverses what was charged to profit or loss first; a decrease takes the surplus first.
+            $toProfit = $change->isPositive()
+                ? BigDecimal::min($change, BigDecimal::max(BigDecimal::of($so['profit'])->negated(), BigDecimal::zero()))
+                : $change->plus(BigDecimal::min($change->negated(), BigDecimal::of($so['surplus'])));
+            $toSurplus = $change->minus($toProfit);
+
+            $revaluationId = (string) Str::uuid7();
+            $label = "{$a->code} {$a->name}";
+            $dims = $a->location_id ? ['location_id' => $a->location_id] : [];
+            $money = fn (BigDecimal $v) => Money::of((string) $v->abs()->toScale(2), $base);
+            $draft = new JournalDraft($id, new DateTimeImmutable($date), $base, $base, '1', mb_substr("Revaluation of {$label}", 0, 255), 'asset_revaluation', $revaluationId);
+            if ($change->isPositive()) {
+                $draft->add(JournalLineDraft::debit($a->asset_account_id, $money($change), null, "Revaluation of {$label}", null, $dims));
+                if (! $toProfit->isZero()) {
+                    $draft->add(JournalLineDraft::credit($a->expense_account_id, $money($toProfit), null, "Revaluation of {$label}: earlier decrease reversed", null, $dims));
+                }
+                if (! $toSurplus->isZero()) {
+                    $draft->add(JournalLineDraft::credit($surplusAccountId, $money($toSurplus), null, "Revaluation surplus on {$label}", null, $dims));
+                }
+            } else {
+                if (! $toSurplus->isZero()) {
+                    $draft->add(JournalLineDraft::debit($surplusAccountId, $money($toSurplus), null, "Revaluation surplus on {$label} used", null, $dims));
+                }
+                if (! $toProfit->isZero()) {
+                    $draft->add(JournalLineDraft::debit($a->expense_account_id, $money($toProfit), null, "Revaluation decrease of {$label}", null, $dims));
+                }
+                $draft->add(JournalLineDraft::credit($a->depreciation_account_id, $money($change), null, "Revaluation of {$label}", null, $dims));
+            }
+            $entry = $this->posting->post($draft, $userId);
+            DB::table('asset_revaluations')->insert(['id' => $revaluationId, 'company_id' => $id, 'asset_id' => $a->id, 'revalued_on' => $date,
+                'fair_value' => (string) $fair, 'carrying_before' => (string) $carrying, 'to_surplus' => (string) $toSurplus->toScale(2),
+                'to_profit' => (string) $toProfit->toScale(2), 'surplus_account_id' => $surplusAccountId, 'reason' => trim($reason),
+                'entry_id' => $entry->getKey(), 'created_by' => $userId]);
+
+            return ['id' => $revaluationId, 'fair_value' => (string) $fair, 'carrying_before' => (string) $carrying, 'to_surplus' => (string) $toSurplus->toScale(2),
+                'to_profit' => (string) $toProfit->toScale(2), 'entry' => ['id' => $entry->getKey(), 'number' => (int) $entry->number]];
+        });
+    }
+
     /** @param list<string> $assetIds @return array<string, string> what each asset has been written down by (091) */
     public function impaired(string $companyId, array $assetIds): array
     {
@@ -230,9 +343,7 @@ final class FixedAssets
             if ($date < (string) $a->acquired_on) {
                 throw ValidationException::withMessages(['date' => ["{$a->code} was acquired on {$a->acquired_on}."]]);
             }
-            $charged = (string) DB::table('asset_depreciation')->where(['company_id' => $id, 'asset_id' => $a->id])->sum('amount');
-            $impaired = (string) ($this->impaired($id, [(string) $a->id])[$a->id] ?? '0');
-            $left = BigDecimal::of((string) $a->cost)->minus((string) $a->residual_value)->minus((string) $a->opening_depreciation)->minus($charged ?: '0')->minus($impaired);
+            $left = $this->carrying($a)->minus((string) $a->residual_value);   // 092: revaluations counted
             if (BigDecimal::of($amount)->isGreaterThan($left)) {
                 throw ValidationException::withMessages(['amount' => ["{$a->code} can be written down by {$left->toScale(2)} at most: its carrying amount above the residual value."]]);
             }
@@ -262,8 +373,10 @@ final class FixedAssets
         $future = [];
         $running = $soFar;
         $impaired = (string) ($this->impaired((string) $a->company_id, [(string) $a->id])[$a->id] ?? '0');
+        $revalued = $this->revalued((string) $a->company_id, [(string) $a->id])[$a->id] ?? null;   // 092
+        $net = (string) BigDecimal::of($impaired)->minus($revalued['net'] ?? '0');
         for ($i = 0; $i < $ahead && $a->status === 'active'; $i++) {
-            $charge = $this->charge($a, (string) $running, $impaired, $posted->count() + $i);
+            $charge = $this->charge($a, (string) $running, $net, $posted->count() + $i, $impaired !== '0' || $revalued !== null);
             if (! $charge->isPositive()) {
                 break;
             }
@@ -278,9 +391,13 @@ final class FixedAssets
             'impairments' => DB::table('asset_impairments')->where(['company_id' => $a->company_id, 'asset_id' => $a->id])->orderBy('impaired_on')
                 ->get(['id', 'impaired_on', 'amount', 'reason', 'entry_id'])->map(fn ($r) => (array) $r)->all(),
             'impaired' => (string) BigDecimal::of($impaired)->toScale(2),
+            'revaluations' => DB::table('asset_revaluations')->where(['company_id' => $a->company_id, 'asset_id' => $a->id])->orderBy('revalued_on')->orderBy('created_at')
+                ->get(['id', 'revalued_on', 'fair_value', 'carrying_before', 'to_surplus', 'to_profit', 'surplus_account_id', 'reason', 'entry_id'])->map(fn ($r) => (array) $r)->all(),
+            'revalued' => $revalued['net'] ?? '0.00',
+            'surplus' => $revalued['surplus'] ?? '0.00',
             'ahead' => $future,
             'depreciated' => (string) $depreciated,
-            'book_value' => (string) BigDecimal::of((string) $a->cost)->minus($depreciated)->toScale(2),
+            'book_value' => (string) BigDecimal::of((string) $a->cost)->minus($depreciated)->plus($revalued['net'] ?? '0')->toScale(2),
         ];
     }
 }

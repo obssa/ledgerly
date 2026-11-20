@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { Account, Dimension, FixedAsset } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
-import { disposeAsset, impairAsset, runDepreciation, saveAsset } from "./actions";
+import { disposeAsset, impairAsset, revalueAsset, runDepreciation, saveAsset } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -97,6 +97,38 @@ export function AssetForm({ asset, options, locked }: { asset?: FixedAsset; opti
         <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : asset ? "Save changes" : "Register asset"}</button>
         {locked && <span className="text-[13px] text-muted">It has been depreciated: how it wears out stays as it was.</span>}
       </div>
+    </form>
+  );
+}
+
+/** 092: revalue an asset to its fair value (a valuer's report, a market price); the surplus is kept on an equity account. */
+export function RevalueAsset({ id, bookValue, accounts, kept }: { id: string; bookValue: string; accounts: { id: string; code: string; name: string }[]; kept?: string }) {
+  const [state, action, pending] = useActionState(revalueAsset, undefined);
+  const today = todayIn();
+  const usual = kept ?? accounts.find((a) => /revaluation/i.test(a.name))?.id;
+  return (
+    <form action={action} noValidate className="grid gap-3">
+      <Message state={state} />
+      <input type="hidden" name="id" value={id} />
+      <p className="text-[13px] text-muted">
+        Carried at {bookValue}. A rise goes to the revaluation surplus (other comprehensive income), except where it reverses an earlier fall charged to profit or loss;
+        a fall takes this asset&rsquo;s surplus first, then profit or loss.
+      </p>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+        <div><label className="field-label" htmlFor="rev-date">Date</label><input className="field num" id="rev-date" name="date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="rev-fair">Fair value</label><input className="field num" id="rev-fair" name="fair_value" inputMode="decimal" /></div>
+        <div>
+          <label className="field-label" htmlFor="rev-surplus">Surplus kept on</label>
+          <select className="field" id="rev-surplus" name="surplus_account_id" defaultValue={usual ?? ""} disabled={Boolean(kept)}>
+            <option value="" disabled>Choose an equity account</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+          </select>
+          {kept && <input type="hidden" name="surplus_account_id" value={kept} />}
+        </div>
+      </div>
+      <div><label className="field-label" htmlFor="rev-reason">How the fair value was found</label><input className="field" id="rev-reason" name="reason" maxLength={500} placeholder="Valuer's report, 30 June" /></div>
+      {accounts.length === 0 && <p className="text-[13px] text-muted">Add an equity account for the surplus first (for example 3400 Revaluation surplus) in the chart of accounts.</p>}
+      <button type="submit" className="btn self-start" disabled={pending || accounts.length === 0}>{pending ? "Posting…" : "Revalue"}</button>
     </form>
   );
 }

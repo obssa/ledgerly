@@ -54,6 +54,21 @@ export async function disposeAsset(_: FormState | undefined, form: FormData): Pr
   }
 }
 
+/** 092: revalues the asset to its fair value; the surplus is kept on an equity account. */
+export async function revalueAsset(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.revalueFixedAsset(text(form, "id") ?? "", {
+      date: text(form, "date") ?? "", fair_value: (text(form, "fair_value") ?? "").replace(/[,\s]/g, ""),
+      surplus_account_id: text(form, "surplus_account_id") ?? "", reason: text(form, "reason") ?? "",
+    }, ctx);
+    refresh();
+    return { notice: "Revalued: the entry is posted, and later depreciation spreads the revalued amount over the remaining life." };
+  } catch (error) {
+    return refusal(error, "revalue assets");
+  }
+}
+
 /** 091: writes the asset down when it is worth less than its carrying amount. */
 export async function impairAsset(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
