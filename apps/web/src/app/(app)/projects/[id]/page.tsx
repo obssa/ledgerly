@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCustomers, getProject, getTimeOptions } from "@/lib/data";
+import { getCustomers, getExpenseAccounts, getProject, getTimeOptions } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { milestoneTotal, PROJECT_BILLING, PROJECT_STATUSES } from "@/lib/projects";
+import { GrantForm } from "../GrantForm";
 import { ProjectForm } from "../ProjectForm";
 import { BillTime } from "../TimeForms";
 import { AddMilestone, MilestoneControls } from "../MilestoneForms";
@@ -32,7 +33,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
   const { id } = await params;
   const q = await searchParams;
   const period = { from: date(q.from), to: date(q.to) };
-  const [p, customers, timeOptions] = await Promise.all([getProject(id, period), getCustomers({}), getTimeOptions()]);
+  const [p, customers, timeOptions, expenseAccounts] = await Promise.all([getProject(id, period), getCustomers({}), getTimeOptions(), getExpenseAccounts()]);
   if (!p) notFound();
 
   return (
@@ -146,6 +147,25 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
           </table>
         </div>
       </Card>
+      {p.grant && (
+        <Card className="mb-4" label="Grant">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-[15px] font-bold">Grant{p.grant.donor ? ` from ${p.grant.donor.name}` : ""}{p.grant.reference ? ` · ${p.grant.reference}` : ""}</h2>
+            <Link href={`/projects/${encodeURIComponent(p.id)}/donor-report`} className="btn">Donor report</Link>
+          </div>
+          <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 text-sm">
+            <div><dt className="text-muted">Award</dt><dd className="num font-semibold">{formatAmount(p.grant.award)}</dd></div>
+            <div><dt className="text-muted">Budget</dt><dd className="num">{formatAmount(p.grant.budget)}</dd></div>
+            <div><dt className="text-muted">Spending</dt><dd>{p.grant.restricted ? <Pill tone="warn">Restricted to its budget lines</Pill> : <Pill>Unrestricted</Pill>}</dd></div>
+          </dl>
+        </Card>
+      )}
+      {p.can.manage && (
+        <Card className="mb-4" label="Grant setup">
+          <h2 className="mb-3 text-[15px] font-bold">{p.grant ? "Grant and budget" : "Funded by a donor?"}</h2>
+          <GrantForm projectId={p.id} grant={p.grant ?? null} donors={customers.data.map((c) => ({ id: c.id, name: c.name }))} accounts={expenseAccounts} />
+        </Card>
+      )}
       {p.can.manage && (
         <Card label="Edit">
           <h2 className="mb-3 text-[15px] font-bold">Edit</h2>

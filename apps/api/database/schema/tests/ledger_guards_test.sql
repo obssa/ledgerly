@@ -4880,6 +4880,73 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T118 a revaluation moves an asset to fair value through the surplus or profit or loss, exactly, and is kept';
 END $$;
+-- T119: grants for NGOs (093). A grant is of a project of the company; its budget lines are expense accounts; a
+-- restricted grant with a budget takes expenses only on its budget lines (credits and reversals let through), and
+-- an unrestricted one takes any. Company A, user f1, on T69's accounts plus a travel account of its own.
+DO $$
+DECLARE
+  grant_p constant uuid := '00000000-0000-0000-0000-0000000119d1';
+  place constant uuid := '00000000-0000-0000-0000-0000000119d2';
+  travel constant uuid := '00000000-0000-0000-0000-0000000119a1';
+  supplies constant uuid := '00000000-0000-0000-0000-0000000069a3';
+  bank constant uuid := '00000000-0000-0000-0000-0000000069a1';
+  e1 constant uuid := '00000000-0000-0000-0000-0000000119e1';
+  e2 constant uuid := '00000000-0000-0000-0000-0000000119e2';
+  e3 constant uuid := '00000000-0000-0000-0000-0000000119e3';
+  e4 constant uuid := '00000000-0000-0000-0000-0000000119e4';
+BEGIN
+  INSERT INTO accounts (id, company_id, code, name, type) VALUES (travel, app_company_id(), '6119', 'T119 travel', 'expense');
+  INSERT INTO dimensions (id, company_id, kind, code, name) VALUES
+    (grant_p, app_company_id(), 'project', 'GR-119', 'T119 water grant'), (place, app_company_id(), 'location', 'LOC-119', 'T119 field office');
+  BEGIN
+    INSERT INTO project_grants (project_id, company_id, award) VALUES (place, app_company_id(), 50000);
+    RAISE EXCEPTION 'FAIL T119a: a location was set up as a grant';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO project_grants (project_id, company_id, award, reference) VALUES (grant_p, app_company_id(), 50000, 'WASH-2027-01');
+  BEGIN
+    INSERT INTO grant_budget_lines (company_id, project_id, account_id, amount) VALUES (app_company_id(), grant_p, bank, 1000);
+    RAISE EXCEPTION 'FAIL T119b: a grant budget line was on an asset account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO grant_budget_lines (company_id, project_id, account_id, amount) VALUES (app_company_id(), grant_p, supplies, 20000);
+
+  -- On its budget line: posted.
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES (e1, app_company_id(), 9922, '2027-09-20', 'ETB');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn, project_id) VALUES
+    (app_company_id(), e1, 1, supplies, 100, 0, 100, grant_p), (app_company_id(), e1, 2, bank, 0, 100, -100, NULL);
+  -- Off its budget: refused.
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES (e2, app_company_id(), 9923, '2027-09-20', 'ETB');
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn, project_id) VALUES
+      (app_company_id(), e2, 1, travel, 100, 0, 100, grant_p), (app_company_id(), e2, 2, bank, 0, 100, -100, NULL);
+    RAISE EXCEPTION 'FAIL T119c: a restricted grant was spent off its budget lines';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  -- A credit off its budget, and a reversal: let through.
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES (e3, app_company_id(), 9924, '2027-09-21', 'ETB');
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn, project_id) VALUES
+    (app_company_id(), e3, 1, bank, 50, 0, 50, NULL), (app_company_id(), e3, 2, travel, 0, 50, -50, grant_p);
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES (e4, app_company_id(), 9925, '2027-09-22', 'ETB', 'reversal', e3);
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn, project_id) VALUES
+    (app_company_id(), e4, 1, travel, 50, 0, 50, grant_p), (app_company_id(), e4, 2, bank, 0, 50, -50, NULL);
+  -- Unrestricted: any account.
+  UPDATE project_grants SET restricted = false WHERE project_id = grant_p;
+  BEGIN
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency) VALUES (e2, app_company_id(), 9923, '2027-09-23', 'ETB');
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn, project_id) VALUES
+      (app_company_id(), e2, 1, travel, 100, 0, 100, grant_p), (app_company_id(), e2, 2, bank, 0, 100, -100, NULL);
+  EXCEPTION WHEN check_violation THEN
+    RAISE EXCEPTION 'FAIL T119d: an unrestricted grant refused an expense';
+  END;
+  BEGIN
+    UPDATE project_grants SET project_id = place WHERE project_id = grant_p;
+    RAISE EXCEPTION 'FAIL T119e: a grant moved to another dimension';
+  EXCEPTION WHEN check_violation OR foreign_key_violation THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM project_grants WHERE project_id = grant_p) OR EXISTS (SELECT 1 FROM grant_budget_lines WHERE project_id = grant_p) THEN
+    RAISE EXCEPTION 'FAIL T119f: company B saw company A''s grant';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T119 a restricted grant is spent only on its budget lines, an unrestricted one on any, and each stays its company''s';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

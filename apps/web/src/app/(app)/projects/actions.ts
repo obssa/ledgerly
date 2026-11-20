@@ -42,6 +42,26 @@ function refusal(error: unknown, what: string): FormState {
   return formStateFromError(error);
 }
 
+/** 093: sets the project up as a grant: donor, award, reference, restricted or not, and its budget lines. */
+export async function saveGrant(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  const lines: { account_id: string; amount: string }[] = [];
+  for (let i = 0; i < 200 && form.has(`lines.${i}.account_id`); i++) {
+    const account = text(form, `lines.${i}.account_id`);
+    if (account) lines.push({ account_id: account, amount: (text(form, `lines.${i}.amount`) ?? "0").replace(/[,\s]/g, "") });
+  }
+  try {
+    await ledgerly.setGrant(text(form, "id") ?? "", {
+      donor_id: text(form, "donor_id") ?? null, award: (text(form, "award") ?? "").replace(/[,\s]/g, ""), reference: text(form, "reference") ?? null,
+      restricted: form.get("restricted") === "on", lines,
+    }, ctx);
+    refresh();
+    return { notice: "Grant saved." };
+  } catch (error) {
+    return refusal(error, "manage grants");
+  }
+}
+
 export async function logTime(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   try {

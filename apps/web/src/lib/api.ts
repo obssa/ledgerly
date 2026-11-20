@@ -495,6 +495,31 @@ export interface Project {
   profit: string;
 }
 
+/** Module 9a (093): a project funded by a donor, with its budget per expense account. */
+export interface ProjectGrant {
+  donor: { id: string; name: string } | null;
+  award: string;
+  reference: string | null;
+  restricted: boolean;
+  lines: { account_id: string; code: string; name: string; amount: string }[];
+  budget: string;
+}
+
+/** Module 9a (093): the donor report for a period. */
+export interface DonorReport {
+  project: { id: string; code: string; name: string; starts_on: string | null; ends_on: string | null };
+  grant: ProjectGrant;
+  from: string | null;
+  to: string;
+  lines: { account_id: string; code: string; name: string; budget: string; period: string; to_date: string; remaining: string; over: boolean }[];
+  totals: { budget: string; period: string; to_date: string; remaining: string };
+  outside_budget: { account_id: string; code: string; name: string; period: string; to_date: string }[];
+  spent: { period: string; to_date: string };
+  income: { period: string; to_date: string };
+  fund_balance: string;
+  award_to_come: string;
+}
+
 export interface ProjectDetail extends Project {
   from: string | null;
   to: string | null;
@@ -503,6 +528,8 @@ export interface ProjectDetail extends Project {
   documents: { id: string; type: string; number: string | null; date: string; contact: string; currency: string; amount: string }[];
   /** Milestones of a fixed-fee project, billed one by one (049). */
   milestones?: ProjectMilestone[];
+  /** 093: set when the project is a donor's grant. */
+  grant?: ProjectGrant | null;
   can: { manage: boolean };
 }
 
@@ -1599,6 +1626,9 @@ export const ledgerly = {
     api<{ entry: { id: string; number: number }; total: string; assets: number }>("depreciation-runs", { ...ctx, method: "POST", body: { period_end: periodEnd } }),
   projects: (ctx: RequestOptions) => api<{ data: Project[]; can: { manage: boolean } }>("projects", ctx),
   project: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) => api<ProjectDetail>(`projects/${encodeURIComponent(id)}`, { ...ctx, query: q }),
+  setGrant: (id: string, body: { donor_id: string | null; award: string; reference: string | null; restricted: boolean; lines: { account_id: string; amount: string }[] }, ctx: RequestOptions) =>
+    api<ProjectDetail>(`projects/${encodeURIComponent(id)}/grant`, { ...ctx, method: "PUT", body }),
+  donorReport: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) => api<DonorReport>(`projects/${encodeURIComponent(id)}/donor-report`, { ...ctx, query: q }),
   saveProject: (id: string | null, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<ProjectDetail>(id ? `projects/${encodeURIComponent(id)}` : "projects", { ...ctx, method: id ? "PUT" : "POST", body }),
   timeEntries: (q: { project_id?: string; from?: string; to?: string }, ctx: RequestOptions) =>

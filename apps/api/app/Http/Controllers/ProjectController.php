@@ -77,6 +77,7 @@ final class ProjectController extends Controller
             'documents' => $documents->map(fn ($d) => ['id' => $d->id, 'type' => $d->type, 'number' => $d->number, 'date' => $d->issue_date,
                 'contact' => $d->contact, 'currency' => $d->currency, 'amount' => $d->amount])->values(),
             'milestones' => ProjectMilestoneController::listFor($companyId, $p->id),
+            'grant' => $this->grantOf($p->id),   // 093
             'can' => ['manage' => (bool) $this->current->membership()?->can('projects.manage')],
         ]);
     }
@@ -116,6 +117,122 @@ final class ProjectController extends Controller
             userId: $request->user()->getKey());
 
         return $this->show($request, $p->id);
+    }
+
+    /**
+     * 093: sets the project up as a grant: the donor, the award, the donor's reference, whether it is restricted, and
+     * its budget, one line per expense account (the lines given replace the ones it had).
+     */
+    public function grant(Request $request, string $project): JsonResponse
+    {
+        $this->authorizeCompany('projects.manage');
+        $p = $this->load($project);   // the company's own, or not found
+        $data = $request->validate([
+            'donor_id' => ['nullable', 'uuid'],
+            'award' => ['required', 'decimal:0,2', 'gt:0', 'max:999999999999'],
+            'reference' => ['nullable', 'string', 'max:100'],
+            'restricted' => ['required', 'boolean'],
+            'lines' => ['present', 'array', 'max:200'],
+            'lines.*.account_id' => ['required', 'uuid'],
+            'lines.*.amount' => ['required', 'decimal:0,2', 'min:0', 'max:999999999999'],
+        ]);
+        $companyId = $this->current->id();
+        if (($data['donor_id'] ?? null) !== null && ! DB::table('contacts')->where(['company_id' => $companyId, 'id' => $data['donor_id']])->exists()) {
+            throw ValidationException::withMessages(['donor_id' => ['Choose the donor from your contacts.']]);
+        }
+        $ids = array_column($data['lines'], 'account_id');
+        $expense = DB::table('accounts')->where(['company_id' => $companyId, 'type' => 'expense'])->whereIn('id', $ids)->pluck('id')->flip();
+        foreach ($ids as $i => $id) {
+            if (! isset($expense[$id])) {
+                throw ValidationException::withMessages(["lines.{$i}.account_id" => ['A budget line is an expense account.']]);
+            }
+            if (array_search($id, $ids, true) !== $i) {
+                throw ValidationException::withMessages(["lines.{$i}.account_id" => ['Each expense account is one budget line.']]);
+            }
+        }
+        $before = $this->grantOf($p->id);
+        $reference = isset($data['reference']) && trim((string) $data['reference']) !== '' ? trim((string) $data['reference']) : null;
+        DB::transaction(function () use ($companyId, $p, $data, $reference) {
+            $row = ['donor_id' => $data['donor_id'] ?? null, 'award' => (string) $data['award'], 'reference' => $reference, 'restricted' => (bool) $data['restricted'], 'updated_at' => now()];
+            DB::table('project_grants')->where(['company_id' => $companyId, 'project_id' => $p->id])->exists()
+                ? DB::table('project_grants')->where(['company_id' => $companyId, 'project_id' => $p->id])->update($row)
+                : DB::table('project_grants')->insert(['project_id' => $p->id, 'company_id' => $companyId, ...$row]);
+            DB::table('grant_budget_lines')->where(['company_id' => $companyId, 'project_id' => $p->id])->delete();
+            DB::table('grant_budget_lines')->insert(array_map(fn (array $l) => ['id' => (string) Str::uuid7(), 'company_id' => $companyId, 'project_id' => $p->id,
+                'account_id' => $l['account_id'], 'amount' => (string) $l['amount']], $data['lines']));
+        });
+        $after = $this->grantOf($p->id);
+        $this->audit->record($companyId, 'grant_set', 'project', $p->id, $before, $after, userId: $request->user()->getKey());
+
+        return $this->show($request, $p->id);
+    }
+
+    /**
+     * 093: the donor report for a period (from the project's start, or the beginning, to today by default): each budget
+     * line's budget, what was spent in the period and to date, and what is left; spending on other accounts; the income
+     * the grant brought in; and the fund balance (income less spending, to date). Read from the ledger by the project.
+     */
+    public function donorReport(Request $request, string $project): JsonResponse
+    {
+        $this->authorizeCompany('projects.view');
+        $p = $this->load($project);
+        $grant = $this->grantOf($p->id)
+            ?? throw ValidationException::withMessages(['project' => ["{$p->code} is not set up as a grant: add its donor, award and budget first."]]);
+        $q = $request->validate(['from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from']]);
+        $to = $q['to'] ?? $this->current->today();
+        $from = $q['from'] ?? ($p->starts_on !== null && (string) $p->starts_on <= $to ? (string) $p->starts_on : null);
+        $companyId = $this->current->id();
+        $moves = $this->ledger($companyId)->where('l.project_id', $p->id)->whereIn('a.type', ['income', 'expense'])->where('l.entry_date', '<=', $to)
+            ->groupBy('a.id', 'a.code', 'a.name', 'a.type')->select('a.id', 'a.code', 'a.name', 'a.type')
+            ->selectRaw("sum(CASE WHEN a.type = 'income' THEN l.credit - l.debit ELSE l.debit - l.credit END)::numeric(20,2)::text AS to_date")
+            ->selectRaw("coalesce(sum(CASE WHEN a.type = 'income' THEN l.credit - l.debit ELSE l.debit - l.credit END) FILTER (WHERE l.entry_date >= ?), 0)::numeric(20,2)::text AS period", [$from ?? '0001-01-01'])
+            ->get()->keyBy('id');
+        $zero = '0.00';
+        $lines = [];
+        $total = ['budget' => $zero, 'period' => $zero, 'to_date' => $zero, 'remaining' => $zero];
+        foreach ($grant['lines'] as $b) {
+            $m = $moves[$b['account_id']] ?? null;
+            $toDate = $m->to_date ?? $zero;
+            $lines[] = ['account_id' => $b['account_id'], 'code' => $b['code'], 'name' => $b['name'], 'budget' => $b['amount'], 'period' => $m->period ?? $zero,
+                'to_date' => $toDate, 'remaining' => bcsub($b['amount'], $toDate, 2), 'over' => bccomp($toDate, $b['amount'], 2) > 0];
+            foreach (['budget' => $b['amount'], 'period' => $m->period ?? $zero, 'to_date' => $toDate] as $k => $v) {
+                $total[$k] = bcadd($total[$k], $v, 2);
+            }
+        }
+        $total['remaining'] = bcsub($total['budget'], $total['to_date'], 2);
+        $budgeted = array_flip(array_column($grant['lines'], 'account_id'));
+        $outside = $moves->filter(fn ($m) => $m->type === 'expense' && ! isset($budgeted[$m->id]) && (bccomp($m->to_date, '0', 2) !== 0 || bccomp($m->period, '0', 2) !== 0))
+            ->map(fn ($m) => ['account_id' => $m->id, 'code' => $m->code, 'name' => $m->name, 'period' => $m->period, 'to_date' => $m->to_date])->sortBy('code')->values();
+        $spent = $moves->filter(fn ($m) => $m->type === 'expense');
+        $income = $moves->filter(fn ($m) => $m->type === 'income');
+        $sum = fn ($set, string $k) => $set->reduce(fn (string $t, $m) => bcadd($t, $m->{$k}, 2), $zero);
+
+        return response()->json([
+            'project' => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name, 'starts_on' => $p->starts_on, 'ends_on' => $p->ends_on],
+            'grant' => $grant, 'from' => $from, 'to' => $to,
+            'lines' => $lines, 'totals' => $total, 'outside_budget' => $outside,
+            'spent' => ['period' => $sum($spent, 'period'), 'to_date' => $sum($spent, 'to_date')],
+            'income' => ['period' => $sum($income, 'period'), 'to_date' => $sum($income, 'to_date')],
+            'fund_balance' => bcsub($sum($income, 'to_date'), $sum($spent, 'to_date'), 2),
+            'award_to_come' => bcsub($grant['award'], $sum($income, 'to_date'), 2),
+        ]);
+    }
+
+    /** @return array<string, mixed>|null the project's grant (093), with its budget lines */
+    private function grantOf(string $projectId): ?array
+    {
+        $g = DB::table('project_grants as g')->leftJoin('contacts as c', 'c.id', '=', 'g.donor_id')
+            ->where(['g.company_id' => $this->current->id(), 'g.project_id' => $projectId])->first(['g.donor_id', 'c.name as donor', 'g.award', 'g.reference', 'g.restricted']);
+        if ($g === null) {
+            return null;
+        }
+        $lines = DB::table('grant_budget_lines as b')->join('accounts as a', 'a.id', '=', 'b.account_id')
+            ->where(['b.company_id' => $this->current->id(), 'b.project_id' => $projectId])->orderBy('a.code')->get(['b.account_id', 'a.code', 'a.name', 'b.amount']);
+
+        return ['donor' => $g->donor_id ? ['id' => $g->donor_id, 'name' => $g->donor] : null, 'award' => (string) $g->award, 'reference' => $g->reference,
+            'restricted' => (bool) $g->restricted,
+            'lines' => $lines->map(fn ($l) => ['account_id' => $l->account_id, 'code' => $l->code, 'name' => $l->name, 'amount' => (string) $l->amount])->values()->all(),
+            'budget' => (string) $lines->reduce(fn (string $t, $l) => bcadd($t, (string) $l->amount, 2), '0.00')];
     }
 
     /** @return array<string, mixed> */

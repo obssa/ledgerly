@@ -106,6 +106,8 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/projects' => 'projects.manage',
         'GET api/v1/projects/{project}' => 'projects.view',
         'PUT api/v1/projects/{project}' => 'projects.manage',
+        'PUT api/v1/projects/{project}/grant' => 'projects.manage',
+        'GET api/v1/projects/{project}/donor-report' => 'projects.view',
         'POST api/v1/projects/{project}/milestones' => 'projects.manage',
         'PUT api/v1/projects/{project}/milestones/{milestone}' => 'projects.manage',
         'DELETE api/v1/projects/{project}/milestones/{milestone}' => 'projects.manage',
