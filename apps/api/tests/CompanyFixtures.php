@@ -199,6 +199,9 @@ trait CompanyFixtures
         // A reconciliation of the bank to 8 Nov in progress, its difference not yet zero.
         $ids['reconciliation'] = $this->postJson("/api/v1/bank-accounts/{$ids['bank']}/reconciliations", ['statement_date' => '2026-11-08', 'ending_balance' => '1'], $h)
             ->assertCreated()->json('id');
+        // An operating lease (095): a shop at 100.00 a month for a year, nothing paid.
+        $ids['lease'] = $this->postJson('/api/v1/leases', ['code' => 'L-1', 'name' => "{$name} shop", 'kind' => 'operating', 'starts_on' => '2026-11-01', 'months' => 12,
+            'payment' => '100', 'expense_account_id' => $ids['rent']], $h)->assertCreated()->json('id');
         // A custom tag (094).
         $ids['tag'] = $this->postJson('/api/v1/tags', ['name' => 'Fixture tag'], $h)->assertCreated()->json('id');
 
@@ -212,7 +215,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(351, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(356, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -245,6 +248,7 @@ trait CompanyFixtures
             'taxReturn' => $ids['tax_return'],
             'project' => $ids['project'],
             'tag' => $ids['tag'],
+            'lease' => $ids['lease'],
             'timeEntry' => $ids['time_entry'],
             'milestone' => $ids['milestone'],
             'cheque' => $ids['post_dated_cheque'],
