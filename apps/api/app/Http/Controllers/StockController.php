@@ -278,17 +278,26 @@ final class StockController extends Controller
             'counted.*.batch' => ['nullable', 'string', 'max:2000'],   // 074: the batch found over, for an item tracked by batch
             'counted.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
             'note' => ['nullable', 'string', 'max:300'],
+            'bin_id' => ['nullable', 'uuid'],   // 098: a count of one bin
         ]);
 
         return DB::transaction(function () use ($data, $stock, $posting, $audit, $request) {
             $company = $this->current->get();
             $warehouse = Warehouse::query()->where('is_active', true)->find($data['warehouse_id'])
                 ?? throw ValidationException::withMessages(['warehouse_id' => ['Choose an active warehouse of this company.']]);
+            // 098: a bin of that warehouse (the company's own); what it counts is kept in it.
+            $bin = null;
+            $kept = [];
+            if (($data['bin_id'] ?? null) !== null) {
+                $bin = DB::table('bins')->where(['company_id' => $company->getKey(), 'id' => $data['bin_id'], 'warehouse_id' => $warehouse->getKey()])->first(['id', 'code'])
+                    ?? throw ValidationException::withMessages(['bin_id' => ["Choose a bin of {$warehouse->name}."]]);
+                $kept = DB::table('item_bins')->where(['company_id' => $company->getKey(), 'bin_id' => $bin->id])->pluck('item_id')->map(fn ($id) => (string) $id)->all();
+            }
             if (DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'warehouse_id' => $warehouse->getKey()])->where('moved_on', '>', $data['date'])->exists()) {
                 throw ValidationException::withMessages(['date' => ['Stock moved in this warehouse after that day: count it as it stands today.']]);
             }
             $date = new DateTimeImmutable($data['date']);
-            $reference = mb_substr('Count ' . $data['date'] . ($data['note'] ? ": {$data['note']}" : ''), 0, 255);
+            $reference = mb_substr('Count ' . $data['date'] . ($bin ? ", bin {$bin->code}" : '') . (($data['note'] ?? null) ? ": {$data['note']}" : ''), 0, 255);
             $base = $company->base_currency;
             $net = \App\Domain\Ledger\Money::zero($base);
             $lines = [];
@@ -296,6 +305,9 @@ final class StockController extends Controller
                 $item = Item::query()->find($c['item_id']);
                 if ($item === null || ! $item->isStock()) {
                     throw ValidationException::withMessages(["counted.{$i}.item_id" => ['Each line is a stock item of this company.']]);
+                }
+                if ($bin !== null && ! in_array((string) $item->getKey(), $kept, true)) {
+                    throw ValidationException::withMessages(["counted.{$i}.item_id" => ["{$item->name} is not kept in bin {$bin->code}: give it this bin first, or count it with its own."]]);
                 }
                 $balance = DB::table('stock_balances')->where(['company_id' => $company->getKey(), 'item_id' => $item->getKey(), 'warehouse_id' => $warehouse->getKey()])
                     ->first(['quantity', 'value']);   // kept by the database's own triggers (the app cannot lock it); a count is taken with the warehouse still
@@ -317,7 +329,7 @@ final class StockController extends Controller
 
             $entry = null;
             if (! $net->isZero()) {
-                $draft = new JournalDraft($company->getKey(), $date, $base, $base, '1', "Stock count of {$warehouse->name} on {$data['date']}", 'stock_count', null);
+                $draft = new JournalDraft($company->getKey(), $date, $base, $base, '1', "Stock count of {$warehouse->name}" . ($bin ? ", bin {$bin->code}," : '') . " on {$data['date']}", 'stock_count', null);
                 $inventory = Account::system('inventory')->getKey();
                 $adjustment = Account::system('inventory_adjustment')->getKey();
                 $value = $net->isNegative() ? $net->negated() : $net;
@@ -327,10 +339,11 @@ final class StockController extends Controller
             }
             $audit->record($company->getKey(), 'stock_counted', 'warehouse', $warehouse->getKey(), null, [
                 'date' => $data['date'], 'items' => count($data['counted']), 'differences' => $lines, 'net' => $net->toDecimalString(), 'journal_entry' => $entry?->number,
+                'bin' => $bin?->code,
             ], $data['note'] ?? null, $request->user()->getKey());
 
             return response()->json(['counted' => count($data['counted']), 'differences' => $lines, 'net' => $net->toDecimalString(),
-                'journal_entry_id' => $entry?->getKey()], 201);
+                'journal_entry_id' => $entry?->getKey(), 'bin' => $bin?->code], 201);
         });
     }
 

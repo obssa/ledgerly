@@ -248,7 +248,7 @@ export async function countStock(_: FormState | undefined, form: FormData): Prom
   let result: { differences: unknown[]; net: string };
   try {
     result = await ledgerly.countStock({ warehouse_id: text(form, "warehouse_id") ?? "", date: text(form, "date") ?? "", counted,
-      ...(text(form, "note") ? { note: text(form, "note") } : {}) }, ctx);
+      ...(text(form, "note") ? { note: text(form, "note") } : {}), ...(text(form, "bin_id") ? { bin_id: text(form, "bin_id") } : {}) }, ctx);
   } catch (error) {
     return refusal(error);
   }

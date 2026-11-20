@@ -204,6 +204,8 @@ trait CompanyFixtures
             'payment' => '100', 'expense_account_id' => $ids['rent']], $h)->assertCreated()->json('id');
         // A custom tag (094).
         $ids['tag'] = $this->postJson('/api/v1/tags', ['name' => 'Fixture tag'], $h)->assertCreated()->json('id');
+        // A bin in the main store (098), nothing kept in it.
+        $ids['bin'] = $this->postJson('/api/v1/bins', ['warehouse_id' => $ids['store'], 'code' => 'A-01'], $h)->assertCreated()->json('id');
 
         return $ids;
     }
@@ -215,7 +217,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(356, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(360, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -249,6 +251,7 @@ trait CompanyFixtures
             'project' => $ids['project'],
             'tag' => $ids['tag'],
             'lease' => $ids['lease'],
+            'bin' => $ids['bin'],
             'timeEntry' => $ids['time_entry'],
             'milestone' => $ids['milestone'],
             'cheque' => $ids['post_dated_cheque'],
