@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ADMIN, CREATE, SECTIONS, locate, pathOf, searchEntries } from "./navigation";
+import { ADMIN, CREATE, SECTIONS, firstPage, locate, pathOf, searchEntries } from "./navigation";
 
 const APP = join(__dirname, "..", "app", "(app)");
 const pageExists = (href: string) => existsSync(join(APP, ...pathOf(href).split("/").filter(Boolean), "page.tsx"));
@@ -12,6 +12,13 @@ describe("navigation", () => {
       expect(pageExists(item.href), item.href).toBe(true);
     }
     for (const action of CREATE) expect(pageExists(action.href), action.href).toBe(true);
+  });
+
+  it("opens each section on its first page", () => {
+    expect(firstPage(SECTIONS.find((s) => s.id === "sales")!).href).toBe("/customers");
+    expect(firstPage(SECTIONS.find((s) => s.id === "reports")!).href).toBe("/reports");
+    expect(firstPage(ADMIN).href).toBe("/settings");
+    for (const s of [...SECTIONS, ADMIN].filter((s) => s.items.some((i) => !i.soon))) expect(pageExists(firstPage(s).href), s.id).toBe(true);
   });
 
   it("lists each page once", () => {

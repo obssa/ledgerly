@@ -174,6 +174,9 @@ export const CREATE: CreateAction[] = [
 
 const ALL: { section: NavSection; item: NavItem }[] = [...SECTIONS, ADMIN].flatMap((section) => section.items.map((item) => ({ section, item })));
 
+/** Where a section's name in the menu leads: its first page that exists yet. */
+export const firstPage = (section: NavSection): NavItem => section.items.find((i) => !i.soon) ?? section.items[0];
+
 /** The path part of an href, without its query. */
 export const pathOf = (href: string): string => href.split("?")[0];
 
