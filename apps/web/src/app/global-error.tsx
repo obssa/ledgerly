@@ -24,7 +24,13 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
             style={{ marginTop: 8, padding: "10px 16px", borderRadius: 10, border: "1px solid #0f766e", background: "#0f766e", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
             Reload the page
           </button>
-          {error.digest && <p style={{ fontSize: 12, color: "#7a8a83" }}>Reference {error.digest}</p>}
+          {error.digest ? (
+            <p style={{ fontSize: 12, color: "#7a8a83" }}>Reference {error.digest}</p>
+          ) : (
+            <p style={{ fontSize: 11.5, color: "#7a8a83", fontFamily: "monospace", textAlign: "left", wordBreak: "break-word" }}>
+              Details: {`${error.name}: ${error.message}`.slice(0, 300)} · {typeof window !== "undefined" ? window.location.pathname : ""}
+            </p>
+          )}
         </main>
       </body>
     </html>

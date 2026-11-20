@@ -31,7 +31,12 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
         <button type="button" className="btn" onClick={() => window.location.reload()}>Reload the page</button>
         <Link href="/" className="btn">Overview</Link>
       </div>
-      {error.digest && <p className="num mt-4 text-[12px] text-faint">Reference {error.digest}</p>}
+      {error.digest ? (
+        <p className="num mt-4 text-[12px] text-faint">Reference {error.digest}</p>
+      ) : (
+        // An error in the browser (a server error carries a reference instead, its details kept on the server).
+        <p className="mt-4 break-words text-left font-mono text-[11.5px] text-faint">Details: {`${error.name}: ${error.message}`.slice(0, 300)}</p>
+      )}
     </section>
   );
 }
