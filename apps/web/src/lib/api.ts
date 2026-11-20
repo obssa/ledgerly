@@ -1496,6 +1496,11 @@ export interface LeaseDetail extends Lease {
 
 /** Module 1 (094): a custom tag, and the transactions it can go on. */
 export interface Tag { id: string; name: string; is_active: boolean; used: number }
+/** 098: a bin inside a warehouse and the stock items kept in it. */
+export interface Bin {
+  id: string; warehouse_id: string; warehouse: string; code: string; name: string | null; is_active: boolean;
+  items: { id: string; name: string; sku: string | null; unit: string }[];
+}
 export type TagKind = "invoice" | "bill" | "expense" | "journal";
 export const tagPath = (kind: TagKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses", journal: "journal-entries" })[kind];
 export interface TransactionTags { data: { id: string; name: string }[]; tags: { id: string; name: string }[]; can: { tag: boolean } }
@@ -1902,6 +1907,11 @@ export const ledgerly = {
     api<LeaseDetail>(`leases/${encodeURIComponent(id)}/payments`, { ...ctx, method: "POST", body }),
   endLease: (id: string, ctx: RequestOptions) => api<LeaseDetail>(`leases/${encodeURIComponent(id)}/end`, { ...ctx, method: "POST", body: {} }),
   tags: (ctx: RequestOptions) => api<{ data: Tag[]; can: { manage: boolean } }>("tags", ctx),
+  bins: (ctx: RequestOptions) => api<{ data: Bin[]; can: { manage: boolean } }>("bins", ctx),
+  addBin: (body: { warehouse_id: string; code: string; name: string | null }, ctx: RequestOptions) => api<Bin>("bins", { ...ctx, method: "POST", body }),
+  changeBin: (id: string, body: { code?: string; name?: string | null; is_active?: boolean }, ctx: RequestOptions) =>
+    api<Bin>(`bins/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  setBinItems: (id: string, itemIds: string[], ctx: RequestOptions) => api<Bin>(`bins/${encodeURIComponent(id)}/items`, { ...ctx, method: "PUT", body: { item_ids: itemIds } }),
   addTag: (name: string, ctx: RequestOptions) => api<Tag>("tags", { ...ctx, method: "POST", body: { name } }),
   changeTag: (id: string, body: { name?: string; is_active?: boolean }, ctx: RequestOptions) => api<Tag>(`tags/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   transactionTags: (kind: TagKind, id: string, ctx: RequestOptions) => api<TransactionTags>(`${tagPath(kind)}/${encodeURIComponent(id)}/tags`, ctx),

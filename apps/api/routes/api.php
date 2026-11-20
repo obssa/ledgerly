@@ -4,6 +4,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\BankingController;
+use App\Http\Controllers\BinController;
 use App\Http\Controllers\CashCountController;
 use App\Http\Controllers\ChartController;
 use App\Http\Controllers\FiscalYearController;
@@ -479,6 +480,10 @@ Route::prefix('v1')->group(function () {
             Route::get('warehouses', [WarehouseController::class, 'index']);
             Route::post('warehouses', [WarehouseController::class, 'store']);
             Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update']);
+            Route::get('bins', [BinController::class, 'index']);   // 098: bins inside warehouses
+            Route::post('bins', [BinController::class, 'store']);
+            Route::put('bins/{bin}', [BinController::class, 'update'])->whereUuid('bin');
+            Route::put('bins/{bin}/items', [BinController::class, 'setItems'])->whereUuid('bin');
             Route::get('stock', [StockController::class, 'index']);
             Route::post('stock/adjustments', [StockController::class, 'adjust']);
             Route::post('stock/issues', [StockController::class, 'issue']);

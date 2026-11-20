@@ -5216,6 +5216,66 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T123 a bundle leaves on a delivery note as its stock parts, billed without moving them again, and comes back within them';
 END $$;
+
+-- T124: bins (098). A bin's code is its warehouse's once, whatever its case; a bin stays in its warehouse, is never
+-- deleted and not archived while items are kept in it. An item is kept in one active bin of the warehouse, and only a
+-- stock item. Company A as f1, bags b1 in warehouse a1, the T123 card (not stock).
+DO $$
+DECLARE
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  van constant uuid := '00000000-0000-0000-0000-000000001240';
+  a01 constant uuid := '00000000-0000-0000-0000-000000001241';
+  a02 constant uuid := '00000000-0000-0000-0000-000000001242';
+  v01 constant uuid := '00000000-0000-0000-0000-000000001243';
+  bags constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  card constant uuid := '00000000-0000-0000-0000-000000001230';
+BEGIN
+  INSERT INTO warehouses (id, company_id, name) VALUES (van, app_company_id(), 'T124 van');
+  INSERT INTO bins (id, company_id, warehouse_id, code) VALUES (a01, app_company_id(), wh, 'A-01'), (a02, app_company_id(), wh, 'A-02'), (v01, app_company_id(), van, 'A-01');
+  BEGIN
+    INSERT INTO bins (company_id, warehouse_id, code) VALUES (app_company_id(), wh, ' a-01');
+    RAISE EXCEPTION 'FAIL T124a: a bin code was used twice in a warehouse';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    UPDATE bins SET warehouse_id = van WHERE id = a02;
+    RAISE EXCEPTION 'FAIL T124b: a bin moved to another warehouse';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  INSERT INTO item_bins (company_id, item_id, warehouse_id, bin_id) VALUES (app_company_id(), bags, wh, a01);
+  BEGIN
+    INSERT INTO item_bins (company_id, item_id, warehouse_id, bin_id) VALUES (app_company_id(), bags, wh, a02);
+    RAISE EXCEPTION 'FAIL T124c: an item was kept in two bins of one warehouse';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_bins (company_id, item_id, warehouse_id, bin_id) VALUES (app_company_id(), bags, van, a02);
+    RAISE EXCEPTION 'FAIL T124d: an item was kept in a bin of another warehouse';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_bins (company_id, item_id, warehouse_id, bin_id) VALUES (app_company_id(), card, wh, a02);
+    RAISE EXCEPTION 'FAIL T124e: an item that is not stock was kept in a bin';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE bins SET is_active = false WHERE id = a01;
+    RAISE EXCEPTION 'FAIL T124f: a bin was archived with items kept in it';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    DELETE FROM bins WHERE id = a02;
+    RAISE EXCEPTION 'FAIL T124g: a bin was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  UPDATE item_bins SET bin_id = a02 WHERE item_id = bags AND warehouse_id = wh;
+  UPDATE bins SET is_active = false WHERE id = a01;
+  BEGIN
+    UPDATE item_bins SET bin_id = a01 WHERE item_id = bags AND warehouse_id = wh;
+    RAISE EXCEPTION 'FAIL T124h: an item was kept in an archived bin';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM bins WHERE id IN (a01, a02, v01)) OR EXISTS (SELECT 1 FROM item_bins WHERE item_id = bags) THEN
+    RAISE EXCEPTION 'FAIL T124i: company B saw company A''s bins';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T124 a bin is its warehouse''s, kept and archived only when empty; an item is kept in one active bin of the warehouse';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
