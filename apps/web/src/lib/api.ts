@@ -459,6 +459,11 @@ export interface FixedAssetDetail extends FixedAsset {
   /** 091: write-downs when it was worth less than its carrying amount. */
   impairments?: { id: string; impaired_on: string; amount: string; reason: string; entry_id: string }[];
   impaired?: string;
+  /** 092: revaluations to fair value, what they moved the asset by in all, and the surplus they keep. */
+  revaluations?: { id: string; revalued_on: string; fair_value: string; carrying_before: string; to_surplus: string; to_profit: string; surplus_account_id: string; reason: string; entry_id: string }[];
+  revalued?: string;
+  surplus?: string;
+  surplus_accounts?: { id: string; code: string; name: string }[];
   can: { manage: boolean };
 }
 
@@ -1173,7 +1178,9 @@ export interface ProfitAndLoss {
   /** Accrual (when invoiced or billed) or cash (when the money moved). */
   basis?: "accrual" | "cash";
   sections: { income: ProfitAndLossRow[]; cost_of_sales: ProfitAndLossRow[]; expenses: ProfitAndLossRow[] };
-  totals: Record<"income" | "cost_of_sales" | "gross_profit" | "expenses" | "net_profit", { current: string; previous: string | null }>;
+  totals: Record<"income" | "cost_of_sales" | "gross_profit" | "expenses" | "net_profit", { current: string; previous: string | null }>
+    /** 092: what revaluations put in the surplus, and the profit with it. */
+    & Partial<Record<"other_comprehensive_income" | "total_comprehensive_income", { current: string; previous: string | null }>>;
 }
 
 /** Module 10: the balance sheet at a date, with the accounting equation checked. */
@@ -1208,8 +1215,9 @@ export interface DirectCashFlow {
 export interface NotesLines { lines: { code: string; name: string; amount: string }[]; total: string }
 export interface FinancialNotes {
   from: string; to: string; company: string; currency: string;
-  policies: { framework: string; basis: string; fiscal_year_start_month: number; inventory: string; depreciation_methods: string[] };
-  ppe: { cost: { opening: string; additions: string; disposals: string; closing: string }; depreciation: { opening: string; charged: string; released: string; closing: string };
+  policies: { framework: string; basis: string; fiscal_year_start_month: number; inventory: string; depreciation_methods: string[]; revaluation?: boolean };
+  ppe: { cost: { opening: string; additions: string; revaluations?: string; disposals: string; closing: string };
+    depreciation: { opening: string; charged: string; revaluations?: string; released: string; closing: string };
     carrying_opening: string; carrying_closing: string };
   receivables: NotesLines; inventory: NotesLines; payables: NotesLines; taxes: NotesLines; loans: NotesLines & { movement: string };
 }
@@ -1581,6 +1589,8 @@ export const ledgerly = {
     api<FixedAssetDetail>(id ? `fixed-assets/${encodeURIComponent(id)}` : "fixed-assets", { ...ctx, method: id ? "PUT" : "POST", body }),
   disposeFixedAsset: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}/dispose`, { ...ctx, method: "POST", body }),
+  revalueFixedAsset: (id: string, body: { date: string; fair_value: string; surplus_account_id: string; reason: string }, ctx: RequestOptions) =>
+    api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}/revalue`, { ...ctx, method: "POST", body }),
   impairFixedAsset: (id: string, body: { date: string; amount: string; reason: string }, ctx: RequestOptions) =>
     api<FixedAssetDetail>(`fixed-assets/${encodeURIComponent(id)}/impair`, { ...ctx, method: "POST", body }),
   depreciationPreview: (periodEnd: string | undefined, ctx: RequestOptions) =>

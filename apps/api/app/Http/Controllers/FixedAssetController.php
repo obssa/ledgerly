@@ -36,15 +36,17 @@ final class FixedAssetController extends Controller
         $charged = DB::table('asset_depreciation')->where('company_id', $companyId)->groupBy('asset_id')->select('asset_id')
             ->selectRaw('sum(amount)::numeric(20,2)::text AS total')->pluck('total', 'asset_id');
         $impaired = $this->assets->impaired($companyId, $rows->pluck('id')->all());   // 091
+        $revalued = $this->assets->revalued($companyId, $rows->pluck('id')->all());   // 092
         $runs = DB::table('depreciation_runs as r')->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'r.company_id')->on('e.id', '=', 'r.journal_entry_id'))
             ->where('r.company_id', $companyId)->orderByDesc('r.period_end')->limit(24)->get(['r.id', 'r.period_end', 'r.total', 'e.id as entry_id', 'e.number']);
         $membership = $this->current->membership();
 
         return response()->json([
-            'data' => $rows->map(function ($a) use ($charged, $impaired) {
+            'data' => $rows->map(function ($a) use ($charged, $impaired, $revalued) {
                 $depreciated = BigDecimal::of((string) $a->opening_depreciation)->plus((string) ($charged[$a->id] ?? '0'))->plus((string) ($impaired[$a->id] ?? '0'))->toScale(2);
 
-                return [...$this->row($a), 'depreciated' => (string) $depreciated, 'book_value' => (string) BigDecimal::of((string) $a->cost)->minus($depreciated)->toScale(2)];
+                return [...$this->row($a), 'depreciated' => (string) $depreciated,
+                    'book_value' => (string) BigDecimal::of((string) $a->cost)->minus($depreciated)->plus($revalued[$a->id]['net'] ?? '0')->toScale(2)];
             })->values(),
             'runs' => $runs->map(fn ($r) => ['id' => $r->id, 'period_end' => $r->period_end, 'total' => (string) $r->total, 'entry' => ['id' => $r->entry_id, 'number' => (int) $r->number]])->values(),
             'next_period_end' => $this->nextPeriodEnd(),
@@ -60,6 +62,9 @@ final class FixedAssetController extends Controller
         return response()->json([
             ...$this->row($a), ...$this->assets->schedule($a),
             'depreciated_by_runs' => DB::table('asset_depreciation')->where(['company_id' => $a->company_id, 'asset_id' => $a->id])->exists(),
+            // 092: the equity accounts a revaluation surplus can be kept on.
+            'surplus_accounts' => \App\Domain\Ledger\Models\Account::query()->where(['type' => 'equity', 'is_active' => true])->whereNull('system_key')
+                ->orderBy('code')->get(['id', 'code', 'name'])->map(fn ($x) => ['id' => $x->id, 'code' => $x->code, 'name' => $x->name])->values(),
             'can' => ['manage' => (bool) $this->current->membership()?->can('assets.manage')],
         ]);
     }
@@ -119,6 +124,29 @@ final class FixedAssetController extends Controller
         $done = $this->assets->impair($this->current->get(), (string) $a->id, $data['date'], (string) $data['amount'], $data['reason'], $request->user()->getKey());
         $this->audit->record($this->current->id(), 'asset_impaired', 'fixed_asset', (string) $a->id, null,
             ['amount' => $done['amount'], 'date' => $data['date'], 'journal_entry' => $done['entry']['number']], $data['reason'], $request->user()->getKey());
+
+        return $this->show((string) $a->id)->setStatusCode(201);
+    }
+
+    /** 092: revalues the asset to its fair value (IFRS for SMEs 17.15B), the surplus on an equity account. */
+    public function revalue(Request $request, string $fixedAsset): JsonResponse
+    {
+        $this->authorizeCompany('assets.manage');
+        $a = $this->load($fixedAsset);   // the company's own, or not found
+        $data = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
+            'fair_value' => ['required', 'decimal:0,2', 'gte:0', 'max:999999999999'],
+            'surplus_account_id' => ['required', 'uuid'],
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+        ], ['reason.required' => 'Say how the fair value was found: a valuer, a market price.']);
+        $surplus = \App\Domain\Ledger\Models\Account::query()->whereKey($data['surplus_account_id'])->where(['type' => 'equity', 'is_active' => true])->first();
+        if ($surplus === null || $surplus->system_key !== null) {
+            throw ValidationException::withMessages(['surplus_account_id' => ['Choose the equity account the revaluation surplus is kept on.']]);
+        }
+        $done = $this->assets->revalue($this->current->get(), (string) $a->id, $data['date'], (string) $data['fair_value'], $surplus->getKey(), $data['reason'], $request->user()->getKey());
+        $this->audit->record($this->current->id(), 'asset_revalued', 'fixed_asset', (string) $a->id, ['carrying' => $done['carrying_before']],
+            ['fair_value' => $done['fair_value'], 'to_surplus' => $done['to_surplus'], 'to_profit' => $done['to_profit'], 'date' => $data['date'],
+                'journal_entry' => $done['entry']['number']], $data['reason'], $request->user()->getKey());
 
         return $this->show((string) $a->id)->setStatusCode(201);
     }
