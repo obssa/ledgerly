@@ -97,6 +97,30 @@ final class DocumentStock
         return $out;
     }
 
+    /**
+     * 097: a sale's bundle lines not delivered on a note take their stock parts out (073), in their place. A part of a
+     * bundle its order's notes delivered is not taken out by the invoice (the database checks it too).
+     *
+     * @param list<array{line: object, item: Item}> $lines
+     * @return list<array{line: object, item: Item}>
+     */
+    private function bundlesOut(Document $doc, array $lines): array
+    {
+        $bundles = array_values(array_filter($lines, fn (array $l) => $l['item']->type === 'bundle'));
+        if ($bundles === []) {
+            return $lines;
+        }
+        $parts = $this->bundleParts(array_map(fn (array $l) => $l['line'], $bundles));
+        $delivered = $doc->type === 'invoice' && $doc->source_document_id !== null ? $this->delivered->items((string) $doc->source_document_id) : [];
+        foreach ($parts as ['line' => $line, 'item' => $item]) {
+            if (in_array((string) $item->getKey(), $delivered, true)) {
+                throw ValidationException::withMessages(['lines' => ["Line {$line->line_no}: {$item->name}, a part of this bundle, left on a delivery note of the order. Deliver this line on a note too, then invoice it."]]);
+            }
+        }
+
+        return [...array_values(array_filter($lines, fn (array $l) => $l['item']->type !== 'bundle')), ...$parts];
+    }
+
     /** The warehouse a document's stock lines use; refuses a document with stock lines and no warehouse. */
     public function warehouseFor(Document $doc): Warehouse
     {
@@ -122,8 +146,19 @@ final class DocumentStock
                 throw ValidationException::withMessages(['lines' => ["Line {$bundles[0]->line_no}: a bundle is sold, not bought. Buy its parts instead."]]);
             }
             // A bundle sold took its stock parts out; brought back on a credit note, they come back at the cost they left with.
-            if (in_array($doc->type, ['invoice', 'sales_receipt'], true) || ($doc->type === 'credit_note' && $doc->restock)) {
+            if ($doc->type === 'credit_note' && $doc->restock) {
                 $lines = [...$lines, ...$this->bundleParts($bundles)];
+            }
+            // 097: on a sale the bundle line itself goes on, so one delivered on its order's note is matched (below); the
+            // others take their stock parts out there. A bundle without a stock part moves nothing.
+            if (in_array($doc->type, ['invoice', 'sales_receipt'], true)) {
+                $withStock = $this->delivered->stockParts(array_values(array_unique(array_map(fn ($l) => (string) $l->item_id, $bundles))));
+                $items = Item::query()->whereIn('id', array_keys($withStock))->get()->keyBy(fn (Item $i) => (string) $i->getKey());
+                foreach ($bundles as $l) {
+                    if (isset($items[(string) $l->item_id])) {
+                        $lines[] = ['line' => $l, 'item' => $items[(string) $l->item_id]];
+                    }
+                }
             }
         }
         if ($lines === [] || ! in_array($doc->type, ['invoice', 'sales_receipt', 'bill', 'credit_note', 'vendor_credit'], true)
@@ -148,6 +183,7 @@ final class DocumentStock
             $cost = Money::zero($base);
             // 071: the items its order's delivery notes took out already left, with their cost: the invoice bills them only.
             $lines = $this->matchDelivered($doc, $lines, $company);
+            $lines = $this->bundlesOut($doc, $lines);   // 097
             foreach ($lines as ['line' => $line, 'item' => $item]) {
                 $move = $this->stock->move($company->getKey(), $base, $item->getKey(), $warehouse->getKey(), $date, 'sale',
                     '-' . self::baseQuantity($line), '0', $doc->number, $doc->getKey(), $userId,
@@ -434,9 +470,18 @@ final class DocumentStock
             ->join('document_lines as ol', 'ol.id', '=', 'm.order_line_id')
             ->where(['m.company_id' => $company->getKey(), 'm.invoice_id' => $invoice->getKey()])
             ->get(['il.item_id', 'm.order_line_id', 'm.quantity', 'ol.unit_factor']);
+        // 097: a bundle billed from the notes stands for its stock parts, each its quantity per bundle.
+        $parts = $this->delivered->stockParts($matches->pluck('item_id')->map(fn ($id) => (string) $id)->unique()->values()->all());
+        $billed = [];
+        foreach ($matches as $r) {
+            $qty = self::baseQuantity((object) ['quantity' => (string) $r->quantity, 'unit_factor' => $r->unit_factor]);
+            foreach ($parts[(string) $r->item_id] ?? [['item_id' => (string) $r->item_id, 'quantity' => '1']] as $p) {
+                $billed[] = (object) ['item_id' => $p['item_id'], 'order_line_id' => $r->order_line_id, 'quantity' => bcmul($qty, $p['quantity'], 2)];
+            }
+        }
         $out = [];
-        foreach ($matches->groupBy('item_id') as $itemId => $rows) {
-            $qty = $rows->reduce(fn (string $s, $r) => bcadd($s, self::baseQuantity((object) ['quantity' => (string) $r->quantity, 'unit_factor' => $r->unit_factor]), 2), '0');
+        foreach (collect($billed)->groupBy('item_id') as $itemId => $rows) {
+            $qty = $rows->reduce(fn (string $s, $r) => bcadd($s, (string) $r->quantity, 2), '0');
             $notes = DB::table('delivery_note_lines as dl')->join('delivery_notes as d', 'd.id', '=', 'dl.delivery_note_id')
                 ->whereIn('dl.order_line_id', $rows->pluck('order_line_id')->all())->where('d.status', 'posted')->distinct()->pluck('dl.delivery_note_id');
             $left = DB::table('stock_moves')->whereIn('delivery_note_id', $notes)->where(['item_id' => $itemId, 'kind' => 'sale'])->get(['quantity', 'amount']);

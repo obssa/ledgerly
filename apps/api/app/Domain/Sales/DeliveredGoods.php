@@ -29,11 +29,38 @@ final class DeliveredGoods
         return $out;
     }
 
-    /** @return list<string> the items the order's live notes delivered: its invoices bill them without moving them (rule 3 of 071) */
+    /**
+     * @return list<string> the items the order's live notes delivered: its invoices bill them without moving them (rule 3
+     * of 071); 097: with the parts of the bundles they delivered, which its invoices do not take out either
+     */
     public function items(string $orderId): array
     {
-        return DB::table('delivery_note_lines as dl')->join('delivery_notes as d', 'd.id', '=', 'dl.delivery_note_id')
+        $items = DB::table('delivery_note_lines as dl')->join('delivery_notes as d', 'd.id', '=', 'dl.delivery_note_id')
             ->where('d.sales_order_id', $orderId)->where('d.status', 'posted')->distinct()->pluck('dl.item_id')->map(fn ($id) => (string) $id)->all();
+        $parts = $items === [] ? [] : DB::table('item_components')->whereIn('bundle_id', $items)->pluck('component_id')->map(fn ($id) => (string) $id)->all();
+
+        return array_values(array_unique([...$items, ...$parts]));
+    }
+
+    /**
+     * 097: the stock parts of the bundles given, each with its quantity per bundle (in the part's own unit). A bundle's
+     * parts are fixed once it is on a document (073).
+     *
+     * @param list<string> $bundleIds
+     * @return array<string, list<array{item_id: string, quantity: string}>> by bundle id; a bundle without a stock part is left out
+     */
+    public function stockParts(array $bundleIds): array
+    {
+        if ($bundleIds === []) {
+            return [];
+        }
+        $out = [];
+        foreach (DB::table('item_components as c')->join('items as p', 'p.id', '=', 'c.component_id')->where('p.type', 'inventory')
+            ->whereIn('c.bundle_id', $bundleIds)->orderBy('p.name')->get(['c.bundle_id', 'c.component_id', 'c.quantity']) as $r) {
+            $out[(string) $r->bundle_id][] = ['item_id' => (string) $r->component_id, 'quantity' => (string) $r->quantity];
+        }
+
+        return $out;
     }
 
     /**

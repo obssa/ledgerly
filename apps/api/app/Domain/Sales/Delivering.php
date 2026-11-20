@@ -27,7 +27,8 @@ use Illuminate\Validation\ValidationException;
  * Module 2: delivery notes (071). What of a confirmed sales order left for the customer, and when. Its stock lines
  * leave the warehouse that day at their cost (the database decides it), and the cost of goods sold is recorded then:
  * one entry, Dr Cost of goods sold, Cr Inventory. The order's invoices then bill those goods without moving them again
- * (DocumentStock). A note is kept; voiding it brings its goods back at the cost they left with and reverses its entry.
+ * (DocumentStock). 097: a bundle leaves as its stock parts, each its quantity per bundle times the bundles delivered.
+ * A note is kept; voiding it brings its goods back at the cost they left with and reverses its entry.
  * A note whose goods are invoiced is not voided until the invoice is. Every query is the company's own under row-level
  * security.
  */
@@ -67,7 +68,8 @@ final class Delivering
             }
 
             $lines = $order->lines->keyBy(fn ($l) => (string) $l->getKey());
-            $stock = Item::query()->whereIn('id', $order->lines->pluck('item_id')->filter())->where('type', 'inventory')->get()->keyBy('id');
+            $stock = Item::query()->whereIn('id', $order->lines->pluck('item_id')->filter())->whereIn('type', ['inventory', 'bundle'])->get()->keyBy('id');
+            $parts = $this->delivered->stockParts($stock->where('type', 'bundle')->keys()->map(fn ($id) => (string) $id)->values()->all());   // 097
             $done = $this->delivered->byLine((string) $order->getKey());
             $invoicedOut = DB::table('stock_moves as m')->join('documents as i', 'i.id', '=', 'm.document_id')
                 ->where(['m.kind' => 'sale', 'i.type' => 'invoice', 'i.source_document_id' => $order->getKey()])->where('i.status', '<>', 'void')
@@ -85,8 +87,13 @@ final class Delivering
                 if (! isset($stock[$line->item_id])) {
                     throw ValidationException::withMessages(['lines' => ["Line {$line->line_no} is not a stock item: only stock is delivered on a note; it is invoiced as it is."]]);
                 }
-                if (in_array((string) $line->item_id, $invoicedOut, true)) {
-                    throw ValidationException::withMessages(['lines' => ["Line {$line->line_no}: an invoice of this order already took {$stock[$line->item_id]->name} out."]]);
+                $bundle = $stock[$line->item_id]->type === 'bundle';
+                if ($bundle && ! isset($parts[(string) $line->item_id])) {
+                    throw ValidationException::withMessages(['lines' => ["Line {$line->line_no}: {$stock[$line->item_id]->name} has no stock part, so nothing of it leaves on a note; it is invoiced as it is."]]);
+                }
+                $taken = $bundle ? array_column($parts[(string) $line->item_id], 'item_id') : [(string) $line->item_id];
+                if (array_intersect($taken, $invoicedOut) !== []) {
+                    throw ValidationException::withMessages(['lines' => ["Line {$line->line_no}: an invoice of this order already took {$stock[$line->item_id]->name}" . ($bundle ? "'s parts" : '') . ' out.']]);
                 }
                 $left = bcsub((string) $line->quantity, $done[$lineId]['delivered'] ?? '0', 2);
                 if (bccomp((string) $quantity, $left, 2) > 0) {
@@ -113,9 +120,18 @@ final class Delivering
                     'item_id' => $line->item_id, 'quantity' => $quantity,
                 ]);
                 $own = DocumentStock::baseQuantity((object) ['quantity' => $quantity, 'unit_factor' => $line->unit_factor]);   // 072
-                $move = $this->stock->move($company->getKey(), $base, (string) $line->item_id, $warehouse->getKey(), $at, 'sale', '-' . $own, '0',
-                    $number, null, $userId, deliveryNoteId: $id);
-                $cost = $cost->plus($move['amount']->negated());
+                // 097: a bundle's stock parts leave in its place, each its quantity per bundle times the bundles delivered.
+                $leaving = isset($parts[(string) $line->item_id])
+                    ? array_map(fn (array $p) => [$p['item_id'], bcmul($own, $p['quantity'], 2)], $parts[(string) $line->item_id])
+                    : [[(string) $line->item_id, $own]];
+                foreach ($leaving as [$itemId, $out]) {
+                    if (bccomp($out, '0', 2) === 0) {
+                        continue;
+                    }
+                    $move = $this->stock->move($company->getKey(), $base, $itemId, $warehouse->getKey(), $at, 'sale', '-' . $out, '0',
+                        $number, null, $userId, deliveryNoteId: $id);
+                    $cost = $cost->plus($move['amount']->negated());
+                }
             }
 
             $entryId = null;
