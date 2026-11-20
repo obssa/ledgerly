@@ -1478,6 +1478,22 @@ export interface Attachment {
 
 export type AttachmentKind = "invoice" | "bill" | "expense" | "expense_claim" | "journal";
 
+/** Module 9 (095): a lease, as the lessee. */
+export interface Lease {
+  id: string; code: string; name: string; kind: "finance" | "operating"; status: "active" | "ended";
+  lessor: { id: string; name: string } | null; starts_on: string; months: number; payment: string; in_advance: boolean;
+  annual_rate: string | null; present_value: string | null; fixed_asset_id: string | null; commencement_entry_id: string | null;
+}
+export type LeaseBands = { within_year: string; one_to_five: string; later: string };
+export interface LeaseRegister {
+  data: (Lease & { paid: number; owed: string | null; to_pay: LeaseBands })[];
+  to_pay: LeaseBands; as_of: string; can: { manage: boolean; pay: boolean };
+}
+export interface LeaseDetail extends Lease {
+  schedule: { number: number; due_on: string; amount: string; interest: string; principal: string; owed: string; paid_on: string | null; entry_id: string | null }[];
+  can: { manage: boolean; pay: boolean };
+}
+
 /** Module 1 (094): a custom tag, and the transactions it can go on. */
 export interface Tag { id: string; name: string; is_active: boolean; used: number }
 export type TagKind = "invoice" | "bill" | "expense" | "journal";
@@ -1879,6 +1895,12 @@ export const ledgerly = {
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
+  leases: (ctx: RequestOptions) => api<LeaseRegister>("leases", ctx),
+  lease: (id: string, ctx: RequestOptions) => api<LeaseDetail>(`leases/${encodeURIComponent(id)}`, ctx),
+  addLease: (body: Record<string, unknown>, ctx: RequestOptions) => api<LeaseDetail>("leases", { ...ctx, method: "POST", body }),
+  payLease: (id: string, body: { date: string; bank_account_id: string }, ctx: RequestOptions) =>
+    api<LeaseDetail>(`leases/${encodeURIComponent(id)}/payments`, { ...ctx, method: "POST", body }),
+  endLease: (id: string, ctx: RequestOptions) => api<LeaseDetail>(`leases/${encodeURIComponent(id)}/end`, { ...ctx, method: "POST", body: {} }),
   tags: (ctx: RequestOptions) => api<{ data: Tag[]; can: { manage: boolean } }>("tags", ctx),
   addTag: (name: string, ctx: RequestOptions) => api<Tag>("tags", { ...ctx, method: "POST", body: { name } }),
   changeTag: (id: string, body: { name?: string; is_active?: boolean }, ctx: RequestOptions) => api<Tag>(`tags/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),

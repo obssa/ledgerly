@@ -59,6 +59,7 @@ use App\Http\Controllers\DimensionController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\LeaseController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\NumberingController;
@@ -286,6 +287,11 @@ Route::prefix('v1')->group(function () {
             Route::post('fixed-assets/{fixedAsset}/dispose', [FixedAssetController::class, 'dispose'])->whereUuid('fixedAsset');
             Route::post('fixed-assets/{fixedAsset}/impair', [FixedAssetController::class, 'impair'])->whereUuid('fixedAsset');   // 091
             Route::post('fixed-assets/{fixedAsset}/revalue', [FixedAssetController::class, 'revalue'])->whereUuid('fixedAsset');   // 092
+            Route::get('leases', [LeaseController::class, 'index']);   // 095: leases, as the lessee
+            Route::post('leases', [LeaseController::class, 'store']);
+            Route::get('leases/{lease}', [LeaseController::class, 'show'])->whereUuid('lease');
+            Route::post('leases/{lease}/payments', [LeaseController::class, 'pay'])->whereUuid('lease');
+            Route::post('leases/{lease}/end', [LeaseController::class, 'end'])->whereUuid('lease');
             Route::get('depreciation/preview', [FixedAssetController::class, 'preview']);
             Route::post('depreciation-runs', [FixedAssetController::class, 'run']);
             Route::get('projects', [ProjectController::class, 'index']);

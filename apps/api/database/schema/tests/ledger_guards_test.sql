@@ -4997,6 +4997,93 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T120 a tag is named once, put on a company''s transaction once while it is on, and never changed or deleted';
 END $$;
+-- T121: leases (095). A finance lease of two payments of 1,000 in arrears at 12% (present value 1,970.40) is paid
+-- 19.70 interest + 980.30 off the liability, then 9.90 + 990.10 (the last clears what is owed); payments go in order,
+-- split by the books, each with its own entry, and are kept; terms are fixed once paid; an operating lease payment
+-- has no interest. Company A, user f1, on T69's asset accounts.
+DO $$
+DECLARE
+  liab constant uuid := '00000000-0000-0000-0000-0000000121a1';
+  intr constant uuid := '00000000-0000-0000-0000-0000000121a2';
+  fa constant uuid := '00000000-0000-0000-0000-0000000121f1';
+  fin constant uuid := '00000000-0000-0000-0000-0000000121c1';
+  opl constant uuid := '00000000-0000-0000-0000-0000000121c2';
+  e0 constant uuid := '00000000-0000-0000-0000-0000000121e0';
+  e1 constant uuid := '00000000-0000-0000-0000-0000000121e1';
+  e2 constant uuid := '00000000-0000-0000-0000-0000000121e2';
+  e3 constant uuid := '00000000-0000-0000-0000-0000000121e3';
+  p1 constant uuid := '00000000-0000-0000-0000-0000000121d1';
+  p2 constant uuid := '00000000-0000-0000-0000-0000000121d2';
+  p3 constant uuid := '00000000-0000-0000-0000-0000000121d3';
+  u constant uuid := '00000000-0000-0000-0000-0000000000f1';
+BEGIN
+  INSERT INTO accounts (id, company_id, code, name, type) VALUES
+    (liab, app_company_id(), '2121', 'T121 lease liability', 'liability'), (intr, app_company_id(), '6121', 'T121 lease interest', 'expense');
+  INSERT INTO fixed_assets (id, company_id, code, name, asset_account_id, depreciation_account_id, expense_account_id, acquired_on, cost, method, useful_life_months, depreciation_starts_on, created_by) VALUES
+    (fa, app_company_id(), 'LEASE-121', 'T121 leased press', '00000000-0000-0000-0000-0000000069a1', '00000000-0000-0000-0000-0000000069a2', '00000000-0000-0000-0000-0000000069a3',
+     '2027-10-01', 1970.40, 'straight_line', 2, '2027-10-01', u);
+  INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type, source_id) VALUES
+    (e0, app_company_id(), 9926, '2027-10-01', 'ETB', 'lease', fin),
+    (e1, app_company_id(), 9927, '2027-10-31', 'ETB', 'lease_payment', p1),
+    (e2, app_company_id(), 9928, '2027-11-30', 'ETB', 'lease_payment', p2),
+    (e3, app_company_id(), 9929, '2027-10-31', 'ETB', 'lease_payment', p3);
+  INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit, amount_txn) VALUES
+    (app_company_id(), e0, 1, '00000000-0000-0000-0000-0000000069a1', 1970.40, 0, 1970.40), (app_company_id(), e0, 2, liab, 0, 1970.40, -1970.40),
+    (app_company_id(), e1, 1, liab, 980.30, 0, 980.30), (app_company_id(), e1, 2, intr, 19.70, 0, 19.70), (app_company_id(), e1, 3, '00000000-0000-0000-0000-0000000069a1', 0, 1000, -1000),
+    (app_company_id(), e2, 1, liab, 990.10, 0, 990.10), (app_company_id(), e2, 2, intr, 9.90, 0, 9.90), (app_company_id(), e2, 3, '00000000-0000-0000-0000-0000000069a1', 0, 1000, -1000),
+    (app_company_id(), e3, 1, intr, 500, 0, 500), (app_company_id(), e3, 2, '00000000-0000-0000-0000-0000000069a1', 0, 500, -500);
+  BEGIN
+    INSERT INTO leases (id, company_id, code, name, kind, starts_on, months, payment, annual_rate, present_value, liability_account_id, interest_account_id, fixed_asset_id, commencement_entry_id, created_by)
+      VALUES (fin, app_company_id(), 'L-121', 'T121 press lease', 'finance', '2027-10-01', 2, 1000, 0.12, 1970.40, intr, intr, fa, e0, u);
+    RAISE EXCEPTION 'FAIL T121a: a finance lease''s liability was an expense account';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO leases (id, company_id, code, name, kind, starts_on, months, payment, annual_rate, present_value, liability_account_id, interest_account_id, fixed_asset_id, commencement_entry_id, created_by)
+    VALUES (fin, app_company_id(), 'L-121', 'T121 press lease', 'finance', '2027-10-01', 2, 1000, 0.12, 1970.40, liab, intr, fa, e0, u);
+  BEGIN
+    INSERT INTO lease_payments (id, company_id, lease_id, number, paid_on, amount, interest, principal, entry_id, created_by)
+      VALUES (p2, app_company_id(), fin, 2, '2027-11-30', 1000, 9.90, 990.10, e2, u);
+    RAISE EXCEPTION 'FAIL T121b: a lease was paid out of order';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO lease_payments (id, company_id, lease_id, number, paid_on, amount, interest, principal, entry_id, created_by)
+      VALUES (p1, app_company_id(), fin, 1, '2027-10-31', 1000, 10, 990, e1, u);
+    RAISE EXCEPTION 'FAIL T121c: a finance lease payment took interest the books do not';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO lease_payments (id, company_id, lease_id, number, paid_on, amount, interest, principal, entry_id, created_by)
+    VALUES (p1, app_company_id(), fin, 1, '2027-10-31', 1000, 19.70, 980.30, e1, u);
+  BEGIN
+    UPDATE leases SET months = 3 WHERE id = fin;
+    RAISE EXCEPTION 'FAIL T121d: a paid lease''s terms changed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE leases SET name = 'T121 press lease (renamed)' WHERE id = fin;
+  BEGIN
+    INSERT INTO lease_payments (id, company_id, lease_id, number, paid_on, amount, interest, principal, entry_id, created_by)
+      VALUES (p2, app_company_id(), fin, 2, '2027-11-30', 1000, 9.80, 990.20, e2, u);
+    RAISE EXCEPTION 'FAIL T121e: the last payment did not clear what was owed';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO lease_payments (id, company_id, lease_id, number, paid_on, amount, interest, principal, entry_id, created_by)
+    VALUES (p2, app_company_id(), fin, 2, '2027-11-30', 1000, 9.90, 990.10, e2, u);
+
+  INSERT INTO leases (id, company_id, code, name, kind, starts_on, months, payment, expense_account_id, created_by)
+    VALUES (opl, app_company_id(), 'L-121-OP', 'T121 shop lease', 'operating', '2027-10-01', 12, 500, intr, u);
+  BEGIN
+    INSERT INTO lease_payments (id, company_id, lease_id, number, paid_on, amount, interest, principal, entry_id, created_by)
+      VALUES (p3, app_company_id(), opl, 1, '2027-10-31', 500, 50, 450, e3, u);
+    RAISE EXCEPTION 'FAIL T121f: an operating lease payment took interest';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO lease_payments (id, company_id, lease_id, number, paid_on, amount, interest, principal, entry_id, created_by)
+    VALUES (p3, app_company_id(), opl, 1, '2027-10-31', 500, 0, 0, e3, u);
+  BEGIN
+    UPDATE lease_payments SET amount = 1 WHERE id = p3;
+    RAISE EXCEPTION 'FAIL T121g: a lease payment was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM leases WHERE id IN (fin, opl)) OR EXISTS (SELECT 1 FROM lease_payments WHERE lease_id IN (fin, opl)) THEN
+    RAISE EXCEPTION 'FAIL T121h: company B saw company A''s leases';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T121 a lease is paid in order, a finance lease split by the effective interest to the cent and cleared, each payment kept';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
