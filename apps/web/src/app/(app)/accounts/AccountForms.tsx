@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import type { ChartAccount } from "@/lib/api";
 import { KIND_LABELS, TYPE_LABELS, type AccountType } from "@/lib/chart";
 import type { FormState } from "@/lib/forms";
-import { addAccount, changeAccount } from "./actions";
+import { addAccount, addIndustryAccounts, changeAccount } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {
   if (state?.error) return <p role="alert" className="mb-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>;
@@ -13,6 +13,20 @@ function Message({ state }: { state: FormState | undefined }) {
 }
 
 const label = (a: ChartAccount) => `${a.code} ${a.name}`;
+
+/** Module 1: add the accounts of an industry template that the chart lacks. */
+export function AddIndustryAccounts({ industry, count }: { industry: string; count: number }) {
+  const [state, action, pending] = useActionState(addIndustryAccounts, undefined);
+  return (
+    <form action={action} noValidate>
+      <Message state={state} />
+      <input type="hidden" name="industry" value={industry} />
+      <button type="submit" className="btn btn-primary" disabled={pending || count === 0}>
+        {pending ? "Adding…" : count === 0 ? "Nothing to add" : `Add ${count} account${count === 1 ? "" : "s"}`}
+      </button>
+    </form>
+  );
+}
 
 /** Add an account: its code, name, type, kind, and the account it sits under, if any. */
 export function AddAccount({ accounts, kinds }: { accounts: ChartAccount[]; kinds: Record<string, string[]> }) {

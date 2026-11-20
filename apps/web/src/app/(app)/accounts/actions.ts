@@ -33,6 +33,19 @@ export async function addAccount(_: FormState | undefined, form: FormData): Prom
   return { notice: `Account ${text(form, "code")} added.` };
 }
 
+/** Module 1: adds the accounts of an industry template that the chart does not have yet. */
+export async function addIndustryAccounts(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  let added: { code: string }[];
+  try {
+    ({ added } = await ledgerly.addIndustryAccounts(text(form, "industry") ?? "", ctx));
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: added.length === 0 ? "Nothing to add: the chart has all of them." : `Added ${added.length} account${added.length === 1 ? "" : "s"}: ${added.map((a) => a.code).join(", ")}.` };
+}
+
 export async function changeAccount(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   const body: Record<string, unknown> = {};

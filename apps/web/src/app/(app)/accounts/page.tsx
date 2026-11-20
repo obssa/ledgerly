@@ -15,7 +15,10 @@ export default async function ChartPage({ searchParams }: PageProps<"/accounts">
   return (
     <>
       <PageTitle eyebrow="Books" title="Chart of accounts"
-        actions={<Link href={archived ? "/accounts" : "/accounts?archived=1"} className="btn">{archived ? "Hide archived" : "Show archived"}</Link>} />
+        actions={<>
+          {!chart.demo && <Link href="/accounts/industry" className="btn">Industry accounts</Link>}
+          <Link href={archived ? "/accounts" : "/accounts?archived=1"} className="btn">{archived ? "Hide archived" : "Show archived"}</Link>
+        </>} />
       {chart.demo && <p className="mb-4 text-[14px] text-muted">Not available in the demo.</p>}
       {byType(chart.data).map((group) => (
         <Card key={group.type} className="mb-4 !p-2" label={group.label}>

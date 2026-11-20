@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Ledger\Models\Account;
+use App\Domain\Tenancy\Support\CountryPack;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -53,6 +54,73 @@ final class ChartController extends Controller
             'kinds' => self::KINDS,
             'can' => ['manage' => (bool) $this->current->membership()?->can('accounting.chart')],
         ]);
+    }
+
+    /**
+     * The industry templates (Module 1), each account marked as one the chart has already (the same code and name, or
+     * the name on another code), one whose code another account uses, or one to add. For a company that changes its
+     * line of business after setup, or started without one.
+     */
+    public function industries(): JsonResponse
+    {
+        $this->authorizeCompany('accounting.view');
+        $industry = (string) DB::table('companies')->where('id', $this->current->id())->value('industry');
+        $chart = $this->chartIndex();
+        $data = [];
+        foreach (CountryPack::industries() as $key => $t) {
+            $accounts = array_map(fn (array $a) => [...array_intersect_key($a, array_flip(['code', 'name', 'type', 'subtype'])), 'status' => $this->templateStatus($a, $chart)], $t['accounts']);
+            $data[] = ['key' => $key, 'name' => $t['name'], 'accounts' => $accounts,
+                'to_add' => count(array_filter($accounts, fn ($a) => $a['status'] === 'add'))];
+        }
+
+        return response()->json(['industry' => $industry === '' ? null : $industry, 'data' => $data,
+            'can' => ['manage' => (bool) $this->current->membership()?->can('accounting.chart')]]);
+    }
+
+    /** Adds the template's accounts the chart does not have yet; the rest are left as they are. */
+    public function addIndustryAccounts(Request $request): JsonResponse
+    {
+        $this->authorizeCompany('accounting.chart');
+        $data = $request->validate(['industry' => ['required', 'string', Rule::in(array_keys(CountryPack::industries()))]]);
+        $template = CountryPack::industries()[$data['industry']];
+
+        $added = $this->saving(function () use ($template) {
+            $chart = $this->chartIndex();
+            $added = [];
+            foreach ($template['accounts'] as $a) {
+                if ($this->templateStatus($a, $chart) !== 'add') {
+                    continue;
+                }
+                Account::query()->create(['code' => $a['code'], 'name' => $a['name'], 'type' => $a['type'], 'subtype' => $a['subtype'] ?? null,
+                    'bank_details' => (object) []]);
+                $added[] = ['code' => $a['code'], 'name' => $a['name']];
+            }
+
+            return $added;
+        });
+        $this->audit->record($this->current->id(), 'industry_accounts_added', 'company', $this->current->id(), null,
+            ['industry' => $data['industry'], 'accounts' => $added], userId: $request->user()->getKey());
+
+        return response()->json(['industry' => $data['industry'], 'added' => $added], $added === [] ? 200 : 201);
+    }
+
+    /** @return array{codes: array<string, string>, names: array<string, true>} the chart's codes (to names) and names, any case */
+    private function chartIndex(): array
+    {
+        $codes = Account::query()->pluck('name', 'code')->all();
+
+        return ['codes' => $codes, 'names' => array_fill_keys(array_map(fn ($n) => mb_strtolower(trim((string) $n)), $codes), true)];
+    }
+
+    /** have: the chart has it (by code and name, or by name); taken: another account has its code; add: neither. */
+    private function templateStatus(array $a, array $chart): string
+    {
+        $name = mb_strtolower(trim($a['name']));
+        if (isset($chart['names'][$name])) {
+            return 'have';
+        }
+
+        return isset($chart['codes'][$a['code']]) ? 'taken' : 'add';
     }
 
     public function store(Request $request): JsonResponse

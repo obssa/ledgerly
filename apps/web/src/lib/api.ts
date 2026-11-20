@@ -330,6 +330,14 @@ export interface ChequeRegister {
 }
 
 /** Module 6: an account of the chart with its balance (debit minus credit) and where it sits. */
+/** Module 1: the industry templates, each account as one the chart has, one whose code is taken, or one to add. */
+export interface IndustryTemplates {
+  industry: string | null;
+  data: { key: string; name: string; to_add: number;
+    accounts: { code: string; name: string; type: string; subtype?: string; status: "have" | "taken" | "add" }[] }[];
+  can: { manage: boolean };
+}
+
 export interface ChartAccount {
   id: string;
   code: string;
@@ -1612,6 +1620,9 @@ export const ledgerly = {
   chart: (archived: boolean, ctx: RequestOptions) =>
     api<{ data: ChartAccount[]; kinds: Record<string, string[]>; can: { manage: boolean } }>("chart", { ...ctx, query: { include_archived: archived ? "1" : undefined } }),
   addAccount: (body: Record<string, unknown>, ctx: RequestOptions) => api<ChartAccount>("accounts", { ...ctx, method: "POST", body }),
+  industryTemplates: (ctx: RequestOptions) => api<IndustryTemplates>("chart/industries", ctx),
+  addIndustryAccounts: (industry: string, ctx: RequestOptions) =>
+    api<{ industry: string; added: { code: string; name: string }[] }>("chart/industry-accounts", { ...ctx, method: "POST", body: { industry } }),
   changeAccount: (id: string, body: Record<string, unknown>, ctx: RequestOptions) => api<ChartAccount>(`accounts/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   openingBalances: (ctx: RequestOptions) => api<OpeningBalances>("opening-balances", ctx),
   enterOpeningDocument: (type: "invoice" | "bill", body: Record<string, unknown>, ctx: RequestOptions) =>

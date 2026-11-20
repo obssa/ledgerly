@@ -62,6 +62,8 @@ final class PermissionMatrixTest extends TestCase
 
         'GET api/v1/accounts' => 'company.view',
         'GET api/v1/chart' => 'accounting.view',
+        'GET api/v1/chart/industries' => 'accounting.view',
+        'POST api/v1/chart/industry-accounts' => 'accounting.chart',
         'POST api/v1/accounts' => 'accounting.chart',
         'PUT api/v1/accounts/{account}' => 'accounting.chart',
         'GET api/v1/journal-entries' => 'accounting.view',
