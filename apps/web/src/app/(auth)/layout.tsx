@@ -10,7 +10,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
           </svg>
           <span className="text-[22px] font-extrabold tracking-tight">Ledgerly</span>
         </div>
-        <main className="rounded-[14px] border border-line bg-surface p-7">{children}</main>
+        <main className="rounded-2xl border border-line bg-surface p-7 shadow-[0_1px_2px_rgba(14,26,23,0.04),0_12px_32px_rgba(12,36,32,0.06)]">{children}</main>
       </div>
     </div>
   );

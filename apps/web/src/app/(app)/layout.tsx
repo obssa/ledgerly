@@ -42,36 +42,57 @@ async function DemoBanner() {
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className="flex min-h-screen flex-wrap">
+    // From a laptop up the menu's colour runs the full height of a long page, behind the sticky menu.
+    <div className="flex min-h-screen lg:bg-[linear-gradient(to_right,var(--color-side)_272px,transparent_272px)]">
       <Sidebar
         company={
-          <Suspense fallback={<div className="h-[58px] rounded-[10px] border border-[#23493f] bg-side-hover" />}>
+          <Suspense fallback={<div className="h-[54px] rounded-xl border border-[#23493f] bg-[#102e28]" />}>
             <CompanyBadge />
           </Suspense>
         }
       />
-      <main className="min-w-0 flex-[999_1_560px] px-8 pb-10 pt-5 print:p-0">
-        <div className="print:hidden">
-          <Suspense fallback={null}>
-            <DemoBanner />
-          </Suspense>
-          <Suspense fallback={null}>
-            <SubscriptionBanner />
-          </Suspense>
+      <div className="min-w-0 flex-1">
+        <div className="z-30 border-b border-line/70 bg-canvas/90 px-4 pt-3 backdrop-blur-md sm:px-6 md:sticky md:top-0 lg:px-8 print:hidden">
+          <div className="mx-auto max-w-[1440px]">
+            <Topbar
+              user={
+                <Suspense fallback={<div className="h-10 w-[84px] rounded-full bg-line-soft" />}>
+                  <UserMenu />
+                </Suspense>
+              }
+            />
+          </div>
         </div>
-        <Suspense fallback={null}>
-          <PrintedCompany />
-        </Suspense>
-        <Topbar
-          user={
-            <Suspense fallback={<div className="size-10 rounded-full bg-line-soft" />}>
-              <UserMenu />
+        <main id="content" className="mx-auto max-w-[1440px] px-4 pb-12 pt-5 sm:px-6 lg:px-8 print:p-0">
+          <div className="print:hidden">
+            <Suspense fallback={null}>
+              <DemoBanner />
             </Suspense>
-          }
-        />
-        {/* Pages read the session and call the API per request (src/lib/data.ts). */}
-        <Suspense fallback={<p className="mt-8 text-sm text-muted">Loading…</p>}>{children}</Suspense>
-      </main>
+            <Suspense fallback={null}>
+              <SubscriptionBanner />
+            </Suspense>
+          </div>
+          <Suspense fallback={null}>
+            <PrintedCompany />
+          </Suspense>
+          {/* Pages read the session and call the API per request (src/lib/data.ts). */}
+          <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/** While a page loads: the shape of a page, not a word. */
+function PageSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading" className="mt-2 animate-pulse">
+      <div className="h-7 w-64 rounded-lg bg-line-soft" />
+      <div className="mt-3 h-4 w-96 max-w-full rounded bg-line-soft" />
+      <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="h-[112px] rounded-[14px] border border-line bg-surface" />)}
+      </div>
+      <div className="mt-4 h-72 rounded-[14px] border border-line bg-surface" />
     </div>
   );
 }

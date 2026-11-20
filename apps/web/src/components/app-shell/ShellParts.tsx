@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut, switchCompany } from "@/app/(auth)/actions";
 import { getShellContext } from "@/lib/data";
+import { Icon } from "./Icon";
 
 /** Server parts of the app shell; the layout renders each inside <Suspense>. */
 
@@ -16,11 +17,14 @@ export async function CompanyBadge() {
   const others = companies.filter((c) => c.id !== companyId);
 
   return (
-    <details className="group w-full rounded-[10px] border border-[#23493f] bg-side-hover text-white">
+    <details className="group w-full rounded-xl border border-[#23493f] bg-[#102e28] text-white">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
-        <span>
-          <span className="block text-sm font-bold">{companyName}</span>
-          <span className="mt-0.5 block text-xs text-[#a9bdb7]">{companyNote}</span>
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#1d4a40] text-[12px] font-extrabold text-mint">{initials(companyName)}</span>
+          <span className="min-w-0">
+            <span className="block truncate text-[13.5px] font-bold">{companyName}</span>
+            <span className="mt-0.5 block truncate text-[11.5px] text-[#a9bdb7]">{companyNote}</span>
+          </span>
         </span>
         <span aria-hidden="true" className="text-xs text-[#a9bdb7] group-open:rotate-180">▾</span>
         <span className="sr-only">Switch company</span>
@@ -51,17 +55,30 @@ function initials(name: string): string {
 }
 
 export async function UserMenu() {
-  const { userName, demo } = await getShellContext();
+  const { userName, companyName, demo } = await getShellContext();
   return (
-    <div className="flex items-center gap-2">
-      <div aria-label={userName ? `Signed in as ${userName}` : "Signed in"} className="grid size-10 place-items-center rounded-full bg-brand text-sm font-bold text-white">
-        {initials(userName)}
+    <details className="group relative">
+      <summary aria-label={userName ? `Signed in as ${userName}` : "Signed in"}
+        className="flex cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-2.5 shadow-[0_1px_2px_rgba(14,26,23,0.04)] hover:border-[#c5cec9] [&::-webkit-details-marker]:hidden">
+        <span className="grid size-8 place-items-center rounded-full bg-brand text-[13px] font-bold text-white">{initials(userName)}</span>
+        <span className="hidden max-w-[140px] truncate text-[13px] font-semibold xl:inline">{userName || "Signed in"}</span>
+        <Icon name="chevron" className="size-3.5 rotate-90 text-muted" />
+      </summary>
+      <div className="absolute right-0 top-[calc(100%+6px)] z-40 w-64 rounded-2xl border border-line bg-surface p-2 shadow-[0_16px_48px_rgba(12,36,32,0.18)]">
+        <div className="border-b border-line-soft px-2.5 pb-2.5 pt-1.5">
+          <div className="truncate text-sm font-bold">{userName || "Signed in"}</div>
+          <div className="truncate text-xs text-muted">{companyName}</div>
+        </div>
+        <Link href="/security" className="mt-1 block rounded-lg px-2.5 py-2 text-sm font-semibold text-ink no-underline hover:bg-canvas">Sign-in security</Link>
+        <Link href="/settings" className="block rounded-lg px-2.5 py-2 text-sm font-semibold text-ink no-underline hover:bg-canvas">Company settings</Link>
+        {!demo && (
+          <form action={signOut}>
+            <button type="submit" className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-semibold text-bad hover:bg-bad-tint">
+              <Icon name="signout" className="size-4" /> Sign out
+            </button>
+          </form>
+        )}
       </div>
-      {!demo && (
-        <form action={signOut}>
-          <button type="submit" className="btn">Sign out</button>
-        </form>
-      )}
-    </div>
+    </details>
   );
 }

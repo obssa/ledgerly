@@ -1,133 +1,149 @@
 "use client";
 
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ADMIN, SECTIONS, locate, type NavSection } from "@/lib/navigation";
+import { Icon } from "./Icon";
 
-type NavItem = { href: string; label: string; soon?: boolean };
+/** Opens and closes the menu on a phone; the button is in the top bar (MenuButton). */
+export const MENU_EVENT = "ledgerly:menu";
 
-const groups: { label?: string; items: NavItem[] }[] = [
-  { items: [{ href: "/", label: "Home" }] },
-  {
-    label: "Money in",
-    items: [
-      { href: "/invoices", label: "Sales and invoices" },
-      { href: "/sales-receipts", label: "Cash sales" },
-      { href: "/delivery-notes", label: "Delivery notes" },
-      { href: "/quotes", label: "Quotes" },
-      { href: "/sales-orders", label: "Sales orders" },
-      { href: "/customers", label: "Customers" },
-      { href: "/payments", label: "Payments received" },
-      { href: "/products", label: "Products and services" },
-    ],
-  },
-  {
-    label: "Money out",
-    items: [
-      { href: "/bills", label: "Bills and purchases" },
-      { href: "/purchase-requisitions", label: "Purchase requisitions" },
-      { href: "/purchase-orders", label: "Purchase orders" },
-      { href: "/goods-received", label: "Goods received" },
-      { href: "/suppliers", label: "Suppliers" },
-      { href: "/payments-made", label: "Payments made" },
-      { href: "/expenses", label: "Expenses" },
-      { href: "/expense-claims", label: "Expense claims" },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { href: "/banking", label: "Banking and cash" },
-      { href: "/inventory", label: "Inventory and bin cards" },
-      { href: "/projects", label: "Projects" },
-      { href: "/time", label: "Timesheets" },
-      { href: "/payroll", label: "Payroll", soon: true },
-    ],
-  },
-  { label: "Compliance", items: [{ href: "/tax", label: "Tax centre" }, { href: "/einvoicing", label: "E-invoicing", soon: true }] },
-  {
-    label: "Books",
-    items: [
-      { href: "/accounts", label: "Chart of accounts" },
-      { href: "/fixed-assets", label: "Fixed assets" },
-      { href: "/journal", label: "Journal entries" },
-      { href: "/revaluation", label: "Currency revaluation" },
-      { href: "/close", label: "Close the books" },
-      { href: "/opening-balances", label: "Opening balances" },
-      { href: "/reports", label: "Reports" },
-      { href: "/audit", label: "Audit log" },
-    ],
-  },
-];
-
-const footer: NavItem[] = [
-  { href: "/settings", label: "Company settings" },
-  { href: "/settings/team", label: "Team" },
-  { href: "/import", label: "Import" },
-  { href: "/security", label: "Sign-in security" },
-];
-
-/** `company` is rendered on the server (CompanyBadge) and passed in, since this component runs in the browser. */
+/**
+ * The main menu: one row per section of the cycle, each opening to its pages. The section of the page being worked
+ * on is open; the others stay folded so the whole menu fits on a screen. On a phone it slides in from the side.
+ * `company` is rendered on the server (CompanyBadge) and passed in, since this component runs in the browser.
+ */
 export function Sidebar({ company }: { company: ReactNode }) {
-  return (
-    <nav aria-label="Main" className="flex-[1_1_240px] max-w-full bg-side px-3.5 py-5 text-side-text lg:max-w-[260px] print:hidden">
-      <div className="flex items-center gap-2.5 px-3 pb-5">
-        <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
-          <rect width="28" height="28" rx="8" fill="#34D399" />
-          <path d="M8 19V9M8 19h12M13 15l3-4 4 3" stroke="#0C2420" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span className="text-[19px] font-extrabold tracking-tight text-white">Ledgerly</span>
-      </div>
-
-      {company}
-
-      {/* On pages like /customers/[id] the path is known only per request: the menu shows without the highlight
-          until then, so the page itself can still be prerendered. */}
-      <Suspense fallback={<Links pathname={null} />}>
-        <CurrentLinks />
-      </Suspense>
-    </nav>
-  );
-}
-
-function CurrentLinks() {
-  return <Links pathname={usePathname()} />;
-}
-
-function Links({ pathname }: { pathname: string | null }) {
-  const isActive = (href: string) => pathname !== null && (href === "/" ? pathname === "/" : pathname.startsWith(href));
-  const cls = (href: string) =>
-    `flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium hover:bg-side-hover hover:text-white ${
-      isActive(href) ? "bg-side-hover font-bold text-white" : ""
-    }`;
+  const [drawer, setDrawer] = useState(false);
+  useEffect(() => {
+    const toggle = () => setDrawer((d) => !d);
+    const escape = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    window.addEventListener(MENU_EVENT, toggle);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener(MENU_EVENT, toggle);
+      window.removeEventListener("keydown", escape);
+    };
+  }, []);
 
   return (
     <>
-      {groups.map((group, i) => (
-        <div key={i} className={i === 0 ? "mt-3" : ""}>
-          {group.label && <div className="px-3 pb-1.5 pt-[18px] text-[11px] font-bold uppercase tracking-[0.08em] text-side-label">{group.label}</div>}
-          {group.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.soon ? "#" : item.href}
-              aria-current={isActive(item.href) ? "page" : undefined}
-              aria-disabled={item.soon || undefined}
-              className={cls(item.href)}
-            >
-              {item.label}
-              {item.soon && <span className="text-[10px] font-semibold uppercase tracking-wide text-side-label">soon</span>}
-            </Link>
-          ))}
-        </div>
-      ))}
-
-      <div className="mt-[18px] border-t border-[#23493f] pt-3">
-        {footer.map((item) => (
-          <Link key={item.href} href={item.href} aria-current={isActive(item.href) ? "page" : undefined} className={cls(item.href)}>
-            {item.label}
+      {drawer && <div aria-hidden="true" onClick={() => setDrawer(false)} className="fixed inset-0 z-40 bg-[#0c2420]/50 backdrop-blur-[2px] lg:hidden" />}
+      <nav
+        aria-label="Main"
+        id="main-menu"
+        className={`fixed inset-y-0 left-0 z-50 flex w-[272px] max-w-[86vw] shrink-0 flex-col bg-side text-side-text transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 print:hidden ${
+          drawer ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2.5 px-5 pb-4 pt-5">
+          <Link href="/" className="flex items-center gap-2.5 no-underline">
+            <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true">
+              <rect width="28" height="28" rx="8" fill="#34D399" />
+              <path d="M8 19V9M8 19h12M13 15l3-4 4 3" stroke="#0C2420" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-[19px] font-extrabold tracking-tight text-white">Ledgerly</span>
           </Link>
-        ))}
-      </div>
+          <button type="button" onClick={() => setDrawer(false)} className="grid size-9 place-items-center rounded-lg text-side-label hover:bg-side-hover hover:text-white lg:hidden" aria-label="Close the menu">
+            <Icon name="close" />
+          </button>
+        </div>
+
+        <div className="px-3.5">{company}</div>
+
+        {/* On pages like /customers/[id] the path is known only per request: the menu shows without the highlight
+            until then, so the page itself can still be prerendered. */}
+        <div className="side-scroll mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          <Suspense fallback={<Sections pathname={null} onNavigate={() => setDrawer(false)} />}>
+            <CurrentSections onNavigate={() => setDrawer(false)} />
+          </Suspense>
+        </div>
+      </nav>
     </>
+  );
+}
+
+function CurrentSections({ onNavigate }: { onNavigate: () => void }) {
+  const pathname = usePathname();
+  useEffect(onNavigate, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps -- close the drawer when a page opens
+  return <Sections pathname={pathname} onNavigate={onNavigate} />;
+}
+
+function Sections({ pathname, onNavigate }: { pathname: string | null; onNavigate: () => void }) {
+  const here = pathname === null ? null : locate(pathname);
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  const isOpen = (s: NavSection) => toggled[s.id] ?? here?.section.id === s.id;
+  const flip = (s: NavSection) => setToggled((t) => ({ ...t, [s.id]: !isOpen(s) }));
+
+  const section = (s: NavSection) => {
+    const current = here?.section.id === s.id;
+    if (s.items.length === 1) {
+      const item = s.items[0];
+      return (
+        <Link
+          key={s.id}
+          href={item.soon ? "#" : item.href}
+          onClick={onNavigate}
+          aria-current={current ? "page" : undefined}
+          aria-disabled={item.soon || undefined}
+          className={`side-row ${current ? "side-row-active" : ""} ${item.soon ? "pointer-events-none opacity-60" : ""}`}
+        >
+          <Icon name={s.icon} />
+          <span className="flex-1">{s.label}</span>
+          {item.soon && <span className="rounded-full bg-side-hover px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-side-label">Soon</span>}
+        </Link>
+      );
+    }
+    const open = isOpen(s);
+    return (
+      <div key={s.id}>
+        <button type="button" onClick={() => flip(s)} aria-expanded={open} aria-controls={`menu-${s.id}`} className={`side-row w-full ${current ? "text-white" : ""}`}>
+          <Icon name={s.icon} className={`size-[18px] ${current ? "text-mint" : ""}`} />
+          <span className="flex-1 text-left">{s.label}</span>
+          <Icon name="chevron" className={`size-4 text-side-label transition-transform ${open ? "rotate-90" : ""}`} />
+        </button>
+        {open && (
+          <ul id={`menu-${s.id}`} className="mb-1.5 ml-[21px] border-l border-[#23493f] py-0.5 pl-2.5">
+            {s.items.map((item) => {
+              const active = here?.item.href === item.href;
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.soon ? "#" : item.href}
+                    onClick={onNavigate}
+                    aria-current={active ? "page" : undefined}
+                    aria-disabled={item.soon || undefined}
+                    className={`relative flex items-center justify-between rounded-md px-2.5 py-[7px] text-[13.5px] no-underline hover:bg-side-hover hover:text-white ${
+                      active ? "bg-side-hover font-semibold text-white before:absolute before:-left-[11px] before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full before:bg-mint" : ""
+                    } ${item.soon ? "pointer-events-none opacity-60" : ""}`}
+                  >
+                    {item.label}
+                    {item.soon && <span className="text-[10px] font-bold uppercase tracking-wide text-side-label">Soon</span>}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div className="grid gap-0.5">{SECTIONS.map(section)}</div>
+      <div className="mt-3 border-t border-[#23493f] pt-3">{section(ADMIN)}</div>
+    </>
+  );
+}
+
+/** The menu button on a phone (the menu is always shown from a laptop up). */
+export function MenuButton() {
+  return (
+    <button type="button" onClick={() => window.dispatchEvent(new Event(MENU_EVENT))} aria-controls="main-menu" aria-label="Open the menu"
+      className="grid size-10 place-items-center rounded-[10px] border border-line bg-surface text-ink hover:border-muted lg:hidden">
+      <Icon name="menu" />
+    </button>
   );
 }

@@ -16,12 +16,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* eslint-disable-next-line @next/next/no-page-custom-font -- App Router root layout: applies to every page */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
         />
       </head>
       <body
         className="min-h-full font-sans"
-        style={{ ["--font-manrope" as string]: "'Manrope'", ["--font-plex-mono" as string]: "'IBM Plex Mono'" }}
+        style={{ ["--font-inter" as string]: "'Inter'", ["--font-plex-mono" as string]: "'IBM Plex Mono'" }}
       >
         {children}
       </body>
