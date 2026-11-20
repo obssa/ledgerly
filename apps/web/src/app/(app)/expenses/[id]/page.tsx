@@ -5,6 +5,7 @@ import { getExpense } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { VoidExpense } from "./VoidExpense";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
+import { TagsPanel } from "../../tags/TagsPanel";
 
 export const metadata = { title: "Expense" };
 
@@ -59,6 +60,7 @@ export default async function ExpensePage({ params, searchParams }: PageProps<"/
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
           {!voided && expense.can?.void && <VoidExpense id={expense.id} />}
           <AttachmentsPanel kind="expense" documentId={expense.id} flag={typeof attachment === "string" ? attachment : undefined} />
+          <TagsPanel kind="expense" id={expense.id} />
         </aside>
       </div>
     </>

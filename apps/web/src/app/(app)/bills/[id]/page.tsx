@@ -8,6 +8,7 @@ import { RefundPanel } from "../../refunds/RefundPanel";
 import { InvoiceActions } from "../../invoices/[id]/InvoiceActions";
 import { LandedCostPanel } from "./LandedCostPanel";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
+import { TagsPanel } from "../../tags/TagsPanel";
 
 export const metadata = { title: "Bill" };
 
@@ -147,6 +148,7 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
             <LandedCostPanel billId={bill.id} landed={landed} base={company.base_currency} />
           )}
           <AttachmentsPanel kind="bill" documentId={bill.id} flag={typeof attachment === "string" ? attachment : undefined} demo={bill.demo} />
+          <TagsPanel kind="bill" id={bill.id} demo={bill.demo} />
           {canApply && <ApplyCredit creditNoteId={bill.id} left={bill.amount_due} invoices={openBills} bills />}
           {canRefund && <RefundPanel side="supplier" contactId={bill.contact.id} currency={bill.currency} left={bill.amount_due} creditId={bill.id} accounts={moneyAccounts} />}
           <Card label="Pay to">

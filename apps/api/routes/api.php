@@ -72,6 +72,7 @@ use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierCreditController;
 use App\Http\Controllers\TaxRateController;
+use App\Http\Controllers\TagController;
 use App\Http\Controllers\TaxReturnController;
 use App\Http\Controllers\TimeEntryController;
 use App\Http\Controllers\WarehouseController;
@@ -213,6 +214,16 @@ Route::prefix('v1')->group(function () {
             Route::get('exchange-rates', [CurrencyController::class, 'rates']);
             Route::post('exchange-rates', [CurrencyController::class, 'storeRate']);
 
+            Route::get('tags', [TagController::class, 'index']);   // 094: custom tags on transactions
+            Route::post('tags', [TagController::class, 'store']);
+            Route::put('tags/{tag}', [TagController::class, 'update'])->whereUuid('tag');
+            Route::get('reports/by-tag', [TagController::class, 'report']);
+            foreach (['invoices' => 'invoice', 'bills' => 'bill', 'expenses' => 'expense'] as $path => $kind) {
+                Route::get("{$path}/{{$kind}}/tags", [TagController::class, 'forDocument'])->defaults('kind', $kind);
+                Route::put("{$path}/{{$kind}}/tags", [TagController::class, 'setDocument'])->defaults('kind', $kind);
+            }
+            Route::get('journal-entries/{entry}/tags', [TagController::class, 'forEntry']);
+            Route::put('journal-entries/{entry}/tags', [TagController::class, 'setEntry']);
             Route::get('dimensions', [DimensionController::class, 'index']);
             Route::post('dimensions', [DimensionController::class, 'store']);
             Route::put('dimensions/{dimension}', [DimensionController::class, 'update']);

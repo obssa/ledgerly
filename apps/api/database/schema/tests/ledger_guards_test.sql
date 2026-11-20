@@ -4947,6 +4947,56 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T119 a restricted grant is spent only on its budget lines, an unrestricted one on any, and each stays its company''s';
 END $$;
+-- T120: custom tags (094). A tag's name is the company's once in any case; a tagging names an active tag and one
+-- document or journal entry of the company, once; taggings are taken off, never changed; tags are never deleted.
+-- Company A, user f1, on T119's entry.
+DO $$
+DECLARE
+  fair constant uuid := '00000000-0000-0000-0000-0000000120a1';
+  old_tag constant uuid := '00000000-0000-0000-0000-0000000120a2';
+  e1 constant uuid := '00000000-0000-0000-0000-0000000119e1';
+  u constant uuid := '00000000-0000-0000-0000-0000000000f1';
+BEGIN
+  INSERT INTO tags (id, company_id, name) VALUES (fair, app_company_id(), 'Trade fair 2027'), (old_tag, app_company_id(), 'Old campaign');
+  BEGIN
+    INSERT INTO tags (company_id, name) VALUES (app_company_id(), ' trade FAIR 2027 ');
+    RAISE EXCEPTION 'FAIL T120a: a tag name was used twice';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  INSERT INTO transaction_tags (company_id, tag_id, journal_entry_id, created_by) VALUES (app_company_id(), fair, e1, u);
+  BEGIN
+    INSERT INTO transaction_tags (company_id, tag_id, journal_entry_id, created_by) VALUES (app_company_id(), fair, e1, u);
+    RAISE EXCEPTION 'FAIL T120b: a transaction had the same tag twice';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO transaction_tags (company_id, tag_id, created_by) VALUES (app_company_id(), fair, u);
+    RAISE EXCEPTION 'FAIL T120c: a tagging named no transaction';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO transaction_tags (company_id, tag_id, document_id, created_by) VALUES (app_company_id(), fair, gen_random_uuid(), u);
+    RAISE EXCEPTION 'FAIL T120d: a tagging named a document that is not the company''s';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE tags SET is_active = false WHERE id = old_tag;
+  BEGIN
+    INSERT INTO transaction_tags (company_id, tag_id, journal_entry_id, created_by) VALUES (app_company_id(), old_tag, e1, u);
+    RAISE EXCEPTION 'FAIL T120e: a transaction was tagged with a tag turned off';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    UPDATE transaction_tags SET tag_id = old_tag WHERE tag_id = fair;
+    RAISE EXCEPTION 'FAIL T120f: a tagging was changed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    DELETE FROM tags WHERE id = old_tag;
+    RAISE EXCEPTION 'FAIL T120g: a tag was deleted';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  DELETE FROM transaction_tags WHERE tag_id = fair AND journal_entry_id = e1;   -- taken off
+  INSERT INTO transaction_tags (company_id, tag_id, journal_entry_id, created_by) VALUES (app_company_id(), fair, e1, u);
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM tags WHERE id = fair) OR EXISTS (SELECT 1 FROM transaction_tags WHERE tag_id = fair) THEN
+    RAISE EXCEPTION 'FAIL T120h: company B saw company A''s tags';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T120 a tag is named once, put on a company''s transaction once while it is on, and never changed or deleted';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
