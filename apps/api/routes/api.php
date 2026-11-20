@@ -227,6 +227,8 @@ Route::prefix('v1')->group(function () {
 
             Route::get('accounts', [LedgerController::class, 'accounts']);
             Route::get('chart', [ChartController::class, 'index']);
+            Route::get('chart/industries', [ChartController::class, 'industries']);   // Module 1: industry templates
+            Route::post('chart/industry-accounts', [ChartController::class, 'addIndustryAccounts']);
             Route::post('accounts', [ChartController::class, 'store']);
             Route::put('accounts/{account}', [ChartController::class, 'update']);
             Route::get('journal-entries', [JournalController::class, 'index']);
