@@ -6,6 +6,7 @@ import { getJournalEntry } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ReverseJournal } from "../JournalForms";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
+import { TagsPanel } from "../../tags/TagsPanel";
 
 export const metadata = { title: "Journal entry" };
 
@@ -67,6 +68,7 @@ export default async function JournalEntryPage({ params, searchParams }: PagePro
       </Card>
       {/* 086: the files behind the entry: a board minute, a loan schedule, the bank's letter. */}
       <div className="mb-4 max-w-[600px]"><AttachmentsPanel kind="journal" documentId={e.id} flag={typeof attachment === "string" ? attachment : undefined} /></div>
+      <div className="mb-4 max-w-[600px]"><TagsPanel kind="journal" id={e.id} /></div>
       {e.can.reverse && (
         <Card className="max-w-[900px]" label="Reverse">
           <h2 className="mb-1 text-[15px] font-bold">Reverse this entry</h2>

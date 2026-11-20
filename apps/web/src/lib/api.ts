@@ -1477,6 +1477,17 @@ export interface Attachment {
 }
 
 export type AttachmentKind = "invoice" | "bill" | "expense" | "expense_claim" | "journal";
+
+/** Module 1 (094): a custom tag, and the transactions it can go on. */
+export interface Tag { id: string; name: string; is_active: boolean; used: number }
+export type TagKind = "invoice" | "bill" | "expense" | "journal";
+export const tagPath = (kind: TagKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses", journal: "journal-entries" })[kind];
+export interface TransactionTags { data: { id: string; name: string }[]; tags: { id: string; name: string }[]; can: { tag: boolean } }
+export interface TagReport {
+  from: string; to: string;
+  data: { id: string; name: string; is_active: boolean; transactions: number; income: string; expenses: string; profit: string;
+    accounts: { account_id: string; code: string; name: string; type: "income" | "expense"; amount: string }[] }[];
+}
 export const attachmentPath = (kind: AttachmentKind) => ({ invoice: "invoices", bill: "bills", expense: "expenses", expense_claim: "expense-claims", journal: "journal-entries" })[kind];
 
 /** GET /expense-claims (083): what a member paid out of their own pocket, claimed back as a bill payable to them. */
@@ -1868,6 +1879,13 @@ export const ledgerly = {
   invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
+  tags: (ctx: RequestOptions) => api<{ data: Tag[]; can: { manage: boolean } }>("tags", ctx),
+  addTag: (name: string, ctx: RequestOptions) => api<Tag>("tags", { ...ctx, method: "POST", body: { name } }),
+  changeTag: (id: string, body: { name?: string; is_active?: boolean }, ctx: RequestOptions) => api<Tag>(`tags/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  transactionTags: (kind: TagKind, id: string, ctx: RequestOptions) => api<TransactionTags>(`${tagPath(kind)}/${encodeURIComponent(id)}/tags`, ctx),
+  setTransactionTags: (kind: TagKind, id: string, tagIds: string[], ctx: RequestOptions) =>
+    api<TransactionTags>(`${tagPath(kind)}/${encodeURIComponent(id)}/tags`, { ...ctx, method: "PUT", body: { tag_ids: tagIds } }),
+  tagReport: (from: string, to: string, ctx: RequestOptions) => api<TagReport>("reports/by-tag", { ...ctx, query: { from, to } }),
   attachments: (kind: AttachmentKind, id: string, ctx: RequestOptions) =>
     api<{ data: Attachment[]; can: { add: boolean } }>(`${attachmentPath(kind)}/${encodeURIComponent(id)}/attachments`, ctx),
   removeAttachment: (id: string, ctx: RequestOptions) => api<unknown>(`attachments/${encodeURIComponent(id)}/remove`, { ...ctx, method: "POST", body: {} }),

@@ -13,6 +13,7 @@ import { BatchInvoice } from "./BatchInvoice";
 import { InvoiceActions } from "./InvoiceActions";
 import { PrintInvoice, SendInvoice } from "./SendInvoice";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
+import { TagsPanel } from "../../tags/TagsPanel";
 import { RepeatInvoice } from "./RepeatInvoice";
 
 export const metadata = { title: "Invoice" };
@@ -158,6 +159,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
               owed={["posted", "part_paid"].includes(invoice.status) ? invoice.amount_due : "0"} issueDate={invoice.issue_date} />
           )}
           <AttachmentsPanel kind="invoice" documentId={invoice.id} flag={typeof attachment === "string" ? attachment : undefined} demo={invoice.demo} />
+          <TagsPanel kind="invoice" id={invoice.id} demo={invoice.demo} />
           {canApply && <ApplyCredit creditNoteId={invoice.id} left={invoice.amount_due} invoices={openInvoices} />}
           {canRefund && <RefundPanel side="customer" contactId={invoice.contact.id} currency={invoice.currency} left={invoice.amount_due} creditId={invoice.id} accounts={moneyAccounts} />}
           <Card label="E-invoice">
