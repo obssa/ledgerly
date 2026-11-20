@@ -182,6 +182,8 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/quotes/{quote}/cancel' => 'invoices.create',
         'POST api/v1/quotes/{quote}/convert' => 'invoices.create',
         'POST api/v1/quotes/{quote}/email' => 'invoices.create',
+        'POST api/v1/quotes/{quote}/share' => 'invoices.create',
+        'POST api/v1/invoices/{invoice}/share' => 'invoices.create',
         'GET api/v1/quotes/{quote}/history' => 'invoices.view',
         'GET api/v1/sales-orders' => 'invoices.view',
         'POST api/v1/sales-orders' => 'invoices.create',

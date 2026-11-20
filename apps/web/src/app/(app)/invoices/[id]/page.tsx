@@ -12,6 +12,7 @@ import { InterestPanel } from "./InterestPanel";
 import { BatchInvoice } from "./BatchInvoice";
 import { InvoiceActions } from "./InvoiceActions";
 import { PrintInvoice, SendInvoice } from "./SendInvoice";
+import { ShareWhatsApp } from "@/components/ShareWhatsApp";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
 import { TagsPanel } from "../../tags/TagsPanel";
 import { RepeatInvoice } from "./RepeatInvoice";
@@ -135,6 +136,9 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4 print:hidden">
           {!invoice.demo && invoice.can.email && ["posted", "part_paid", "paid"].includes(invoice.status) && (
             <SendInvoice invoiceId={invoice.id} email={invoice.contact.email ?? null} label={kind} />
+          )}
+          {!invoice.demo && invoice.can.email && !creditNote && ["posted", "part_paid", "paid"].includes(invoice.status) && (
+            <ShareWhatsApp kind="invoice" id={invoice.id} phone={invoice.contact.phone ?? null} />
           )}
           {!invoice.demo && <InvoiceActions invoice={invoice} />}
           {!creditNote && invoice.can.credit && ["posted", "part_paid", "paid"].includes(invoice.status) && !invoice.demo && (
