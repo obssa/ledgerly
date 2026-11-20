@@ -13,6 +13,8 @@ describe("imports", () => {
     expect(importKind("opening-balances")).toBe("opening-balances");
     expect(importSummary(result({ kind: "accounts", checked: false, added: 2, skipped: ["1110"] }))).toBe("2 accounts added. 1 already in the chart, left as they are (1110).");
     expect(importSummary(result({ kind: "opening-balances", checked: false, added: 2 }))).toBe("Opening balances entered: 2 accounts.");
+    expect(importSummary(result({ kind: "accounts", checked: false, added: 3, left_out: [{ row: 5, name: "Dashen current", reason: "Left out: a bank account: open it under Banking." }] })))
+      .toBe("3 accounts added. 1 left out: they belong elsewhere here (listed below).");
     expect(importSummary(result({ kind: "open-bills", checked: false, added: 4 }))).toBe("4 open bills brought in.");
   });
   it("says what happened", () => {

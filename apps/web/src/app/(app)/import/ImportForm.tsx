@@ -18,6 +18,15 @@ export function ImportForm({ kind, example }: { kind: ImportKind; example: strin
           {r.ignored_columns.length > 0 && <span className="block font-normal">Columns not read: {r.ignored_columns.join(", ")}.</span>}
         </p>
       )}
+      {r && r.left_out && r.left_out.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="tbl">
+            <caption className="text-left text-[13px] font-semibold">Left out of the chart</caption>
+            <thead><tr><th scope="col">Row</th><th scope="col">Name</th><th scope="col">Why, and where it goes</th></tr></thead>
+            <tbody>{r.left_out.map((e) => <tr key={e.row}><td className="num">{e.row}</td><td>{e.name ?? ""}</td><td className="text-[13px]">{e.reason}</td></tr>)}</tbody>
+          </table>
+        </div>
+      )}
       {r && r.errors.length > 0 && (
         <div className="overflow-x-auto">
           <table className="tbl">
