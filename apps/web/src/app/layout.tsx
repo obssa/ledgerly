@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { DomGuard } from "@/components/DomGuard";
 
 export const metadata: Metadata = {
   title: { default: "Ledgerly", template: "%s · Ledgerly" },
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         className="min-h-full font-sans"
         style={{ ["--font-inter" as string]: "'Inter'", ["--font-plex-mono" as string]: "'IBM Plex Mono'" }}
       >
+        <DomGuard />
         {children}
       </body>
     </html>
