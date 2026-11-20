@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domain\Audit\AuditLogger;
+use App\Domain\Banking\CashForecast;
 use App\Domain\Banking\ChequeNumbers;
+use App\Domain\Ledger\Models\Account;
+use App\Domain\Purchases\PaymentFile;
 use App\Domain\Ledger\Currency;
 use App\Domain\Ledger\Money;
 use App\Domain\Purchases\Actions\PayBills;
@@ -17,6 +21,7 @@ use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -63,6 +68,34 @@ final class PaymentMadeController extends Controller
         }
 
         return response()->json([...$this->advice->for($this->current->get(), $supplier), 'cash_limit' => $this->advice->cashLimit($this->current->get())]);
+    }
+
+    /**
+     * Module 3: the bank payment file. The supplier payments of a day by bank transfer (or mobile money), from one
+     * money account or all of them, as a CSV for the bank's bulk transfer. It moves nothing; a download is audited.
+     */
+    public function bankFile(Request $request, PaymentFile $file): JsonResponse
+    {
+        $this->authorizeCompany('payments.pay');
+        $q = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'account_id' => ['nullable', 'uuid'],
+            'method' => ['nullable', Rule::in(PaymentFile::METHODS)],
+            'download' => ['nullable', 'boolean'],
+        ]);
+        $account = null;
+        if (($q['account_id'] ?? null) !== null) {
+            $account = Account::query()->whereIn('subtype', CashForecast::MONEY)->find($q['account_id'])   // the company's own (rule 4)
+                ?? throw ValidationException::withMessages(['account_id' => ['Choose a bank or mobile money account of this company.']]);
+        }
+        $result = $file->build($this->current->id(), $q['date'] ?? $this->current->today(), $account?->getKey(), $q['method'] ?? 'bank_transfer');
+        if ($request->boolean('download')) {
+            app(AuditLogger::class)->record($this->current->id(), 'bank_file_downloaded', 'company', $this->current->id(), null, ['date' => $result['date'],
+                'account_id' => $result['account_id'], 'method' => $result['method'], 'payments' => array_column($result['rows'], 'payment_id'), 'totals' => $result['totals']],
+                userId: $request->user()->getKey());
+        }
+
+        return response()->json($result);
     }
 
     /** Module 3: batch payments. Several suppliers' bills paid in one run, one payment each, all or none (not by cheque). */

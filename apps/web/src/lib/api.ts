@@ -1496,6 +1496,14 @@ export interface LeaseDetail extends Lease {
 
 /** Module 1 (094): a custom tag, and the transactions it can go on. */
 export interface Tag { id: string; name: string; is_active: boolean; used: number }
+/** Module 3: the bank payment file of a day's supplier payments by bank transfer or mobile money. */
+export interface BankPaymentFile {
+  date: string; account_id: string | null; method: "bank_transfer" | "mobile_money";
+  rows: { payment_id: string; supplier: string; contact_id: string; amount: string; currency: string; reference: string | null; from: string;
+    institution: string; account_name: string; account_number: string; details_changed_on: string | null }[];
+  missing: { payment_id: string; supplier: string; contact_id: string; amount: string; currency: string; needs: string }[];
+  recently_changed: number; totals: Record<string, string>; filename: string; csv: string;
+}
 /** 098: a bin inside a warehouse and the stock items kept in it. */
 export interface Bin {
   id: string; warehouse_id: string; warehouse: string; code: string; name: string | null; is_active: boolean;
@@ -1862,6 +1870,9 @@ export const ledgerly = {
   inventoryValuation: (asOf: string | undefined, ctx: RequestOptions) =>
     api<{ as_of: string; rows: { item_id: string; name: string; sku: string | null; unit: string; warehouse: string; quantity: string; value: string }[]; stock_value: string; inventory_account: string; difference: string }>(
       "reports/inventory-valuation", { ...ctx, query: { as_of: asOf } }),
+  bankPaymentFile: (q: { date?: string; account_id?: string; method: string; download?: boolean }, ctx: RequestOptions) =>
+    api<BankPaymentFile>("payments-made/bank-file", { ...ctx, query: { method: q.method, ...(q.date ? { date: q.date } : {}), ...(q.account_id ? { account_id: q.account_id } : {}),
+      ...(q.download ? { download: "1" } : {}) } }),
   bankAccounts: (ctx: RequestOptions) => api<{ data: BankAccount[]; can: { manage: boolean; transfer: boolean; deposit: boolean } }>("bank-accounts", ctx),
   bankAccount: (id: string, ctx: RequestOptions) => api<BankAccount>(`bank-accounts/${encodeURIComponent(id)}`, ctx),
   createBankAccount: (body: Record<string, unknown>, ctx: RequestOptions) => api<BankAccount>("bank-accounts", { ...ctx, method: "POST", body }),
