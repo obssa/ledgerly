@@ -430,6 +430,7 @@ Route::prefix('v1')->group(function () {
             Route::get('payments-made', [PaymentMadeController::class, 'index']);
             Route::post('payments-made', [PaymentMadeController::class, 'store']);
             Route::post('payments-made/batch', [PaymentMadeController::class, 'batch']);   // Module 3: batch payments
+            Route::get('payments-made/bank-file', [PaymentMadeController::class, 'bankFile']);   // Module 3: the bank payment file
             Route::get('purchase-requisitions', [PurchaseRequisitionController::class, 'index']);   // 084
             Route::post('purchase-requisitions', [PurchaseRequisitionController::class, 'store']);
             Route::get('purchase-requisitions/{purchaseRequisition}', [PurchaseRequisitionController::class, 'show'])->whereUuid('purchaseRequisition');
