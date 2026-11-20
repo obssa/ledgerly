@@ -442,6 +442,7 @@ Route::prefix('v1')->group(function () {
             Route::post('items/{item}/units', [ItemController::class, 'addUnit']);   // 072
             Route::put('items/{item}/components', [ItemController::class, 'setComponents']);   // 073
             Route::post('items/{item}/variants', [ItemController::class, 'makeVariants']);   // 089
+            Route::put('items/{item}/locations', [ItemController::class, 'setLocation']);   // 090
             Route::get('items/{item}/assembly', [AssemblyController::class, 'show']);   // 087
             Route::put('items/{item}/assembly', [AssemblyController::class, 'setParts']);
             Route::post('items/{item}/builds', [AssemblyController::class, 'build']);

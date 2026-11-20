@@ -176,8 +176,13 @@ final class ItemController extends Controller
     /** @return array<string, mixed> */
     private function present(Item $item): array
     {
+        // 090: where it is kept in each warehouse, beside what is there.
+        $bins = DB::table('item_locations')->where('item_id', $item->getKey())->pluck('bin', 'warehouse_id');
         $balances = StockBalance::query()->where('item_id', $item->getKey())->with('warehouse:id,name')->get()
-            ->map(fn (StockBalance $b) => ['warehouse' => $b->warehouse, 'quantity' => (string) $b->quantity, 'value' => (string) $b->value]);
+            ->map(fn (StockBalance $b) => ['warehouse' => $b->warehouse, 'quantity' => (string) $b->quantity, 'value' => (string) $b->value,
+                'bin' => $bins[$b->warehouse_id] ?? null]);
+        $locations = DB::table('item_locations as l')->join('warehouses as w', 'w.id', '=', 'l.warehouse_id')->where('l.item_id', $item->getKey())
+            ->orderBy('w.name')->get(['l.warehouse_id', 'w.name as warehouse', 'l.bin']);
 
         $units = DB::table('item_units')->where('item_id', $item->getKey())->orderByDesc('is_active')->orderBy('factor')
             ->get(['id', 'name', 'factor', 'is_active', 'created_at', 'barcode']);
@@ -203,7 +208,7 @@ final class ItemController extends Controller
         $parent = $item->parent_item_id !== null ? Item::query()->whereKey($item->parent_item_id)->first(['id', 'name']) : null;
 
         return [...$item->toArray(), 'balances' => $balances, 'units' => $units, 'components' => $components, 'batches' => $batches,
-            'variants' => $variants, 'parent' => $parent,
+            'variants' => $variants, 'parent' => $parent, 'locations' => $item->type === 'inventory' ? $locations : [],
             'can' => [...$this->can(), 'components' => $item->type === 'bundle' && ! $used && (bool) $this->current->membership()?->can('inventory.items'),
                 'variants' => $item->parent_item_id === null && $item->type !== 'bundle' && (bool) $this->current->membership()?->can('inventory.items')]];
     }
@@ -260,6 +265,33 @@ final class ItemController extends Controller
         });
 
         return response()->json(['made' => $made, 'item' => $this->present($item->refresh())], 201);
+    }
+
+    /** 090: where a stock item is kept in a warehouse ("Aisle 3 / B2"); none clears it. */
+    public function setLocation(Request $request, Item $item): JsonResponse
+    {
+        $this->authorizeCompany('inventory.items');
+        $data = $request->validate(['warehouse_id' => ['required', 'uuid'], 'bin' => ['nullable', 'string', 'max:40']]);
+        if ($item->type !== 'inventory') {
+            throw ValidationException::withMessages(['bin' => ["{$item->name} is not a stock item: only stock is kept in a bin."]]);
+        }
+        // Company-scoped: another company's warehouse is simply not found.
+        $warehouse = \App\Domain\Inventory\Models\Warehouse::query()->find($data['warehouse_id'])
+            ?? throw ValidationException::withMessages(['warehouse_id' => ['Choose a warehouse of this company.']]);
+        $bin = trim((string) ($data['bin'] ?? ''));
+        $before = DB::table('item_locations')->where(['item_id' => $item->getKey(), 'warehouse_id' => $warehouse->getKey()])->value('bin');
+        if ($bin === '') {
+            DB::table('item_locations')->where(['item_id' => $item->getKey(), 'warehouse_id' => $warehouse->getKey()])->delete();
+        } else {
+            DB::table('item_locations')->upsert([['company_id' => $item->company_id, 'item_id' => $item->getKey(), 'warehouse_id' => $warehouse->getKey(), 'bin' => $bin]],
+                ['company_id', 'item_id', 'warehouse_id'], ['bin']);
+        }
+        if ($before !== ($bin === '' ? null : $bin)) {
+            $this->audit->record($this->current->id(), 'bin_location_set', 'item', $item->getKey(), ['warehouse' => $warehouse->name, 'bin' => $before],
+                ['warehouse' => $warehouse->name, 'bin' => $bin === '' ? null : $bin], userId: $request->user()->getKey());
+        }
+
+        return response()->json($this->present($item->refresh()));
     }
 
     public function setComponents(Request $request, Item $item): JsonResponse

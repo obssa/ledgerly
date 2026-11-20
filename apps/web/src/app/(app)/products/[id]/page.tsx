@@ -8,6 +8,7 @@ import { ItemUnits } from "./ItemUnits";
 import { BundleParts } from "./BundleParts";
 import { AssemblyPanel } from "./AssemblyPanel";
 import { VariantsPanel } from "./VariantsPanel";
+import { BinLocations } from "./BinLocations";
 
 export const metadata = { title: "Item" };
 
@@ -35,10 +36,13 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
                 {item.balances!.map((b) => (
                   <li key={b.warehouse.id} className="flex justify-between gap-2 border-t border-line py-1.5">
                     <Link href={`/inventory/bin-card?item=${encodeURIComponent(item.id)}&warehouse=${encodeURIComponent(b.warehouse.id)}`} className="hover:underline">{b.warehouse.name}</Link>
-                    <span className="num">{formatAmount(b.quantity)} {item.unit} · {formatAmount(b.value)}</span>
+                    <span className="num">{b.bin && <span className="mr-2 text-[12px] text-muted">{b.bin}</span>}{formatAmount(b.quantity)} {item.unit} · {formatAmount(b.value)}</span>
                   </li>
                 ))}
               </ul>
+            )}
+            {item.can?.edit && warehouses.length > 0 && (
+              <BinLocations itemId={item.id} warehouses={warehouses.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name }))} locations={item.locations ?? []} />
             )}
             {item.can?.adjust && warehouses.length > 0 && (
               <div className="mt-5 border-t border-line pt-4">

@@ -4709,6 +4709,36 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   RAISE NOTICE 'PASS T115 a variant is an item of its parent''s type, one level deep, its label used once';
 END $$;
+
+-- T116: bin locations (090). A location is for a stock item and a warehouse of the company, once each; another company
+-- never sees one. Company A: stock item b1 in a1; company B's item b8.
+DO $$
+DECLARE
+  b1 constant uuid := '00000000-0000-0000-0000-0000000000b1';
+  wh constant uuid := '00000000-0000-0000-0000-0000000000a1';
+  svc constant uuid := '00000000-0000-0000-0000-000000000fd0';
+BEGIN
+  INSERT INTO items (id, company_id, name, type) VALUES (svc, app_company_id(), 'T116 delivery', 'service');
+  INSERT INTO item_locations (company_id, item_id, warehouse_id, bin) VALUES (app_company_id(), b1, wh, 'Aisle 3 / B2');
+  BEGIN
+    INSERT INTO item_locations (company_id, item_id, warehouse_id, bin) VALUES (app_company_id(), b1, wh, 'Aisle 4');
+    RAISE EXCEPTION 'FAIL T116a: an item had two locations in one warehouse';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_locations (company_id, item_id, warehouse_id, bin) VALUES (app_company_id(), svc, wh, 'Shelf 1');
+    RAISE EXCEPTION 'FAIL T116b: a service had a bin location';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO item_locations (company_id, item_id, warehouse_id, bin) VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000b8', wh, 'Shelf 1');
+    RAISE EXCEPTION 'FAIL T116c: another company''s item had a location here';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+  IF EXISTS (SELECT 1 FROM item_locations WHERE item_id = b1) THEN
+    RAISE EXCEPTION 'FAIL T116d: company B saw company A''s bin locations';
+  END IF;
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  RAISE NOTICE 'PASS T116 a bin location is for a stock item and warehouse of the company, once each';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
