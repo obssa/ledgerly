@@ -61,6 +61,8 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
       />
       {/* On paper: who it is from (the page's own header and side panels are not printed). */}
       <div className="mb-4 hidden text-[13px] print:block">
+        {/* eslint-disable-next-line @next/next/no-img-element -- the company's own logo, served by this site */}
+        {company.has_logo && <img src="/company-logo" alt="" className="mb-1.5 max-h-[56px] max-w-[200px] object-contain" />}
         <div className="text-[16px] font-bold">{company.trading_name || company.legal_name}</div>
         {company.trading_name && <div>{company.legal_name}</div>}
         {company.tin && <div>TIN <span className="num">{company.tin}</span>{company.vat_number ? <> · VAT <span className="num">{company.vat_number}</span></> : null}</div>}

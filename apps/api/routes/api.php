@@ -63,6 +63,7 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LeaseController;
+use App\Http\Controllers\LogoController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\NumberingController;
@@ -183,6 +184,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware(['company', 'idempotent'])->group(function () {
             Route::get('company', [CompanySettingsController::class, 'show']);
+            Route::get('company/logo', [LogoController::class, 'show']);   // 100: the company's logo
             Route::get('subscription', [SubscriptionController::class, 'show']);
             Route::get('people', [PeopleController::class, 'index']);
             Route::get('members', [TeamController::class, 'index']);
@@ -197,6 +199,8 @@ Route::prefix('v1')->group(function () {
                 Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind']);
                 Route::post('invoices/{invoice}/email', [InvoiceController::class, 'email']);
                 Route::post('quotes/{quote}/email', [QuoteController::class, 'email']);
+                Route::post('company/logo', [LogoController::class, 'store']);   // 100: not changed in the shared demo
+                Route::post('company/logo/remove', [LogoController::class, 'remove']);
                 Route::post('invoices/{invoice}/share', [ShareController::class, 'invoice']);   // by WhatsApp: a link and the message (099)
                 Route::post('quotes/{quote}/share', [ShareController::class, 'quote']);
                 // Files attached to documents (063): not stored for the shared demo accounts.

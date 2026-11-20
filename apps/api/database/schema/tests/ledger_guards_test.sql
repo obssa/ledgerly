@@ -5321,6 +5321,45 @@ BEGIN
   PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
   RAISE NOTICE 'PASS T125 invoice links are made for posted invoices only, looked up outside any company, and seen only by their own';
 END $$;
+
+-- T126: the company's logo (100). A PNG or JPEG by its first bytes, once per company, set by an owner or admin only;
+-- another company never sees it. Access Co (company C): c4 an accountant, c1 its owner.
+DO $$
+DECLARE
+  co   constant uuid := '00000000-0000-0000-0000-00000000000c';
+  png  constant text := 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+BEGIN
+  PERFORM set_config('app.company_id', co::text, true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000c4', true);
+  BEGIN
+    INSERT INTO company_logos (company_id, content_type, image_base64, updated_by) VALUES (co, 'image/png', png, app_user_id());
+    RAISE EXCEPTION 'FAIL T126a: an accountant set the company''s logo';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', true);
+  BEGIN
+    INSERT INTO company_logos (company_id, content_type, image_base64, updated_by) VALUES (co, 'image/png', encode(convert_to('<svg onload="x()"></svg> padding padding', 'UTF8'), 'base64'), app_user_id());
+    RAISE EXCEPTION 'FAIL T126b: a file that is not a PNG was kept as one';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO company_logos (company_id, content_type, image_base64, updated_by) VALUES (co, 'image/jpeg', png, app_user_id());
+    RAISE EXCEPTION 'FAIL T126c: a PNG was kept as a JPEG';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO company_logos (company_id, content_type, image_base64, updated_by) VALUES (co, 'image/png', png, app_user_id());
+  BEGIN
+    INSERT INTO company_logos (company_id, content_type, image_base64, updated_by) VALUES (co, 'image/png', png, app_user_id());
+    RAISE EXCEPTION 'FAIL T126d: a company had two logos';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+  PERFORM set_config('app.user_id', '00000000-0000-0000-0000-0000000000c4', true);
+  BEGIN
+    DELETE FROM company_logos WHERE company_id = co;
+    RAISE EXCEPTION 'FAIL T126e: an accountant removed the company''s logo';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+
+  PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+  IF EXISTS (SELECT 1 FROM company_logos) THEN
+    RAISE EXCEPTION 'FAIL T126f: company A saw another company''s logo';
+  END IF;
+  RAISE NOTICE 'PASS T126 a logo is a PNG or JPEG by its first bytes, one per company, set by an owner or admin, seen only by its own';
+END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 

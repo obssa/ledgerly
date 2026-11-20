@@ -41,7 +41,8 @@ final class QuoteLinkController extends Controller
             $quote = Document::query()->where('type', 'quote')->with(['lines', 'contact:id,name'])->findOrFail($link->document_id);
 
             return response()->json([
-                'company' => ['name' => (string) ($company->trading_name ?: $company->legal_name), 'tin' => $company->tin, 'email' => $company->email, 'phone' => $company->phone],
+                'company' => ['name' => (string) ($company->trading_name ?: $company->legal_name), 'tin' => $company->tin, 'email' => $company->email, 'phone' => $company->phone,
+                    'logo' => app(\App\Domain\Tenancy\CompanyLogo::class)->dataUri((string) $company->getKey())],   // 100
                 'customer' => $quote->contact?->name,
                 'quote' => [
                     'number' => $quote->number, 'issue_date' => $quote->issue_date->format('Y-m-d'), 'valid_until' => $quote->due_date?->format('Y-m-d'),

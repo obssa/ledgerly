@@ -37,6 +37,8 @@ async function Quote({ searchParams }: Pick<PageProps<"/quote">, "searchParams">
 
   return (
     <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI from the API, the company's own logo */}
+      {view.company.logo && <img src={view.company.logo} alt="" className="mb-2 max-h-[56px] max-w-[200px] object-contain" />}
       <p className="text-[13px] text-muted">A quote from</p>
       <h1 className="text-[22px] font-extrabold tracking-tight">{view.company.name}</h1>
       {view.company.tin && <p className="num text-[12px] text-muted">TIN {view.company.tin}</p>}

@@ -46,6 +46,8 @@ export interface CompanySettings {
   books_closed_until: string | null;
   /** True once anything is posted: the fields in locked_fields can no longer change. */
   books_started: boolean;
+  /** 100: whether the company has a logo (served at /company-logo). */
+  has_logo?: boolean;
   locked_fields: string[];
   fiscal_years: { starts_on: string; ends_on: string; status: string }[];
   /** Above these amounts someone other than the creator approves (invoices, bills, manual journals). */
@@ -1553,7 +1555,7 @@ export interface ExpenseClaimList {
 /** GET public/quote (065): a quote as its customer sees it through the emailed link. */
 /** 099: an invoice seen through a shared link, without an account. */
 export interface PublicInvoice {
-  company: { name: string; tin: string | null; email: string | null; phone: string | null };
+  company: { name: string; tin: string | null; email: string | null; phone: string | null; logo?: string | null; payment_details?: string | null };
   customer: string | null;
   invoice: {
     number: string; issue_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; total: string; amount_due: string; paid: boolean;
@@ -1564,7 +1566,7 @@ export interface PublicInvoice {
 /** An invoice or quote sent by WhatsApp: its link, the message, and the WhatsApp link that opens the chat with it written. */
 export interface SharedDocument { url: string; message: string; expires_at: string; to: string | null; whatsapp_url: string; status: string }
 export interface PublicQuote {
-  company: { name: string; tin: string | null; email: string | null; phone: string | null };
+  company: { name: string; tin: string | null; email: string | null; phone: string | null; logo?: string | null; payment_details?: string | null };
   customer: string | null;
   quote: {
     number: string; issue_date: string; valid_until: string | null; currency: string; subtotal: string; tax_total: string; total: string;
@@ -1946,6 +1948,7 @@ export const ledgerly = {
   tagReport: (from: string, to: string, ctx: RequestOptions) => api<TagReport>("reports/by-tag", { ...ctx, query: { from, to } }),
   attachments: (kind: AttachmentKind, id: string, ctx: RequestOptions) =>
     api<{ data: Attachment[]; can: { add: boolean } }>(`${attachmentPath(kind)}/${encodeURIComponent(id)}/attachments`, ctx),
+  removeLogo: (ctx: RequestOptions) => api<{ logo: boolean }>("company/logo/remove", { ...ctx, method: "POST", body: {} }),
   removeAttachment: (id: string, ctx: RequestOptions) => api<unknown>(`attachments/${encodeURIComponent(id)}/remove`, { ...ctx, method: "POST", body: {} }),
   postDatedCheques: (ctx: RequestOptions) => api<PostDatedCheques>("post-dated-cheques", ctx),
   recordPostDatedCheque: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ id: string }>("post-dated-cheques", { ...ctx, method: "POST", body }),
