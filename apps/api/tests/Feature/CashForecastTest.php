@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Domain\Ledger\RecurringJournals;
 use App\Models\User;
 use Tests\CompanyFixtures;
 use Tests\RefreshLedgerDatabase;
@@ -61,6 +62,52 @@ final class CashForecastTest extends TestCase
         $this->assertCount(4, $this->getJson('/api/v1/reports/cash-forecast?weeks=4', $h)->assertOk()->json('data'));
 
         // Another company's forecast does not see the bill.
+        $this->actingAs(User::query()->findOrFail($b['user']), 'sanctum');
+        $this->assertSame($theirsBefore['data'], $forecast(['X-Company-Id' => $b['company']])['data']);
+    }
+
+    /**
+     * Recurring entries count on their dates: a bank-paid lease of 2,000.00 three days from now and a month later goes
+     * out in those weeks; one that never touches cash moves nothing; a one-off repeat of the coffee invoice tomorrow
+     * comes in by the customer's terms after it, at the invoice's own total. Another company sees none of it.
+     */
+    public function test_recurring_journals_and_invoices_count_on_their_dates(): void
+    {
+        config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
+        $b = $this->companyWithRecords('b@example.test', 'Blue Nile Traders');
+        $c = $this->companyWithRecords('owner@example.test', 'Abyssinia Coffee');
+        $h = ['X-Company-Id' => $c['company']];
+        $forecast = fn (array $hh = []) => $this->getJson('/api/v1/reports/cash-forecast', $hh ?: $h)->assertOk()->json();
+        $sum = fn (array $f, string $key) => array_reduce($f['data'], fn (string $s, array $w) => bcadd($s, $w[$key], 2), '0.00');
+
+        $this->actingAs(User::query()->findOrFail($b['user']), 'sanctum');
+        $theirsBefore = $forecast(['X-Company-Id' => $b['company']]);
+        $this->actingAs(User::query()->findOrFail($c['user']), 'sanctum');
+        $f = $forecast();
+        $on = fn (int $days) => (new \DateTimeImmutable($f['as_of']))->modify("+{$days} days")->format('Y-m-d');
+        $weekOf = fn (string $date) => intdiv((int) (new \DateTimeImmutable($f['as_of']))->diff(new \DateTimeImmutable($date))->format('%a'), 7);
+
+        $lease = fn (string $credit, string $amount) => $this->postJson('/api/v1/recurring-journals', ['name' => "Lease {$amount}", 'memo' => 'Generator lease',
+            'frequency' => 'monthly', 'next_on' => $on(3), 'ends_on' => $on(40),
+            'lines' => [['account_id' => $c['rent'], 'debit' => $amount], ['account_id' => $credit, 'credit' => $amount]]], $h)->assertCreated();
+        $lease($c['bank'], '2000');
+        $lease($c['equity'], '500');   // never touches cash
+        $after = $forecast();
+        $second = $weekOf(RecurringJournals::advance($on(3), 'monthly'));
+        $this->assertSame(bcadd($f['data'][0]['recurring_out'], '2000.00', 2), $after['data'][0]['recurring_out']);
+        $this->assertSame(bcadd($f['data'][$second]['recurring_out'], '2000.00', 2), $after['data'][$second]['recurring_out']);
+        $this->assertSame(bcadd($sum($f, 'recurring_out'), '4000.00', 2), $sum($after, 'recurring_out'));
+        $this->assertSame(bcsub($f['closing'], '4000.00', 2), $after['closing']);
+
+        $source = $this->getJson("/api/v1/invoices/{$c['invoice']}", $h)->assertOk()->json();
+        $this->postJson("/api/v1/invoices/{$c['invoice']}/repeat", ['name' => 'Coffee once more', 'frequency' => 'monthly', 'next_on' => $on(1), 'ends_on' => $on(1)], $h)->assertCreated();
+        $terms = (int) $this->owner()->table('contacts')->where('id', $c['contact'])->value('payment_terms_days');
+        $week = $weekOf($on(1 + $terms));
+        $then = $forecast();
+        $this->assertSame(bcadd($after['data'][$week]['recurring_in'], $source['total'], 2), $then['data'][$week]['recurring_in']);
+        $this->assertSame(bcadd($sum($after, 'recurring_in'), $source['total'], 2), $sum($then, 'recurring_in'));
+        $this->assertSame(bcadd($after['closing'], $source['total'], 2), $then['closing']);
+
         $this->actingAs(User::query()->findOrFail($b['user']), 'sanctum');
         $this->assertSame($theirsBefore['data'], $forecast(['X-Company-Id' => $b['company']])['data']);
     }
