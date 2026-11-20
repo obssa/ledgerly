@@ -60,6 +60,8 @@ final class PostingService
                 throw new LedgerException("The {$what} return for {$filed->period_start} to {$filed->period_end} was filed on {$filed->filed_on}: date this after the period, or correct it in a later return.");
             }
 
+            $this->assertGrantBudgets($draft);
+
             $entryId = (string) Str::uuid7(); // time-ordered: new rows land together in the index
             $number = $this->nextNumber($draft->companyId, 'journal');
 
@@ -174,6 +176,34 @@ final class PostingService
 
             return $posted;
         });
+    }
+
+    /** 093: a restricted grant with a budget is spent only on its budget lines; the database refuses it too. */
+    private function assertGrantBudgets(JournalDraft $draft): void
+    {
+        $spent = array_values(array_filter($draft->lines(), fn (JournalLineDraft $l) => ($l->dimensions['project_id'] ?? null) !== null && ! $l->debit->isZero()));
+        if ($spent === [] || $draft->sourceType === 'reversal') {
+            return;
+        }
+        $grants = DB::table('project_grants as g')->join('dimensions as d', 'd.id', '=', 'g.project_id')
+            ->where(['g.company_id' => $draft->companyId, 'g.restricted' => true])
+            ->whereIn('g.project_id', array_values(array_unique(array_map(fn (JournalLineDraft $l) => $l->dimensions['project_id'], $spent))))
+            ->whereExists(fn ($q) => $q->from('grant_budget_lines as b')->whereColumn('b.project_id', 'g.project_id'))
+            ->pluck('d.code', 'g.project_id');
+        if ($grants->isEmpty()) {
+            return;
+        }
+        $budget = DB::table('grant_budget_lines')->where('company_id', $draft->companyId)->whereIn('project_id', $grants->keys()->all())
+            ->get(['project_id', 'account_id'])->map(fn ($b) => "{$b->project_id}:{$b->account_id}")->flip();
+        $expenses = DB::table('accounts')->where(['company_id' => $draft->companyId, 'type' => 'expense'])
+            ->whereIn('id', array_map(fn (JournalLineDraft $l) => $l->accountId, $spent))->get(['id', 'code', 'name'])->keyBy('id');
+        foreach ($spent as $l) {
+            $project = $l->dimensions['project_id'];
+            if (isset($grants[$project], $expenses[$l->accountId]) && ! isset($budget["{$project}:{$l->accountId}"])) {
+                $a = $expenses[$l->accountId];
+                throw new LedgerException("Grant {$grants[$project]} is restricted: {$a->code} {$a->name} is not one of its budget lines. Use a budget line, or tag the cost to another project.");
+            }
+        }
     }
 
     private function assertAccountsUsable(JournalDraft $draft): void

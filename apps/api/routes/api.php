@@ -286,6 +286,8 @@ Route::prefix('v1')->group(function () {
             Route::post('projects', [ProjectController::class, 'store']);
             Route::get('projects/{project}', [ProjectController::class, 'show'])->whereUuid('project');
             Route::put('projects/{project}', [ProjectController::class, 'update'])->whereUuid('project');
+            Route::put('projects/{project}/grant', [ProjectController::class, 'grant'])->whereUuid('project');   // 093
+            Route::get('projects/{project}/donor-report', [ProjectController::class, 'donorReport'])->whereUuid('project');
             Route::post('projects/{project}/milestones', [ProjectMilestoneController::class, 'store'])->whereUuid('project');
             Route::put('projects/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'update'])->whereUuid(['project', 'milestone']);
             Route::delete('projects/{project}/milestones/{milestone}', [ProjectMilestoneController::class, 'destroy'])->whereUuid(['project', 'milestone']);
