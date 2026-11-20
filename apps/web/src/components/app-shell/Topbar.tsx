@@ -1,24 +1,29 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { CommandPalette } from "./CommandPalette";
+import { MenuButton } from "./Sidebar";
+import { Breadcrumb, NewMenu, SectionTabs } from "./SectionNav";
 
+/**
+ * The bar over every page: where you are, the search that opens anything (Ctrl+K), the "+ New" menu and who is
+ * signed in; under it, the tabs of the section being worked in.
+ */
 export function Topbar({ user }: { user: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-      <div className="max-w-[520px] flex-[1_1_320px]">
-        <label htmlFor="q" className="sr-only">Search</label>
-        <input
-          id="q"
-          type="search"
-          placeholder="Search invoices, customers, amounts…"
-          className="h-[42px] w-full rounded-[10px] border border-[#d5dcd8] bg-surface px-3.5 text-sm font-medium outline-none focus:border-brand"
-        />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button className="btn" aria-label="Switch calendar">GC · EC</button>
-        <button className="btn" aria-label="Language">EN</button>
-        <Link href="/invoices/new" className="btn btn-primary">+ New invoice</Link>
-        {user}
-      </div>
-    </header>
+    <div className="print:hidden">
+      <header className="flex flex-wrap items-center gap-3">
+        <MenuButton />
+        <div className="hidden min-w-0 flex-1 md:block">
+          <Breadcrumb />
+        </div>
+        <div className="order-last w-full md:order-none md:w-[min(420px,40vw)]">
+          <CommandPalette />
+        </div>
+        <div className="ml-auto flex items-center gap-2 md:ml-0">
+          <NewMenu />
+          {user}
+        </div>
+      </header>
+      <SectionTabs />
+    </div>
   );
 }
