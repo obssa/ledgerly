@@ -14,7 +14,7 @@ async function DemoSignIn({ searchParams }: { searchParams: PageProps<"/sign-in"
     <section aria-labelledby="demo_heading" className="mt-6 border-t border-line pt-5">
       <h2 id="demo_heading" className="text-[15px] font-bold">Try the demo</h2>
       <p className="mt-1 text-[13px] text-muted">
-        Sign in to <span className="font-semibold text-ink">{options.company}</span> as one of its team. Everyone trying the demo shares this company, so don&apos;t enter anything real.
+        Sign in to <span className="font-semibold text-ink">{options.company}</span> as one of its team.
       </p>
       {demo === "unavailable" && (
         <p role="alert" className="mt-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">

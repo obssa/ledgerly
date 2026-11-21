@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
-import { getSession, selectCompany } from "@/lib/session";
+import { getSession } from "@/lib/session";
 import { settingsBody } from "@/lib/settings";
 
 /*
@@ -117,34 +117,3 @@ export async function setPeriodLock(_: FormState | undefined, form: FormData): P
   }
 }
 
-/** The details a fresh company keeps from this one: who it is and how its books are kept, nothing posted. */
-const KEPT = ["legal_name", "trading_name", "legal_form", "address_line1", "address_line2", "city", "region", "postal_code", "country_code", "base_currency",
-  "industry", "tin", "vat_registered", "vat_number", "phone", "email", "website", "calendar", "timezone", "fiscal_year_start_month"] as const;
-
-/**
- * Start fresh: a new, empty company with this one's name and details, in the same organisation; then this company is
- * archived (kept, read-only, out of the switcher; nothing deleted) and the new one opens. The new one is made first,
- * so a failure leaves this company as it was.
- */
-export async function startFresh(_: FormState | undefined, form: FormData): Promise<FormState> {
-  const ctx = await context();
-  const confirm = (text(form, "confirm") ?? "").trim();
-  let freshId: string;
-  try {
-    const settings = await ledgerly.companySettings(ctx);
-    if (confirm !== settings.legal_name) return { error: `Type the company's name exactly as it is: ${settings.legal_name}.` };
-    const { data } = await ledgerly.companies(ctx.token);
-    const current = data.find((c) => c.id === ctx.companyId);
-    const body: Record<string, unknown> = { organisation_id: current?.organisation_id };
-    for (const key of KEPT) {
-      const value = (settings as unknown as Record<string, unknown>)[key];
-      if (value !== null && value !== undefined && value !== "") body[key] = value;
-    }
-    freshId = (await ledgerly.createCompany(body, ctx.token)).id;
-    await ledgerly.archiveCompany({ confirm, reason: "Started fresh: the books continue in a new, empty company" }, ctx);
-  } catch (error) {
-    return refusal(error);
-  }
-  await selectCompany(freshId);
-  redirect("/?fresh=1");
-}

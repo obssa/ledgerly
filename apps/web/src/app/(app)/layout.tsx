@@ -3,7 +3,6 @@ import { connection } from "next/server";
 import { Sidebar } from "@/components/app-shell/Sidebar";
 import { Topbar } from "@/components/app-shell/Topbar";
 import { CompanyBadge, PrintedCompany, UserMenu } from "@/components/app-shell/ShellParts";
-import Link from "next/link";
 import { isDemoMode } from "@/lib/api";
 import { getSession } from "@/lib/session";
 import { getSubscription } from "@/lib/data";
@@ -26,9 +25,9 @@ async function DemoBanner() {
   const { demo } = await getSession();
   if (demo) {
     return (
-      <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
-        Demo company, signed in as {demo}. Everyone trying the demo shares this data, so don&apos;t enter anything real.{" "}
-        <Link href="/sign-up" className="underline">Create your own account</Link>
+      <p role="status" className="mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-[12.5px] font-semibold text-muted">
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />
+        Demo · signed in as {demo}
       </p>
     );
   }
