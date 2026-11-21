@@ -99,6 +99,9 @@ final class ApproveInvoice
                 $invoice->amount_due = '0.00'; // paid on the spot (021, 070)
             }
             $invoice->save();
+            // Its own history shows who posted it and when (the journal entry keeps its own record too).
+            app(\App\Domain\Audit\AuditLogger::class)->record($company->getKey(), 'posted', $invoice->type, $invoice->getKey(), null,
+                ['number' => $invoice->number, 'total' => (string) $invoice->total, 'journal_entry_id' => $entry->getKey()], null, $userId);
 
             // A credit settles what its invoice (or bill) still owes; the rest stays as credit to apply later.
             if ($original !== null && in_array($original->status, ['posted', 'part_paid'], true)) {

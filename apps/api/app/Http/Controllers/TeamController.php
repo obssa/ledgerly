@@ -42,7 +42,9 @@ final class TeamController extends Controller
         return response()->json([
             'data' => $rows->map(fn ($r) => ['id' => $r->id, 'user' => ['id' => $r->user_id, 'name' => $r->name, 'email' => $r->email], 'role' => $r->role,
                 'permissions' => self::permissionsOf($r), 'status' => $r->status, 'invited_at' => $r->invited_at, 'joined_at' => $r->created_at,
-                'me' => $r->user_id === $request->user()->getKey()]),
+                'me' => $r->user_id === $request->user()->getKey(),
+                // Whether this person may correct posted invoices and bills (transactions.edit), from their role.
+                'can_correct' => (new \App\Domain\Tenancy\Models\Membership(['role' => $r->role, 'permissions' => self::permissionsOf($r)]))->can('transactions.edit')]),
             'roles' => $this->rolesICanGive(),
             'grantable' => collect(config('permissions.grantable'))->map(fn ($label, $permission) => ['permission' => $permission, 'label' => $label])->values(),
         ]);

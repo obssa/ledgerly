@@ -22,21 +22,38 @@ async function context(): Promise<{ token: string; companyId: string }> {
 function refusal(error: unknown): FormState {
   if (error instanceof ApiError && error.status === 401) redirect("/sign-in");
   if (error instanceof ApiError && error.status === 403) return { error: "Your role cannot do this." };
+  if (error instanceof ApiError && error.status === 409) {
+    return { error: "Someone else changed this bill after you opened it. Open it again to see their changes, then make yours." };
+  }
   if (error instanceof ApiError && error.status === 422 && (error.body as { type?: string } | null)?.type) {
     return { error: (error.body as { message?: string }).message ?? "Not possible right now." };
   }
   return formStateFromError(error);
 }
 
-/** Saves the draft; with intent=approve also posts it. Either way the bill page opens. */
+/**
+ * Saves a new bill, the draft being edited (with the version it was read at), or corrects a posted bill with a
+ * reason (intent=correct: the API reverses and reposts it and keeps the old version).
+ */
 export async function createBill(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
+  const existing = text(form, "id");
+  const correcting = form.get("intent") === "correct";
   let id: string;
   try {
-    id = (await ledgerly.createBill(invoiceBody(form), ctx)).id;
+    const body = invoiceBody(form);
+    const version = Number(text(form, "lock_version"));
+    const reason = text(form, "reason");
+    if (existing && correcting && (!reason || reason.trim().length < 3)) {
+      return { error: "Say why it is being corrected: the reason is kept with the old version.", fields: { reason: ["Required"] } };
+    }
+    id = existing
+      ? (await ledgerly.updateBill(existing, { ...body, ...(Number.isInteger(version) && version > 0 ? { lock_version: version } : {}), ...(correcting ? { reason } : {}) }, ctx)).id
+      : (await ledgerly.createBill(body, ctx)).id;
   } catch (error) {
     return refusal(error);
   }
+  if (correcting) redirect(`/bills/${encodeURIComponent(id)}?corrected=1`);
   if (form.get("intent") === "approve") {
     try {
       await ledgerly.approveBill(id, ctx);

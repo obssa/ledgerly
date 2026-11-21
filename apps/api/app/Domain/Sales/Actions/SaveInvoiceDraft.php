@@ -71,12 +71,14 @@ final class SaveInvoiceDraft
                 $this->assertCreditable($original, $calc['totals']['total'], $document);
             }
 
+            $before = null;
             if ($document) {
                 $document = Document::query()->lockForUpdate()->findOrFail($document->getKey());
                 $document->assertVersion(isset($data['lock_version']) ? (int) $data['lock_version'] : null);
                 if (! $document->isEditable()) {
                     throw new LedgerException('Posted invoices are edited through EditPostedInvoice, which keeps their history.');
                 }
+                $before = self::auditFields($document->load('lines'));
             }
 
             $document ??= new Document(['type' => $type, 'created_by' => $userId, 'original_document_id' => $original?->getKey()]);
@@ -90,9 +92,34 @@ final class SaveInvoiceDraft
             $document->save();
 
             self::writeLines($document, $calc['lines']);
+            $document = $document->refresh()->load('lines'); // refresh: the database bumped lock_version
 
-            return $document->refresh()->load('lines'); // refresh: the database bumped lock_version
+            // Who made it and who changed it, field by field (audit_log; posted documents keep versions too).
+            $after = self::auditFields($document);
+            $audit = app(\App\Domain\Audit\AuditLogger::class);
+            if ($before === null) {
+                $action = match ($type) { 'credit_note' => 'credit_note_created', 'vendor_credit' => 'supplier_credit_created', default => 'created' };
+                $audit->record($this->company->id(), $action, $type, $document->getKey(), null, $after,
+                    in_array($type, ['credit_note', 'vendor_credit'], true) ? ($document->notes ?: null) : null, $userId);
+            } elseif (($changes = \App\Domain\Audit\AuditLogger::diff($before, $after)) !== []) {
+                $audit->record($this->company->id(), 'draft_saved', $type, $document->getKey(),
+                    array_map(fn ($c) => $c['old'], $changes), array_map(fn ($c) => $c['new'], $changes), null, $userId);
+            }
+
+            return $document;
         });
+    }
+
+    /** What a draft's history shows: the header people read, and each line in a few words. */
+    private static function auditFields(Document $d): array
+    {
+        $date = fn ($v) => $v instanceof \DateTimeInterface ? $v->format('Y-m-d') : $v;
+
+        return [
+            'number' => $d->number, 'contact_id' => $d->contact_id, 'issue_date' => $date($d->issue_date), 'due_date' => $date($d->due_date),
+            'currency' => $d->currency, 'total' => (string) $d->total, 'notes' => $d->notes,
+            'lines' => $d->lines->sortBy('line_no')->map(fn ($l) => trim("{$l->description} × {$l->quantity} @ {$l->unit_price}"))->values()->all(),
+        ];
     }
 
     /** The salesperson named: an active member of the company, or the one the document already had (who may have left); not sent, unchanged. */

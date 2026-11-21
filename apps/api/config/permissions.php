@@ -97,7 +97,7 @@ return [
         'expenses.view' => 'Expenses: see expenses',
         'expenses.create' => 'Expenses: record expenses',
         'expenses.claim' => 'Expenses: claim back what one paid',
-        'transactions.edit' => 'Edit posted documents while the period is open',
+        'transactions.edit' => 'Correct posted invoices and bills (every change is kept in the history)',
         'inventory.view' => 'Inventory: see items and stock',
         'inventory.items' => 'Inventory: add and change items and warehouses',
         'inventory.transfer' => 'Inventory: move stock between warehouses',
