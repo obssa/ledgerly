@@ -3,6 +3,7 @@ import { getCompanySettings, getCurrencies, getDimensions, getNumbering, getSubs
 import { subscriptionStatus } from "@/lib/subscription";
 import { CompanyProfileForm, CurrenciesPanel, DimensionsPanel, NumberingPanel, PeriodLockForm } from "./SettingsForms";
 import { LogoCard } from "./LogoCard";
+import { StartFresh } from "./StartFresh";
 
 export const metadata = { title: "Company settings" };
 
@@ -35,6 +36,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
         <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
           <LogoCard hasLogo={Boolean(settings.has_logo)} manage={settings.can.manage} flag={typeof logo === "string" ? logo : undefined} />
+          {settings.can.manage && !settings.demo && <StartFresh companyName={settings.legal_name} />}
 
           <Card label="Period lock">
             <h2 className="text-[19px] font-bold">Closed periods</h2>

@@ -211,6 +211,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('journal-entries/{entry}/attachments', [AttachmentController::class, 'storeJournal']);   // 086
             });
             Route::put('company', [CompanySettingsController::class, 'update']);
+            Route::post('company/archive', [CompanySettingsController::class, 'archive']);   // Start fresh: the old company kept, read-only
             Route::put('company/period-lock', [CompanySettingsController::class, 'periodLock']);
             Route::get('close-checklist', [CompanySettingsController::class, 'closeChecklist']);
             Route::get('fiscal-years', [FiscalYearController::class, 'index']);

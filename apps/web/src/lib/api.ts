@@ -11,6 +11,8 @@ export interface Company {
   trading_name: string | null;
   country_code: string;
   base_currency: string;
+  /** setting_up, live, or archived (read-only, kept out of the switcher). */
+  status?: string;
 }
 
 /** GET /company: the profile and fiscal settings of the company being worked in (Module 1). */
@@ -1644,6 +1646,8 @@ export const ledgerly = {
     api<{ token: string }>("auth/password", { method: "POST", body, token }),
   companies: (token: string) => api<{ data: Company[] }>("companies", { token }),
   createCompany: (body: Record<string, unknown>, token: string) => api<Company>("companies", { method: "POST", body, token }),
+  /** Start fresh: archive the company being worked in (owner or admin; its name typed to confirm). */
+  archiveCompany: (body: { confirm: string; reason?: string }, ctx: RequestOptions) => api<{ id: string; status: string }>("company/archive", { ...ctx, method: "POST", body }),
   companySettings: (ctx: RequestOptions) => api<CompanySettings>("company", ctx),
   saveCompanySettings: (body: Record<string, unknown>, ctx: RequestOptions) => api<CompanySettings>("company", { ...ctx, method: "PUT", body }),
   setPeriodLock: (body: { books_closed_until: string | null; reason?: string }, ctx: RequestOptions) =>

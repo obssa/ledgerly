@@ -52,6 +52,42 @@ final class CompanySettingsController extends Controller
         return response()->json($this->present($current->get()));
     }
 
+    /**
+     * Archive this company: it stays in full, read-only (the API refuses every change and the ledger every posting),
+     * and leaves the company switcher. Used by "Start fresh", which opens a new empty company first. Nothing is
+     * deleted. Owner or admin only (company.manage, and the database's company guard), with the name typed to confirm.
+     */
+    public function archive(Request $request, CurrentCompany $current): JsonResponse
+    {
+        $this->authorizeCompany('company.manage');
+        $data = $request->validate([
+            'confirm' => ['required', 'string', 'max:200'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+        $company = $current->get();
+        if ($company->status === 'archived') {
+            return response()->json(['message' => 'This company is already archived.', 'type' => 'CompanyArchived'], 422);
+        }
+        if (trim($data['confirm']) !== $company->legal_name) {
+            return response()->json(['message' => "Type the company's name exactly as it is: {$company->legal_name}.",
+                'errors' => ['confirm' => ['Does not match the company name']]], 422);
+        }
+
+        DB::transaction(function () use ($company, $data) {
+            $before = $company->status;
+            // The company state machine (006) runs setting_up -> live -> archived: a company still being set up goes
+            // live first, in the same transaction, so every step is one the database allows.
+            if ($before === 'setting_up') {
+                DB::table('companies')->where('id', $company->getKey())->update(['status' => 'live', 'updated_at' => now()]);
+            }
+            DB::table('companies')->where('id', $company->getKey())->update(['status' => 'archived', 'updated_at' => now()]);
+            $this->audit->record($company->getKey(), 'company_archived', 'company', $company->getKey(),
+                ['status' => $before], ['status' => 'archived'], $data['reason'] ?? 'Archived', (string) request()->user()?->getKey());
+        });
+
+        return response()->json(['id' => $company->getKey(), 'status' => 'archived']);
+    }
+
     public function update(Request $request, CurrentCompany $current): JsonResponse
     {
         $this->authorizeCompany('company.manage');
