@@ -1648,6 +1648,10 @@ export const ledgerly = {
   createCompany: (body: Record<string, unknown>, token: string) => api<Company>("companies", { method: "POST", body, token }),
   /** Start fresh: archive the company being worked in (owner or admin; its name typed to confirm). */
   archiveCompany: (body: { confirm: string; reason?: string }, ctx: RequestOptions) => api<{ id: string; status: string }>("company/archive", { ...ctx, method: "POST", body }),
+  /** The demo's owner only (101): a new, empty demo company, every demo account moved to it. */
+  demoStartFresh: (ctx: RequestOptions) => api<{ company_id: string }>("demo/start-fresh", { ...ctx, method: "POST", body: {} }),
+  /** The demo's owner only: the sample books put into an empty demo company, in the background. */
+  demoFill: (ctx: RequestOptions) => api<{ queued: boolean }>("demo/fill", { ...ctx, method: "POST", body: {} }),
   companySettings: (ctx: RequestOptions) => api<CompanySettings>("company", ctx),
   saveCompanySettings: (body: Record<string, unknown>, ctx: RequestOptions) => api<CompanySettings>("company", { ...ctx, method: "PUT", body }),
   setPeriodLock: (body: { books_closed_until: string | null; reason?: string }, ctx: RequestOptions) =>

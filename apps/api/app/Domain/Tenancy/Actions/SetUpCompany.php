@@ -31,10 +31,10 @@ final class SetUpCompany
      *              phone?: ?string, email?: ?string, website?: ?string, conversion_date?: ?string, legal_form?: ?string,
      *              address_line1?: ?string, address_line2?: ?string, city?: ?string, region?: ?string, postal_code?: ?string} $data
      */
-    public function handle(User $owner, array $data): Company
+    public function handle(User $owner, array $data, ?string $companyId = null): Company
     {
         $pack = CountryPack::load($data['country_code']);
-        $companyId = (string) Str::uuid7();
+        $companyId ??= (string) Str::uuid7();   // a demo fresh start names the company first (101)
         $accounts = $pack->accountsFor($data['industry'] ?? null);
         $calendar = $data['calendar'] ?? 'gregorian';
 

@@ -5363,6 +5363,79 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T127: a fresh start of the demo (101). Only the demo's owner starts it, at most once a minute, never written by the
+-- application directly; the old demo company must be archived first; then every demo account is a member of the new
+-- company with its role and the demo accounts point there; a start is finished once. Access Co (company C) as the demo:
+-- cd its demo owner, c3 a bookkeeper. The start itself is rolled back at the end; cd stays an owner of C.
+RESET ROLE;
+-- A second owner of company C who belongs to no other company: the demo's owner.
+INSERT INTO users (id, name, email, password) VALUES ('00000000-0000-0000-0000-0000000000cd', 'Demo owner', 'owner@demo.test', 'not-usable');
+INSERT INTO memberships (company_id, user_id, role, status) VALUES ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000cd', 'owner', 'active');
+INSERT INTO demo_accounts (user_id, company_id, role) VALUES
+  ('00000000-0000-0000-0000-0000000000cd', '00000000-0000-0000-0000-00000000000c', 'owner'),
+  ('00000000-0000-0000-0000-0000000000c3', '00000000-0000-0000-0000-00000000000c', 'bookkeeper');
+SET ROLE ledgerly_web;
+DO $$
+DECLARE
+  co     constant uuid := '00000000-0000-0000-0000-00000000000c';
+  owner_ constant uuid := '00000000-0000-0000-0000-0000000000cd';
+  keeper constant uuid := '00000000-0000-0000-0000-0000000000c3';
+  org    uuid;
+  fresh  uuid;
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', co::text, true), set_config('app.user_id', keeper::text, true);
+    SELECT organisation_id INTO org FROM companies WHERE id = co;
+    BEGIN
+      PERFORM demo_fresh_start_begin();
+      RAISE EXCEPTION 'FAIL T127a: a demo bookkeeper started the demo fresh';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+
+    PERFORM set_config('app.user_id', owner_::text, true);
+    BEGIN
+      INSERT INTO demo_fresh_starts (company_id, previous_company_id, requested_by) VALUES (gen_random_uuid(), co, owner_);
+      RAISE EXCEPTION 'FAIL T127b: the application role recorded a fresh start itself';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    fresh := demo_fresh_start_begin();
+    BEGIN
+      PERFORM demo_fresh_start_begin();
+      RAISE EXCEPTION 'FAIL T127c: the demo was started fresh twice within a minute';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    -- The new company and its first owner, as the company setup makes them.
+    PERFORM set_config('app.company_id', fresh::text, true);
+    INSERT INTO companies (id, organisation_id, legal_name, country_code, base_currency) VALUES (fresh, org, 'Fresh demo', 'ET', 'ETB');
+    INSERT INTO memberships (company_id, user_id, role, status) VALUES (fresh, owner_, 'owner', 'active');
+    BEGIN
+      PERFORM demo_fresh_start_finish(fresh);
+      RAISE EXCEPTION 'FAIL T127d: the demo moved before its old company was archived';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    PERFORM set_config('app.company_id', co::text, true);
+    UPDATE companies SET status = 'live' WHERE id = co;
+    UPDATE companies SET status = 'archived' WHERE id = co;
+    PERFORM demo_fresh_start_finish(fresh);
+
+    PERFORM set_config('app.company_id', fresh::text, true);
+    IF (SELECT count(*) FROM demo_accounts WHERE company_id = fresh) <> 2
+       OR EXISTS (SELECT 1 FROM demo_accounts WHERE company_id = co)
+       OR NOT EXISTS (SELECT 1 FROM memberships WHERE company_id = fresh AND user_id = keeper AND role = 'bookkeeper' AND status = 'active') THEN
+      RAISE EXCEPTION 'FAIL T127e: the demo accounts did not all move to the new company with their roles';
+    END IF;
+    BEGIN
+      PERFORM demo_fresh_start_finish(fresh);
+      RAISE EXCEPTION 'FAIL T127f: a fresh start was finished twice';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    RAISE EXCEPTION 'T127 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T127 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T127 only the demo owner starts the demo fresh, once its old company is archived, and every demo account moves with its role';
+END $$;
+RESET ROLE;
+DELETE FROM demo_accounts;
+SET ROLE ledgerly_web;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN
