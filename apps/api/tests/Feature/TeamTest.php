@@ -160,6 +160,19 @@ final class TeamTest extends TestCase
         $this->getJson('/api/v1/auth/invitation?token=short')->assertUnprocessable();
     }
 
+    public function test_the_team_list_says_who_may_correct_posted_documents(): void
+    {
+        $m = $this->postJson('/api/v1/members/invitations', ['email' => 'selam@example.test', 'name' => 'Selam', 'role' => 'viewer'], $this->h)->assertCreated()->json('id');
+        $canCorrect = fn () => collect($this->getJson('/api/v1/members', $this->h)->assertOk()->json('data'))->firstWhere('id', $m)['can_correct'];
+
+        $this->assertFalse($canCorrect());
+        $this->assertTrue(collect($this->getJson('/api/v1/members', $this->h)->json('data'))->firstWhere('me', true)['can_correct']);
+        foreach ([['accountant', [], true], ['bookkeeper', [], true], ['sales', [], false], ['custom', ['invoices.view'], false], ['custom', ['invoices.view', 'transactions.edit'], true]] as [$role, $permissions, $expected]) {
+            $this->putJson("/api/v1/members/{$m}", ['role' => $role, 'permissions' => $permissions], $this->h)->assertOk();
+            $this->assertSame($expected, $canCorrect(), $role . ' ' . implode(',', $permissions));
+        }
+    }
+
     public function test_a_custom_role_works_with_exactly_the_permissions_chosen_for_it(): void
     {
         $grantable = collect($this->getJson('/api/v1/members', $this->h)->assertOk()->json('grantable'))->pluck('permission');
@@ -175,6 +188,10 @@ final class TeamTest extends TestCase
         $invite(['users.manage'])->assertUnprocessable()->assertJsonValidationErrors('permissions.0');
         $m = $invite(['reports.view', 'invoices.view'])->assertCreated()->assertJsonPath('role', 'custom')
             ->assertJsonPath('permissions', ['company.view', 'invoices.view', 'reports.view'])->json('id');
+        // Who may correct posted invoices and bills, per person: the custom role chosen without it may not.
+        $people = collect($this->getJson('/api/v1/members', $this->h)->assertOk()->json('data'));
+        $this->assertFalse($people->firstWhere('id', $m)['can_correct']);
+        $this->assertTrue($people->firstWhere('me', true)['can_correct']);
         // Other roles keep only their name's permissions, whatever is sent.
         $this->postJson('/api/v1/members/invitations', ['email' => 'dawit@example.test', 'name' => 'Dawit', 'role' => 'viewer', 'permissions' => ['payments.pay']], $this->h)
             ->assertCreated()->assertJsonPath('permissions', []);

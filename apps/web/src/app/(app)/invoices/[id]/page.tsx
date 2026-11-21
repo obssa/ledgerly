@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanySettings, getInvoice, getMoneyAccounts, getOpenInvoices, getLateInterest, getWriteOffs, getCustomerChoices } from "@/lib/data";
+import { getCompanySettings, getDocumentHistory, getInvoice, getMoneyAccounts, getOpenInvoices, getLateInterest, getWriteOffs, getCustomerChoices } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { ApplyCredit } from "./ApplyCredit";
@@ -16,6 +16,8 @@ import { ShareWhatsApp } from "@/components/ShareWhatsApp";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
 import { TagsPanel } from "../../tags/TagsPanel";
 import { RepeatInvoice } from "./RepeatInvoice";
+import { FixMistake } from "@/components/FixMistake";
+import { DocumentHistoryPanel } from "@/components/DocumentHistoryPanel";
 
 export const metadata = { title: "Invoice" };
 
@@ -31,8 +33,8 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "good" | "warn" 
 /** One invoice: lines, totals, e-invoice state, warnings (credit limit) and what can be done next. */
 export default async function InvoicePage({ params, searchParams }: PageProps<"/invoices/[id]">) {
   const { id } = await params;
-  const { posted, attachment } = await searchParams;
-  const [invoice, company] = await Promise.all([getInvoice(id), getCompanySettings()]);
+  const { posted, attachment, corrected } = await searchParams;
+  const [invoice, company, history] = await Promise.all([getInvoice(id), getCompanySettings(), getDocumentHistory("invoice", id)]);
   if (!invoice) notFound();
   const writeOffs = invoice.type === "invoice" && !invoice.demo && ["posted", "part_paid", "paid"].includes(invoice.status) ? await getWriteOffs(invoice.id) : null;
   const batchable = invoice.type === "invoice" && !invoice.demo && invoice.can.credit && invoice.status !== "void";
@@ -55,10 +57,15 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
         eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / {kind}</>}
         title={<>{kind} {invoice.number ? <span className="num">{invoice.number}</span> : "(draft)"} <span className="print:hidden"><Pill tone={status.tone}>{status.label}</Pill></span></>}
         actions={["posted", "part_paid", "paid"].includes(invoice.status)
-          ? <><a href={`/invoices/${encodeURIComponent(invoice.id)}/pdf`} className="btn print:hidden">Download PDF</a><PrintInvoice /></>
+          ? <>{!creditNote && invoice.can.correct && !invoice.demo && <Link href={`/invoices/${encodeURIComponent(invoice.id)}/edit`} className="btn print:hidden">Correct</Link>}<a href={`/invoices/${encodeURIComponent(invoice.id)}/pdf`} className="btn print:hidden">Download PDF</a><PrintInvoice /></>
           : !creditNote && invoice.can.edit && !invoice.demo && ["draft", "awaiting_approval"].includes(invoice.status)
             ? <Link href={`/invoices/${encodeURIComponent(invoice.id)}/edit`} className="btn print:hidden">Edit draft</Link> : undefined}
       />
+      {corrected === "1" && (
+        <p role="status" className="mb-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good print:hidden">
+          Correction saved. The original entry was reversed and the corrected one posted; the earlier version is in the history below.
+        </p>
+      )}
       {/* On paper: who it is from (the page's own header and side panels are not printed). */}
       <div className="mb-4 hidden text-[13px] print:block">
         {/* eslint-disable-next-line @next/next/no-img-element -- the company's own logo, served by this site */}
@@ -143,9 +150,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <ShareWhatsApp kind="invoice" id={invoice.id} phone={invoice.contact.phone ?? null} />
           )}
           {!invoice.demo && <InvoiceActions invoice={invoice} />}
-          {!creditNote && invoice.can.credit && ["posted", "part_paid", "paid"].includes(invoice.status) && !invoice.demo && (
-            <Link href={`/invoices/${encodeURIComponent(invoice.id)}/credit-note`} className="btn justify-center">Issue a credit note</Link>
-          )}
+          {!creditNote && !invoice.demo && <FixMistake kind="invoice" doc={invoice} />}
           {!creditNote && !invoice.demo && ["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0 && (
             <Reminders invoiceId={invoice.id} sent={invoice.reminders ?? []} canSend={Boolean(invoice.can.remind)} />
           )}
@@ -164,6 +169,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <BadDebtPanel invoiceId={invoice.id} writeOffs={writeOffs.data} canManage={writeOffs.can.write_off}
               owed={["posted", "part_paid"].includes(invoice.status) ? invoice.amount_due : "0"} issueDate={invoice.issue_date} />
           )}
+          <DocumentHistoryPanel history={history} timeZone={company.timezone || "Africa/Addis_Ababa"} auditHref={`/audit?subject_id=${encodeURIComponent(invoice.id)}`} />
           <AttachmentsPanel kind="invoice" documentId={invoice.id} flag={typeof attachment === "string" ? attachment : undefined} demo={invoice.demo} />
           <TagsPanel kind="invoice" id={invoice.id} demo={invoice.demo} />
           {canApply && <ApplyCredit creditNoteId={invoice.id} left={invoice.amount_due} invoices={openInvoices} />}

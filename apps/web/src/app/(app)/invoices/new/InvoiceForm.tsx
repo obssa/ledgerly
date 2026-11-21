@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { startTransition, useActionState, useMemo, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
 import type { InvoiceDetail } from "@/lib/api";
 import type { InvoiceOptions } from "@/lib/data";
@@ -53,7 +53,7 @@ const KIND = {
 
 /** What the form needs from a saved document to edit it: an invoice draft, or a quote or sales order. */
 type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
-  | "warehouse_id" | "number" | "notes" | "lines" | "lock_version"> & { status: string };
+  | "warehouse_id" | "number" | "notes" | "lines" | "lock_version"> & { status: string; reference?: string | null };
 
 const METHODS: Record<string, string> = {
   cash: "Cash", card: "Card", bank_transfer: "Bank transfer", mobile_money: "Mobile money (telebirr, M-PESA …)", cheque: "Cheque", other: "Other",
@@ -104,6 +104,8 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const quote = kind === "quote" || kind === "sales_order" || purchase;
   // A quote already sent, or an order already confirmed, is revised: its earlier version is kept, with what changed.
   const revision = quote && draft !== undefined && draft.status !== "draft";
+  // A posted invoice or bill corrected in place: the API reverses its entry, posts the corrected one and keeps the old version.
+  const correcting = (kind === "invoice" || kind === "bill") && draft !== undefined && draft.status === "posted";
   const [state, action, pending] = useActionState(kind === "bill" ? createBill : kind === "expense" ? createExpense : kind === "sales_receipt" ? createSalesReceipt
     : purchase ? savePurchaseOrder : quote ? saveQuote : createInvoice, undefined);
   const onTheSpot = kind === "expense" || kind === "sales_receipt";   // paid at once, from or into a money account
@@ -200,7 +202,13 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   }
 
   return (
-    <form action={action} noValidate className="flex flex-wrap items-start gap-4">
+    // Submitted by hand, not as a form action: React resets a form after its action, which cleared the chosen
+    // customer and the typed fields whenever a save was refused, so the corrected retry was refused again.
+    <form onSubmit={(e: FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const data = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
+      startTransition(() => action(data));
+    }} noValidate className="flex flex-wrap items-start gap-4">
       <input type="hidden" name="lines" value={linesJson} />
       {draft && <input type="hidden" name="id" value={draft.id} />}
       {draft?.lock_version && <input type="hidden" name="lock_version" value={String(draft.lock_version)} />}
@@ -227,7 +235,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               </select>
               {customer && <p className="mt-1.5 text-[13px] text-muted">{customer.tax_id ? <>TIN <span className="num">{customer.tax_id}</span> · </> : "No TIN · "}Terms {customer.payment_terms_days} days</p>}
             </div>
-            {kind === "bill" && <Field name="reference" label="Supplier's invoice number" hint="As printed on their invoice" invalid={bad("reference")} />}
+            {kind === "bill" && <Field name="reference" label="Supplier's invoice number" hint="As printed on their invoice" defaultValue={draft?.reference ?? ""} invalid={bad("reference")} />}
             {onTheSpot && (
               <>
                 {kind === "expense"
@@ -247,7 +255,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 </div>
               </>
             )}
-            {options.manualNumbers && !revision && <Field name="number" label={words.numberLabel} defaultValue={draft?.number ?? ""} invalid={bad("number")} />}
+            {options.manualNumbers && !revision && !correcting && <Field name="number" label={words.numberLabel} defaultValue={draft?.number ?? ""} invalid={bad("number")} />}
             <div>
               <label className="field-label" htmlFor="issue_date">Issue date</label>
               <input className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
@@ -414,6 +422,24 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               </div>
             )}
           </Card>
+        ) : correcting ? (
+          <Card label="Correcting a posted document" className="border-brand/40 bg-brand-tint/40">
+            <h2 className="text-[17px] font-bold">Correcting a posted {words.noun}</h2>
+            <p className="mt-1.5 text-[13px] text-muted">
+              Ledgerly reverses the original entry and posts the corrected one, on the same date. The {words.noun} keeps its number, and the
+              version before this change is kept in its history with your name, the time and the reason.
+            </p>
+            <dl className="num mt-3 text-[13px]">
+              {words.posting.map(([label, amount]) => (
+                <div key={label} className="flex justify-between py-1"><dt>{label}</dt><dd>{formatAmount(totals[amount], currency)}</dd></div>
+              ))}
+            </dl>
+            <div className="mt-3">
+              <label className="field-label" htmlFor="reason">Reason for the change</label>
+              <textarea className={`field min-h-[64px] ${bad("reason") ? "!border-bad" : ""}`} id="reason" name="reason" required minLength={3} maxLength={500}
+                placeholder={kind === "bill" ? "The supplier corrected the price on their invoice" : "Customer returned 40 kg before delivery"} aria-invalid={bad("reason") || undefined} />
+            </div>
+          </Card>
         ) : (
         <Card label="Posting preview">
           <h2 className="text-[17px] font-bold">On approval this posts</h2>
@@ -442,6 +468,8 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               </button>
             ) : revision ? (
               <button type="submit" name="intent" value="draft" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save the revision"}</button>
+            ) : correcting ? (
+              <button type="submit" name="intent" value="correct" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save the correction"}</button>
             ) : quote ? (
               <>
                 <button type="submit" name="intent" value="draft" className="btn" disabled={pending}>Save draft</button>

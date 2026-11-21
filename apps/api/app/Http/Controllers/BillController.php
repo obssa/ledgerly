@@ -34,14 +34,19 @@ final class BillController extends Controller
     private function present(Document $bill, int $status = 200): JsonResponse
     {
         $membership = $this->current->membership();
+        $blocked = $bill->isPosted() ? app(EditPostedInvoice::class)->blockedReason($bill) : null;
 
         return response()->json([
             ...$bill->toArray(),
+            // Why it cannot be corrected in place (a payment, goods received…); null when it can.
+            'correct_blocked' => $blocked,
             'warnings' => $bill->type === 'bill' ? $this->duplicates->warnings($bill) : [],
             // 069: against its purchase order and the goods received, line by line (warnings only).
             'match' => $this->match->forBill($bill),
             'can' => [
                 'edit' => (bool) $membership?->can($bill->isPosted() ? 'transactions.edit' : 'bills.create'),
+                // A posted bill corrected in place (EditPostedInvoice): allowed for this member, and nothing in the way.
+                'correct' => $bill->isPosted() && $bill->type === 'bill' && (bool) $membership?->can('transactions.edit') && $blocked === null,
                 'approve' => (bool) $membership?->can('bills.approve'),
                 'void' => (bool) $membership?->can('transactions.edit'),
                 'credit' => (bool) $membership?->can('bills.create'),
@@ -142,17 +147,10 @@ final class BillController extends Controller
     }
 
     /** Every saved version and every audit record for this bill, newest first. */
-    public function history(Document $bill): JsonResponse
+    public function history(Document $bill, \App\Domain\Audit\DocumentHistory $history): JsonResponse
     {
         $this->authorizeCompany('bills.view');
 
-        return response()->json([
-            'versions' => DocumentVersion::query()->where('document_id', $bill->getKey())->orderByDesc('version')->get(),
-            'audit' => DB::table('audit_log')
-                ->where('company_id', $bill->company_id)
-                ->where('subject_id', $bill->getKey())
-                ->orderByDesc('id')
-                ->get(['id', 'action', 'user_id', 'actor_type', 'before', 'after', 'reason', 'ip', 'created_at']),
-        ]);
+        return response()->json($history->for($bill));
     }
 }

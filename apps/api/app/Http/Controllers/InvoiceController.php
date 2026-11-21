@@ -30,6 +30,8 @@ final class InvoiceController extends Controller
     private function present(Document $invoice, int $status = 200): JsonResponse
     {
         $membership = $this->current->membership();
+        // Worked out per call: the route keeps one controller across requests, so nothing about a document is kept on it.
+        $blocked = $invoice->isPosted() ? app(EditPostedInvoice::class)->blockedReason($invoice) : null;
 
         return response()->json([
             ...$invoice->toArray(),
@@ -40,6 +42,8 @@ final class InvoiceController extends Controller
             'warnings' => $invoice->type !== 'invoice' || in_array($invoice->status, ['void', 'paid'], true) ? [] : $this->credit->warnings($this->current->get(), $invoice),
             'can' => [
                 'edit' => (bool) $membership?->can($invoice->isPosted() ? 'transactions.edit' : 'invoices.create'),
+                // A posted document corrected in place (EditPostedInvoice): allowed for this member, and nothing in the way.
+                'correct' => $invoice->isPosted() && (bool) $membership?->can('transactions.edit') && $blocked === null,
                 'approve' => (bool) $membership?->can('invoices.approve'),
                 'void' => (bool) $membership?->can('transactions.edit'),
                 'credit' => (bool) $membership?->can('invoices.create'),
@@ -49,6 +53,8 @@ final class InvoiceController extends Controller
                 'email' => (bool) $membership?->can('invoices.create'),
                 'retain' => (bool) $membership?->can('payments.receive'),
             ],
+            // Why it cannot be corrected in place (a payment, stock, the tax authority…); null when it can.
+            'correct_blocked' => $blocked,
             'retentions' => $invoice->type === 'invoice' ? app(\App\Domain\Sales\Retention::class)->of($invoice->getKey()) : [],
             'reminders' => $invoice->type === 'invoice' ? app(\App\Domain\Sales\InvoiceReminders::class)->sentFor($invoice->getKey()) : [],
         ], $status);
@@ -109,19 +115,11 @@ final class InvoiceController extends Controller
     }
 
     /** Every saved version and every audit record for this document, newest first. */
-    public function history(Document $invoice): JsonResponse
+    public function history(Document $invoice, \App\Domain\Audit\DocumentHistory $history): JsonResponse
     {
         $this->authorizeCompany('invoices.view');
 
-        return response()->json([
-            'versions' => DocumentVersion::query()->where('document_id', $invoice->getKey())->orderByDesc('version')->get(),
-            // Always name the company, even though row-level security would filter it anyway.
-            'audit' => DB::table('audit_log')
-                ->where('company_id', $invoice->company_id)
-                ->where('subject_id', $invoice->getKey())
-                ->orderByDesc('id')
-                ->get(['id', 'action', 'user_id', 'actor_type', 'before', 'after', 'reason', 'ip', 'created_at']),
-        ]);
+        return response()->json($history->for($invoice));
     }
 
     public function submit(Request $request, Document $invoice, InvoiceWorkflow $workflow): JsonResponse

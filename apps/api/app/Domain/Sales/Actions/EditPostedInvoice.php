@@ -43,33 +43,51 @@ final class EditPostedInvoice
     ) {
     }
 
-    public function handle(Document $invoice, array $data, string $reason, string $userId, Membership $membership): Document
+    /**
+     * Why this posted document cannot be corrected in place, in words for the screen; null when it can. The same
+     * checks guard handle(), so what the screen offers and what the API allows never disagree.
+     */
+    public function blockedReason(Document $invoice): ?string
     {
+        $credit = $invoice->type === 'bill' ? 'a supplier credit' : 'a credit note';
         if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill'], true) || ! $invoice->isPosted()) {
-            throw new LedgerException("Only posted invoices, credit notes and bills are edited this way ({$invoice->number} is {$invoice->status}).");
+            return "Only posted invoices, credit notes and bills are corrected this way ({$invoice->number} is {$invoice->status}).";
         }
         if ($invoice->opening) {
-            throw new LedgerException("{$invoice->number} was brought in from the old books: void it and enter it again with the right amount.");
+            return "{$invoice->number} was brought in from the old books: void it and enter it again with the right amount.";
         }
         if (DB::table('stock_moves')->where(['company_id' => $invoice->company_id, 'document_id' => $invoice->getKey()])->exists()
             || DB::table('bill_receipt_matches')->where(['company_id' => $invoice->company_id, 'bill_id' => $invoice->getKey()])->exists()
             || DB::table('invoice_delivery_matches')->where(['company_id' => $invoice->company_id, 'invoice_id' => $invoice->getKey()])->exists()) {
-            throw new LedgerException("{$invoice->number} moved stock: void it and enter it again, so the bin card stays exact.");
+            return "{$invoice->number} moved stock: issue {$credit} for what was wrong, or void it and enter it again, so the bin card stays exact.";
         }
         if ($invoice->status !== 'posted') {
-            throw new LedgerException("{$invoice->number} has payments allocated to it. Remove the allocation first, then edit.");
+            return "{$invoice->number} has a payment against it: issue {$credit} for the difference, or remove the payment first and then correct it.";
+        }
+        // Tax-authority rule: a registered e-invoice is corrected with a credit note and a new invoice.
+        if (EInvoiceSubmission::query()->where('document_id', $invoice->getKey())->where('status', 'cleared')->exists()) {
+            return "{$invoice->number} is registered with the tax authority; issue a credit note and a new invoice instead.";
+        }
+        if (EInvoiceSubmission::query()->where('document_id', $invoice->getKey())->where('status', 'submitted')->exists()) {
+            return "{$invoice->number} is being registered with the tax authority right now; try again when it has an answer.";
+        }
+        if (DB::table('invoice_retentions')->where('document_id', $invoice->getKey())->whereNull('released_on')->exists()) {
+            return "{$invoice->number} holds retention: release it before correcting the invoice.";
+        }
+        if (DB::table('invoice_write_offs')->where('document_id', $invoice->getKey())->whereNull('reversed_on')->exists()) {
+            return "{$invoice->number} has a bad debt written off: reverse the write-off before correcting the invoice.";
+        }
+
+        return null;
+    }
+
+    public function handle(Document $invoice, array $data, string $reason, string $userId, Membership $membership): Document
+    {
+        if (($blocked = $this->blockedReason($invoice)) !== null) {
+            throw new LedgerException($blocked);
         }
         if (mb_strlen(trim($reason)) < 3) {
             throw new LedgerException('A reason is required to edit a posted document.');
-        }
-
-        // Tax-authority rule: a registered e-invoice is corrected with a credit note and a new invoice.
-        $cleared = EInvoiceSubmission::query()->where('document_id', $invoice->getKey())->where('status', 'cleared')->exists();
-        if ($cleared) {
-            throw new LedgerException("{$invoice->number} is registered with the tax authority; issue a credit note and a new invoice instead.");
-        }
-        if (EInvoiceSubmission::query()->where('document_id', $invoice->getKey())->where('status', 'submitted')->exists()) {
-            throw new LedgerException("{$invoice->number} is being registered with the tax authority right now; try again when it has an answer.");
         }
 
         if (isset($data['number']) && $data['number'] !== '' && $data['number'] !== $invoice->number) {

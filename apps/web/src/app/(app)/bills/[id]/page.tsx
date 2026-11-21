@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getBill, getCompanySettings, getLandedCosts, getMoneyAccounts, getOpenBills } from "@/lib/data";
+import { getBill, getCompanySettings, getDocumentHistory, getLandedCosts, getMoneyAccounts, getOpenBills } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { ApiError } from "@/lib/api";
 import { ApplyCredit } from "../../invoices/[id]/ApplyCredit";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { InvoiceActions } from "../../invoices/[id]/InvoiceActions";
 import { LandedCostPanel } from "./LandedCostPanel";
 import { AttachmentsPanel } from "../../attachments/AttachmentsPanel";
 import { TagsPanel } from "../../tags/TagsPanel";
+import { FixMistake } from "@/components/FixMistake";
+import { DocumentHistoryPanel } from "@/components/DocumentHistoryPanel";
 
 export const metadata = { title: "Bill" };
 
@@ -24,8 +27,10 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "good" | "warn" 
 /** One bill: the supplier and where they are paid, the lines and totals, possible duplicates, and what can be done next. */
 export default async function BillPage({ params, searchParams }: PageProps<"/bills/[id]">) {
   const { id } = await params;
-  const { posted, attachment } = await searchParams;
-  const bill = await getBill(id);
+  const { posted, attachment, corrected } = await searchParams;
+  // The company's settings give the time zone for the history; a role without company.view still sees the bill.
+  const [bill, history, settings] = await Promise.all([getBill(id), getDocumentHistory("bill", id),
+    getCompanySettings().catch((error: unknown) => { if (error instanceof ApiError) return null; throw error; })]);
   if (!bill) notFound();
   const credit = bill.type === "vendor_credit";
   const status = credit && bill.status === "paid" ? { label: "Applied", tone: "good" as const }
@@ -38,14 +43,23 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
   const canRefund = credit && Boolean(bill.can.refund) && ["posted", "part_paid"].includes(bill.status) && bill.amount_due !== "0.00" && !bill.demo;
   const moneyAccounts = canRefund ? await getMoneyAccounts(bill.currency) : [];
   const postedBill = !credit && !bill.demo && ["posted", "part_paid", "paid"].includes(bill.status);
-  const [landed, company] = postedBill ? await Promise.all([getLandedCosts(bill.id), getCompanySettings()]) : [null, null];
+  const landed = postedBill ? await getLandedCosts(bill.id) : null;
+  const company = postedBill && settings ? settings : null;
 
   return (
     <>
       <PageTitle
         eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / {kind}</>}
         title={<>{kind} {bill.number ? <span className="num">{bill.number}</span> : "(draft)"} <Pill tone={status.tone}>{status.label}</Pill></>}
+        actions={credit || bill.demo ? undefined
+          : ["draft", "awaiting_approval"].includes(bill.status) && bill.can.edit ? <Link href={`/bills/${encodeURIComponent(bill.id)}/edit`} className="btn">Edit draft</Link>
+          : bill.can.correct ? <Link href={`/bills/${encodeURIComponent(bill.id)}/edit`} className="btn">Correct</Link> : undefined}
       />
+      {corrected === "1" && (
+        <p role="status" className="mb-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">
+          Correction saved. The original entry was reversed and the corrected one posted; the earlier version is in the history.
+        </p>
+      )}
       {posted === "0" && bill.status !== "posted" && (
         <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
           Saved as a draft but not posted. Approve it below to see why, or send it for approval.
@@ -141,12 +155,11 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
           {!credit && !bill.demo && ["posted", "part_paid"].includes(bill.status) && (
             <Link href={`/payments-made/new?supplier=${encodeURIComponent(bill.contact.id)}`} className="btn justify-center">Pay this bill</Link>
           )}
-          {!credit && !bill.demo && bill.can.credit && ["posted", "part_paid", "paid"].includes(bill.status) && (
-            <Link href={`/bills/${encodeURIComponent(bill.id)}/credit`} className="btn justify-center">Record a supplier credit</Link>
-          )}
+          {!credit && !bill.demo && <FixMistake kind="bill" doc={bill} />}
           {landed && company && (landed.spread.length > 0 || landed.received.length > 0 || (landed.can.apply && Number(landed.left) > 0)) && (
             <LandedCostPanel billId={bill.id} landed={landed} base={company.base_currency} />
           )}
+          <DocumentHistoryPanel history={history} timeZone={settings?.timezone || "Africa/Addis_Ababa"} auditHref={`/audit?subject_id=${encodeURIComponent(bill.id)}`} />
           <AttachmentsPanel kind="bill" documentId={bill.id} flag={typeof attachment === "string" ? attachment : undefined} demo={bill.demo} />
           <TagsPanel kind="bill" id={bill.id} demo={bill.demo} />
           {canApply && <ApplyCredit creditNoteId={bill.id} left={bill.amount_due} invoices={openBills} bills />}

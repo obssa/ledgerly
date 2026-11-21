@@ -835,6 +835,8 @@ export interface TaxRate {
   effective_to: string | null;
 }
 
+import type { DocumentHistory } from "./history";
+
 /** GET /invoices/{id}: the invoice, warnings that do not block, and what the signed-in member may do with it. */
 /** A supplier's bill (Module 3): posted to accounts payable; `reference` is the supplier's own invoice number. */
 export interface Bill extends Invoice {
@@ -852,7 +854,9 @@ export interface BillDetail extends Bill {
   warnings: { type: string; message: string; bill_id?: string }[];
   /** 069: against its purchase order and the goods received, when it was made from an order. */
   match?: ThreeWayMatch | null;
-  can: { edit: boolean; approve: boolean; void: boolean; credit?: boolean; apply?: boolean; refund?: boolean };
+  can: { edit: boolean; approve: boolean; void: boolean; credit?: boolean; apply?: boolean; refund?: boolean; correct?: boolean };
+  /** Why a posted bill cannot be corrected in place (a payment, goods received…); null when it can. */
+  correct_blocked?: string | null;
 }
 
 /** An expense paid on the spot (Module 3): posted at once against the account it was paid from. */
@@ -901,7 +905,9 @@ export interface InvoiceDetail extends Invoice {
   contact: Contact & { email?: string | null; phone?: string | null };
   lines: InvoiceLine[];
   warnings: { type: string; message: string }[];
-  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean; refund?: boolean; remind?: boolean; email?: boolean; retain?: boolean };
+  can: { edit: boolean; approve: boolean; void: boolean; credit: boolean; apply: boolean; refund?: boolean; remind?: boolean; email?: boolean; retain?: boolean; correct?: boolean };
+  /** Why a posted invoice cannot be corrected in place (a payment, the tax authority…); null when it can. */
+  correct_blocked?: string | null;
   /** Retention the customer holds back until the work is complete (050). */
   retentions?: InvoiceRetention[];
   /** Payment reminders sent to the customer, newest first (048). */
@@ -1345,6 +1351,8 @@ export interface Member {
   invited_at: string | null;
   joined_at: string;
   me?: boolean;
+  /** May correct posted invoices and bills (transactions.edit), by role or a custom role's own choice. */
+  can_correct?: boolean;
 }
 
 /** Module 10: the custom report (rows by one grouping, columns by period). */
@@ -1811,6 +1819,10 @@ export const ledgerly = {
   applySupplierCredit: (creditId: string, body: { bill_id: string; amount: string }, ctx: RequestOptions) =>
     api<unknown>(`supplier-credits/${encodeURIComponent(creditId)}/apply`, { ...ctx, method: "POST", body }),
   bill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}`, ctx),
+  updateBill: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<BillDetail>(`bills/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  billHistory: (id: string, ctx: RequestOptions) => api<DocumentHistory>(`bills/${encodeURIComponent(id)}/history`, ctx),
+  invoiceHistory: (id: string, ctx: RequestOptions) => api<DocumentHistory>(`invoices/${encodeURIComponent(id)}/history`, ctx),
   createBill: (body: Record<string, unknown>, ctx: RequestOptions) => api<BillDetail>("bills", { ...ctx, method: "POST", body }),
   approveBill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}/approve`, { ...ctx, method: "POST" }),
   submitBill: (id: string, ctx: RequestOptions) => api<BillDetail>(`bills/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST" }),
