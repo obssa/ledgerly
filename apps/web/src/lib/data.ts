@@ -1557,8 +1557,8 @@ export interface ShellContext {
   companyNote: string;
   userName: string;
   demo: boolean;
-  /** Every company the person can switch to, the current one included. */
-  companies: { id: string; name: string }[];
+  /** Every company the person can switch to, the current one included; archived ones are read-only. */
+  companies: { id: string; name: string; archived?: boolean }[];
   companyId: string;
   organisationId: string | null;
 }
@@ -1598,7 +1598,7 @@ export async function getShellContext(): Promise<ShellContext> {
     companyNote: company.base_currency,
     userName: name ?? "",
     demo: false,
-    companies: data.map((c) => ({ id: c.id, name: c.trading_name ?? c.legal_name })),
+    companies: data.map((c) => ({ id: c.id, name: c.trading_name ?? c.legal_name, archived: c.status === "archived" })),
     companyId: company.id,
     organisationId: company.organisation_id,
   };

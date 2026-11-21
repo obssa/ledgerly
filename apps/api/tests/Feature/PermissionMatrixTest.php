@@ -186,6 +186,7 @@ final class PermissionMatrixTest extends TestCase
         'POST api/v1/invoices/{invoice}/share' => 'invoices.create',
         'GET api/v1/company/logo' => 'company.view',
         'POST api/v1/company/logo' => 'company.manage',
+        'POST api/v1/company/archive' => 'company.manage',
         'POST api/v1/company/logo/remove' => 'company.manage',
         'GET api/v1/quotes/{quote}/history' => 'invoices.view',
         'GET api/v1/sales-orders' => 'invoices.view',

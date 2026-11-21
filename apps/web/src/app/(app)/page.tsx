@@ -42,7 +42,8 @@ function lastMonths(today: string, count = 6): { label: string; from: string; to
 const sum = (...values: string[]) => toString(values.reduce((acc, v) => acc + parse(v), 0n));
 const greeting = (hour: number) => (hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening");
 
-export default async function OverviewPage() {
+export default async function OverviewPage({ searchParams }: PageProps<"/">) {
+  const { fresh } = await searchParams;
   const invoices = await getInvoices(); // first: decides demo mode for this request
   const demo = isDemoMode();
   const todayIso = demo ? "2026-11-02" : await getCompanyToday();
@@ -91,6 +92,11 @@ export default async function OverviewPage() {
         }
       />
 
+      {fresh === "1" && (
+        <p role="status" className="mb-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">
+          Fresh start: these books are new and empty. The previous company is archived, read-only, under Archived in the company switcher.
+        </p>
+      )}
       {kpis ? <KeyFigures k={kpis} /> : demo ? <DemoFigures /> : null}
 
       {!demo && (

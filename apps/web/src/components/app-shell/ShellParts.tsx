@@ -14,7 +14,8 @@ export async function PrintedCompany() {
 
 export async function CompanyBadge() {
   const { companyName, companyNote, companies, companyId, organisationId, demo } = await getShellContext();
-  const others = companies.filter((c) => c.id !== companyId);
+  const others = companies.filter((c) => c.id !== companyId && !c.archived);
+  const archived = companies.filter((c) => c.id !== companyId && c.archived);
 
   return (
     <details className="group w-full rounded-xl border border-[#23493f] bg-[#102e28] text-white">
@@ -36,6 +37,19 @@ export async function CompanyBadge() {
             <button type="submit" className="block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-side">{c.name}</button>
           </form>
         ))}
+        {archived.length > 0 && (
+          <details className="mt-1 border-t border-[#23493f] pt-1">
+            <summary className="cursor-pointer list-none rounded-md px-2 py-1.5 text-xs font-semibold text-[#a9bdb7] hover:bg-side [&::-webkit-details-marker]:hidden">
+              Archived ({archived.length})
+            </summary>
+            {archived.map((c) => (
+              <form key={c.id} action={switchCompany}>
+                <input type="hidden" name="company_id" value={c.id} />
+                <button type="submit" className="block w-full rounded-md px-2 py-1.5 text-left text-sm text-[#a9bdb7] hover:bg-side">{c.name} <span className="text-[11px]">· read-only</span></button>
+              </form>
+            ))}
+          </details>
+        )}
         {!demo && (
           <Link
             href={organisationId ? `/onboarding?organisation=${encodeURIComponent(organisationId)}` : "/onboarding"}
