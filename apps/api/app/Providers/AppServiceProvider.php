@@ -45,6 +45,11 @@ class AppServiceProvider extends ServiceProvider
         // demo account (config/demo.php) is counted per demo sign-in, so one visitor cannot use up the others' share.
         RateLimiter::for('api', function (Request $request) {
             $token = $request->user()?->currentAccessToken();
+            // The demo's sample books are written by the server itself (DemoSetup, FillDemoData) with a short-lived token
+            // that never leaves the server; those requests are not a visitor's and are not counted.
+            if ($token !== null && ($token->name ?? null) === 'demo-setup') {
+                return Limit::none();
+            }
             $key = $token !== null && ($token->name ?? null) === 'demo'
                 ? 'demo-token:' . $token->getKey()
                 : ($request->user()?->getAuthIdentifier() ?? ClientAddress::of($request));

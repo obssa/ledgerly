@@ -56,12 +56,10 @@ final class DemoSetup
             $say("Created the demo company {$company}.");
         }
 
-        $this->addPurchases($owner, $company, $say);
-        $this->addPaymentsMade($owner, $company, $say);
-        $this->addExpenses($owner, $company, $say);
-        $this->addSupplierCredit($owner, $company, $say);
-        $this->addInventory($owner, $company, $say);
-        $this->addStatement($owner, $company, $say);
+        // A demo company started fresh (101) stays empty until its owner fills it ("Fill with demo data").
+        if (! $owner->table('demo_fresh_starts')->where('company_id', $company)->exists()) {
+            $this->addSamples($owner, $company, $say);
+        }
 
         foreach ($roles as $role) {
             if ($owner->table('demo_accounts')->where('role', $role)->exists()) {
@@ -73,6 +71,36 @@ final class DemoSetup
             $say("Added the demo {$role}.");
         }
         $say('Demo sign-in is ready: ' . implode(', ', $roles) . '.');
+    }
+
+    /** Every part of the sample books a demo company is missing. */
+    private function addSamples(ConnectionInterface $db, string $company, callable $say): void
+    {
+        $this->addPurchases($db, $company, $say);
+        $this->addPaymentsMade($db, $company, $say);
+        $this->addExpenses($db, $company, $say);
+        $this->addSupplierCredit($db, $company, $say);
+        $this->addInventory($db, $company, $say);
+        $this->addStatement($db, $company, $say);
+    }
+
+    /**
+     * "Fill with demo data" (FillDemoData): the whole sample into an empty demo company, as its owner, from inside a
+     * tenant transaction on the application's own connection (no owner role at run time).
+     */
+    public function fill(string $company, string $ownerUserId): void
+    {
+        $user = User::query()->findOrFail($ownerUserId);
+        $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
+        $this->company = $company;
+        try {
+            $today = new DateTimeImmutable('today');
+            $row = DB::table('companies')->where('id', $company)->first(['calendar', 'fiscal_year_start_month']);
+            $this->books($today, (new FiscalCalendar((string) $row->calendar, (int) $row->fiscal_year_start_month))->yearContaining($today)['start']);
+        } finally {
+            $user->tokens()->where('name', 'demo-setup')->delete();
+        }
+        $this->addSamples(DB::connection(), $company, fn (string $m) => null);
     }
 
     private function newUser(ConnectionInterface $owner, string $role): string

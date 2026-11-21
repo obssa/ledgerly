@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
-import { getSession } from "@/lib/session";
+import { getSession, selectCompany } from "@/lib/session";
 import { settingsBody } from "@/lib/settings";
 
 /*
@@ -117,3 +117,29 @@ export async function setPeriodLock(_: FormState | undefined, form: FormData): P
   }
 }
 
+
+/** The demo's "Start fresh": a new, empty demo company; this session moves to it. */
+export async function demoStartFresh(): Promise<FormState> {
+  const ctx = await context();
+  let company: string;
+  try {
+    company = (await ledgerly.demoStartFresh(ctx)).company_id;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 422) return { error: (error.body as { message?: string }).message ?? "Not possible right now." };
+    return refusal(error);
+  }
+  await selectCompany(company);
+  redirect("/");
+}
+
+/** The demo's "Fill with demo data": the sample books, put in by the server in the next minute or two. */
+export async function demoFill(): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.demoFill(ctx);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 422) return { error: (error.body as { message?: string }).message ?? "Not possible right now." };
+    return refusal(error);
+  }
+  return { notice: "Filling with demo data. It is ready in a minute or two: refresh to see it." };
+}

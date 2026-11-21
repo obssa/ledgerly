@@ -1589,16 +1589,19 @@ export async function getShellContext(): Promise<ShellContext> {
       organisationId: null,
     };
   }
-  const { name, companyId } = await getSession();
+  const { name, companyId, demo } = await getSession();
   const { data } = await withApi(({ token }) => ledgerly.companies(token));
   const company: Company | undefined = data.find((c) => c.id === companyId);
   if (!company) redirect("/onboarding");
+  // The demo was started fresh by its owner: everyone in the demo goes on in the new demo company.
+  if (demo && company.status === "archived" && data.some((c) => c.status !== "archived")) redirect("/demo-company");
   return {
     companyName: company.trading_name ?? company.legal_name,
     companyNote: company.base_currency,
     userName: name ?? "",
     demo: false,
-    companies: data.map((c) => ({ id: c.id, name: c.trading_name ?? c.legal_name, archived: c.status === "archived" })),
+    // Earlier demo companies are not listed in the demo.
+    companies: data.filter((c) => !(demo && c.status === "archived")).map((c) => ({ id: c.id, name: c.trading_name ?? c.legal_name, archived: c.status === "archived" })),
     companyId: company.id,
     organisationId: company.organisation_id,
   };
