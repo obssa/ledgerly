@@ -1107,8 +1107,13 @@ export interface PaymentReceived {
 /** GET /reports/ar-ageing: open invoices by days overdue; each total is the customer's receivable balance. */
 export interface ArAgeing {
   as_of: string;
+  /** The company's currency, which every amount is in. */
+  currency?: string;
   rows: ({ contact_id: string; name: string } & Record<"current" | "days_1_30" | "days_31_60" | "days_61_90" | "over_90" | "credits" | "total", string>)[];
   totals: Record<"current" | "days_1_30" | "days_31_60" | "days_61_90" | "over_90" | "credits" | "total", string>;
+  /** The detail: every open invoice (or bill), oldest due first; `amount` is what is still due in the company's currency. */
+  documents?: { id: string; contact_id: string; number: string | null; reference: string | null; issue_date: string; due_date: string | null;
+    days_late: number; bucket: string; currency: string; total: string; amount_due: string; amount: string }[];
 }
 
 /** GET /customers/{id}/statement: the receivable account's lines for the customer, with a running balance. */

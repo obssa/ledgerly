@@ -30,12 +30,14 @@ final class ReceivablesReport
     {
         $payable = $documentType === 'bill';
         $open = DB::select(<<<'SQL'
-            SELECT d.contact_id,
+            SELECT d.contact_id, d.id, d.number, d.reference, d.issue_date::text AS issue_date, d.due_date::text AS due_date,
+                   d.currency, d.amount_due::text AS amount_due, d.total::text AS total,
                    greatest(?::date - coalesce(d.due_date, d.issue_date), 0) AS days,
                    round(d.amount_due * d.fx_rate, 2)::text AS amount
               FROM documents d
              WHERE d.company_id = ?::uuid AND d.type = ?
                AND d.status IN ('posted', 'part_paid') AND d.amount_due > 0
+             ORDER BY coalesce(d.due_date, d.issue_date), d.number
             SQL, [$asOf, $companyId, $payable ? 'bill' : 'invoice']);
 
         $ledger = collect(DB::select(<<<'SQL'
@@ -47,6 +49,7 @@ final class ReceivablesReport
 
         $zero = fn () => Money::zero($currency);
         $rows = [];
+        $documents = [];
         foreach ($open as $o) {
             $rows[$o->contact_id] ??= ['buckets' => array_fill_keys(self::BUCKETS, $zero())];
             $amount = Money::of($o->amount, $currency);
@@ -58,6 +61,10 @@ final class ReceivablesReport
                 default => 'over_90',
             };
             $rows[$o->contact_id]['buckets'][$bucket] = $rows[$o->contact_id]['buckets'][$bucket]->plus($amount);
+            // The detail: each open document, in the bucket its days late put it in.
+            $documents[] = ['id' => $o->id, 'contact_id' => $o->contact_id, 'number' => $o->number, 'reference' => $o->reference,
+                'issue_date' => $o->issue_date, 'due_date' => $o->due_date, 'days_late' => (int) $o->days, 'bucket' => $bucket,
+                'currency' => $o->currency, 'total' => $o->total, 'amount_due' => $o->amount_due, 'amount' => $amount->toDecimalString()];
         }
         foreach ($ledger as $contactId => $balance) {
             $rows[$contactId] ??= ['buckets' => array_fill_keys(self::BUCKETS, $zero())];
@@ -90,7 +97,7 @@ final class ReceivablesReport
         }
         usort($out, fn (array $a, array $b) => strcasecmp($a['name'], $b['name']));
 
-        return ['as_of' => $asOf, 'rows' => $out, 'totals' => array_map(fn (Money $m) => $m->toDecimalString(), $totals)];
+        return ['as_of' => $asOf, 'currency' => $currency, 'rows' => $out, 'totals' => array_map(fn (Money $m) => $m->toDecimalString(), $totals), 'documents' => $documents];
     }
 
     /**
