@@ -57,13 +57,13 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
         eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / {kind}</>}
         title={<>{kind} {invoice.number ? <span className="num">{invoice.number}</span> : "(draft)"} <span className="print:hidden"><Pill tone={status.tone}>{status.label}</Pill></span></>}
         actions={["posted", "part_paid", "paid"].includes(invoice.status)
-          ? <>{!creditNote && invoice.can.correct && !invoice.demo && <Link href={`/invoices/${encodeURIComponent(invoice.id)}/edit`} className="btn print:hidden">Correct</Link>}<a href={`/invoices/${encodeURIComponent(invoice.id)}/pdf`} className="btn print:hidden">Download PDF</a><PrintInvoice /></>
+          ? <>{!creditNote && invoice.can.correct && !invoice.demo && <Link href={`/invoices/${encodeURIComponent(invoice.id)}/edit`} className="btn print:hidden">Edit</Link>}<a href={`/invoices/${encodeURIComponent(invoice.id)}/pdf`} className="btn print:hidden">Download PDF</a><PrintInvoice /></>
           : !creditNote && invoice.can.edit && !invoice.demo && ["draft", "awaiting_approval"].includes(invoice.status)
             ? <Link href={`/invoices/${encodeURIComponent(invoice.id)}/edit`} className="btn print:hidden">Edit draft</Link> : undefined}
       />
       {corrected === "1" && (
         <p role="status" className="mb-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good print:hidden">
-          Correction saved. The original entry was reversed and the corrected one posted; the earlier version is in the history below.
+          Changes saved. The history below shows what changed, and the version before.
         </p>
       )}
       {/* On paper: who it is from (the page's own header and side panels are not printed). */}

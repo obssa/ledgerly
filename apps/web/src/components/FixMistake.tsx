@@ -42,18 +42,18 @@ export function FixMistake({ kind, doc }: { kind: "invoice" | "bill"; doc: Doc }
           </Option>
         )}
         {doc.status === "posted" && (doc.can.correct ? (
-          <Option title={`Correct this ${noun}`} action={<Link href={`${base}/edit`} className="btn btn-primary">Correct it</Link>}>
-            Change the lines, dates or amounts and say why. The original entry is reversed and the corrected one posted; the old version stays in the history.
+          <Option title={`Edit this ${noun}`} action={<Link href={`${base}/edit`} className="btn btn-primary">Edit</Link>}>
+            Change the lines, dates or amounts, say why, and save. The {noun} keeps its number; the history shows who changed what, and the version before.
           </Option>
         ) : doc.correct_blocked ? (
-          <Option title={`Correcting this ${noun} in place is not possible`}>{doc.correct_blocked}</Option>
+          <Option title={`This ${noun} cannot be edited as it is`}>{doc.correct_blocked}</Option>
         ) : (
-          <Option title={`Correct this ${noun}`}>
-            Only an Owner, Admin, Accountant or Bookkeeper, or a custom role with &quot;Correct posted invoices and bills&quot;, can correct a posted {noun}. Ask your admin.
+          <Option title={`Edit this ${noun}`}>
+            Only an Owner, Admin, Accountant or Bookkeeper, or a custom role with &quot;Edit posted invoices and bills&quot;, can edit a posted {noun}. Ask your admin.
           </Option>
         ))}
         {booked && doc.status !== "posted" && doc.correct_blocked && (
-          <Option title={`Correcting this ${noun} in place is not possible`}>{doc.correct_blocked}</Option>
+          <Option title={`This ${noun} cannot be edited as it is`}>{doc.correct_blocked}</Option>
         )}
         {booked && doc.can.credit && (
           <Option title={`Issue a ${creditWord}`} action={<Link href={creditHref} className="btn">{kind === "bill" ? "Record a supplier credit" : "Issue a credit note"}</Link>}>
@@ -62,7 +62,7 @@ export function FixMistake({ kind, doc }: { kind: "invoice" | "bill"; doc: Doc }
         )}
         {(draft || doc.status === "posted") && doc.can.void && (
           <Option title={`Void the whole ${noun}`}>
-            When it should never have existed and nothing is paid on it: use Void with a reason. Its entry is reversed and the number is kept.
+            When it should never have existed and nothing is paid on it: use Void with a reason. It no longer counts in the books; its number is kept.
           </Option>
         )}
         {kind === "invoice" && ["posted", "part_paid"].includes(doc.status) && (

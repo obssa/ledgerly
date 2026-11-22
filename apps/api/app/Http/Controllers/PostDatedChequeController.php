@@ -130,8 +130,11 @@ final class PostDatedChequeController extends Controller
         $this->authorizeCompany($this->permissionFor($cheque));
         $c = $this->held($cheque);
         $reason = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:300']])['reason'];
-        DB::table('post_dated_cheques')->where(['company_id' => $c->company_id, 'id' => $c->id, 'status' => 'held'])
+        $changed = DB::table('post_dated_cheques')->where(['company_id' => $c->company_id, 'id' => $c->id, 'status' => 'held'])
             ->update(['status' => 'cancelled', 'closed_on' => max($this->current->today(), (string) $c->handed_on), 'updated_at' => now()]);
+        if ($changed === 0) {   // presented or cancelled by someone else a moment ago: nothing is recorded
+            throw ValidationException::withMessages(['cheque' => ["Cheque {$c->cheque_number} was presented or cancelled already."]]);
+        }
         $this->audit->record($c->company_id, 'post_dated_cheque_cancelled', 'post_dated_cheque', $c->id, ['status' => 'held'], ['status' => 'cancelled'],
             reason: $reason, userId: $request->user()->getKey());
 

@@ -23,8 +23,8 @@ export default async function EditInvoicePage({ params }: PageProps<"/invoices/[
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / <Link href={back} className="hover:underline">{invoice.number ?? "Draft"}</Link> / {draft ? "Edit" : "Correct"}</>}
-        title={draft ? <>Edit invoice <Pill>Draft</Pill></> : <>Correct invoice <span className="num">{invoice.number}</span> <Pill tone="brand">Posted</Pill></>}
+        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / <Link href={back} className="hover:underline">{invoice.number ?? "Draft"}</Link> / Edit</>}
+        title={draft ? <>Edit invoice <Pill>Draft</Pill></> : <>Edit invoice <span className="num">{invoice.number}</span> <Pill tone="brand">Posted</Pill></>}
       />
       <InvoiceForm options={options} draft={invoice} />
     </>

@@ -81,6 +81,16 @@ final class QuoteWorkflow
 
     public function cancel(Document $document, string $userId, ?string $note = null): Document
     {
+        return DB::transaction(function () use ($document, $userId, $note) {
+            // Locked first: a bill, receipt or delivery made from it at the same moment waits, and is then seen here.
+            Document::query()->lockForUpdate()->findOrFail($document->getKey());
+
+            return $this->cancelLocked($document, $userId, $note);
+        });
+    }
+
+    private function cancelLocked(Document $document, string $userId, ?string $note): Document
+    {
         if (in_array($document->type, self::ORDERS, true) && $this->invoiced($document)) {
             $made = $document->type === 'purchase_order' ? 'bills' : 'invoices';
             throw new LedgerException(SaveQuote::noun((string) $document->type) . " {$document->number} has {$made} made from it: close it instead, and what is left is dropped.");

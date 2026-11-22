@@ -51,18 +51,21 @@ final class EditPostedInvoice
     {
         $credit = $invoice->type === 'bill' ? 'a supplier credit' : 'a credit note';
         if (! in_array($invoice->type, ['invoice', 'credit_note', 'bill'], true) || ! $invoice->isPosted()) {
-            return "Only posted invoices, credit notes and bills are corrected this way ({$invoice->number} is {$invoice->status}).";
+            return "Only posted invoices, credit notes and bills are edited this way ({$invoice->number} is {$invoice->status}).";
         }
         if ($invoice->opening) {
             return "{$invoice->number} was brought in from the old books: void it and enter it again with the right amount.";
         }
-        if (DB::table('stock_moves')->where(['company_id' => $invoice->company_id, 'document_id' => $invoice->getKey()])->exists()
-            || DB::table('bill_receipt_matches')->where(['company_id' => $invoice->company_id, 'bill_id' => $invoice->getKey()])->exists()
+        // Goods that moved on the document itself go back and move again with the edit (below). Goods that moved on a
+        // delivery note or a goods received note are that note's: the document is matched to it line by line.
+        if (DB::table('bill_receipt_matches')->where(['company_id' => $invoice->company_id, 'bill_id' => $invoice->getKey()])->exists()
             || DB::table('invoice_delivery_matches')->where(['company_id' => $invoice->company_id, 'invoice_id' => $invoice->getKey()])->exists()) {
-            return "{$invoice->number} moved stock: issue {$credit} for what was wrong, or void it and enter it again, so the bin card stays exact.";
+            $note = $invoice->type === 'bill' ? 'goods received note' : 'delivery note';
+
+            return "{$invoice->number} is matched to a {$note}: issue {$credit} for what was wrong, or void the {$note} and it first.";
         }
         if ($invoice->status !== 'posted') {
-            return "{$invoice->number} has a payment against it: issue {$credit} for the difference, or remove the payment first and then correct it.";
+            return "{$invoice->number} has a payment against it: issue {$credit} for the difference, or remove the payment first and then edit it.";
         }
         // Tax-authority rule: a registered e-invoice is corrected with a credit note and a new invoice.
         if (EInvoiceSubmission::query()->where('document_id', $invoice->getKey())->where('status', 'cleared')->exists()) {
@@ -72,10 +75,10 @@ final class EditPostedInvoice
             return "{$invoice->number} is being registered with the tax authority right now; try again when it has an answer.";
         }
         if (DB::table('invoice_retentions')->where('document_id', $invoice->getKey())->whereNull('released_on')->exists()) {
-            return "{$invoice->number} holds retention: release it before correcting the invoice.";
+            return "{$invoice->number} holds retention: release it before editing the invoice.";
         }
         if (DB::table('invoice_write_offs')->where('document_id', $invoice->getKey())->whereNull('reversed_on')->exists()) {
-            return "{$invoice->number} has a bad debt written off: reverse the write-off before correcting the invoice.";
+            return "{$invoice->number} has a bad debt written off: reverse the write-off before editing the invoice.";
         }
 
         return null;
@@ -89,6 +92,7 @@ final class EditPostedInvoice
         if (mb_strlen(trim($reason)) < 3) {
             throw new LedgerException('A reason is required to edit a posted document.');
         }
+        \App\Domain\Compliance\Jobs\SubmitEInvoice::holdFor($invoice);
 
         if (isset($data['number']) && $data['number'] !== '' && $data['number'] !== $invoice->number) {
             throw ValidationException::withMessages(['number' => ["{$invoice->number} is posted; its number never changes."]]);
@@ -150,12 +154,17 @@ final class EditPostedInvoice
             // 2. Reverse the original entry on its own date.
             $oldEntryId = $invoice->journal_entry_id;
             $reversal = $this->posting->reverse($oldEntryId, DateTimeImmutable::createFromInterface($invoice->issue_date), $userId);
+            // Its goods go back as they left (or leave as they came), then move again for the lines as edited (025).
+            $stock = app(\App\Domain\Inventory\DocumentStock::class);
+            $stock->onVoid($invoice, $company, DateTimeImmutable::createFromInterface($invoice->issue_date), $userId, editing: true);
 
             // 3. Apply the corrected lines and post the corrected entry.
             SaveInvoiceDraft::writeLines($invoice, $calc['lines']);
             $invoice->fill($calc['header']);
             $invoice->setRelation('lines', $invoice->lines()->get());
-            $corrected = $this->posting->post($this->approver->journalDraftFor($invoice), $userId);
+            $draft = $this->approver->journalDraftFor($invoice);
+            $stock->onPosting($invoice, $draft, $company, $userId);
+            $corrected = $this->posting->post($draft, $userId);
 
             $invoice->forceFill($calc['totals']);
             $invoice->amount_due = $newTotal->minus($paid)->toDecimalString();

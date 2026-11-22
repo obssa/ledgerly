@@ -359,12 +359,19 @@ final class DocumentStock
     }
 
     /** Undoes a voided document's stock moves, keeping the inventory account equal to the stock on hand. */
-    public function onVoid(Document $doc, Company $company, DateTimeImmutable $date, ?string $userId): void
+    public function onVoid(Document $doc, Company $company, DateTimeImmutable $date, ?string $userId, bool $editing = false): void
     {
         // A credit note's returned goods are undone like goods bought: they go out again at today's average.
         $moves = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $doc->getKey()])
             ->whereIn('kind', match ($doc->type) { 'credit_note' => ['sale_return'], 'vendor_credit' => ['purchase_return'], default => ['sale', 'purchase', 'price_adjustment'] })
             ->orderBy('seq')->get();
+        if ($editing) {
+            // A posted document edited more than once: only the moves of its latest posting are undone (the earlier
+            // ones were undone by the edit before, whose own moves end with a return).
+            $undone = DB::table('stock_moves')->where(['company_id' => $company->getKey(), 'document_id' => $doc->getKey()])
+                ->whereIn('kind', ['sale_return', 'purchase_return'])->max('seq');
+            $moves = $undone === null ? $moves : $moves->where('seq', '>', $undone)->values();
+        }
         if ($moves->isEmpty()) {
             return;
         }

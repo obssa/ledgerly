@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
+import { settleProblem, settledIn } from "@/lib/payments";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { paymentBody } from "@/lib/payments";
 import { getSession } from "@/lib/session";
@@ -28,6 +29,9 @@ function refusal(error: unknown): FormState {
 export async function receivePayment(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   let id: string;
+  const settled = settledIn(form);
+  const missing = settleProblem(settled, settled.length, form.get("keep_as_credit") === "on", "invoice");
+  if (missing) return { error: missing };
   try {
     id = (await ledgerly.receivePayment(paymentBody(form), ctx)).id;
   } catch (error) {

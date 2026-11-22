@@ -403,7 +403,7 @@ Artisan::command('ledgerly:expire-quotes', function (\App\Domain\Sales\Actions\Q
 | where the person sets a password and an authenticator; --deactivate switches the account off and ends its sign-ins.
 */
 Artisan::command('ledgerly:staff {email : the staff member\'s email} {--name= : their name (a new account)} {--resend : a new setup link}
-        {--deactivate : switch the account off} {--by=operator : who is doing this}', function () {
+        {--deactivate : switch the account off} {--reactivate : with --resend, switch a deactivated account on again} {--by=operator : who is doing this}', function () {
     $db = DB::connection('owner');
     $email = mb_strtolower(trim((string) $this->argument('email')));
     if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
@@ -441,6 +441,10 @@ Artisan::command('ledgerly:staff {email : the staff member\'s email} {--name= : 
         $id = (string) \Illuminate\Support\Str::uuid7();
         $db->table('staff_users')->insert(['id' => $id, 'email' => $email, 'name' => $name, ...$fields]);
         $action = 'account_created';
+    } elseif ($this->option('resend') && ! $staff->active && ! $this->option('reactivate')) {
+        $this->error('That staff account is switched off. Add --reactivate to switch it on again with a new setup link.');
+
+        return 1;
     } elseif ($this->option('resend')) {
         $id = $staff->id;
         $db->table('staff_users')->where('id', $id)->update(['active' => true, 'password' => null, 'mfa_secret' => null, 'mfa_last_step' => null, ...$fields]);

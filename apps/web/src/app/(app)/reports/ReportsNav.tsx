@@ -13,7 +13,7 @@ const CYCLE: { stage: string; reports: [string, string][] }[] = [
   { stage: "Inventory and assets", reports: [["Inventory valuation", "/reports/inventory-valuation"], ["Stock movement", "/reports/stock-movement"],
     ["Stock ageing (slow-moving)", "/reports/stock-ageing"], ["Bin cards", "/inventory"], ["Fixed asset register", "/fixed-assets"]] },
   { stage: "Tax", reports: [["VAT return worksheet", "/tax"], ["Withholding register", "/tax?kind=withholding"]] },
-  { stage: "Audit", reports: [["Audit log", "/audit"]] },
+  { stage: "Audit", reports: [["Changes: who changed what", "/reports/changes"], ["Audit log", "/audit"]] },
   { stage: "Saved", reports: [["Saved and scheduled reports", "/reports/saved"]] },
   { stage: "Management", reports: [["Financial health", "/reports/financial-health"], ["Profit by location, class or project", "/reports/profit-by-dimension"], ["Profit by tag", "/reports/by-tag"], ["Custom report", "/reports/custom"],
     ["Project profitability", "/projects"], ["Review queue", "/journal/review"]] },

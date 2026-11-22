@@ -423,11 +423,11 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             )}
           </Card>
         ) : correcting ? (
-          <Card label="Correcting a posted document" className="border-brand/40 bg-brand-tint/40">
-            <h2 className="text-[17px] font-bold">Correcting a posted {words.noun}</h2>
+          <Card label="Editing a posted document" className="border-brand/40 bg-brand-tint/40">
+            <h2 className="text-[17px] font-bold">Editing a posted {words.noun}</h2>
             <p className="mt-1.5 text-[13px] text-muted">
-              Ledgerly reverses the original entry and posts the corrected one, on the same date. The {words.noun} keeps its number, and the
-              version before this change is kept in its history with your name, the time and the reason.
+              Change what is wrong and save: the books and every report show the new figures. The {words.noun} keeps its number, and its
+              history keeps the version before this change with your name, the time and the reason.
             </p>
             <dl className="num mt-3 text-[13px]">
               {words.posting.map(([label, amount]) => (
@@ -469,7 +469,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             ) : revision ? (
               <button type="submit" name="intent" value="draft" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save the revision"}</button>
             ) : correcting ? (
-              <button type="submit" name="intent" value="correct" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save the correction"}</button>
+              <button type="submit" name="intent" value="correct" className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : "Save changes"}</button>
             ) : quote ? (
               <>
                 <button type="submit" name="intent" value="draft" className="btn" disabled={pending}>Save draft</button>

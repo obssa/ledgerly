@@ -7,7 +7,7 @@ const row = (action: string, before: unknown, after: unknown): HistoryAuditRow =
 
 describe("document history", () => {
   it("names each kind of event in words", () => {
-    expect(actionLabel("edited_after_posting")).toBe("Corrected after posting");
+    expect(actionLabel("edited_after_posting")).toBe("Edited");
     expect(actionLabel("posted")).toBe("Approved and posted");
     expect(actionLabel("something_new")).toBe("Something new");
   });

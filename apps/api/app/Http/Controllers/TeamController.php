@@ -66,7 +66,11 @@ final class TeamController extends Controller
             $userId = DB::selectOne('SELECT app_user_id_for_invite(?) AS id', [$email])->id;
             if ($userId !== null) {
                 $status = DB::table('memberships')->where(['company_id' => $this->current->id(), 'user_id' => $userId])->value('status');
-                if ($status !== null) {
+                $old = DB::table('memberships')->where(['company_id' => $this->current->id(), 'user_id' => $userId])->value('id');
+                if ($status === 'deactivated' && $this->neverJoined((string) $old)) {
+                    // An invitation withdrawn before it was accepted: it is dropped (its links go with it) and made anew.
+                    DB::table('memberships')->where(['company_id' => $this->current->id(), 'id' => $old])->delete();
+                } elseif ($status !== null) {
                     throw ValidationException::withMessages(['email' => [$status === 'deactivated'
                         ? 'This person was deactivated here: reactivate them instead.' : 'This person is already in the company, or invited.']]);
                 }
@@ -152,6 +156,10 @@ final class TeamController extends Controller
         if ($m->status !== 'deactivated') {
             throw ValidationException::withMessages(['membership' => ['Only someone deactivated is reactivated.']]);
         }
+        // Someone invited who never accepted has not joined: making them active would skip their consent.
+        if ($this->neverJoined((string) $m->id)) {
+            throw ValidationException::withMessages(['membership' => ['They never accepted the invitation, which was withdrawn: invite them again.']]);
+        }
         $this->change($m, ['status' => 'active'], 'member_reactivated', $request);
 
         return response()->json($this->member($m->id));
@@ -215,6 +223,14 @@ final class TeamController extends Controller
             str_contains(strtolower($message), 'owner') => 'A company always keeps at least one active owner.',
             default => 'This change is not allowed.',
         };
+    }
+
+    /** Invited, and no invitation link of theirs was ever used: the person has not joined the company. */
+    private function neverJoined(string $membershipId): bool
+    {
+        $links = DB::table('invitation_tokens')->where('membership_id', $membershipId);
+
+        return (clone $links)->exists() && ! (clone $links)->whereNotNull('used_at')->exists();
     }
 
     private function find(string $id): object

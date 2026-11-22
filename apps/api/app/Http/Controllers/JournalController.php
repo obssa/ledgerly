@@ -39,12 +39,18 @@ final class JournalController extends Controller
             'source' => ['nullable', 'string', 'max:40', 'regex:/^[a-z_]+$/'],
             'search' => ['nullable', 'string', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1', 'max:10000'],
+            // An edited document shows as its entry as it stands now. With this, the entries each edit replaced (and the
+            // entries that cancel them) are listed too: they are always kept.
+            'earlier' => ['nullable', 'boolean'],
         ]);
         $companyId = $this->current->id();
+        $replaced = fn () => DB::table('document_versions')->where('company_id', $companyId)->whereNotNull('journal_entry_id')->select('journal_entry_id');
         $page = (int) ($q['page'] ?? 1);
         $rows = DB::table('journal_entries as e')
             ->leftJoin('users as u', 'u.id', '=', 'e.posted_by')
             ->where('e.company_id', $companyId)
+            ->when(! ($q['earlier'] ?? false), fn ($b) => $b->whereNotIn('e.id', $replaced())
+                ->where(fn ($w) => $w->where('e.source_type', '!=', 'reversal')->orWhereNotIn('e.source_id', $replaced())))
             ->when($q['from'] ?? null, fn ($b, $v) => $b->where('e.entry_date', '>=', $v))
             ->when($q['to'] ?? null, fn ($b, $v) => $b->where('e.entry_date', '<=', $v))
             ->when($q['source'] ?? null, fn ($b, $v) => $b->where('e.source_type', $v))

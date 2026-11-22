@@ -93,3 +93,22 @@ function safe(value: string): bigint {
     return 0n;
   }
 }
+
+/**
+ * A payment recorded while invoices (or bills) are open must say what it settles: an empty Settle column would
+ * leave them all unpaid and the money as credit. Keeping it all as credit is a choice made on purpose (a tick).
+ * Returns what to tell the person, or null when the payment can be saved.
+ */
+export function settleProblem(settled: string[], openCount: number, keepAsCredit: boolean, kind: "invoice" | "bill"): string | null {
+  if (openCount === 0 || keepAsCredit) return null;
+  const any = settled.some((v) => /[1-9]/.test(v.replace(/[,\s]/g, "")));
+  if (any) return null;
+  return kind === "invoice"
+    ? "Fill in the Settle column first: type how much of this payment goes to each invoice, or click \"Settle oldest first\". Left empty, no invoice would be marked as paid."
+    : "Fill in the Pay column first: type how much of this payment goes to each bill, or click \"Spread the amount\". Left empty, no bill would be marked as paid.";
+}
+
+/** The Settle values of a submitted payment form (fields named alloc:<id>). */
+export function settledIn(form: FormData): string[] {
+  return [...form.entries()].filter(([k]) => k.startsWith("alloc:")).map(([, v]) => String(v));
+}

@@ -49,6 +49,34 @@ final class StockDocumentsTest extends TestCase
             ->assertCreated()->json('id');
     }
 
+    public function test_a_posted_invoice_with_stock_is_edited_and_the_stock_follows(): void
+    {
+        config(['einvoicing.force_sandbox' => false]);   // not registered, so it can be edited
+        $this->app->forgetInstance(\App\Domain\Compliance\ConnectorRegistry::class);   // built with the sandbox during the fixtures
+        $id = $this->invoice('5');
+        $this->postJson("/api/v1/invoices/{$id}/approve", [], $this->h)->assertOk();
+        $this->assertSame(['15.00', '750.00'], $this->onHand());
+        $this->getJson("/api/v1/invoices/{$id}", $this->h)->assertOk()->assertJsonPath('correct_blocked', null)->assertJsonPath('can.correct', true);
+
+        // 5 sold becomes 8 sold: three more bags leave, at their cost.
+        $this->putJson("/api/v1/invoices/{$id}", ['reason' => 'Eight bags were delivered, not five', 'contact_id' => $this->c['contact'], 'issue_date' => '2026-11-09',
+            'currency' => 'ETB', 'warehouse_id' => $this->c['store'],
+            'lines' => [['description' => 'Roasted coffee', 'quantity' => '8', 'unit_price' => '1150', 'account_id' => $this->c['sales'], 'item_id' => $this->c['stock_item']]]], $this->h)
+            ->assertOk()->assertJsonPath('total', '9200.00');
+        $this->assertSame(['12.00', '600.00'], $this->onHand());
+        $this->assertSame('600.00', $this->balance('1300'), 'the inventory account equals the stock on hand');
+        $this->assertSame([], $this->owner()->select('select * from ledger_verify(?)', [$this->c['company']]));
+
+        // And back down to 2: six bags return.
+        $version = $this->getJson("/api/v1/invoices/{$id}", $this->h)->json('lock_version');
+        $this->putJson("/api/v1/invoices/{$id}", ['reason' => 'Only two in the end', 'lock_version' => $version, 'contact_id' => $this->c['contact'], 'issue_date' => '2026-11-09',
+            'currency' => 'ETB', 'warehouse_id' => $this->c['store'],
+            'lines' => [['description' => 'Roasted coffee', 'quantity' => '2', 'unit_price' => '1150', 'account_id' => $this->c['sales'], 'item_id' => $this->c['stock_item']]]], $this->h)
+            ->assertOk()->assertJsonPath('total', '2300.00');
+        $this->assertSame(['18.00', '900.00'], $this->onHand());
+        $this->assertSame('900.00', $this->balance('1300'));
+    }
+
     public function test_bought_on_a_bill_and_sold_on_an_invoice_the_ledger_follows_the_stock(): void
     {
         // 10 more at 60.00 + VAT; the company is not VAT-registered, so the VAT is part of the cost: 690.00.

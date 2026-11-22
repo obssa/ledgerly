@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
+import { settleProblem, settledIn } from "@/lib/payments";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { paymentBody } from "@/lib/payments";
 import { batchBody } from "@/lib/batchPayments";
@@ -52,6 +53,9 @@ export async function payBills(_: FormState | undefined, form: FormData): Promis
   const ctx = await context();
   let id: string;
   let cashWarning = false;
+  const settled = settledIn(form);
+  const missing = settleProblem(settled, settled.length, form.get("keep_as_credit") === "on", "bill");
+  if (missing) return { error: missing };
   try {
     const paid = await ledgerly.payBills(paymentBody(form, "bill"), ctx);
     id = paid.id;

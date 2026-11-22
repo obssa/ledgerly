@@ -49,7 +49,7 @@ export async function createInvoice(_: FormState | undefined, form: FormData): P
     const reason = text(form, "reason");
     // A posted invoice is corrected with a reason (the API reverses and reposts, and keeps the old version).
     if (draft && form.get("intent") === "correct" && (!reason || reason.trim().length < 3)) {
-      return { error: "Say why it is being corrected: the reason is kept with the old version.", fields: { reason: ["Required"] } };
+      return { error: "Say why it is being changed: the reason is kept in the history.", fields: { reason: ["Required"] } };
     }
     id = draft
       ? (await ledgerly.updateInvoice(draft, { ...body, ...(Number.isInteger(version) && version > 0 ? { lock_version: version } : {}), ...(form.get("intent") === "correct" ? { reason } : {}) }, ctx)).id
@@ -247,5 +247,5 @@ export async function invoiceAction(_: FormState | undefined, form: FormData): P
     return refusal(error);
   }
   refresh();
-  return { notice: action === "approve" ? "Posted." : action === "submit" ? "Sent for approval." : "Voided. The number is kept and the entry reversed." };
+  return { notice: action === "approve" ? "Posted." : action === "submit" ? "Sent for approval." : "Voided. It no longer counts in the books; the number is kept." };
 }

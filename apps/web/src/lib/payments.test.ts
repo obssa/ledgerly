@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocateOldestFirst, paymentBody, paymentTotals, suggestedWithholding, withholdingBasis } from "./payments";
+import { allocateOldestFirst, paymentBody, paymentTotals, settleProblem as problemOf, suggestedWithholding, withholdingBasis } from "./payments";
 
 const form = (entries: [string, string][]) => {
   const f = new FormData();
@@ -63,5 +63,18 @@ describe("cheque numbers", () => {
     const base: [string, string][] = [["contact_id", "s1"], ["account_id", "bank"], ["payment_date", "2026-11-10"], ["currency", "ETB"], ["amount", "50"], ["cheque_number", "000101"]];
     expect(paymentBody(form([...base, ["method", "cheque"]]), "bill")).toMatchObject({ method: "cheque", cheque_number: "000101" });
     expect(paymentBody(form([...base, ["method", "bank_transfer"]]), "bill")).not.toHaveProperty("cheque_number");
+  });
+});
+
+
+describe("a payment says what it settles", () => {
+  it("refuses an empty Settle column while invoices are open", () => {
+    expect(problemOf(["", ""], 2, false, "invoice")).toMatch(/Fill in the Settle column/);
+    expect(problemOf(["0", "0.00"], 2, false, "bill")).toMatch(/Fill in the Pay column/);
+  });
+  it("accepts a settled amount, a deliberate credit, or nothing open", () => {
+    expect(problemOf(["", "1,150.00"], 2, false, "invoice")).toBeNull();
+    expect(problemOf(["", ""], 2, true, "invoice")).toBeNull();
+    expect(problemOf([], 0, false, "invoice")).toBeNull();
   });
 });

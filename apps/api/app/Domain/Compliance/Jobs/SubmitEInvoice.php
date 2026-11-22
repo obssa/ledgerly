@@ -17,6 +17,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -59,6 +60,47 @@ final class SubmitEInvoice implements ShouldQueue, ShouldBeUnique
      * therefore be idempotent on the document id (authorities de-duplicate on the invoice number).
      */
     public function handle(ConnectorRegistry $registry, CurrentCompany $current): void
+    {
+        // One at a time per invoice: while it is being sent, it is not corrected or voided (EditPostedInvoice and
+        // InvoiceWorkflow take the same lock), so what the authority registers is what the books say.
+        $documentId = $this->inTenant($current, fn () => EInvoiceSubmission::query()->whereKey($this->submissionId)->value('document_id'));
+        $lock = Cache::lock(self::lockKey((string) $documentId), 180);
+        if (! $lock->get()) {
+            $this->release(20);
+
+            return;
+        }
+        try {
+            $this->send($registry, $current);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Called before a posted invoice is corrected or voided: refused while it is being sent, and no sending starts
+     * until this change is committed (or rolled back).
+     */
+    public static function holdFor(\App\Domain\Sales\Models\Document $document): void
+    {
+        $lock = Cache::lock(self::lockKey((string) $document->getKey()), 30);
+        if (! $lock->get()) {
+            throw new \App\Domain\Ledger\Exceptions\LedgerException("{$document->number} is being registered with the tax authority right now; try again in a minute.");
+        }
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit(fn () => $lock->release());
+            DB::afterRollBack(fn () => $lock->release());
+        } else {
+            $lock->release();
+        }
+    }
+
+    public static function lockKey(string $documentId): string
+    {
+        return "einvoice-in-flight:{$documentId}";
+    }
+
+    private function send(ConnectorRegistry $registry, CurrentCompany $current): void
     {
         $prepared = $this->inTenant($current, function (Company $company) use ($registry) {
             $submission = EInvoiceSubmission::query()->with('document')->findOrFail($this->submissionId);

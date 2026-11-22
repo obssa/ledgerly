@@ -45,7 +45,7 @@ export async function createBill(_: FormState | undefined, form: FormData): Prom
     const version = Number(text(form, "lock_version"));
     const reason = text(form, "reason");
     if (existing && correcting && (!reason || reason.trim().length < 3)) {
-      return { error: "Say why it is being corrected: the reason is kept with the old version.", fields: { reason: ["Required"] } };
+      return { error: "Say why it is being changed: the reason is kept in the history.", fields: { reason: ["Required"] } };
     }
     id = existing
       ? (await ledgerly.updateBill(existing, { ...body, ...(Number.isInteger(version) && version > 0 ? { lock_version: version } : {}), ...(correcting ? { reason } : {}) }, ctx)).id
@@ -78,7 +78,7 @@ export async function billAction(_: FormState | undefined, form: FormData): Prom
     return refusal(error);
   }
   refresh();
-  return { notice: action === "approve" ? "Posted." : action === "submit" ? "Sent for approval." : "Voided. The number is kept and the entry reversed." };
+  return { notice: action === "approve" ? "Posted." : action === "submit" ? "Sent for approval." : "Voided. It no longer counts in the books; the number is kept." };
 }
 
 /** A draft supplier credit for a posted bill; it opens on its own page, where it is approved like a bill. */

@@ -20,6 +20,10 @@ final class AuditLogController extends Controller
     {
     }
 
+    /** What the Changes report lists: a document changed after it was made, cancelled or credited. */
+    private const DOCUMENT_CHANGES = ['edited_after_posting', 'draft_saved', 'voided', 'credit_note_created', 'supplier_credit_created',
+        'bad_debt_written_off', 'bad_debt_reversed', 'period_reopened'];
+
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('audit.view');
@@ -31,6 +35,7 @@ final class AuditLogController extends Controller
             'subject_type' => ['nullable', 'string', 'max:60', 'regex:/^[a-z_]+$/'],
             'subject_id' => ['nullable', 'uuid'],
             'before_id' => ['nullable', 'integer', 'min:1'],
+            'group' => ['nullable', 'in:document_changes'],   // the Changes report: edits, voids and credits of documents
         ]);
         $companyId = $this->current->id();
         $rows = DB::table('audit_log as a')->leftJoin('users as u', 'u.id', '=', 'a.user_id')->where('a.company_id', $companyId)
@@ -40,17 +45,22 @@ final class AuditLogController extends Controller
             ->when($q['action'] ?? null, fn ($b, $v) => $b->where('a.action', $v))
             ->when($q['subject_type'] ?? null, fn ($b, $v) => $b->where('a.subject_type', $v))
             ->when($q['subject_id'] ?? null, fn ($b, $v) => $b->where('a.subject_id', $v))
+            ->when(($q['group'] ?? null) === 'document_changes', fn ($b) => $b->whereIn('a.action', self::DOCUMENT_CHANGES))
             ->when($q['before_id'] ?? null, fn ($b, $v) => $b->where('a.id', '<', $v))
             ->orderByDesc('a.id')->limit(101)
             ->get(['a.id', 'a.created_at', 'a.user_id', 'u.name as user_name', 'a.actor_type', 'a.action', 'a.subject_type', 'a.subject_id', 'a.before', 'a.after',
                 'a.reason', 'a.ip', 'a.device']);
         $decode = fn ($v) => $v === null ? null : json_decode((string) $v, true);
+        // The documents the rows are about, named (number and kind), so a row links to its invoice or bill.
+        $documents = DB::table('documents')->where('company_id', $companyId)->whereIn('id', $rows->pluck('subject_id')->filter()->unique()->all())
+            ->get(['id', 'type', 'number', 'reference'])->keyBy('id')->map(fn ($d) => ['id' => $d->id, 'type' => $d->type, 'number' => $d->number ?? $d->reference]);
 
         return response()->json([
             'data' => $rows->take(100)->map(fn ($r) => [
                 'id' => (int) $r->id, 'at' => $r->created_at, 'user' => $r->user_id ? ['id' => $r->user_id, 'name' => $r->user_name] : null,
                 'actor_type' => $r->actor_type, 'action' => $r->action, 'subject_type' => $r->subject_type, 'subject_id' => $r->subject_id,
                 'before' => $decode($r->before), 'after' => $decode($r->after), 'reason' => $r->reason, 'ip' => $r->ip, 'device' => $r->device,
+                'document' => $documents[$r->subject_id] ?? null,
             ])->values(),
             'more' => $rows->count() > 100,
             'next_before_id' => $rows->count() > 100 ? (int) $rows->take(100)->last()->id : null,
