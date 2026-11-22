@@ -3,6 +3,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { getArAgeing } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ExportLink } from "../ReportsNav";
+import { AgeingDetail, AgeingViews } from "../AgeingDetail";
 
 export const metadata = { title: "AR ageing" };
 
@@ -13,24 +14,28 @@ const COLUMNS = [
 
 /** What customers owe by how late it is. Each customer's total is their balance on the receivable account. */
 export default async function ArAgeingPage({ searchParams }: PageProps<"/reports/ar-ageing">) {
-  const { as_of } = await searchParams;
+  const { as_of, view } = await searchParams;
+  const detail = view === "detail";
   const asOf = typeof as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(as_of) ? as_of : undefined;
   const ageing = await getArAgeing(asOf);
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Receivables</>} title="AR ageing" actions={<ExportLink report="ar-ageing" params={{ as_of: asOf }} />} />
+      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Receivables</>} title={detail ? "AR ageing detail" : "AR ageing summary"} actions={<ExportLink report="ar-ageing" params={{ as_of: asOf }} />} />
       {ageing === null ? (
         <Card><p className="text-sm text-muted">Not available in the demo.</p></Card>
       ) : (
         <>
+          <AgeingViews base="/reports/ar-ageing" asOf={asOf} detail={detail} />
           <form className="mb-4 flex flex-wrap items-end gap-2.5">
+            {detail && <input type="hidden" name="view" value="detail" />}
             <div>
               <label className="field-label" htmlFor="as_of">Days late counted at</label>
               <input className="field" id="as_of" name="as_of" type="date" defaultValue={ageing.as_of} />
             </div>
             <button type="submit" className="btn">Show</button>
           </form>
+          {detail ? <AgeingDetail ageing={ageing} kind="invoice" baseCurrency={ageing.currency ?? ""} /> : (
           <Card className="!p-2" label="AR ageing">
             <div className="overflow-x-auto">
               <table className="tbl">
@@ -64,6 +69,7 @@ export default async function ArAgeingPage({ searchParams }: PageProps<"/reports
               </table>
             </div>
           </Card>
+          )}
           <p className="mt-3 text-[13px] text-muted">Amounts in the company&apos;s currency, each invoice at its own rate. The total equals the receivable account in the trial balance.</p>
         </>
       )}

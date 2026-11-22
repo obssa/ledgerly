@@ -49,6 +49,12 @@ final class ReceivablesReportTest extends TestCase
         $this->assertSame('700.00', $ar['debit'], 'the ageing total is the receivable account');
 
         $this->getJson('/api/v1/reports/ar-ageing?as_of=2027-03-01', $this->h)->assertJsonPath('rows.0.over_90', '1000.00');
+        // The detail: each open invoice with its days late and bucket; together they are the buckets of the summary.
+        $late = $this->getJson('/api/v1/reports/ar-ageing?as_of=2027-03-01', $this->h)->assertOk();
+        $documents = collect($late->json('documents'));
+        $this->assertGreaterThan(0, $documents->count());
+        $this->assertSame($late->json('totals.over_90'), number_format((float) $documents->where('bucket', 'over_90')->sum(fn ($d) => (float) $d['amount']), 2, '.', ''));
+        $this->assertTrue($documents->every(fn ($d) => $d['number'] !== null && $d['days_late'] >= 0 && isset($d['issue_date'], $d['amount_due'])));
     }
 
     public function test_the_statement_lists_every_movement_with_a_running_balance(): void

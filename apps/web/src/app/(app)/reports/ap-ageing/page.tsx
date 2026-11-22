@@ -3,6 +3,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { getApAgeing } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ExportLink } from "../ReportsNav";
+import { AgeingDetail, AgeingViews } from "../AgeingDetail";
 
 export const metadata = { title: "AP ageing" };
 
@@ -13,24 +14,28 @@ const COLUMNS = [
 
 /** What the company owes suppliers by how late it is. Each supplier's total is their balance on accounts payable. */
 export default async function ApAgeingPage({ searchParams }: PageProps<"/reports/ap-ageing">) {
-  const { as_of } = await searchParams;
+  const { as_of, view } = await searchParams;
+  const detail = view === "detail";
   const asOf = typeof as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(as_of) ? as_of : undefined;
   const ageing = await getApAgeing(asOf);
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Payables</>} title="AP ageing" actions={<ExportLink report="ap-ageing" params={{ as_of: asOf }} />} />
+      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Payables</>} title={detail ? "AP ageing detail" : "AP ageing summary"} actions={<ExportLink report="ap-ageing" params={{ as_of: asOf }} />} />
       {ageing === null ? (
         <Card><p className="text-sm text-muted">Not available in the demo.</p></Card>
       ) : (
         <>
+          <AgeingViews base="/reports/ap-ageing" asOf={asOf} detail={detail} />
           <form className="mb-4 flex flex-wrap items-end gap-2.5">
+            {detail && <input type="hidden" name="view" value="detail" />}
             <div>
               <label className="field-label" htmlFor="as_of">Days late counted at</label>
               <input className="field" id="as_of" name="as_of" type="date" defaultValue={ageing.as_of} />
             </div>
             <button type="submit" className="btn">Show</button>
           </form>
+          {detail ? <AgeingDetail ageing={ageing} kind="bill" baseCurrency={ageing.currency ?? ""} /> : (
           <Card className="!p-2" label="AP ageing">
             <div className="overflow-x-auto">
               <table className="tbl">
@@ -64,6 +69,7 @@ export default async function ApAgeingPage({ searchParams }: PageProps<"/reports
               </table>
             </div>
           </Card>
+          )}
           <p className="mt-3 text-[13px] text-muted">Amounts in the company&apos;s currency, each bill at its own rate. The total equals accounts payable in the trial balance.</p>
         </>
       )}
