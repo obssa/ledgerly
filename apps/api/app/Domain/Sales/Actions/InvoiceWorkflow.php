@@ -49,6 +49,7 @@ final class InvoiceWorkflow
     public function void(Document $invoice, string $reason, string $userId, Membership $membership): Document
     {
         $company = $this->current->get();
+        \App\Domain\Compliance\Jobs\SubmitEInvoice::holdFor($invoice);
 
         return DB::transaction(function () use ($invoice, $reason, $userId, $membership, $company) {
             $invoice = Document::query()->lockForUpdate()->findOrFail($invoice->getKey());

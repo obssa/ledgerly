@@ -53,11 +53,11 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
         title={<>{kind} {bill.number ? <span className="num">{bill.number}</span> : "(draft)"} <Pill tone={status.tone}>{status.label}</Pill></>}
         actions={credit || bill.demo ? undefined
           : ["draft", "awaiting_approval"].includes(bill.status) && bill.can.edit ? <Link href={`/bills/${encodeURIComponent(bill.id)}/edit`} className="btn">Edit draft</Link>
-          : bill.can.correct ? <Link href={`/bills/${encodeURIComponent(bill.id)}/edit`} className="btn">Correct</Link> : undefined}
+          : bill.can.correct ? <Link href={`/bills/${encodeURIComponent(bill.id)}/edit`} className="btn">Edit</Link> : undefined}
       />
       {corrected === "1" && (
         <p role="status" className="mb-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">
-          Correction saved. The original entry was reversed and the corrected one posted; the earlier version is in the history.
+          Changes saved. The history below shows what changed, and the version before.
         </p>
       )}
       {posted === "0" && bill.status !== "posted" && (

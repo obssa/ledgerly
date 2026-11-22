@@ -129,8 +129,8 @@ final class TeamTest extends TestCase
         $this->postJson("/api/v1/members/{$bk}/resend", [], $this->h)->assertOk();
         Notification::assertSentToTimes(User::query()->where('email', 'bk@example.test')->sole(), InvitationToJoin::class, 2);
         $this->postJson("/api/v1/members/{$bk}/deactivate", [], $this->h)->assertOk()->assertJsonPath('status', 'deactivated');
-        $this->postJson('/api/v1/members/invitations', ['email' => 'bk@example.test', 'role' => 'sales'], $this->h)->assertUnprocessable()->assertJsonValidationErrors('email');
-        $this->postJson("/api/v1/members/{$bk}/reactivate", [], $this->h)->assertOk()->assertJsonPath('status', 'active');
+        // Withdrawn before it was accepted: not someone to reactivate (they never joined); they are invited again.
+        $this->postJson("/api/v1/members/{$bk}/reactivate", [], $this->h)->assertUnprocessable()->assertJsonValidationErrors('membership');
 
         // The owner makes the admin an owner too, then steps down to admin: the company keeps an owner throughout.
         $this->actingAs($this->me, 'sanctum');
@@ -158,6 +158,19 @@ final class TeamTest extends TestCase
         $this->getJson("/api/v1/auth/invitation?token={$token}")->assertNotFound();   // a withdrawn invitation's link is dead
         $this->getJson('/api/v1/auth/invitation?token=' . str_repeat('a', 64))->assertNotFound();
         $this->getJson('/api/v1/auth/invitation?token=short')->assertUnprocessable();
+    }
+
+    public function test_a_withdrawn_invitation_is_invited_again_not_reactivated(): void
+    {
+        $m = $this->postJson('/api/v1/members/invitations', ['email' => 'kebede@example.test', 'name' => 'Kebede', 'role' => 'viewer'], $this->h)->assertCreated()->json('id');
+        $this->postJson("/api/v1/members/{$m}/deactivate", [], $this->h)->assertOk()->assertJsonPath('status', 'deactivated');
+        // Never accepted: reactivating would make them a member without their consent.
+        $this->postJson("/api/v1/members/{$m}/reactivate", [], $this->h)->assertUnprocessable()->assertJsonValidationErrors('membership');
+        $this->assertSame('deactivated', $this->owner()->table('memberships')->where('id', $m)->value('status'));
+        // Invited again: a new invitation, waiting for them to accept.
+        $again = $this->postJson('/api/v1/members/invitations', ['email' => 'kebede@example.test', 'name' => 'Kebede', 'role' => 'viewer'], $this->h)->assertCreated()->assertJsonPath('status', 'invited')->json('id');
+        $this->assertNotSame($m, $again);
+        $this->assertNull($this->owner()->table('memberships')->where('id', $m)->first());
     }
 
     public function test_the_team_list_says_who_may_correct_posted_documents(): void

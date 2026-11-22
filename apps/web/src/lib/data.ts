@@ -75,7 +75,7 @@ export async function getCurrencies(): Promise<Currencies> {
 }
 
 /** Entries of the books, newest first, 50 a page. */
-export async function getJournal(q: { from?: string; to?: string; source?: string; search?: string; page?: string }): Promise<{ data: JournalRow[]; page: number; more: boolean; can: { create: boolean }; demo: boolean }> {
+export async function getJournal(q: { from?: string; to?: string; source?: string; search?: string; page?: string; earlier?: string }): Promise<{ data: JournalRow[]; page: number; more: boolean; can: { create: boolean }; demo: boolean }> {
   await connection();
   if (isDemoMode()) return { data: [], page: 1, more: false, can: { create: false }, demo: true };
   return { ...(await withApi((ctx) => ledgerly.journal(q, ctx))), demo: false };

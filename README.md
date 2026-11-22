@@ -113,13 +113,13 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 
 - **Database: 138 checks pass on PostgreSQL 13, 16 and 18** as the restricted app role: 134 guard checks (T1–T127) and 4
   two-session concurrency checks (C1–C4).
-- **API: 407 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
+- **API: 409 tests pass.** `PermissionMatrixTest` calls every company route as every role (SECURITY.md S4). Feature tests build the schema as the owner and run every request as
   `ledgerly_web`, so row-level security applies (SECURITY.md S1). `TenantIsolationTest` covers every company route with
   company B's ids in the header, URL and body, and tests row-level security and the Eloquent scope each on its own;
   removing either one fails the suite.
 - **Shared hosting**: the feature tests also pass on PostgreSQL 13 with the role layout of the cPanel account (no role
   creation, `public` writable by everyone, tables in their own schema), in CI on every pull request.
-- **Web: 138 unit tests, lint (0 errors), production build.** The menu, the tabs across each section, the breadcrumb, the
+- **Web: 140 unit tests, lint (0 errors), production build.** The menu, the tabs across each section, the breadcrumb, the
   "+ New" menu and the Ctrl+K search all read one list (`apps/web/src/lib/navigation.ts`); a test checks every entry is a
   page that exists.
 - **Production images** build and run: the API image migrated a database as the owner, served sign-up and company setup as

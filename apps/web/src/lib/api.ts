@@ -1315,6 +1315,8 @@ export interface AuditEntry {
   reason: string | null;
   ip: string | null;
   device: string | null;
+  /** The invoice, bill or credit the entry is about, when it is one. */
+  document?: { id: string; type: string; number: string | null } | null;
 }
 
 export interface AuditLog {
@@ -1662,7 +1664,7 @@ export const ledgerly = {
   addExchangeRate: (body: { currency: string; rate_date: string; rate: string }, ctx: RequestOptions) =>
     api<{ id: string }>("exchange-rates", { ...ctx, method: "POST", body }),
   accounts: (ctx: RequestOptions) => api<{ data: Account[] }>("accounts", ctx),
-  journal: (q: { from?: string; to?: string; source?: string; search?: string; page?: string }, ctx: RequestOptions) =>
+  journal: (q: { from?: string; to?: string; source?: string; search?: string; page?: string; earlier?: string }, ctx: RequestOptions) =>
     api<{ data: JournalRow[]; page: number; more: boolean; can: { create: boolean } }>("journal-entries", { ...ctx, query: q }),
   journalEntry: (id: string, ctx: RequestOptions) => api<JournalDetail>(`journal-entries/${encodeURIComponent(id)}`, ctx),
   postJournal: (body: Record<string, unknown>, ctx: RequestOptions) => api<JournalDetail | { request: JournalRequest }>("journal-entries", { ...ctx, method: "POST", body }),

@@ -119,6 +119,7 @@ export const SECTIONS: NavSection[] = [
       { href: "/reports/ap-ageing", label: "AP ageing", keywords: "payables aged creditors" },
       { href: "/reports/cash-forecast", label: "Cash forecast", keywords: "13 week cash outlook" },
       { href: "/reports/financial-health", label: "Financial health", keywords: "ratios kpi" },
+      { href: "/reports/changes", label: "Changes", keywords: "edits who changed what history corrections audit" },
       { href: "/reports/sales", label: "Sales analysis", keywords: "by customer by product", tabHidden: true },
       { href: "/reports/purchases", label: "Purchases analysis", keywords: "by supplier", tabHidden: true },
       { href: "/reports/changes-in-equity", label: "Changes in equity", keywords: "equity statement", tabHidden: true },

@@ -20,18 +20,18 @@ export default async function TeamPage() {
           <Card className="mb-4" label="Invite someone">
             <InviteForm roles={team.roles} grantable={team.grantable} />
           </Card>
-          <Card className="mb-4 border-brand/30 bg-brand-tint/40" label="Who can correct posted documents">
-            <h2 className="text-[15px] font-bold">Who can correct posted invoices and bills</h2>
+          <Card className="mb-4 border-brand/30 bg-brand-tint/40" label="Who can edit posted documents">
+            <h2 className="text-[15px] font-bold">Who can edit posted invoices and bills</h2>
             <p className="mt-1 text-[13px] text-muted">
-              Owners, admins, accountants and bookkeepers can. To let someone else correct them, change their role below to Accountant or Bookkeeper, or
-              choose Custom and tick &quot;Correct posted invoices and bills&quot;. Every correction keeps the earlier version and records who made it, when and why;
+              Owners, admins, accountants and bookkeepers can. To let someone else edit them, change their role below to Accountant or Bookkeeper, or
+              choose Custom and tick &quot;Edit posted invoices and bills&quot;. Every edit keeps the earlier version and records who made it, when and why;
               every role change is in the audit log. Once the books are closed for a period, only owners and admins can change anything in it.
             </p>
           </Card>
           <Card className="!p-2" label="People">
             <div className="overflow-x-auto">
               <table className="tbl">
-                <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Can correct posted documents</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+                <thead><tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Can edit posted documents</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
                 <tbody>
                   {team.data.map((m) => (
                     <tr key={m.id} className="align-top">

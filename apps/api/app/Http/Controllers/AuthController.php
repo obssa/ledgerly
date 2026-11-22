@@ -109,6 +109,21 @@ final class AuthController extends Controller
             'recovery_code' => ['required_without:code', 'nullable', 'string', 'max:30'],
         ]);
 
+        // One request at a time per challenge: a code and a recovery code sent together cannot both sign in.
+        $turn = Cache::lock('mfa-turn:' . self::challengeKey($data['challenge']), 10);
+        if (! $turn->get()) {
+            throw ValidationException::withMessages(['code' => ['This sign-in is being checked already. Try again.']])->status(429);
+        }
+        try {
+            return $this->finishMfa($request, $mfa, $data);
+        } finally {
+            $turn->release();
+        }
+    }
+
+    /** @param array{challenge: string, code?: ?string, recovery_code?: ?string} $data */
+    private function finishMfa(Request $request, Mfa $mfa, array $data): JsonResponse
+    {
         $userId = Cache::get(self::challengeKey($data['challenge']));
         $user = $userId ? User::query()->find($userId) : null;
         if (! $user || ! $user->mfa_enabled) {

@@ -17,6 +17,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
     source: typeof q.source === "string" && /^[a-z_]+$/.test(q.source) ? q.source : undefined,
     search: typeof q.search === "string" && q.search.trim() ? q.search.trim().slice(0, 100) : undefined,
     page: typeof q.page === "string" && /^\d{1,4}$/.test(q.page) ? q.page : undefined,
+    earlier: q.earlier === "1" ? "1" : undefined,
   };
   const [journal, requests] = await Promise.all([getJournal(filters), getJournalRequests()]);
   const pageHref = (page: number) => `/journal?${new URLSearchParams(Object.entries({ ...filters, page: String(page) }).filter(([, v]) => v) as [string, string][]).toString()}`;
@@ -54,6 +55,9 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
           <select className="field" id="source" name="source" defaultValue={filters.source ?? ""}>{SOURCES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         </div>
         <div><label className="field-label" htmlFor="search">Memo contains</label><input className="field" id="search" name="search" defaultValue={filters.search} /></div>
+        <label className="flex h-[42px] items-center gap-2 text-sm" title="An edited invoice or bill shows as its entry as it stands now. Tick to list the entries each edit replaced as well; they are always kept.">
+          <input type="checkbox" name="earlier" value="1" defaultChecked={filters.earlier === "1"} className="size-4" /> Show earlier entries of edited documents
+        </label>
         <button type="submit" className="btn">Show</button>
       </form>
       <Card className="!p-2" label="Entries">

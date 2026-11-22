@@ -43,7 +43,7 @@ const ACTIONS: Record<string, string> = {
   submitted_for_approval: "Sent for approval",
   approval_rejected: "Sent back from approval",
   posted: "Approved and posted",
-  edited_after_posting: "Corrected after posting",
+  edited_after_posting: "Edited",
   voided: "Voided",
   invoice_emailed: "Emailed to the customer",
   invoice_shared: "Shared by WhatsApp",
@@ -59,7 +59,7 @@ const ACTIONS: Record<string, string> = {
   attachment_removed: "Attachment removed",
 };
 
-/** "edited_after_posting" → "Corrected after posting"; anything unknown in plain words. */
+/** "edited_after_posting" → "Edited"; anything unknown in plain words. */
 export function actionLabel(action: string): string {
   return ACTIONS[action] ?? (action.charAt(0).toUpperCase() + action.slice(1)).replace(/_/g, " ");
 }

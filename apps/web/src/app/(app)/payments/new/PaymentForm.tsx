@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
 import type { ReceiveOptions } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { allocateOldestFirst, paymentTotals } from "@/lib/payments";
+import { allocateOldestFirst, paymentTotals, settleProblem } from "@/lib/payments";
 import { receivePayment } from "../actions";
 import { todayIn } from "@/lib/dates";
 
@@ -27,11 +27,25 @@ export function PaymentForm({ options }: { options: ReceiveOptions & { customer:
   const [withholding, setWithholding] = useState("");
   const [alloc, setAlloc] = useState<string[]>(invoices.map(() => ""));
   const totals = paymentTotals(amount, withholding, alloc);
+  const [keepAsCredit, setKeepAsCredit] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  // Submitted by hand: the fields keep what was typed when a save is refused, and an empty Settle column is caught first.
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const missing = settleProblem(alloc, invoices.length, keepAsCredit, "invoice");
+    setProblem(missing);
+    if (missing) {
+      e.currentTarget.querySelector<HTMLInputElement>('input[name^="alloc:"]')?.focus();
+      return;
+    }
+    const data = new FormData(e.currentTarget);
+    startTransition(() => action(data));
+  };
   const bad = (name: string) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k === name || k.startsWith(`${name}.`)));
 
   return (
-    <form action={action} noValidate className="flex flex-col gap-4">
-      {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
+    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      {(problem ?? state?.error) && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{problem ?? state?.error}</p>}
       <input type="hidden" name="contact_id" value={options.customer.id} />
       <input type="hidden" name="currency" value={currency} />
 
@@ -80,7 +94,7 @@ export function PaymentForm({ options }: { options: ReceiveOptions & { customer:
                     <td className="num">{inv.due_date ?? "—"}</td>
                     <td className="num text-right">{formatAmount(inv.amount_due)}</td>
                     <td className="text-right">
-                      <input aria-label={`Settle ${inv.number}`} inputMode="decimal" className="field num ml-auto w-[130px] text-right" name={`alloc:${inv.id}`}
+                      <input aria-label={`Settle ${inv.number}`} inputMode="decimal" className={`field num ml-auto w-[130px] text-right ${problem ? "!border-bad" : ""}`} name={`alloc:${inv.id}`}
                         value={alloc[i]} onChange={(e) => setAlloc((a) => a.map((v, j) => (j === i ? e.target.value : v)))} />
                     </td>
                   </tr>
@@ -94,6 +108,12 @@ export function PaymentForm({ options }: { options: ReceiveOptions & { customer:
             <button type="button" className="btn" onClick={() => setAlloc(allocateOldestFirst(totals.settles, invoices.map((i) => i.amount_due)))}>
               Settle oldest first
             </button>
+          )}
+          {invoices.length > 0 && (
+            <label className="flex items-center gap-2 text-[13px]">
+              <input type="checkbox" name="keep_as_credit" className="size-4" checked={keepAsCredit} onChange={(e) => { setKeepAsCredit(e.target.checked); setProblem(null); }} />
+              Settle nothing now: keep it all as the customer&apos;s credit
+            </label>
           )}
           <dl className="ml-auto flex gap-5">
             <div><dt className="text-muted">Settles</dt><dd className="num font-semibold">{formatAmount(totals.settles)}</dd></div>

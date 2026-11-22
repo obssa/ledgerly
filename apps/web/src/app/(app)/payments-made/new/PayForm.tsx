@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
 import type { PayOptions } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { allocateOldestFirst, paymentTotals, suggestedWithholding, withholdingBasis } from "@/lib/payments";
+import { allocateOldestFirst, paymentTotals, settleProblem, suggestedWithholding, withholdingBasis } from "@/lib/payments";
 import { payBills } from "../actions";
 import { todayIn } from "@/lib/dates";
 
@@ -30,6 +30,20 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
   const [method, setMethod] = useState("bank_transfer");
   const [alloc, setAlloc] = useState<string[]>(bills.map(() => ""));
   const totals = paymentTotals(amount, withholding, alloc);
+  const [keepAsCredit, setKeepAsCredit] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  // Submitted by hand: the fields keep what was typed when a save is refused, and an empty Settle column is caught first.
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const missing = settleProblem(alloc, bills.length, keepAsCredit, "bill");
+    setProblem(missing);
+    if (missing) {
+      e.currentTarget.querySelector<HTMLInputElement>('input[name^="alloc:"]')?.focus();
+      return;
+    }
+    const data = new FormData(e.currentTarget);
+    startTransition(() => action(data));
+  };
   const basis = withholdingBasis(alloc, bills);
   const suggestion = advice?.applies ? suggestedWithholding(advice.rate, basis, advice.services_above) : "";
   // Exact decimals: the amount less the limit, positive when over it.
@@ -48,8 +62,8 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
   };
 
   return (
-    <form action={action} noValidate className="flex flex-col gap-4">
-      {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
+    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      {(problem ?? state?.error) && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{problem ?? state?.error}</p>}
       <input type="hidden" name="contact_id" value={options.supplier.id} />
       <input type="hidden" name="currency" value={currency} />
 
@@ -70,7 +84,7 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
                     <td className={`num ${b.due_date !== null && b.due_date < today ? "font-semibold text-bad" : ""}`}>{b.due_date ?? "—"}</td>
                     <td className="num text-right">{formatAmount(b.amount_due)}</td>
                     <td className="text-right">
-                      <input aria-label={`Pay ${b.number}`} inputMode="decimal" className="field num ml-auto w-[130px] text-right" name={`alloc:${b.id}`}
+                      <input aria-label={`Pay ${b.number}`} inputMode="decimal" className={`field num ml-auto w-[130px] text-right ${problem ? "!border-bad" : ""}`} name={`alloc:${b.id}`}
                         value={alloc[i]} onChange={(e) => setAlloc((a) => a.map((v, j) => (j === i ? e.target.value : v)))} />
                     </td>
                   </tr>
@@ -85,6 +99,12 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
               <button type="button" className="btn" onClick={payAll}>Pay all, with withholding</button>
               <button type="button" className="btn" onClick={() => setAlloc(allocateOldestFirst(totals.settles, bills.map((b) => b.amount_due)))}>Spread the amount</button>
             </div>
+          )}
+          {bills.length > 0 && (
+            <label className="flex items-center gap-2 text-[13px]">
+              <input type="checkbox" name="keep_as_credit" className="size-4" checked={keepAsCredit} onChange={(e) => { setKeepAsCredit(e.target.checked); setProblem(null); }} />
+              Pay no bill now: keep it all as an advance to the supplier
+            </label>
           )}
           <dl className="ml-auto flex gap-5">
             <div><dt className="text-muted">Settles</dt><dd className="num font-semibold">{formatAmount(totals.settles)}</dd></div>
