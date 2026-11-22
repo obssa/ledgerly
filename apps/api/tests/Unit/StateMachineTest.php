@@ -20,7 +20,7 @@ final class StateMachineTest extends TestCase
         $schema = dirname(__DIR__, 2) . '/database/schema';
         $sql = (string) file_get_contents($schema . '/006_state_machines.sql');
         // Later files add transitions with their own INSERT INTO state_transitions (056: a confirmed order is cancelled).
-        foreach (glob($schema . '/0*.sql') as $file) {
+        foreach (glob($schema . '/[0-9][0-9][0-9]_*.sql') as $file) {
             if (basename($file) !== '006_state_machines.sql' && preg_match_all('/INSERT INTO state_transitions\b[^;]*;/', (string) file_get_contents($file), $more)) {
                 $sql .= "\n" . implode("\n", $more[0]);
             }

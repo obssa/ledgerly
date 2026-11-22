@@ -107,6 +107,11 @@ final class ProjectController extends Controller
         $p = $this->load($project);
         $data = $this->validated($request, false);
         $companyId = $this->current->id();
+        // The database refuses the same moves (102); said here in words.
+        $from = DB::table('projects')->where(['company_id' => $companyId, 'dimension_id' => $p->id])->lockForUpdate()->value('status');
+        if ($from !== null && $from !== $data['status'] && ! app(\App\Support\StateMachine::class)->can('project', $from, $data['status'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['status' => ["A {$from} project is reopened (made active) first; it cannot go straight to " . str_replace('_', ' ', $data['status']) . '.']]);
+        }
         DB::table('dimensions')->where(['company_id' => $companyId, 'id' => $p->id])
             ->update(['name' => $data['name'], 'is_active' => in_array($data['status'], self::OPEN, true), 'updated_at' => now()]);
         $exists = DB::table('projects')->where(['company_id' => $companyId, 'dimension_id' => $p->id])->exists();

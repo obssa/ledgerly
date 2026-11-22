@@ -92,4 +92,19 @@ return [
         'excluded' => ['imported'],
         'reconciled' => ['matched', 'categorised'],
     ],
+
+    // Project (102). A finished project is reopened to active before anything else.
+    'project' => [
+        '' => ['active', 'on_hold', 'completed', 'cancelled'],
+        'active' => ['on_hold', 'completed', 'cancelled'],
+        'on_hold' => ['active', 'completed', 'cancelled'],
+        'completed' => ['active'],
+        'cancelled' => ['active'],
+    ],
+
+    // Lease (102). ended is final.
+    'lease' => [
+        '' => ['active'],
+        'active' => ['ended'],
+    ],
 ];
