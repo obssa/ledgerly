@@ -5363,6 +5363,59 @@ END $$;
 SELECT set_config('app.user_id', '00000000-0000-0000-0000-0000000000c1', false),
        set_config('app.company_id', '00000000-0000-0000-0000-00000000000c', false) \gset ignore_
 
+-- T128: lifecycle guards (102). A finished project is reopened before anything else, an ended lease stays ended, a
+-- recovery code or email link once used stays used, an authenticator step never goes back, and a recurring
+-- template's count only goes up. Access Co (company C) as its owner c1.
+DO $$
+DECLARE
+  co constant uuid := '00000000-0000-0000-0000-00000000000c';
+  me constant uuid := '00000000-0000-0000-0000-0000000000c1';
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', co::text, true), set_config('app.user_id', me::text, true);
+    IF state_transition_allowed('project', 'completed', 'on_hold') OR state_transition_allowed('project', 'cancelled', 'completed')
+       OR NOT state_transition_allowed('project', 'completed', 'active') OR NOT state_transition_allowed('project', 'active', 'on_hold') THEN
+      RAISE EXCEPTION 'FAIL T128a: the project moves are not the ones allowed';
+    END IF;
+    IF state_transition_allowed('lease', 'ended', 'active') OR NOT state_transition_allowed('lease', 'active', 'ended') THEN
+      RAISE EXCEPTION 'FAIL T128b: an ended lease could be made active again';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'projects_state_machine')
+       OR NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'leases_state_machine') THEN
+      RAISE EXCEPTION 'FAIL T128c: projects or leases are not held to their state machine';
+    END IF;
+
+    INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (me, 't128-code');
+    UPDATE user_recovery_codes SET used_at = now() WHERE code_hash = 't128-code';
+    BEGIN
+      UPDATE user_recovery_codes SET used_at = NULL WHERE code_hash = 't128-code';
+      RAISE EXCEPTION 'FAIL T128d: a used recovery code was made usable again';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    INSERT INTO user_email_tokens (user_id, purpose, token_hash, expires_at) VALUES (me, 'reset_password', 't128-link', now() + interval '1 hour');
+    UPDATE user_email_tokens SET used_at = now() WHERE token_hash = 't128-link';
+    BEGIN
+      UPDATE user_email_tokens SET used_at = NULL WHERE token_hash = 't128-link';
+      RAISE EXCEPTION 'FAIL T128e: a used email link was made usable again';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    UPDATE users SET mfa_last_step = 100 WHERE id = me;
+    BEGIN
+      UPDATE users SET mfa_last_step = 99 WHERE id = me;
+      RAISE EXCEPTION 'FAIL T128f: an authenticator step went back';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      UPDATE users SET mfa_last_step = NULL WHERE id = me;
+      RAISE EXCEPTION 'FAIL T128g: an authenticator step was cleared with the same secret';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    UPDATE users SET mfa_secret = 'another-secret', mfa_confirmed_at = NULL, mfa_last_step = NULL WHERE id = me;   -- enrolling again starts over
+    RAISE EXCEPTION 'T128 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T128 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T128 projects and leases follow their state machines; used codes and links stay used; an authenticator step never goes back';
+END $$;
+
 -- T127: a fresh start of the demo (101). Only the demo's owner starts it, at most once a minute, never written by the
 -- application directly; the old demo company must be archived first; then every demo account is a member of the new
 -- company with its role and the demo accounts point there; a start is finished once. Access Co (company C) as the demo:
