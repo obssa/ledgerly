@@ -38,7 +38,8 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
                 <span className="num">{formatAmount(f.overdue.payables)}</span> to suppliers.
               </p>
             )}
-            <div className="overflow-x-auto">
+            {/* Wider than a laptop screen: a keyboard stop, so it can be scrolled sideways without a mouse. */}
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Cash forecast by week">
               <table className="tbl">
                 <thead>
                   <tr><th scope="col">Week</th><th scope="col" className="!text-right">From customers</th><th scope="col" className="!text-right">Cheques in</th>
