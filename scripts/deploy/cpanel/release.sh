@@ -30,6 +30,11 @@ IFS= read -r OWNER_PASSWORD || true
 BUNDLE="$ROOT/incoming/ledgerly-$SHA.tar.gz"
 [ -f "$BUNDLE" ] || { echo "No upload at $BUNDLE"; exit 1; }
 
+# How much of the account's process limit is in use (shared with bakery-ops): counts by program name only, never
+# arguments, so nothing private reaches the deploy log. When this nears the limit, nothing new can start.
+echo "== Processes on this account: $(ps -u "$(id -un)" --no-headers 2>/dev/null | wc -l) (limit $(ulimit -u))"
+ps -u "$(id -un)" -o comm= 2>/dev/null | sort | uniq -c | sort -rn | head -8 || true
+
 REL="$ROOT/releases/$SHA"
 echo "== Unpack $SHA"
 rm -rf "$REL" && mkdir -p "$REL"
@@ -91,6 +96,9 @@ ln -sfn "$REL" "$ROOT/current.next" && mv -Tf "$ROOT/current.next" "$ROOT/curren
 [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$REL" ] && printf '%s\n' "$PREVIOUS" > "$ROOT/shared/previous-release"
 mkdir -p "$WEB_APP_ROOT/tmp" && touch "$WEB_APP_ROOT/tmp/restart.txt"   # the Node.js app restarts on its next request
 "$PHP" artisan queue:restart --no-interaction || true                    # cron workers pick up the new code
+
+echo "== Cron jobs"
+LEDGERLY_ROOT="$ROOT" PHP_BIN="$PHP" bash "$ROOT/deploy/cron.sh" || echo "WARNING: the cron jobs were not checked"
 
 echo "== Keep the newest $KEEP releases"
 find "$ROOT/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP + 1)) | cut -d' ' -f2- |

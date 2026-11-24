@@ -120,25 +120,9 @@ grep -q '^LEDGERLY_WEB_URL=' "$ROOT/shared/web.env" || printf 'LEDGERLY_WEB_URL=
 
 [ -f "$ROOT/deploy/web-app.js" ] && cp "$ROOT/deploy/web-app.js" "$WEB_APP_ROOT/app.js"
 
-# The crontab is shared with every other app on this cPanel account (bakery-ops). Lines are only ever appended;
-# nothing else in it is changed, and if it cannot be read for any reason other than "there is none yet", it is
-# left alone, so a read failure can never wipe another app's jobs. A copy is kept before the first change.
-add_cron() {
-  local current
-  if ! current="$(crontab -l 2>&1)"; then
-    case "$current" in
-      *"no crontab"*) current="" ;;
-      *) echo "Could not read the crontab ($current): not touching it. Add this line by hand: $1"; return 1 ;;
-    esac
-  fi
-  # Already there? Compared by the command, not the whole line: this host rewrites a line when it is saved
-  # (it puts `sleep $((RANDOM % 60)) &&` in front, to spread load), and an exact match would add it again.
-  grep -qF -- "${1#\* \* \* \* \* }" <<<"$current" && return 0
-  [ -f "$ROOT/shared/crontab.before-ledgerly" ] || printf '%s\n' "$current" > "$ROOT/shared/crontab.before-ledgerly"
-  if [ -n "$current" ]; then printf '%s\n%s\n' "$current" "$1"; else printf '%s\n' "$1"; fi | crontab -
-  echo "cron: $1"
-}
-add_cron "* * * * * cd $ROOT/current/api && $PHP artisan schedule:run >/dev/null 2>&1"
-add_cron "* * * * * cd $ROOT/current/api && $PHP artisan queue:work --stop-when-empty --max-time=50 --tries=3 >/dev/null 2>&1"
+# Ledgerly's two cron jobs (scheduler, queue). The crontab is shared with every other app on this cPanel account
+# (bakery-ops): cron.sh adds Ledgerly's lines or brings older ones up to date and changes no other line, and leaves
+# the crontab alone if it cannot be read. Each job runs at most once at a time and for a bounded time.
+LEDGERLY_ROOT="$ROOT" PHP_BIN="$PHP" bash "$ROOT/deploy/cron.sh"
 
 echo "Provisioned $ROOT"

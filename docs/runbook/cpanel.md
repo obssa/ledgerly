@@ -12,7 +12,7 @@ PostgreSQL before the first paying customer; `deploy.yml` already publishes cont
 | https://ledgerly.orcamind.dev | Web app (Next.js server) | cPanel *Setup Node.js App*: Node 22, app root `~/ledgerly-web`, startup file `app.js` |
 | https://ledgerly-api.orcamind.dev | API (Laravel) | subdomain, document root `~/ledgerly/current/api/public`, PHP 8.3 through `shared/api.htaccess` (the account default is 8.1) |
 | PostgreSQL 13 | `orcamiib_ledgerly`, schema `ledgerly` | owner login `orcamiib_lowner` (deploy only), app login `orcamiib_lweb` |
-| cron | `schedule:run` and `queue:work` every minute | no Redis or long-running workers on shared hosting |
+| cron | `schedule:run` and `queue:work` every minute, each under `flock -n` (one at a time) and `timeout` (55 and 10 minutes at most) | no Redis or long-running workers on shared hosting; a run that never ends must not be joined by another every minute |
 | Email | confirmation and password-reset links, from `no-reply@orcamind.dev` | the server's `sendmail` (`MAIL_MAILER=sendmail` in `shared/api.env`); the domain publishes SPF and DKIM for this server |
 | Demo sign-in | one button per role on the sign-in page, into a shared demo company | repository variable `DEMO_LOGINS` (`true`/`false`): each deploy writes it to `shared/api.env` and, when on, runs `ledgerly:demo-setup` as the owner (SECURITY.md, Demo sign-in) |
 
@@ -38,7 +38,7 @@ Both apps run under the same cPanel account (`orcamiib`). What keeps them apart,
 | Database | `orcamiib_ledgerly` (logins `_lowner`, `_lweb`) | its own | no: separate database and logins; nothing in Ledgerly names another database, and pg_hba lets each login into its own database only |
 | Deploy | this repository, its own SSH key and secrets | its own repository and key | no: either key can be revoked alone |
 | PHP version | 8.3 | 8.3 | no: the account default is 8.1 and each app picks its version with an `AddHandler` line in its own `.htaccess` (bakery-ops in `public/.htaccess`, Ledgerly through `shared/api.htaccess`, added to every release). Leave the account default alone |
-| Crontab | 2 lines appended | its own lines | **yes, one file**. `provision.sh` only appends, keeps a copy in `shared/crontab.before-ledgerly`, and touches nothing if the crontab cannot be read. The host rewrites each saved line to start with `sleep $((RANDOM % 60)) &&`; `provision.sh` recognises its lines by their command, so running it again adds nothing |
+| Crontab | 2 lines | its own lines | **yes, one file**. `cron.sh` (run by `provision.sh` and every release) adds Ledgerly's two lines or brings older ones up to date, and changes no other line. It keeps a copy in `shared/crontab.before-ledgerly` (first change) and `shared/crontab.previous` (last change), and touches nothing if the crontab cannot be read or `flock`/`timeout` are missing. The host rewrites each saved line to start with `sleep $((RANDOM % 60)) &&`; lines are recognised by their command, so running it again changes nothing |
 | CPU, memory, processes | Node.js app, PHP requests, cron | the same | **yes, one account quota** (CloudLinux LVE). Check cPanel → *Resource Usage* after the first week; if either app hits the limits, that is the moment to move Ledgerly to its own server |
 | PostgreSQL server | one database on it | possibly one too | the server, not the data; advisory locks and row-level security are per database |
 
@@ -109,3 +109,17 @@ Done once; the deploy needs all of it. **Status (15 Nov 2026): all done; live.**
 | Logs | `~/ledgerly/shared/storage/logs/laravel-*.log`; Node.js app log in cPanel → Setup Node.js App |
 | Which release is live? | `cat ~/ledgerly/current/REVISION` |
 | Change a setting | edit `~/ledgerly/shared/api.env`, then `php artisan config:cache` in `current/api` |
+
+### When the account runs out of processes
+
+Symptom: the deploy fails with `fork: Resource temporarily unavailable` or `Connection reset by peer` right after
+connecting, and SSH logs in but cannot run anything. The site may keep answering (its processes are already running).
+The limit is the whole account's, shared with bakery-ops, so the cause can be either app.
+
+1. cPanel → *Resource Usage*: the *Number of processes* (NPROC) and *Entry processes* graphs show when it filled up;
+   its snapshot lists the processes at the time.
+2. Free the account. Either ask the host to end this account's stuck processes, or in cPanel turn off the two
+   Ledgerly lines under *Cron Jobs* for a few minutes and restart the app under *Setup Node.js App*.
+3. Re-run the failed deploy (Actions → deploy → Re-run failed jobs). Each release prints the process count by program
+   name at its start (`== Processes on this account`), and `cron.sh` puts the cron lines back as they should be.
+
