@@ -3,7 +3,7 @@ import type { DocumentHistory } from "./history";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
-import type { BankPaymentFile, Bin, LeaseDetail, LeaseRegister, Tag, TagKind, TagReport, TransactionTags, DonorReport, IndustryTemplates, DirectCashFlow, FinancialNotes, ItemAssembly, ExpenseClaim, ExpenseClaimList, PurchaseRequisition, RequisitionList, InvoiceWriteOffs, LateInterestPreview, PriceList, PriceListDetail } from "./api";
+import type { BankPaymentFile, Bin, LeaseDetail, LeaseRegister, Tag, TagKind, TagReport, TransactionTags, DonorReport, IndustryTemplates, DirectCashFlow, FinancialNotes, ItemAssembly, ExpenseClaim, ExpenseClaimList, PurchaseRequisition, RequisitionList, InvoiceWriteOffs, LateInterestPreview, PriceList, PriceListDetail, ScheduledPayments, ScheduledPaymentDetail } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
@@ -1186,6 +1186,34 @@ export async function getPaymentsMade(): Promise<PaymentReceived[]> {
   await connection();
   if (isDemoMode()) return [];
   return (await withApi((ctx) => ledgerly.paymentsMade(ctx))).data;
+}
+
+/** Module 3: scheduled supplier payments (103), those still to pay first. */
+export async function getScheduledPayments(status?: "scheduled" | "paid" | "cancelled"): Promise<ScheduledPayments | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  return withApi((ctx) => ledgerly.scheduledPayments({ status }, ctx));
+}
+
+/** For confirming a scheduled payment: what the country's rules say about withholding on it, and the base currency. */
+export async function getConfirmContext(supplierId: string): Promise<{ advice: WithholdingAdvice | null; baseCurrency: string }> {
+  await connection();
+  if (isDemoMode()) return { advice: null, baseCurrency: "ETB" };
+  return withApi(async (ctx) => {
+    const [advice, currencies] = await Promise.all([ledgerly.withholdingAdvice(supplierId, ctx).catch(() => null), ledgerly.currencies(ctx)]);
+    return { advice, baseCurrency: currencies.base_currency };
+  });
+}
+
+export async function getScheduledPayment(id: string): Promise<ScheduledPaymentDetail | null> {
+  await connection();
+  if (isDemoMode()) return null;
+  try {
+    return await withApi((ctx) => ledgerly.scheduledPayment(id, ctx));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 export async function getPaymentMade(id: string) {

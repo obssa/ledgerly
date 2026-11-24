@@ -148,6 +148,11 @@ trait CompanyFixtures
         // An advance of 100.00 to the supplier (6 Nov), not allocated to a bill.
         $ids['payment_made'] = $this->postJson('/api/v1/payments-made', ['contact_id' => $ids['supplier'], 'account_id' => $ids['bank'],
             'payment_date' => '2026-11-06', 'method' => 'bank_transfer', 'currency' => 'ETB', 'amount' => '100'], $h)->assertCreated()->json('id');
+        // A payment to the supplier scheduled for the end of the year (103), with no bills yet: it changes no bill and
+        // posts nothing, so every other test sees the fixture's bills as they were.
+        $ids['scheduled_payment'] = (string) Str::uuid7();
+        $this->owner()->table('scheduled_payments')->insert(['id' => $ids['scheduled_payment'], 'company_id' => $company, 'contact_id' => $ids['supplier'],
+            'account_id' => $ids['bank'], 'pay_on' => '2027-12-31', 'method' => 'bank_transfer', 'currency' => 'ETB', 'created_by' => $user->getKey()]);
         // The supplier gives 10.00 of the advance back (8 Nov), so 90.00 of it is left.
         $ids['refund'] = $this->postJson('/api/v1/refunds/supplier', ['contact_id' => $ids['supplier'], 'account_id' => $ids['bank'], 'payment_date' => '2026-11-08',
             'method' => 'bank_transfer', 'currency' => 'ETB', 'amount' => '10', 'payment_id' => $ids['payment_made']], $h)->assertCreated()->json('id');
@@ -217,7 +222,7 @@ trait CompanyFixtures
             app('router')->getRoutes()->getRoutes(),
             fn (Route $r) => in_array('company', $r->gatherMiddleware(), true),
         ));
-        $this->assertGreaterThanOrEqual(369, count($routes), 'company routes went missing from the router');
+        $this->assertGreaterThanOrEqual(375, count($routes), 'company routes went missing from the router');
 
         return $routes;
     }
@@ -255,6 +260,7 @@ trait CompanyFixtures
             'timeEntry' => $ids['time_entry'],
             'milestone' => $ids['milestone'],
             'cheque' => $ids['post_dated_cheque'],
+            'scheduledPayment' => $ids['scheduled_payment'],
             'attachment' => $ids['attachment'],
             'quote' => $ids['quote'],
             'salesOrder' => $ids['sales_order'],

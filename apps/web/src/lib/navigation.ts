@@ -51,6 +51,7 @@ export const SECTIONS: NavSection[] = [
       { href: "/bills/credits", label: "Supplier credits", keywords: "debit notes returns" },
       { href: "/payments-made", label: "Payments made", keywords: "pay suppliers disbursements" },
       { href: "/payments-made/batch", label: "Pay many bills", keywords: "batch payment run" },
+      { href: "/payments-made/scheduled", label: "Scheduled payments", keywords: "plan pay later future date bill pay reminder" },
       { href: "/payments-made/bank-file", label: "Bank payment file", keywords: "csv transfer upload", tabHidden: true },
       { href: "/expenses", label: "Expenses", keywords: "spend direct costs receipts" },
       { href: "/expense-claims", label: "Expense claims", keywords: "staff reimbursements" },

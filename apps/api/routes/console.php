@@ -14,6 +14,7 @@ Schedule::command('ledgerly:post-recurring')->hourly();
 Schedule::command('ledgerly:make-recurring-invoices')->hourly();
 Schedule::command('ledgerly:send-saved-reports')->hourly();
 Schedule::command('ledgerly:send-invoice-reminders')->hourly();
+Schedule::command('ledgerly:remind-scheduled-payments')->hourly();
 Schedule::command('ledgerly:subscriptions-tick')->dailyAt('01:00');
 Schedule::command('ledgerly:send-tax-reminders')->dailyAt('05:00');
 Schedule::command('ledgerly:expire-quotes')->dailyAt('00:30');
@@ -159,6 +160,50 @@ Artisan::command('ledgerly:send-invoice-reminders', function (\App\Domain\Sales\
 
     return 0;
 })->purpose('Email the payment reminders that have come due');
+
+/*
+| Reminders of scheduled supplier payments (103): on the day a payment is scheduled for (the company's own today), an
+| email to the person who scheduled it, or, when they can no longer pay bills there, to everyone who can. Once per
+| payment (reminded_on is set once). Which are due comes from scheduled_payments_due(): ids only. Nothing is recorded:
+| the payment waits for someone to confirm the money went out.
+*/
+Artisan::command('ledgerly:remind-scheduled-payments', function (\App\Domain\Purchases\ScheduledPayments $plans, \App\Domain\Tenancy\Support\CurrentCompany $current) {
+    $due = DB::select('SELECT company_id, scheduled_payment_id FROM scheduled_payments_due(?)', [now('UTC')->addDay()->format('Y-m-d')]);
+    $sent = 0;
+    foreach ($due as $row) {
+        try {
+            $sent += \App\Domain\Tenancy\Support\DatabaseTenantContext::run(null, $row->company_id, function () use ($plans, $current, $row) {
+                $company = \App\Domain\Tenancy\Models\Company::query()->findOrFail($row->company_id);
+                $current->set($company);
+                $today = $current->today();
+                $plan = DB::table('scheduled_payments')->where(['company_id' => $row->company_id, 'id' => $row->scheduled_payment_id, 'status' => 'scheduled'])
+                    ->whereNull('reminded_on')->first();
+                if ($plan === null || substr((string) $plan->pay_on, 0, 10) > $today) {
+                    return 0;   // confirmed, cancelled or not yet due in the company's own time zone
+                }
+                $members = \App\Domain\Tenancy\Models\Membership::query()->where(['company_id' => $company->getKey(), 'status' => 'active'])->get()
+                    ->filter(fn ($m) => $m->can('payments.pay'));
+                $ids = $members->contains(fn ($m) => $m->user_id === $plan->created_by) ? [$plan->created_by] : $members->pluck('user_id')->all();
+                DB::table('scheduled_payments')->where(['company_id' => $row->company_id, 'id' => $plan->id])->update(['reminded_on' => $today, 'updated_at' => now()]);
+                $one = $plans->one($plan->id);
+                foreach (\App\Models\User::query()->whereIn('id', $ids)->get() as $person) {
+                    $person->notify(new \App\Notifications\ScheduledPaymentDue((string) ($company->trading_name ?: $company->legal_name), $one['contact']['name'],
+                        $one['pay_on'], $one['currency'], $one['amount'], $plan->id));
+                }
+
+                return 1;
+            });
+        } catch (\Throwable $e) {
+            report($e);
+            $this->error("Reminder for scheduled payment {$row->scheduled_payment_id} failed: " . $e::class);
+        } finally {
+            $current->forget();
+        }
+    }
+    $this->info("Sent {$sent} scheduled payment reminders.");
+
+    return 0;
+})->purpose('Email the people who pay bills about payments scheduled for today');
 
 /*
 | Ledgerly's own subscriptions (053): once a day, a trial past its end is suspended, a subscription past its paid-until

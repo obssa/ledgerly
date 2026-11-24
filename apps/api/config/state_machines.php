@@ -107,4 +107,10 @@ return [
         '' => ['active'],
         'active' => ['ended'],
     ],
+
+    // Scheduled supplier payment (103). Confirmed once (paid) or cancelled; both are final.
+    'scheduled_payment' => [
+        '' => ['scheduled'],
+        'scheduled' => ['paid', 'cancelled'],
+    ],
 ];
