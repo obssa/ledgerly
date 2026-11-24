@@ -14,6 +14,7 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
 
   return (
     <html lang="en">
+      <head><title>This page didn&apos;t load · Ledgerly</title></head>
       <body style={{ margin: 0, minHeight: "100vh", display: "grid", placeItems: "center", background: "#f5f7f6", color: "#0e1a17", fontFamily: "Inter, system-ui, sans-serif" }}>
         <main role="alert" style={{ maxWidth: 440, padding: 28, textAlign: "center", background: "#fff", border: "1px solid #e2e7e4", borderRadius: 16 }}>
           <h1 style={{ fontSize: 20, margin: 0 }}>This page didn&apos;t load</h1>
