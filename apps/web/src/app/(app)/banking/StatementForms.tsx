@@ -26,9 +26,10 @@ export function ImportStatement({ accountId }: { accountId: string }) {
       <input type="hidden" name="account_id" value={accountId} />
       <div>
         <label className="field-label" htmlFor="file">Statement file</label>
-        <input className="field" id="file" name="file" type="file" accept=".csv,.xlsx,.txt,.ofx,.qfx,.sta,.940,.mt940,.xml,.camt,text/csv,text/plain,application/xml,text/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-describedby="file-hint" />
+        <input className="field" id="file" name="file" type="file" accept=".csv,.xlsx,.pdf,.txt,.ofx,.qfx,.sta,.940,.mt940,.xml,.camt,text/csv,text/plain,application/pdf,application/xml,text/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" aria-describedby="file-hint" />
         <p id="file-hint" className="mt-1.5 text-[13px] text-muted">
-          CSV or an Excel workbook (any export with a date, a description and an amount, or money out and money in, column), OFX or QFX, SWIFT MT940, or ISO 20022 camt.053.
+          CSV or an Excel workbook (any export with a date, a description and an amount, or money out and money in, column), the PDF statement from internet banking
+          (not a scan), OFX or QFX, SWIFT MT940, or ISO 20022 camt.053.
           The form is recognised from the file itself. Lines already imported are skipped.
         </p>
       </div>
