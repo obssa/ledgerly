@@ -70,6 +70,7 @@ final class ScheduledPaymentController extends Controller
     public function update(Request $request, string $scheduledPayment): JsonResponse
     {
         $this->authorizeCompany('payments.pay');
+        $this->plans->one($scheduledPayment);   // another company's (or no) scheduled payment: not found, before anything is checked
         $data = $request->validate(['account_id' => ['required', 'uuid'], ...$this->planRules()], $this->messages());
 
         return response()->json($this->plans->update($scheduledPayment, $data, $request->user()->getKey()));
@@ -79,6 +80,7 @@ final class ScheduledPaymentController extends Controller
     public function confirm(Request $request, string $scheduledPayment): JsonResponse
     {
         $this->authorizeCompany('payments.pay');
+        $this->plans->one($scheduledPayment);   // another company's (or no) scheduled payment: not found, before anything is checked
         $data = $request->validate([
             'payment_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
             'reference' => ['nullable', 'string', 'max:100'],
@@ -99,6 +101,7 @@ final class ScheduledPaymentController extends Controller
     public function cancel(Request $request, string $scheduledPayment): JsonResponse
     {
         $this->authorizeCompany('payments.pay');
+        $this->plans->one($scheduledPayment);   // another company's (or no) scheduled payment: not found, before anything is checked
         $reason = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:300']])['reason'];
 
         return response()->json($this->plans->cancel($scheduledPayment, $reason, $request->user()->getKey()));
