@@ -14,7 +14,7 @@
   --color-line-soft: #eef2f0;
   --color-ink: #0e1a17;
   --color-muted: #56665f;
-  --color-faint: #7a8a83;
+  --color-faint: #627069;   /* 5.2:1 on white, 4.8:1 on the canvas: WCAG AA for small text */
 
   --color-side: #0b2420;
   --color-side-hover: #143a32;

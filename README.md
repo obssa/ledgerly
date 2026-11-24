@@ -122,6 +122,12 @@ Adding a country later = one JSON file + one connector class. Nothing in the cor
 - **Web: 149 unit tests, lint (0 errors), production build.** The menu, the tabs across each section, the breadcrumb, the
   "+ New" menu and the Ctrl+K search all read one list (`apps/web/src/lib/navigation.ts`); a test checks every entry is a
   page that exists.
+- **Accessibility (24 Nov 2026):** axe-core's WCAG 2.0, 2.1 and 2.2 A/AA rules on the production build, signed in as the demo
+  owner: every page in the menu, the main forms and a detail page of each kind (122 pages). It found and fixed the faint
+  grey text (now 5.2:1 on white) and the cash forecast's wide table (now scrolled by keyboard); re-run on the fixed build,
+  neither comes back. The only other report was pages with no title: those were pages the API refused because the audit
+  loaded about 14 pages a minute, past the limit of 120 requests a minute, and the error page shown then had no title. It
+  has one now. Automated rules cover part of WCAG only; keyboard and screen-reader use have not been tested by a person.
 - **Production images** build and run: the API image migrated a database as the owner, served sign-up and company setup as
   `ledgerly_web`, and runs as a non-root user; the web image runs in demo mode or against the API from the same build.
 

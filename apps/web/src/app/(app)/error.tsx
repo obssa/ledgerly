@@ -20,6 +20,8 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
   }
   return (
     <section role="alert" className="mx-auto mt-10 max-w-[520px] rounded-2xl border border-line bg-surface p-7 text-center shadow-card">
+      {/* The failed page never sent its own title: this one says what happened (React puts it in the head). */}
+      <title>This page didn&apos;t load · Ledgerly</title>
       <h1 className="text-[20px] font-bold tracking-[-0.01em]">This page didn&apos;t load</h1>
       <p className="mt-2 text-sm text-muted">
         {isStaleBuild(error)
