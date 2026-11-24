@@ -17,8 +17,10 @@ use Illuminate\Support\Facades\DB;
  * owe on posted invoices by their due date, what is still owed on posted bills by theirs, and the post-dated cheques
  * held, by their cheque date; and what the recurring journals (their cash lines, on each date) and recurring invoices
  * (their total, by the customer's terms after each date) will bring in or pay out; and confirmed sales and purchase
- * orders, for what is not yet on a posted invoice or bill, by the date wanted plus the contact's terms. Anything already overdue is in the first week. Foreign-currency documents count at their
- * own rate. Nothing is stored: it is read from the books as they stand, and it posts nothing.
+ * orders, for what is not yet on a posted invoice or bill, by the date wanted plus the contact's terms. A bill with a
+ * supplier payment scheduled for it (103) goes out on the planned day instead of its due date, for the planned amount.
+ * Anything already overdue is in the first week. Foreign-currency documents count at their own rate. Nothing is stored:
+ * it is read from the books as they stand, and it posts nothing.
  */
 final class CashForecast
 {
@@ -47,7 +49,7 @@ final class CashForecast
         for ($w = 0; $w < $weeks; $w++) {
             $from = $start->modify('+' . ($w * 7) . ' days');
             $rows[] = ['week' => $w + 1, 'from' => $from->format('Y-m-d'), 'to' => $from->modify('+6 days')->format('Y-m-d'),
-                'receivables' => '0.00', 'payables' => '0.00', 'cheques_in' => '0.00', 'cheques_out' => '0.00', 'recurring_in' => '0.00', 'recurring_out' => '0.00', 'orders_in' => '0.00', 'orders_out' => '0.00', 'in' => '0.00', 'out' => '0.00', 'net' => '0.00', 'closing' => '0.00'];
+                'receivables' => '0.00', 'payables' => '0.00', 'cheques_in' => '0.00', 'cheques_out' => '0.00', 'recurring_in' => '0.00', 'recurring_out' => '0.00', 'orders_in' => '0.00', 'orders_out' => '0.00', 'scheduled_out' => '0.00', 'in' => '0.00', 'out' => '0.00', 'net' => '0.00', 'closing' => '0.00'];
         }
         $weekOf = function (?string $date) use ($start, $weeks): int {
             if ($date === null) {
@@ -58,6 +60,7 @@ final class CashForecast
             return max(0, min($weeks - 1, intdiv(max(0, $days), 7)));
         };
         $overdue = ['receivables' => '0.00', 'payables' => '0.00'];
+        $bills = [];   // each bill counted above: its week, whether overdue, its rate (for a scheduled payment of it)
         foreach ($due as $d) {
             $base = bcmul((string) $d->amount_due, (string) $d->fx_rate, 2);
             $key = $d->type === 'invoice' ? 'receivables' : 'payables';
@@ -67,6 +70,33 @@ final class CashForecast
             }
             $i = $weekOf($date);
             $rows[$i][$key] = bcadd($rows[$i][$key], $base, 2);
+            if ($d->type === 'bill') {
+                $bills[$d->id] = ['week' => $i, 'overdue' => $date < $today, 'rate' => (string) $d->fx_rate];
+            }
+        }
+
+        // Scheduled supplier payments (103): each planned amount leaves its bill's due-date week and goes out on the day
+        // planned (overdue: the first week; after the window: not counted). Only what the bill still owes is counted.
+        $planned = DB::table('scheduled_payment_bills as sb')
+            ->join('scheduled_payments as s', fn ($j) => $j->on('s.company_id', '=', 'sb.company_id')->on('s.id', '=', 'sb.scheduled_payment_id'))
+            ->join('documents as d', fn ($j) => $j->on('d.company_id', '=', 'sb.company_id')->on('d.id', '=', 'sb.document_id'))
+            ->where(['sb.company_id' => $companyId, 's.status' => 'scheduled'])->whereIn('d.status', ['posted', 'part_paid'])->where('d.amount_due', '>', 0)
+            ->get(['sb.document_id', 'sb.amount', 'd.amount_due', 'd.fx_rate', 's.pay_on']);
+        foreach ($planned as $p) {
+            $amount = bccomp((string) $p->amount, (string) $p->amount_due, 2) > 0 ? (string) $p->amount_due : (string) $p->amount;
+            $base = bcmul($amount, (string) $p->fx_rate, 2);
+            if (isset($bills[$p->document_id])) {
+                $b = $bills[$p->document_id];
+                $rows[$b['week']]['payables'] = bcsub($rows[$b['week']]['payables'], $base, 2);
+                if ($b['overdue']) {
+                    $overdue['payables'] = bcsub($overdue['payables'], $base, 2);
+                }
+            }
+            $on = substr((string) $p->pay_on, 0, 10);
+            if ($on <= $end) {
+                $i = $weekOf(max($on, $today));
+                $rows[$i]['scheduled_out'] = bcadd($rows[$i]['scheduled_out'], $base, 2);
+            }
         }
         $baseCurrency = (string) DB::table('companies')->where('id', $companyId)->value('base_currency');
         foreach ($cheques as $c) {
@@ -161,7 +191,7 @@ final class CashForecast
         $lowest = null;
         foreach ($rows as &$r) {
             $r['in'] = bcadd(bcadd(bcadd($r['receivables'], $r['cheques_in'], 2), $r['recurring_in'], 2), $r['orders_in'], 2);
-            $r['out'] = bcadd(bcadd(bcadd($r['payables'], $r['cheques_out'], 2), $r['recurring_out'], 2), $r['orders_out'], 2);
+            $r['out'] = bcadd(bcadd(bcadd(bcadd($r['payables'], $r['cheques_out'], 2), $r['recurring_out'], 2), $r['orders_out'], 2), $r['scheduled_out'], 2);
             $r['net'] = bcsub($r['in'], $r['out'], 2);
             $balance = bcadd($balance, $r['net'], 2);
             $r['closing'] = $balance;

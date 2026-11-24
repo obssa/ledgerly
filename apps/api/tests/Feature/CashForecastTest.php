@@ -112,6 +112,55 @@ final class CashForecastTest extends TestCase
         $this->assertSame($theirsBefore['data'], $forecast(['X-Company-Id' => $b['company']])['data']);
     }
 
+    /**
+     * A bill of 25,000.00 due in ten days with 10,000.00 of it scheduled for payment in twenty: that part leaves the
+     * bill's week and goes out on the planned day, so the closing cash is the same and nothing is counted twice. Planned
+     * beyond the window, it is not in the forecast; cancelled, the bill counts by its due date again.
+     */
+    public function test_a_scheduled_payment_moves_its_bill_to_the_planned_day(): void
+    {
+        config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
+        $b = $this->companyWithRecords('b@example.test', 'Blue Nile Traders');
+        $c = $this->companyWithRecords('owner@example.test', 'Abyssinia Coffee');
+        $h = ['X-Company-Id' => $c['company']];
+        $forecast = fn (array $hh = []) => $this->getJson('/api/v1/reports/cash-forecast', $hh ?: $h)->assertOk()->json();
+        $sum = fn (array $f, string $key) => array_reduce($f['data'], fn (string $s, array $w) => bcadd($s, $w[$key], 2), '0.00');
+
+        $this->actingAs(User::query()->findOrFail($b['user']), 'sanctum');
+        $theirsBefore = $forecast(['X-Company-Id' => $b['company']]);
+        $this->actingAs(User::query()->findOrFail($c['user']), 'sanctum');
+        $f = $forecast();
+        $on = fn (int $days) => (new \DateTimeImmutable($f['as_of']))->modify("+{$days} days")->format('Y-m-d');
+        $weekOf = fn (string $date) => intdiv((int) (new \DateTimeImmutable($f['as_of']))->diff(new \DateTimeImmutable($date))->format('%a'), 7);
+
+        $bill = $this->postJson('/api/v1/bills', ['contact_id' => $c['supplier'], 'issue_date' => $f['as_of'], 'due_date' => $on(10), 'currency' => 'ETB', 'reference' => 'SCH-1',
+            'lines' => [['description' => 'Roaster service', 'quantity' => '1', 'unit_price' => '25000', 'account_id' => $c['rent']]]], $h)->assertCreated()->json('id');
+        $this->postJson("/api/v1/bills/{$bill}/approve", [], $h)->assertOk();
+        $billed = $forecast();
+        $due = $weekOf($on(10));
+        $this->assertSame(bcadd($f['data'][$due]['payables'], '25000.00', 2), $billed['data'][$due]['payables']);
+
+        $plan = fn (string $payOn) => $this->postJson('/api/v1/scheduled-payments', ['contact_id' => $c['supplier'], 'account_id' => $c['bank'], 'currency' => 'ETB',
+            'pay_on' => $payOn, 'method' => 'bank_transfer', 'bills' => [['bill_id' => $bill, 'amount' => '10000']]], $h)->assertCreated()->json('id');
+        $id = $plan($on(20));
+        $s = $forecast();
+        $this->assertSame(bcsub($billed['data'][$due]['payables'], '10000.00', 2), $s['data'][$due]['payables']);
+        $this->assertSame('10000.00', $s['data'][$weekOf($on(20))]['scheduled_out']);
+        $this->assertSame('10000.00', $sum($s, 'scheduled_out'));
+        $this->assertSame($billed['closing'], $s['closing'], 'moved, not counted twice');
+
+        // Cancelled: the bill counts by its due date again. Planned after the window: that part is not in the forecast.
+        $this->postJson("/api/v1/scheduled-payments/{$id}/cancel", ['reason' => 'Paying it next quarter'], $h)->assertOk();
+        $this->assertSame($billed['data'], $forecast()['data']);
+        $plan($on(200));
+        $later = $forecast();
+        $this->assertSame('0.00', $sum($later, 'scheduled_out'));
+        $this->assertSame(bcadd($billed['closing'], '10000.00', 2), $later['closing']);
+
+        $this->actingAs(User::query()->findOrFail($b['user']), 'sanctum');
+        $this->assertSame($theirsBefore['data'], $forecast(['X-Company-Id' => $b['company']])['data']);
+    }
+
     public function test_confirmed_orders_count_for_what_is_not_yet_invoiced_or_billed(): void
     {
         config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
