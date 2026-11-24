@@ -43,6 +43,8 @@ final class BillController extends Controller
             'warnings' => $bill->type === 'bill' ? $this->duplicates->warnings($bill) : [],
             // 069: against its purchase order and the goods received, line by line (warnings only).
             'match' => $this->match->forBill($bill),
+            // 103: a payment scheduled for it and not confirmed yet (its day and amount), or null.
+            'scheduled_payment' => $bill->type === 'bill' ? app(\App\Domain\Purchases\ScheduledPayments::class)->forBill($bill->getKey()) : null,
             'can' => [
                 'edit' => (bool) $membership?->can($bill->isPosted() ? 'transactions.edit' : 'bills.create'),
                 // A posted bill corrected in place (EditPostedInvoice): allowed for this member, and nothing in the way.

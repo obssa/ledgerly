@@ -859,6 +859,8 @@ export interface BillDetail extends Bill {
   can: { edit: boolean; approve: boolean; void: boolean; credit?: boolean; apply?: boolean; refund?: boolean; correct?: boolean };
   /** Why a posted bill cannot be corrected in place (a payment, goods received…); null when it can. */
   correct_blocked?: string | null;
+  /** 103: a payment scheduled for it and not confirmed yet. */
+  scheduled_payment?: { id: string; pay_on: string; amount: string } | null;
 }
 
 /** An expense paid on the spot (Module 3): posted at once against the account it was paid from. */
@@ -917,6 +919,41 @@ export interface InvoiceDetail extends Invoice {
 }
 
 /** GET post-dated-cheques (062): the register, what is held by side and currency, and what the member may do. */
+/** A supplier payment planned for a later day (103): not in the books until someone confirms the money went out. */
+export interface ScheduledPayment {
+  id: string;
+  contact: { id: string; name: string };
+  account: { id: string; code: string; name: string };
+  pay_on: string;
+  method: string;
+  reference: string | null;
+  note: string | null;
+  currency: string;
+  amount: string;
+  bill_count: number;
+  status: "scheduled" | "paid" | "cancelled";
+  payment_id: string | null;
+  closed_on: string | null;
+  /** Scheduled for today or a day gone by, and not confirmed yet. */
+  due: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ScheduledPaymentDetail extends ScheduledPayment {
+  bills: { id: string; number: string | null; reference: string | null; issue_date: string; due_date: string | null; subtotal: string; total: string;
+    amount_due: string; status: string; amount: string }[];
+  today: string;
+  can: { pay: boolean };
+}
+
+export interface ScheduledPayments {
+  data: ScheduledPayment[];
+  totals: { currency: string; scheduled: string; due: string; count: number; due_count: number }[];
+  today: string;
+  can: { pay: boolean };
+}
+
 export interface PostDatedCheques {
   data: {
     id: string; direction: "in" | "out"; contact: { id: string; name: string }; account: { id: string; code: string; name: string };
@@ -1977,6 +2014,15 @@ export const ledgerly = {
     api<{ data: Attachment[]; can: { add: boolean } }>(`${attachmentPath(kind)}/${encodeURIComponent(id)}/attachments`, ctx),
   removeLogo: (ctx: RequestOptions) => api<{ logo: boolean }>("company/logo/remove", { ...ctx, method: "POST", body: {} }),
   removeAttachment: (id: string, ctx: RequestOptions) => api<unknown>(`attachments/${encodeURIComponent(id)}/remove`, { ...ctx, method: "POST", body: {} }),
+  scheduledPayments: (q: { status?: string; contact_id?: string }, ctx: RequestOptions) => api<ScheduledPayments>("scheduled-payments", { ...ctx, query: q }),
+  scheduledPayment: (id: string, ctx: RequestOptions) => api<ScheduledPaymentDetail>(`scheduled-payments/${encodeURIComponent(id)}`, ctx),
+  schedulePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<ScheduledPaymentDetail>("scheduled-payments", { ...ctx, method: "POST", body }),
+  updateScheduledPayment: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<ScheduledPaymentDetail>(`scheduled-payments/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
+  confirmScheduledPayment: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
+    api<ScheduledPaymentDetail & { payment_id: string }>(`scheduled-payments/${encodeURIComponent(id)}/confirm`, { ...ctx, method: "POST", body }),
+  cancelScheduledPayment: (id: string, reason: string, ctx: RequestOptions) =>
+    api<ScheduledPaymentDetail>(`scheduled-payments/${encodeURIComponent(id)}/cancel`, { ...ctx, method: "POST", body: { reason } }),
   postDatedCheques: (ctx: RequestOptions) => api<PostDatedCheques>("post-dated-cheques", ctx),
   recordPostDatedCheque: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ id: string }>("post-dated-cheques", { ...ctx, method: "POST", body }),
   presentPostDatedCheque: (id: string, ctx: RequestOptions) =>

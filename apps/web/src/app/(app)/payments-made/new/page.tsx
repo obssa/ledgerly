@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { getPayOptions } from "@/lib/data";
 import { PayForm } from "./PayForm";
@@ -11,7 +12,8 @@ export default async function PayBillsPage({ searchParams }: PageProps<"/payment
 
   return (
     <>
-      <PageTitle eyebrow="Money out / Payments made" title="Pay bills" />
+      <PageTitle eyebrow="Money out / Payments made" title="Pay bills"
+        actions={<Link href={`/payments-made/scheduled/new${options.supplier ? `?supplier=${encodeURIComponent(options.supplier.id)}` : ""}`} className="btn">Schedule for a later day</Link>} />
       <Card className="mb-4 max-w-[720px]" label="Supplier">
         <form className="flex flex-wrap items-end gap-2.5">
           <div className="min-w-[240px] flex-1">

@@ -31,6 +31,7 @@ use App\Http\Controllers\QuoteLinkController;
 use App\Http\Controllers\ShareController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\PostDatedChequeController;
+use App\Http\Controllers\ScheduledPaymentController;
 use App\Http\Controllers\LandedCostController;
 use App\Http\Controllers\AssemblyController;
 use App\Http\Controllers\BadDebtController;
@@ -459,6 +460,13 @@ Route::prefix('v1')->group(function () {
             Route::get('payments-made/{paymentMade}', [PaymentMadeController::class, 'show']);
             Route::post('payments-made/{paymentMade}/reverse', [PaymentMadeController::class, 'reverse']);
             Route::post('payments-made/{paymentMade}/allocate', [PaymentMadeController::class, 'allocate']);
+            // Module 3: scheduled payments (103). A plan for a later day; confirmed by hand once the money went out.
+            Route::get('scheduled-payments', [ScheduledPaymentController::class, 'index']);
+            Route::post('scheduled-payments', [ScheduledPaymentController::class, 'store']);
+            Route::get('scheduled-payments/{scheduledPayment}', [ScheduledPaymentController::class, 'show']);
+            Route::put('scheduled-payments/{scheduledPayment}', [ScheduledPaymentController::class, 'update']);
+            Route::post('scheduled-payments/{scheduledPayment}/confirm', [ScheduledPaymentController::class, 'confirm']);
+            Route::post('scheduled-payments/{scheduledPayment}/cancel', [ScheduledPaymentController::class, 'cancel']);
 
             Route::get('refunds', [RefundController::class, 'index']);
             Route::post('refunds/customer', [RefundController::class, 'storeCustomer']);

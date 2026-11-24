@@ -5416,6 +5416,120 @@ BEGIN
   RAISE NOTICE 'PASS T128 projects and leases follow their state machines; used codes and links stay used; an authenticator step never goes back';
 END $$;
 
+-- T129: scheduled supplier payments (103). To the company's own supplier from its own money account, for that
+-- supplier's open bills in the payment's currency, each bill in one scheduled payment at a time; the lines change only
+-- while scheduled; paid once as the matching payment made, or cancelled, and then final; the reminder goes once; the
+-- scheduler sees ids only; another company sees nothing. Company A as f1: customer c1, supplier c8, bank a10. Rolled back.
+DO $$
+DECLARE
+  c1  constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  c8  constant uuid := '00000000-0000-0000-0000-0000000000c8';
+  a10 constant uuid := '00000000-0000-0000-0000-000000000a10';
+  e1  constant uuid := '00000000-0000-0000-0000-00000000e129';
+  b1  constant uuid := '00000000-0000-0000-0000-000000000b29';
+  s1  constant uuid := '00000000-0000-0000-0000-000000000529';
+  s2  constant uuid := '00000000-0000-0000-0000-000000000530';
+  pay constant uuid := '00000000-0000-0000-0000-000000000f29';
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    INSERT INTO journal_entries (id, company_id, number, entry_date, currency, source_type) VALUES (e1, app_company_id(), 91290, '2027-11-10', 'ETB', 'bill');
+    INSERT INTO journal_lines (company_id, journal_entry_id, line_no, account_id, debit, credit) VALUES
+      (app_company_id(), e1, 1, '00000000-0000-0000-0000-000000000a40', 700, 0), (app_company_id(), e1, 2, '00000000-0000-0000-0000-000000000a22', 0, 700);
+    INSERT INTO documents (id, company_id, type, number, contact_id, issue_date, currency, subtotal, total, amount_due)
+      VALUES (b1, app_company_id(), 'bill', 'BILL-T129', c8, '2027-11-10', 'ETB', 700, 700, 700);
+    UPDATE documents SET status = 'posted', journal_entry_id = e1 WHERE id = b1;
+
+    BEGIN
+      INSERT INTO scheduled_payments (company_id, contact_id, account_id, pay_on, method, currency, created_by)
+        VALUES (app_company_id(), c1, a10, '2027-11-20', 'bank_transfer', 'ETB', app_user_id());
+      RAISE EXCEPTION 'FAIL T129a: a payment was scheduled to a customer who is not a supplier';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO scheduled_payments (company_id, contact_id, account_id, pay_on, method, currency, created_by)
+        VALUES (app_company_id(), c8, '00000000-0000-0000-0000-000000000a40', '2027-11-20', 'bank_transfer', 'ETB', app_user_id());
+      RAISE EXCEPTION 'FAIL T129b: a payment was scheduled out of an account that holds no money';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO scheduled_payments (company_id, contact_id, account_id, pay_on, method, currency, status, closed_on, created_by)
+        VALUES (app_company_id(), c8, a10, '2027-11-20', 'bank_transfer', 'ETB', 'cancelled', '2027-11-20', app_user_id());
+      RAISE EXCEPTION 'FAIL T129c: a scheduled payment started out cancelled';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    INSERT INTO scheduled_payments (id, company_id, contact_id, account_id, pay_on, method, currency, created_by)
+      VALUES (s1, app_company_id(), c8, a10, '2027-11-20', 'bank_transfer', 'ETB', app_user_id()),
+             (s2, app_company_id(), c8, a10, '2027-11-21', 'bank_transfer', 'ETB', app_user_id());
+    INSERT INTO scheduled_payment_bills (company_id, scheduled_payment_id, document_id, amount) VALUES (app_company_id(), s1, b1, 500);
+    BEGIN
+      INSERT INTO scheduled_payment_bills (company_id, scheduled_payment_id, document_id, amount) VALUES (app_company_id(), s2, b1, 200);
+      RAISE EXCEPTION 'FAIL T129d: a bill was planned in two scheduled payments';
+    EXCEPTION WHEN unique_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO scheduled_payment_bills (company_id, scheduled_payment_id, document_id, amount)
+        SELECT app_company_id(), s2, id, 10 FROM documents WHERE company_id = app_company_id() AND type = 'invoice' LIMIT 1;
+      IF FOUND THEN RAISE EXCEPTION 'FAIL T129e: a scheduled payment settled an invoice'; END IF;
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      UPDATE scheduled_payments SET contact_id = c1 WHERE id = s1;
+      RAISE EXCEPTION 'FAIL T129f: a scheduled payment changed its supplier';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    UPDATE scheduled_payments SET pay_on = '2027-11-22', reference = 'Rent', reminded_on = '2027-11-22' WHERE id = s1;   -- while scheduled
+    UPDATE scheduled_payment_bills SET amount = 600 WHERE scheduled_payment_id = s1;
+    BEGIN
+      UPDATE scheduled_payments SET reminded_on = '2027-11-23' WHERE id = s1;
+      RAISE EXCEPTION 'FAIL T129g: a scheduled payment was reminded of twice';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    -- Paid only as the payment it became: the same supplier, account and currency, on the day it closed.
+    INSERT INTO payments (id, company_id, direction, contact_id, account_id, payment_date, method, currency, amount)
+      VALUES (pay, app_company_id(), 'out', c8, a10, '2027-11-22', 'bank_transfer', 'ETB', 600);
+    BEGIN
+      UPDATE scheduled_payments SET status = 'paid', payment_id = pay, closed_on = '2027-11-23' WHERE id = s1;
+      RAISE EXCEPTION 'FAIL T129h: a scheduled payment was paid as a payment of another day';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    UPDATE scheduled_payments SET status = 'paid', payment_id = pay, closed_on = '2027-11-22' WHERE id = s1;
+    BEGIN
+      UPDATE scheduled_payments SET status = 'cancelled', payment_id = NULL WHERE id = s1;
+      RAISE EXCEPTION 'FAIL T129i: a paid scheduled payment was cancelled';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      UPDATE scheduled_payments SET note = 'changed' WHERE id = s1;
+      RAISE EXCEPTION 'FAIL T129j: a paid scheduled payment was changed';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      DELETE FROM scheduled_payment_bills WHERE scheduled_payment_id = s1;
+      RAISE EXCEPTION 'FAIL T129k: the bills of a paid scheduled payment were changed';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      DELETE FROM scheduled_payments WHERE id = s2;
+      RAISE EXCEPTION 'FAIL T129l: a scheduled payment was deleted';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    UPDATE scheduled_payments SET status = 'cancelled', closed_on = '2027-11-21' WHERE id = s2;
+    BEGIN
+      UPDATE scheduled_payments SET status = 'scheduled', closed_on = NULL WHERE id = s2;
+      RAISE EXCEPTION 'FAIL T129m: a cancelled scheduled payment was scheduled again';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    INSERT INTO scheduled_payments (id, company_id, contact_id, account_id, pay_on, method, currency, created_by)
+      VALUES ('00000000-0000-0000-0000-000000000531', app_company_id(), c8, a10, '2027-11-24', 'cash', 'ETB', app_user_id());
+    IF EXISTS (SELECT 1 FROM scheduled_payments_due('2027-11-25')) THEN
+      RAISE EXCEPTION 'FAIL T129n: the scheduler''s list was read inside a company';
+    END IF;
+    PERFORM set_config('app.company_id', '', true), set_config('app.user_id', '', true);
+    IF (SELECT array_agg(scheduled_payment_id) FROM scheduled_payments_due('2027-11-25') WHERE company_id = '00000000-0000-0000-0000-00000000000a')
+       IS DISTINCT FROM ARRAY['00000000-0000-0000-0000-000000000531'::uuid] THEN
+      RAISE EXCEPTION 'FAIL T129p: the scheduler did not see exactly the payment due and not reminded of';
+    END IF;
+
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+    IF EXISTS (SELECT 1 FROM scheduled_payments) OR EXISTS (SELECT 1 FROM scheduled_payment_bills) THEN
+      RAISE EXCEPTION 'FAIL T129o: company B saw company A''s scheduled payments';
+    END IF;
+    RAISE EXCEPTION 'T129 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T129 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T129 scheduled payments go to the company''s own supplier for its open bills, each bill once, and are paid once as their payment';
+END $$;
+
 -- T127: a fresh start of the demo (101). Only the demo's owner starts it, at most once a minute, never written by the
 -- application directly; the old demo company must be archived first; then every demo account is a member of the new
 -- company with its role and the demo accounts point there; a start is finished once. Access Co (company C) as the demo:

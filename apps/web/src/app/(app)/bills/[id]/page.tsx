@@ -152,9 +152,16 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
 
         <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
           {!bill.demo && <InvoiceActions invoice={bill} />}
-          {!credit && !bill.demo && ["posted", "part_paid"].includes(bill.status) && (
+          {!credit && !bill.demo && ["posted", "part_paid"].includes(bill.status) && (<>
             <Link href={`/payments-made/new?supplier=${encodeURIComponent(bill.contact.id)}`} className="btn justify-center">Pay this bill</Link>
-          )}
+            {bill.scheduled_payment ? (
+              <Link href={`/payments-made/scheduled/${encodeURIComponent(bill.scheduled_payment.id)}`} className="rounded-lg bg-brand-tint px-3 py-2 text-center text-[13px] font-semibold text-brand hover:underline">
+                Payment of {formatAmount(bill.scheduled_payment.amount)} scheduled for {bill.scheduled_payment.pay_on}
+              </Link>
+            ) : (
+              <Link href={`/payments-made/scheduled/new?supplier=${encodeURIComponent(bill.contact.id)}`} className="btn justify-center">Schedule payment</Link>
+            )}
+          </>)}
           {!credit && !bill.demo && <FixMistake kind="bill" doc={bill} />}
           {landed && company && (landed.spread.length > 0 || landed.received.length > 0 || (landed.can.apply && Number(landed.left) > 0)) && (
             <LandedCostPanel billId={bill.id} landed={landed} base={company.base_currency} />

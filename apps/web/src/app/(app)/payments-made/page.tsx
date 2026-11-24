@@ -1,17 +1,24 @@
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getPaymentsMade } from "@/lib/data";
+import { getPaymentsMade, getScheduledPayments } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Payments made" };
 
 /** Module 3: what the company paid its suppliers, newest first. */
 export default async function PaymentsMadePage() {
-  const payments = await getPaymentsMade();
+  const [payments, scheduled] = await Promise.all([getPaymentsMade(), getScheduledPayments("scheduled").catch(() => null)]);
+  const due = scheduled?.totals.filter((t) => t.due_count > 0) ?? [];
 
   return (
     <>
       <PageTitle eyebrow="Money out" title="Payments made" actions={<><Link href="/refunds" className="btn">Refunds</Link><Link href="/payments-made/bank-file" className="btn">Bank file</Link><Link href="/payments-made/new" className="btn btn-primary">+ Pay bills</Link></>} />
+      {due.length > 0 && (
+        <p role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-warn-tint px-3 py-2 text-[13.5px] font-semibold text-warn">
+          <span>Scheduled payments due: {due.map((t) => `${t.due_count} (${formatMoney(t.due, t.currency)})`).join(" · ")}. Confirm them once the money has gone out.</span>
+          <Link href="/payments-made/scheduled" className="btn">Open scheduled payments</Link>
+        </p>
+      )}
       <Card className="!p-2" label="Payments made">
         <div className="overflow-x-auto">
           <table className="tbl">
