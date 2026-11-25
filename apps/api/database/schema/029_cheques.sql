@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 29: cheques (Module 5).
+-- Evenbooks core schema, part 29: cheques (Module 5).
 --
 -- A cheque is a payment by the method 'cheque'. Rules here:
 --   1. Only a cheque has a cheque number. A cheque the company writes has one, and it is used once per bank account:

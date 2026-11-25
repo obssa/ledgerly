@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 7: tenant isolation with PostgreSQL row-level security, and grants.
+-- Evenbooks core schema, part 7: tenant isolation with PostgreSQL row-level security, and grants.
 --
 -- Migrations run as the table OWNER (e.g. ledgerly_owner), which bypasses RLS.
 -- The application connects as a login role that is (or is a member of) {{app_role}} and is NOT the owner,

@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 51: the custom report can be saved and scheduled like the others (Module 10).
+-- Evenbooks core schema, part 51: the custom report can be saved and scheduled like the others (Module 10).
 -- Its choices are kept in saved_reports.options, checked by the API against fixed lists (SavedReports::OPTIONS).
 
 ALTER TABLE saved_reports DROP CONSTRAINT saved_reports_report_check;

@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 52: turnover tax returns (Module 7).
+-- Evenbooks core schema, part 52: turnover tax returns (Module 7).
 --
 -- In a country whose pack has a turnover tax (TOT), sales taxed at a TOT rate post their tax to TOT payable
 -- (ApproveInvoice). A TOT return is filed and settled like a VAT return (039): its period then locks TOT payable as

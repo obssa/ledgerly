@@ -1,5 +1,5 @@
 /**
- * Typed client for the Ledgerly API (apps/api/routes/api.php). Amounts are decimal strings, never numbers.
+ * Typed client for the Evenbooks API (apps/api/routes/api.php). Amounts are decimal strings, never numbers.
  * Without LEDGERLY_API_URL the app runs in demo mode on sample data (src/lib/demo.ts).
  */
 

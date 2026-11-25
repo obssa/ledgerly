@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Production image for the Ledgerly web app: Next.js standalone server, non-root.
+# Production image for the Evenbooks web app: Next.js standalone server, non-root.
 # Built and pushed to GHCR by .github/workflows/deploy.yml.
 # Runtime: LEDGERLY_API_URL=https://api.example (server side only; without it the app runs in demo mode).
 

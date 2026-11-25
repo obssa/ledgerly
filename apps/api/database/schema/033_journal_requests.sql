@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 33: manual journals waiting for approval (Module 6).
+-- Evenbooks core schema, part 33: manual journals waiting for approval (Module 6).
 --
 -- The one optional approval step for manual journals: when the company sets settings.approval.journal_above, a manual
 -- journal above it is not posted but kept as a request. Rules here:

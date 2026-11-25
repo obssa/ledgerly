@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 81: credit notes bring back goods delivered on notes (Module 2).
+-- Evenbooks core schema, part 81: credit notes bring back goods delivered on notes (Module 2).
 --
 -- An invoice made from a sales order may bill goods that left on delivery notes (071): the invoice moved no stock, the
 -- notes did. A credit note for that invoice can now say the goods came back: they return at the cost they left the

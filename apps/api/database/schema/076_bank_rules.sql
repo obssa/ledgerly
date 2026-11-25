@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 76: bank rules (Module 5).
+-- Evenbooks core schema, part 76: bank rules (Module 5).
 --
 -- A bank rule says how a kind of statement line is categorised: the bank charge every month, the rent, the mobile-money
 -- fee. A line to review that the rule fits (its words are in the line's description, in the direction and amount range

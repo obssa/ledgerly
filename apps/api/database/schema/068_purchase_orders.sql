@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 68: purchase orders (Module 3).
+-- Evenbooks core schema, part 68: purchase orders (Module 3).
 --
 -- A purchase order is what the company asked a supplier for: drafted, issued (accepted in the quote machine of 006,
 -- which takes its number), billed as the supplier's invoices come in, in as many bills as it takes, and converted

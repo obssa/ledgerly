@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 99: invoices seen online (Module 2).
+-- Evenbooks core schema, part 99: invoices seen online (Module 2).
 --
 -- A posted invoice can be shared with the customer as a link, sent by WhatsApp (or pasted anywhere): the link shows that
 -- invoice, what is still due on it, and gives its PDF, without an account. Nothing can be done through it; paying stays

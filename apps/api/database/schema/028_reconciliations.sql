@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 28: bank reconciliation (Module 5).
+-- Evenbooks core schema, part 28: bank reconciliation (Module 5).
 --
 -- A reconciliation agrees a money account's books with one bank statement: the statement's date and ending balance, and
 -- the entries on the account the statement shows (cleared). Rules here:

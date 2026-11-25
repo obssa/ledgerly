@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 42: fixed assets and depreciation (Module 9c).
+-- Evenbooks core schema, part 42: fixed assets and depreciation (Module 9c).
 --
 -- The asset register: each asset with its cost (already in the ledger, from the bill or the opening balances), where it
 -- is and who keeps it, and how it wears out (straight line over its useful life, or a reducing balance at an annual
@@ -29,7 +29,7 @@ CREATE TABLE fixed_assets (
     useful_life_months      integer       CHECK (useful_life_months BETWEEN 1 AND 1200),
     annual_rate             numeric(9,6)  CHECK (annual_rate > 0 AND annual_rate < 1),
     depreciation_starts_on  date          NOT NULL,
-    opening_depreciation    numeric(20,2) NOT NULL DEFAULT 0 CHECK (opening_depreciation >= 0),   -- before the company's books began in Ledgerly
+    opening_depreciation    numeric(20,2) NOT NULL DEFAULT 0 CHECK (opening_depreciation >= 0),   -- before the company's books began in Evenbooks
     status                  text          NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disposed')),
     source_document_id      uuid          REFERENCES documents (id),
     created_by              uuid          NOT NULL REFERENCES users (id),

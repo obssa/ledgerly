@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 88: supplier credits send back goods that came in on goods received notes (Module 3).
+-- Evenbooks core schema, part 88: supplier credits send back goods that came in on goods received notes (Module 3).
 --
 -- A bill made from a purchase order may bill goods that came in on goods received notes (069): the notes moved the
 -- stock, the bill moved none. A supplier credit for that bill can now send those goods back, as for goods the bill

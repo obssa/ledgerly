@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 15: customers (Module 2).
+-- Evenbooks core schema, part 15: customers (Module 2).
 --
 -- A contact is a customer, a supplier or both. This adds what the customer side needs: a credit limit (a warning,
 -- not a block: product rule), tax exemption with its reason, a delivery address, and archiving. Contacts are

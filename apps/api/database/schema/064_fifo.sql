@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 64: FIFO as an option per item (Module 4).
+-- Evenbooks core schema, part 64: FIFO as an option per item (Module 4).
 --
 -- Every item is costed at the weighted average unless it is set to FIFO before its first stock move. A FIFO item keeps
 -- cost layers: each move in opens one (its quantity and value, by the day it came in); each move out takes from the

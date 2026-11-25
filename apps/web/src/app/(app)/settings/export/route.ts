@@ -11,7 +11,7 @@ export async function GET(): Promise<Response> {
   try {
     const file = await apiFile("company/export", { token, companyId });
     const disposition = file.headers.get("content-disposition") ?? "";
-    const name = /filename="?([a-z0-9.-]+\.zip)"?/i.exec(disposition)?.[1] ?? "ledgerly-export.zip";
+    const name = /filename="?([a-z0-9.-]+\.zip)"?/i.exec(disposition)?.[1] ?? "evenbooks-export.zip";
     return new Response(file.body, {
       headers: { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
     });

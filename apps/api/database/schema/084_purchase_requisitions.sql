@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 84: purchase requisitions (Module 3).
+-- Evenbooks core schema, part 84: purchase requisitions (Module 3).
 --
 -- A member asks for something to be bought: what, how many, roughly at what price, by when and why. Someone who
 -- approves bills approves or rejects it (never the person who asked), and someone who enters bills turns an approved

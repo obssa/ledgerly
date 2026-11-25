@@ -9,7 +9,7 @@ use App\Domain\Compliance\SubmissionResult;
 
 /**
  * One implementation per tax authority (MoR Ethiopia, KRA eTIMS, URA EFRIS, TRA VFD, RRA EBM, NRS MBS).
- * Connectors translate Ledgerly's normalised payload into the authority's format and back; they never
+ * Connectors translate Evenbooks' normalised payload into the authority's format and back; they never
  * touch the ledger.
  */
 interface EInvoiceConnector

@@ -51,7 +51,7 @@ final class ImportController extends Controller
         // The chart: a parent is named by its code, above its accounts in the file.
         'accounts' => ['code' => 'code', 'account_code' => 'code', 'number' => 'code', 'account_number' => 'code', 'name' => 'name', 'account_name' => 'name',
             'account' => 'name', 'type' => 'type', 'account_type' => 'type', 'account_#' => 'code', 'account_no' => 'code', 'a/c' => 'code', 'ref' => 'code', 'nominal_code' => 'code', 'category' => 'type', 'group' => 'type', 'under' => 'type', 'kind' => 'kind', 'parent' => 'parent', 'parent_code' => 'parent'],
-        // A customer or supplier is named as in Ledgerly; dates as 2026-06-30 or 30/06/2026; the amount is what was still open.
+        // A customer or supplier is named as in Evenbooks; dates as 2026-06-30 or 30/06/2026; the amount is what was still open.
         'open-invoices' => ['customer' => 'contact', 'customer_name' => 'contact', 'name' => 'contact', 'number' => 'number', 'invoice_number' => 'number',
             'invoice' => 'number', 'date' => 'issue_date', 'issue_date' => 'issue_date', 'invoice_date' => 'issue_date', 'due_date' => 'due_date', 'due' => 'due_date',
             'currency' => 'currency', 'amount' => 'amount', 'open_amount' => 'amount', 'amount_due' => 'amount', 'balance' => 'amount', 'outstanding' => 'amount',
@@ -90,10 +90,10 @@ final class ImportController extends Controller
      */
     private const FOREIGN_TYPES = [
         // QuickBooks
-        'bank' => [null, null, 'a bank account: open it under Banking'], 'accounts_receivable_(a/r)' => [null, null, 'the receivable: Ledgerly keeps one, from invoices'],
-        'accounts_receivable' => [null, null, 'the receivable: Ledgerly keeps one, from invoices'], 'other_current_assets' => ['asset', null], 'fixed_assets' => ['asset', 'fixed_asset'],
-        'other_assets' => ['asset', null], 'accounts_payable_(a/p)' => [null, null, 'the payable: Ledgerly keeps one, from bills'],
-        'accounts_payable' => [null, null, 'the payable: Ledgerly keeps one, from bills'], 'credit_card' => ['liability', null], 'other_current_liabilities' => ['liability', null],
+        'bank' => [null, null, 'a bank account: open it under Banking'], 'accounts_receivable_(a/r)' => [null, null, 'the receivable: Evenbooks keeps one, from invoices'],
+        'accounts_receivable' => [null, null, 'the receivable: Evenbooks keeps one, from invoices'], 'other_current_assets' => ['asset', null], 'fixed_assets' => ['asset', 'fixed_asset'],
+        'other_assets' => ['asset', null], 'accounts_payable_(a/p)' => [null, null, 'the payable: Evenbooks keeps one, from bills'],
+        'accounts_payable' => [null, null, 'the payable: Evenbooks keeps one, from bills'], 'credit_card' => ['liability', null], 'other_current_liabilities' => ['liability', null],
         'long_term_liabilities' => ['liability', 'loan'], 'other_income' => ['income', 'other_income'], 'cost_of_goods_sold' => ['expense', 'cogs'],
         'other_expense' => ['expense', 'operating'],
         // Sage

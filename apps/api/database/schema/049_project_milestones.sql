@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 49: project milestones and progress billing (Module 9a).
+-- Evenbooks core schema, part 49: project milestones and progress billing (Module 9a).
 --
 -- A fixed-fee project is billed in steps: a milestone is a part of the contract (an amount, often a share of the
 -- contract value) with a name and a due date, billed on an invoice to the project's customer when it is reached.

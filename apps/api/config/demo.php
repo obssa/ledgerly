@@ -1,7 +1,7 @@
 <?php
 
 /*
-| Demo sign-in: one shared account per role in a demo company, so anyone can try Ledgerly without signing up.
+| Demo sign-in: one shared account per role in a demo company, so anyone can try Evenbooks without signing up.
 |
 | Off unless DEMO_LOGINS=true. The deploy turns it on from the repository variable DEMO_LOGINS and then runs
 | `ledgerly:demo-setup` as the owner role (database/schema/018_demo_accounts.sql). Every visitor shares these

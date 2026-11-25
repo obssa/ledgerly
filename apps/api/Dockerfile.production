@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Production image for the Ledgerly API: FrankenPHP (Caddy + PHP 8.4), OPcache, no dev packages, non-root.
+# Production image for the Evenbooks API: FrankenPHP (Caddy + PHP 8.4), OPcache, no dev packages, non-root.
 # Built and pushed to GHCR by .github/workflows/deploy.yml. Local development uses ./Dockerfile instead.
 #
 # Runtime contract (all from the host's secret store, never baked into the image, SECURITY.md S9):

@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 83: employee expense claims (Module 3).
+-- Evenbooks core schema, part 83: employee expense claims (Module 3).
 --
 -- A member of staff who paid for the company out of their own pocket claims it back. The claim is an ordinary bill
 -- payable to them: the company keeps a supplier record for the member (contacts.employee_user_id), and the bill names

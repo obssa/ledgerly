@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 23: refunds (Modules 2 and 3).
+-- Evenbooks core schema, part 23: refunds (Modules 2 and 3).
 --
 -- A refund gives back credit: money paid out to a customer for what they hold (a credit note's credit left, or the
 -- unused part of their payment), or money a supplier pays back (a supplier credit's credit left, or the unused part of

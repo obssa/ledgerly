@@ -1,6 +1,6 @@
--- Ledgerly core schema, part 66: the staff console (SECURITY.md S8).
+-- Evenbooks core schema, part 66: the staff console (SECURITY.md S8).
 --
--- Ledgerly's own support staff sign in apart from customers: their own accounts, a password and an authenticator code
+-- Evenbooks' own support staff sign in apart from customers: their own accounts, a password and an authenticator code
 -- always, from allow-listed addresses only (checked by the API). To look into a customer's books they open a support
 -- session for one company, with a reason, for up to two hours; inside it they only read (the API reads in a read-only
 -- transaction, under row-level security for that company). Every staff step is in the staff log. Rules here:

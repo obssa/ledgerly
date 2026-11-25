@@ -29,7 +29,7 @@ unset OWNER_PASSWORD
 case "$MODE" in
   dump)
     command -v pg_dump >/dev/null || { echo "pg_dump is not installed on this server" >&2; exit 1; }
-    # Only Ledgerly's schema; owners and grants are left out (a restore recreates them for its own roles).
+    # Only Evenbooks' schema; owners and grants are left out (a restore recreates them for its own roles).
     exec pg_dump --format=custom --compress=6 --no-owner --no-privileges --schema="$SCHEMA"
     ;;
   heads)

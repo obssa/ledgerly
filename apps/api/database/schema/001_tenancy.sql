@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 1: tenancy and identity.
+-- Evenbooks core schema, part 1: tenancy and identity.
 -- An organisation is the paying tenant; it owns one or more companies (legal entities with their own books).
 -- Every business table carries company_id and is protected by row-level security (005_rls.sql).
 -- The big append-only tables are hash-partitioned by company_id from this first migration.
@@ -67,7 +67,7 @@ CREATE TABLE companies (
     languages               text[]      NOT NULL DEFAULT ARRAY['en'],
     framework               text        NOT NULL DEFAULT 'ifrs_sme' CHECK (framework IN ('ifrs_sme')),
     status                  text        NOT NULL DEFAULT 'setting_up' CHECK (status IN ('setting_up', 'live', 'archived')),
-    conversion_date         date,       -- last bank statement date before Ledgerly; opening balances are as at this date
+    conversion_date         date,       -- last bank statement date before Evenbooks; opening balances are as at this date
     books_closed_until      date,       -- period lock: nothing may post on or before this date
     settings                jsonb       NOT NULL DEFAULT '{}'::jsonb,
     created_at              timestamptz NOT NULL DEFAULT now(),

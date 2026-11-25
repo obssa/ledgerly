@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 40: projects and job costing (Module 9a).
+-- Evenbooks core schema, part 40: projects and job costing (Module 9a).
 --
 -- A project is a dimension of kind 'project' (014) with its details: the customer it is for, its status, dates, how it
 -- is billed, its contract value and its budget. Job costing tags each line of an invoice, credit note, bill, supplier

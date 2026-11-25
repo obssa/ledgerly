@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 70: sales receipts, the cash sale (Module 2).
+-- Evenbooks core schema, part 70: sales receipts, the cash sale (Module 2).
 --
 -- A sales receipt is a sale paid at once, in cash, by card, transfer or wallet: a shop sale, a walk-in customer. It
 -- is a document of its own (type 'sales_receipt', numbered SR-) that posts in one entry, Dr the account the money went

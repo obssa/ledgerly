@@ -60,7 +60,7 @@ export default async function ChangesReport({ searchParams }: PageProps<"/report
                               {href ? <Link href={href} className="num font-semibold text-ink hover:underline">{doc?.number ?? "Draft"}</Link> : <span className="num font-semibold">{doc?.number ?? "—"}</span>}
                             </td>
                             <td><Pill tone={e.action === "voided" ? "bad" : e.action === "edited_after_posting" ? "warn" : "neutral"}>{actionLabel(e.action)}</Pill></td>
-                            <td>{e.user?.name ?? "Ledgerly"}</td>
+                            <td>{e.user?.name ?? "Evenbooks"}</td>
                             <td className="!whitespace-normal text-[13px]">
                               {changes.length === 0 ? <span className="text-muted">—</span> : (
                                 <ul className="grid gap-0.5">

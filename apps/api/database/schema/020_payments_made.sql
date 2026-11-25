@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 20: payments made to suppliers (Module 3).
+-- Evenbooks core schema, part 20: payments made to suppliers (Module 3).
 --
 -- 016 covers payments received. This part extends the same rules to payments out:
 --   1. A payment in settles invoices of its customer; a payment out settles bills of its supplier. Same company, same

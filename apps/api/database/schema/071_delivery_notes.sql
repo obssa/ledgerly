@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 71: delivery notes (Module 2).
+-- Evenbooks core schema, part 71: delivery notes (Module 2).
 --
 -- A delivery note says what of a confirmed sales order left for the customer, and when. Its stock lines leave the
 -- warehouse that day at their cost (weighted average or FIFO, decided by the database), and the cost of goods sold is

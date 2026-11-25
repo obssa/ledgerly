@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 8: who may change access, companies and credentials (security review).
+-- Evenbooks core schema, part 8: who may change access, companies and credentials (security review).
 --
 -- 007 isolates one company from another. This file closes the gaps INSIDE a company and around sign-in:
 --   1. Only an owner or admin can add, change or remove members. Only an owner can grant or take the owner role.
@@ -49,7 +49,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = {{schema}}, pg_temp AS $$
                       AND m.status = 'active' AND m.role IN ('owner', 'admin'))
 $$;
 
--- For inviting someone who already has a Ledgerly account: returns only the id, only to an owner or admin
+-- For inviting someone who already has an Evenbooks account: returns only the id, only to an owner or admin
 -- of the current company.
 CREATE FUNCTION app_user_id_for_invite(p_email text) RETURNS uuid
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = {{schema}}, pg_temp AS $$

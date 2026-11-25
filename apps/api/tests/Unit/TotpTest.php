@@ -80,8 +80,8 @@ final class TotpTest extends TestCase
     public function test_the_qr_address_names_the_account_and_issuer(): void
     {
         $this->assertSame(
-            'otpauth://totp/Ledgerly:hana%40example.test?secret=' . self::SECRET . '&issuer=Ledgerly&algorithm=SHA1&digits=6&period=30',
-            Totp::uri(self::SECRET, 'hana@example.test', 'Ledgerly'),
+            'otpauth://totp/Evenbooks:hana%40example.test?secret=' . self::SECRET . '&issuer=Evenbooks&algorithm=SHA1&digits=6&period=30',
+            Totp::uri(self::SECRET, 'hana@example.test', 'Evenbooks'),
         );
     }
 }

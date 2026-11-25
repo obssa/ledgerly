@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 74: batches and expiry (Module 4).
+-- Evenbooks core schema, part 74: batches and expiry (Module 4).
 --
 -- A stock item may be tracked by batch (a lot, with an expiry date when it has one): food, medicine, chemicals. Every
 -- stock move of such an item names the batch it moves; the stock of each batch in each warehouse is kept, and it never

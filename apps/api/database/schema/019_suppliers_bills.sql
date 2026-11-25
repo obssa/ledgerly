@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 19: suppliers and bills (Module 3).
+-- Evenbooks core schema, part 19: suppliers and bills (Module 3).
 --
 -- A contact is a customer, a supplier (is_vendor) or both. The supplier side adds where to pay them (bank or
 -- mobile-money details), the expense account their bills usually go to, and whether withholding tax applies

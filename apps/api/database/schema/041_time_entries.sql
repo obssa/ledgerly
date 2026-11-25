@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 41: time tracking and billing time (Module 9a).
+-- Evenbooks core schema, part 41: time tracking and billing time (Module 9a).
 --
 -- People log hours against a project: billable or not, at a rate (the project's hourly rate unless one is given).
 -- Billing time puts the billable hours on an invoice for the project's customer; each entry then names that invoice.

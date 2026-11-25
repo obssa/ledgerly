@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 37: the adjustments period for the auditor (Module 6).
+-- Evenbooks core schema, part 37: the adjustments period for the auditor (Module 6).
 --
 -- After a fiscal year is closed, the auditor's adjusting entries are posted into it without reopening it: each is dated
 -- the year's last day (source 'adjustment', naming the year), and the year's closing entry is posted again so retained

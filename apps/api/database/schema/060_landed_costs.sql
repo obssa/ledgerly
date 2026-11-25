@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 60: landed costs (Module 4).
+-- Evenbooks core schema, part 60: landed costs (Module 4).
 --
 -- A bill for freight, customs duty or clearing (the cost bill) is added to the cost of the goods another bill brought in
 -- (the goods bill): its amount is spread over the goods bill's stock lines, by their value or their quantity. The share

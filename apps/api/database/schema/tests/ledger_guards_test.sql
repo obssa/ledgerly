@@ -3125,7 +3125,7 @@ BEGIN
   RAISE NOTICE 'PASS T86 landed costs add value onto stock on hand, join two posted bills, stay within the cost bill and are kept';
 END $$;
 -- T87: a fixed asset's tax depreciation (061). Straight line names its months, a reducing balance its rate, never both;
--- what tax allowed before Ledgerly is never more than the cost; no tax method, no tax figures. Company A as f1, the
+-- what tax allowed before Evenbooks is never more than the cost; no tax method, no tax figures. Company A as f1, the
 -- accounts of T69.
 DO $$
 DECLARE
@@ -3145,14 +3145,14 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN
     UPDATE fixed_assets SET tax_opening_depreciation = 100 WHERE id = a;
-    RAISE EXCEPTION 'FAIL T87c: tax depreciation before Ledgerly without a tax method';
+    RAISE EXCEPTION 'FAIL T87c: tax depreciation before Evenbooks without a tax method';
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN
     UPDATE fixed_assets SET tax_method = 'reducing_balance', tax_annual_rate = 0.25, tax_opening_depreciation = 60001 WHERE id = a;
-    RAISE EXCEPTION 'FAIL T87d: tax depreciation before Ledgerly was more than the cost';
+    RAISE EXCEPTION 'FAIL T87d: tax depreciation before Evenbooks was more than the cost';
   EXCEPTION WHEN check_violation THEN NULL; END;
   UPDATE fixed_assets SET tax_method = 'reducing_balance', tax_annual_rate = 0.25, tax_opening_depreciation = 1000 WHERE id = a;
-  RAISE NOTICE 'PASS T87 an asset''s tax depreciation names one rule, and never more than its cost before Ledgerly';
+  RAISE NOTICE 'PASS T87 an asset''s tax depreciation names one rule, and never more than its cost before Evenbooks';
 END $$;
 -- T88: post-dated cheques (062). Held from the company's own customer (in) or to its own supplier (out) through its
 -- own bank account, dated after the day it changes hands; a cheque written is numbered once per account; it stays as

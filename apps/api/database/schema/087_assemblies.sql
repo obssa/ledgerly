@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 87: assemblies, a bill of materials (Module 4).
+-- Evenbooks core schema, part 87: assemblies, a bill of materials (Module 4).
 --
 -- A stock item may be made from other stock items: its parts list says how many of each go into one. Building some
 -- takes the parts out of a warehouse at their cost and puts the assembled item in at the sum of that cost (production

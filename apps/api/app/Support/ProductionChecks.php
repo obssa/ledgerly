@@ -25,7 +25,7 @@ final class ProductionChecks
             appKey: (string) config('app.key'),
         );
         if ($problems !== []) {
-            throw new RuntimeException('Ledgerly will not start in production: ' . implode(' ', $problems));
+            throw new RuntimeException('Evenbooks will not start in production: ' . implode(' ', $problems));
         }
     }
 

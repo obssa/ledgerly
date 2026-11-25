@@ -36,7 +36,7 @@ async function DemoSignIn({ searchParams }: { searchParams: PageProps<"/sign-in"
 export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   return (
     <>
-      <h1 className="text-[24px] font-extrabold tracking-tight">Sign in to Ledgerly</h1>
+      <h1 className="text-[24px] font-extrabold tracking-tight">Sign in to Evenbooks</h1>
       <AuthForm
         action={signIn}
         submit="Sign in"
@@ -49,7 +49,7 @@ export default function SignInPage({ searchParams }: PageProps<"/sign-in">) {
         <Link href="/forgot-password" className="font-bold text-brand">Forgot your password?</Link>
       </p>
       <p className="mt-3 text-center text-sm text-muted">
-        New to Ledgerly? <Link href="/sign-up" className="font-bold text-brand">Create an account</Link>
+        New to Evenbooks? <Link href="/sign-up" className="font-bold text-brand">Create an account</Link>
       </p>
       <Suspense fallback={null}>
         <DemoSignIn searchParams={searchParams} />

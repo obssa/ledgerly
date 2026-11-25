@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 32: manual journal entries (Module 6).
+-- Evenbooks core schema, part 32: manual journal entries (Module 6).
 --
 -- A manual journal (source 'manual') is the accountant's own entry: an accrual, a correction, a reclassification. It
 -- never touches an account another part of the books keeps by its documents, because the documents and the account would

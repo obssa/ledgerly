@@ -58,7 +58,7 @@ jobs:
       - name: Verify every company's books and audit chain
         run: |
           SCHEMA=$(psql -At -c "SELECT n.nspname FROM pg_namespace n JOIN pg_class c ON c.relnamespace = n.oid WHERE c.relname = 'journal_entries' LIMIT 1")
-          test -n "$SCHEMA" || { echo "No Ledgerly tables were restored"; exit 1; }
+          test -n "$SCHEMA" || { echo "No Evenbooks tables were restored"; exit 1; }
           psql -X -v ON_ERROR_STOP=1 -v schema="$SCHEMA" <<'SQL' | tee drill.txt
           SET search_path = :"schema", pg_temp;
           SELECT 'companies' AS what, count(*) FROM companies

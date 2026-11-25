@@ -79,7 +79,7 @@ final class TeamController extends Controller
             if ($new) {
                 $name = trim((string) ($data['name'] ?? ''));
                 if ($name === '') {
-                    throw ValidationException::withMessages(['name' => ['Give their name: they have no Ledgerly account yet.']]);
+                    throw ValidationException::withMessages(['name' => ['Give their name: they have no Evenbooks account yet.']]);
                 }
                 // An account with no usable password: it opens only through the invitation link (or a password reset).
                 $created = new User();

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs ON the cPanel server, called by .github/workflows/billing.yml: the operator's hand on a Ledgerly subscription
+# Runs ON the cPanel server, called by .github/workflows/billing.yml: the operator's hand on an Evenbooks subscription
 # (053), as the owner role, since the application cannot change it.
 #
 #   ssh target "bash ~/ledgerly/deploy/billing.sh <organisation-or-company-id> <action> [plan] [paid-until] [days] [reference]" <<< "<owner password>"

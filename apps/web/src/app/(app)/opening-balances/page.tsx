@@ -9,7 +9,7 @@ export const metadata = { title: "Opening balances" };
 
 /**
  * Module 1, opening balances: the trial balance on the conversion date (the last bank statement date before
- * Ledgerly). Receivables, payables and stock come from the open invoices, bills and stock behind them.
+ * Evenbooks). Receivables, payables and stock come from the open invoices, bills and stock behind them.
  */
 export default async function OpeningBalancesPage() {
   const data = await getOpeningBalances();
@@ -39,7 +39,7 @@ export default async function OpeningBalancesPage() {
       <Card className="max-w-[1000px]" label="Opening trial balance">
         {opening.conversion_date === null ? (
           <p className="text-sm">
-            Set the conversion date first: it is the date of your last bank statement before Ledgerly, and opening balances are as at that
+            Set the conversion date first: it is the date of your last bank statement before Evenbooks, and opening balances are as at that
             date. <Link href="/settings" className="font-bold text-brand">Company settings</Link>
           </p>
         ) : (

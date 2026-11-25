@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 100: the company's logo (Module 1).
+-- Evenbooks core schema, part 100: the company's logo (Module 1).
 --
 -- A company can have a logo on its invoices and quotes: on the page and its print view, on the invoice or quote the
 -- customer opens from a link, and on the PDF where the host can draw images. It is kept apart from the company row,

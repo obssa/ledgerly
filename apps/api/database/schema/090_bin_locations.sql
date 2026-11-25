@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 90: bin locations (Module 4).
+-- Evenbooks core schema, part 90: bin locations (Module 4).
 --
 -- Where a stock item is kept in each warehouse ("Aisle 3 / B2"), so it is picked, counted and put away in the right
 -- place. A location is where to look; the stock itself is still counted per warehouse (024). Rules:

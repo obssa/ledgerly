@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 62: post-dated cheques (Module 5).
+-- Evenbooks core schema, part 62: post-dated cheques (Module 5).
 --
 -- A cheque dated later than the day it changes hands (a customer pays with next month's cheque, or the company writes
 -- one) is held in a register, not in the books: it is not money yet. When its date comes it is presented, and only then

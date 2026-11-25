@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 39: tax returns (Module 7).
+-- Evenbooks core schema, part 39: tax returns (Module 7).
 --
 -- A tax return is the record of what was filed with the tax authority for a period: the figures as built from the
 -- ledger when it was filed, the date and the authority's reference. Settling it posts one entry (source

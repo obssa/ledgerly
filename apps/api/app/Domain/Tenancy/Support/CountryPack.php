@@ -12,7 +12,7 @@ use JsonException;
  * A country pack is data, not code: tax rates, tax rules, calendars and the e-invoicing connector for one
  * country, on top of the shared IFRS for SMEs chart. Adding a country = a new JSON file + one connector class.
  *
- * Ledgerly works in every country: a country without its own pack gets the default pack (_default.json),
+ * Evenbooks works in every country: a country without its own pack gets the default pack (_default.json),
  * where the company picks its currency and enters its own tax rates. An industry template
  * (_industries.json) then adds the accounts that type of business needs.
  */

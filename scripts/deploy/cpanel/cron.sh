@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ledgerly's two cron jobs on the cPanel account, run by provision.sh and by every release.sh.
+# Evenbooks' two cron jobs on the cPanel account, run by provision.sh and by every release.sh.
 #
 #   bash cron.sh            ROOT and PHP come from LEDGERLY_ROOT / PHP_BIN, as in release.sh
 #
@@ -10,7 +10,7 @@
 #   flock -n    a run that finds the previous one still going does nothing (one process, gone at once)
 #   timeout     a run that outlives its time is stopped (TERM, then KILL); its transaction rolls back
 #
-# The crontab is shared with any other app on the account. Only lines that run Ledgerly's own
+# The crontab is shared with any other app on the account. Only lines that run Evenbooks' own
 # commands from this ROOT are replaced; every other line stays as it is. If the crontab cannot be read for any
 # reason other than "there is none yet", or flock/timeout are missing, nothing is changed.
 set -euo pipefail
@@ -66,4 +66,4 @@ mkdir -p "$ROOT/shared"
 [ -f "$ROOT/shared/crontab.before-ledgerly" ] || printf '%s\n' "$current" > "$ROOT/shared/crontab.before-ledgerly"
 printf '%s\n' "$current" > "$ROOT/shared/crontab.previous"
 printf '%s' "$out" | crontab -
-echo "cron: Ledgerly's jobs now run one at a time, for a bounded time (copy of the previous crontab: shared/crontab.previous)"
+echo "cron: Evenbooks' jobs now run one at a time, for a bounded time (copy of the previous crontab: shared/crontab.previous)"

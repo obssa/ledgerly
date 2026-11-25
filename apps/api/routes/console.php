@@ -206,7 +206,7 @@ Artisan::command('ledgerly:remind-scheduled-payments', function (\App\Domain\Pur
 })->purpose('Email the people who pay bills about payments scheduled for today');
 
 /*
-| Ledgerly's own subscriptions (053): once a day, a trial past its end is suspended, a subscription past its paid-until
+| Evenbooks' own subscriptions (053): once a day, a trial past its end is suspended, a subscription past its paid-until
 | date becomes past due, and past due beyond the grace days is suspended (suspended books are read-only). Only while
 | billing is enforced (config/billing.php); never the shared demo. Runs as the application, outside any company.
 */
@@ -316,12 +316,12 @@ Artisan::command('ledgerly:subscription {organisation : the organisation id, or 
     $this->info("{$action}: plan {$now->plan}, status {$now->status}, trial ends " . ($now->trial_ends_at ?? '-') . ', paid until ' . ($now->paid_until ?? '-') . '.');
 
     return 0;
-})->purpose("Record a payment or change a company's Ledgerly subscription (owner role)");
+})->purpose("Record a payment or change a company's Evenbooks subscription (owner role)");
 
 /*
 | Reminders of tax returns that are due (054): from each company's filing calendar (the country pack's due dates), an
 | email to the people who may file tax when a return is due within ten days, and again when it has just become overdue
-| (within a week of its due date, so a company new to Ledgerly is not sent its whole past). Once per period and stage.
+| (within a week of its due date, so a company new to Evenbooks is not sent its whole past). Once per period and stage.
 | Which companies come from tax_reminder_companies(): in use, not the demo, reminders not turned off.
 */
 Artisan::command('ledgerly:send-tax-reminders', function (\App\Domain\Tax\TaxCalendar $calendar, \App\Domain\Tenancy\Support\CurrentCompany $current) {
@@ -381,7 +381,7 @@ Artisan::command('ledgerly:create-schema {--database=owner}', function () {
     $schema = SchemaSql::schema();
     DB::connection($this->option('database'))->statement('CREATE SCHEMA IF NOT EXISTS "' . $schema . '"');
     $this->info("Schema {$schema} is ready.");
-})->purpose('Create the schema the Ledgerly tables live in (DB_SCHEMA)');
+})->purpose('Create the schema the Evenbooks tables live in (DB_SCHEMA)');
 
 /*
 | Run by the deploy after migrating, on the application's own connection: refuses to go live if the login the
@@ -505,10 +505,10 @@ Artisan::command('ledgerly:staff {email : the staff member\'s email} {--name= : 
     $this->info("Setup link mailed to {$email}; it works for {$hours} hours.");
 
     return 0;
-})->purpose('Make, re-invite or switch off a Ledgerly staff account (owner role)');
+})->purpose('Make, re-invite or switch off an Evenbooks staff account (owner role)');
 
 /*
-| A test company (104): real books the operator keeps for trying Ledgerly out, run as the owner role. It
+| A test company (104): real books the operator keeps for trying Evenbooks out, run as the owner role. It
 |  - adds each --owner as an active owner of the company: an account that does not exist yet is made with a
 |    generated password, written only to --accounts-file (mode 600), never printed or mailed;
 |  - takes the company out of the shared demo, if it was in it: its demo accounts stop being demo accounts, lose

@@ -1,7 +1,7 @@
--- Ledgerly core schema, part 104: test companies.
+-- Evenbooks core schema, part 104: test companies.
 --
 -- A test company is a real company (real members with their own sign-in, real books, tax reminders, a subscription)
--- that the operator keeps for trying Ledgerly out. It is not the shared demo (018): nobody signs in to it without an
+-- that the operator keeps for trying Evenbooks out. It is not the shared demo (018): nobody signs in to it without an
 -- account of their own. What it has that other companies do not: its owners may give it empty books (a new company,
 -- the old one archived and kept, read-only) and fill those with the sample books, as the demo's owner can (101).
 --   1. Only the owner role marks a company as a test company (the operator, `ledgerly:test-company`); the application

@@ -1,4 +1,4 @@
-# The operator's hand on a company's Ledgerly subscription (053): record a bank transfer (activate until a date), change
+# The operator's hand on a company's Evenbooks subscription (053): record a bank transfer (activate until a date), change
 # the plan, extend a trial, suspend or cancel, or just show it. Runs scripts/deploy/cpanel/billing.sh on the server as the
 # owner role, with the owner password on stdin only (as a release does). Every run is kept in subscription_events.
 name: billing

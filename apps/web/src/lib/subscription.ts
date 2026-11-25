@@ -1,4 +1,4 @@
-/** Module 11: the company's subscription to Ledgerly (GET /subscription, 053). */
+/** Module 11: the company's subscription to Evenbooks (GET /subscription, 053). */
 export interface Subscription {
   plan: string;
   plan_name: string;
@@ -29,7 +29,7 @@ export function subscriptionNotice(s: Subscription | null): { tone: "bad" | "war
     return { tone: "bad", text: `The subscription is ${s.status}: the books are read-only. You can still view and export them.${s.can.manage ? " See Settings, Plan and billing, to pay." : ""}` };
   }
   if (s.status === "past_due") {
-    return { tone: "warn", text: `The payment for Ledgerly is overdue${s.until ? ` (paid until ${s.until})` : ""}. The books become read-only after a short grace period.` };
+    return { tone: "warn", text: `The payment for Evenbooks is overdue${s.until ? ` (paid until ${s.until})` : ""}. The books become read-only after a short grace period.` };
   }
   if (s.status === "trial" && s.enforced && s.days_left !== null && s.days_left <= 7) {
     const when = s.days_left <= 0 ? "today" : s.days_left === 1 ? "tomorrow" : `in ${s.days_left} days`;

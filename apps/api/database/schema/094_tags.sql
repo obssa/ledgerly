@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 94: custom tags (Module 1).
+-- Evenbooks core schema, part 94: custom tags (Module 1).
 --
 -- A tag is a label of the company's own ("Trade fair 2027", "Addis branch launch") put on whole transactions: an
 -- invoice, bill or expense, or a journal entry. Unlike the location, class and project dimensions it sits on the

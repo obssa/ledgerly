@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 101: a fresh start for the demo.
+-- Evenbooks core schema, part 101: a fresh start for the demo.
 --
 -- The demo's owner can give the shared demo accounts an empty company: a new demo company is set up, the old one is
 -- archived (kept, read-only: nothing in the books is ever deleted), and every demo account moves to the new one.

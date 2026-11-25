@@ -42,7 +42,7 @@ export function DocumentHistoryPanel({ history, timeZone, auditHref }: { history
                 <span aria-hidden="true" className={`absolute -left-[21px] top-1.5 size-2.5 rounded-full ring-2 ring-surface ${tone}`} />
                 <div className="text-[13.5px] font-semibold">{actionLabel(row.action)}{version ? <span className="font-normal text-muted"> · version {version.version} kept</span> : null}</div>
                 <div className="text-[12.5px] text-muted">
-                  {row.user_name ?? (row.actor_type === "system" || !row.user_id ? "Ledgerly" : "A former member")} · <time dateTime={row.created_at}>{when(row.created_at)}</time>
+                  {row.user_name ?? (row.actor_type === "system" || !row.user_id ? "Evenbooks" : "A former member")} · <time dateTime={row.created_at}>{when(row.created_at)}</time>
                 </div>
                 {row.reason && <p className="mt-1 rounded-md bg-canvas px-2 py-1 text-[12.5px]"><span className="text-muted">Why: </span>{row.reason}</p>}
                 {changes.length > 0 && (
