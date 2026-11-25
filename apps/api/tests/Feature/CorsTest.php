@@ -7,7 +7,7 @@ namespace Tests\Feature;
 use Tests\RefreshLedgerDatabase;
 use Tests\TestCase;
 
-/** SECURITY.md S5: a browser may call the API only from Ledgerly's own web app, never with credentials. */
+/** SECURITY.md S5: a browser may call the API only from Evenbooks' own web app, never with credentials. */
 final class CorsTest extends TestCase
 {
     use RefreshLedgerDatabase;
@@ -16,7 +16,7 @@ final class CorsTest extends TestCase
 
     public function test_another_sites_page_gets_no_permission_to_call_the_api(): void
     {
-        // The answer names only Ledgerly's own web app (or nothing), so the browser refuses the other site's page.
+        // The answer names only Evenbooks' own web app (or nothing), so the browser refuses the other site's page.
         $own = rtrim((string) config('security.frontend_url'), '/');
         $preflight = $this->call('OPTIONS', '/api/v1/auth/login', server: $this->server(['Origin' => 'https://evil.example', ...self::PREFLIGHT]));
         $this->assertContains($preflight->headers->get('Access-Control-Allow-Origin'), [null, $own]);

@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 24: perpetual inventory at weighted average cost (Module 4).
+-- Evenbooks core schema, part 24: perpetual inventory at weighted average cost (Module 4).
 --
 -- Every stock move carries its value (amount, signed, base currency). The database keeps a running balance per item and
 -- warehouse (stock_balances) and decides the cost of every move out itself, so the bin card and the ledger always agree:

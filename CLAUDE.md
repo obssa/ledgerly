@@ -1,4 +1,4 @@
-# Ledgerly — instructions for Claude Code
+# Evenbooks — instructions for Claude Code
 
 Multi-tenant financial accounting SaaS (QuickBooks-style). Laravel 13 API (`apps/api`), Next.js 16 web
 (`apps/web`), PostgreSQL 18, Redis. Launches in Ethiopia; works in any country through country packs.

@@ -35,7 +35,7 @@ final class CompanyExportController extends Controller
         }
         RateLimiter::hit($key, 3600);
 
-        $path = tempnam(sys_get_temp_dir(), 'ledgerly-export-');
+        $path = tempnam(sys_get_temp_dir(), 'evenbooks-export-');
         $out = fopen($path, 'wb');
         try {
             $counts = $this->export->write($companyId, $out);
@@ -48,7 +48,7 @@ final class CompanyExportController extends Controller
 
         $name = Str::slug((string) ($this->current->get()->trading_name ?: $this->current->get()->legal_name)) ?: 'company';
 
-        return response()->download($path, "ledgerly-{$name}-" . now()->format('Y-m-d') . '.zip', ['Content-Type' => 'application/zip'])
+        return response()->download($path, "evenbooks-{$name}-" . now()->format('Y-m-d') . '.zip', ['Content-Type' => 'application/zip'])
             ->deleteFileAfterSend();
     }
 }

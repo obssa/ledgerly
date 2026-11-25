@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 3: contacts, tax rates, business documents and payments.
+-- Evenbooks core schema, part 3: contacts, tax rates, business documents and payments.
 -- Documents (quotes, invoices, bills, credit notes) are editable until posted; posting creates a
 -- journal entry and stores its id on the document.
 

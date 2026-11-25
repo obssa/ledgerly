@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 31: the chart of accounts (Module 6).
+-- Evenbooks core schema, part 31: the chart of accounts (Module 6).
 --
 -- Accounts are added, renamed, re-coded, grouped under a parent and archived; never deleted, because the ledger names
 -- them. Rules here (026 already keeps an account's type, kind and currency once it has entries):

@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 73: bundles and kits (Module 4).
+-- Evenbooks core schema, part 73: bundles and kits (Module 4).
 --
 -- A bundle is an item sold as one, made of other items: a gift box of two bags of coffee and a mug. It has its own
 -- price and holds no stock itself; selling it (on an invoice or a cash sale) takes its stock parts out, each its

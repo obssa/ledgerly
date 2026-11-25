@@ -8,7 +8,7 @@ restores.
 
 1. **The dump.** The workflow connects to the server with the deploy key. It hands the owner password over stdin to
    `scripts/deploy/cpanel/backup.sh`, the same way a release does, so the password is never written on the server.
-   `pg_dump` streams Ledgerly's schema back in PostgreSQL's custom format.
+   `pg_dump` streams Evenbooks' schema back in PostgreSQL's custom format.
 2. **Encryption.** The stream is encrypted with [age](https://age-encryption.org) for one public key
    (`BACKUP_AGE_RECIPIENT`) before it touches a disk. Nothing unencrypted is kept, either on the server or on the
    runner.

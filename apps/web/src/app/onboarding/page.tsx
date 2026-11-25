@@ -28,7 +28,7 @@ export default function OnboardingPage({ searchParams }: PageProps<"/onboarding"
   return (
     <div className="flex min-h-screen flex-wrap">
       <aside className="max-w-full flex-[1_1_340px] bg-side px-9 py-8 text-white">
-        <div className="text-xl font-extrabold tracking-tight">Ledgerly</div>
+        <div className="text-xl font-extrabold tracking-tight">Evenbooks</div>
         <h1 className="mt-12 text-[30px] font-extrabold leading-tight tracking-tight">Set up your books in about 10 minutes</h1>
         <p className="mb-7 mt-2.5 text-[15px] leading-relaxed text-[#a9bdb7]">Skip any step and finish it later from your home screen.</p>
         <ol aria-label="Setup steps">

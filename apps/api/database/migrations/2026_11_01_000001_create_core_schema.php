@@ -24,7 +24,7 @@ return new class extends Migration
     public function up(): void
     {
         if (DB::getDriverName() !== 'pgsql') {
-            throw new RuntimeException('Ledgerly requires PostgreSQL 16+ (row-level security, constraint triggers).');
+            throw new RuntimeException('Evenbooks requires PostgreSQL 16+ (row-level security, constraint triggers).');
         }
 
         foreach (self::FILES as $file) {

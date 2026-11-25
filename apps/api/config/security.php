@@ -21,7 +21,7 @@ return [
 
     'mfa' => [
         'required_roles' => ['owner', 'admin'],
-        'issuer' => env('APP_NAME', 'Ledgerly'),
+        'issuer' => env('APP_NAME', 'Evenbooks'),
         'challenge_minutes' => 5,
         'max_attempts' => 5,
         'lock_seconds' => 900,

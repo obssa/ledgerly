@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 44: the salesperson on a sales document (Module 2, for Module 10's sales by salesperson).
+-- Evenbooks core schema, part 44: the salesperson on a sales document (Module 2, for Module 10's sales by salesperson).
 --
 -- An invoice, credit note, cash sale, quote or sales order may name the member of the company who made the sale.
 -- Rules here:

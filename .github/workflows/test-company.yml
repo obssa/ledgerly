@@ -1,6 +1,6 @@
 name: test-company
 
-# A test company (schema 104): real books the team tries Ledgerly out on, whose owners may empty them and fill them
+# A test company (schema 104): real books the team tries Evenbooks out on, whose owners may empty them and fill them
 # with the sample. Run by hand, as the owner role (whose password lives only in this repository's secrets and is given
 # to this one run). Accounts made now get a generated password written only to shared/test-accounts.txt on the server
 # (mode 600): never to this run's log, never by email.

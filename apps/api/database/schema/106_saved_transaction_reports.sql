@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 106: the transaction reports (Transaction list by date, Invoice list, Open invoices, Bill
+-- Evenbooks core schema, part 106: the transaction reports (Transaction list by date, Invoice list, Open invoices, Bill
 -- list, Unpaid bills, Payments received and made) can be saved and scheduled, with their Customize choices kept in the
 -- options (columns, sort, grouping, status: each checked by the API against its own list, SavedReports::OPTIONS).
 ALTER TABLE saved_reports DROP CONSTRAINT saved_reports_report_check;

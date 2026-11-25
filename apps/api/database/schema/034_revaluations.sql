@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 34: month-end revaluation of foreign-currency balances (Module 6).
+-- Evenbooks core schema, part 34: month-end revaluation of foreign-currency balances (Module 6).
 --
 -- IAS 21: monetary items in a foreign currency are reported at the closing rate. A revaluation restates, at a date, the
 -- base-currency value of every foreign-currency bank or wallet balance and every open foreign-currency invoice, credit

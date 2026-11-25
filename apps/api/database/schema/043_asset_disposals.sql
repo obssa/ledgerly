@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 43: disposing of fixed assets (Module 9c).
+-- Evenbooks core schema, part 43: disposing of fixed assets (Module 9c).
 --
 -- An asset is sold or scrapped by one entry (source 'asset_disposal', naming the asset) dated the day it goes: its
 -- accumulated depreciation and its cost come off, what it was sold for comes in, and the difference is a gain or loss

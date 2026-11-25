@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 63: files attached to documents (SECURITY.md S7; Module 3 receipts).
+-- Evenbooks core schema, part 63: files attached to documents (SECURITY.md S7; Module 3 receipts).
 --
 -- A receipt, a supplier's invoice or a contract kept with the bill, expense or invoice it backs. The file itself is in
 -- private storage outside the web root under a random name; this table holds what is known about it. Rules:

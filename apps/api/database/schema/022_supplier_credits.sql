@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 22: supplier credits (Module 3).
+-- Evenbooks core schema, part 22: supplier credits (Module 3).
 --
 -- A supplier credit (documents.type 'vendor_credit') is what a supplier gives back on one posted bill: goods returned,
 -- a price corrected. It mirrors a customer credit note (017): it names the bill, is in the bill's supplier and

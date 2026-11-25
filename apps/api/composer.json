@@ -1,7 +1,7 @@
 {
     "name": "ledgerly/api",
     "type": "project",
-    "description": "Ledgerly multi-tenant accounting API (Laravel 13)",
+    "description": "Evenbooks multi-tenant accounting API (Laravel 13)",
     "license": "proprietary",
     "require": {
         "php": "^8.3",

@@ -91,7 +91,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Route;
 
 /*
-| Ledgerly public API v1. The Next.js app uses exactly this API, so every feature is API-first.
+| Evenbooks public API v1. The Next.js app uses exactly this API, so every feature is API-first.
 | Company-scoped routes need the X-Company-Id header (see ResolveCompany).
 | Every authenticated request is one database transaction with the tenant set (RunInTenantTransaction).
 | POST and PUT requests may send an Idempotency-Key header and are then safe to repeat (Idempotency).

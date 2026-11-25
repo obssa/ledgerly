@@ -38,7 +38,7 @@ final class ScheduledPaymentDue extends Notification
             ->subject("To pay: {$this->supplier}, {$this->currency} {$this->amount} ({$this->company})")
             ->greeting("Hello {$notifiable->name},")
             ->line("A payment of {$this->currency} {$this->amount} to {$this->supplier} is scheduled for {$day}.")
-            ->line('Once the money has gone out, confirm it in Ledgerly: the payment is recorded and the bills are marked as paid. Until then nothing is in the books.')
+            ->line('Once the money has gone out, confirm it in Evenbooks: the payment is recorded and the bills are marked as paid. Until then nothing is in the books.')
             ->action('Open the payment', $url)
             ->line('You get this because you scheduled the payment, or can pay bills for the company.');
     }

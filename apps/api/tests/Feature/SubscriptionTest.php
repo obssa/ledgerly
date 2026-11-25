@@ -8,7 +8,7 @@ use Tests\CompanyFixtures;
 use Tests\RefreshLedgerDatabase;
 use Tests\TestCase;
 
-/** Module 11: Ledgerly's own subscription, without a payment provider (053): trial, read-only when suspended, the operator's hand. */
+/** Module 11: Evenbooks' own subscription, without a payment provider (053): trial, read-only when suspended, the operator's hand. */
 final class SubscriptionTest extends TestCase
 {
     use CompanyFixtures;

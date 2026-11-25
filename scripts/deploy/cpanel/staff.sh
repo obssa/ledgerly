@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Makes, re-invites or switches off a Ledgerly staff account (SECURITY.md S8), run by .github/workflows/staff.yml on
+# Makes, re-invites or switches off an Evenbooks staff account (SECURITY.md S8), run by .github/workflows/staff.yml on
 # the server. The owner database password comes on stdin and is used for this one artisan run only; it is never
 # written anywhere. Arguments: email, action (add, resend, deactivate), name, who asked.
 set -euo pipefail

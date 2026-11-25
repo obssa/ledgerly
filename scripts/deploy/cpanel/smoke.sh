@@ -31,7 +31,7 @@ echo "ok  API security headers (HSTS means the API sees the request as HTTPS)"
 
 wait_for "$WEB/sign-in" 200   # the first request also starts the Node.js app
 page="$(curl -s --max-time 20 "$WEB/sign-in")"
-grep -q 'Sign in to Ledgerly' <<<"$page" || { echo "FAIL the sign-in page did not render"; exit 1; }
+grep -q 'Sign in to Evenbooks' <<<"$page" || { echo "FAIL the sign-in page did not render"; exit 1; }
 grep -q 'This page couldn' <<<"$page" && { echo "FAIL the sign-in page shows a server error"; exit 1; }
 curl -sI --max-time 20 "$WEB/sign-in" | grep -qi '^x-frame-options: DENY' || { echo "FAIL web app lacks X-Frame-Options"; exit 1; }
 echo "ok  sign-in page renders"

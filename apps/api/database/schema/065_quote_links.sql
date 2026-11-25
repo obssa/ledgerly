@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 65: quotes accepted online (Module 2).
+-- Evenbooks core schema, part 65: quotes accepted online (Module 2).
 --
 -- A quote emailed to the customer carries a link to see it and accept or decline it, without an account. Rules, as for
 -- invitation links (046):

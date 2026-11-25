@@ -8,7 +8,7 @@ use App\Domain\Sales\Models\Document;
 use App\Domain\Tenancy\Models\Company;
 
 /**
- * Ledgerly's authority-neutral view of an invoice. Each connector maps this to its own schema.
+ * Evenbooks' authority-neutral view of an invoice. Each connector maps this to its own schema.
  */
 final readonly class EInvoicePayload
 {

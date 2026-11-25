@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 17: credit notes (Module 2).
+-- Evenbooks core schema, part 17: credit notes (Module 2).
 --
 -- A credit note corrects one posted invoice (a return, a price correction) and must name it. It is in the invoice's
 -- customer and currency, and the credit notes of one invoice never add up to more than the invoice.

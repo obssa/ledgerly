@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 91: impairment of fixed assets (Module 9c).
+-- Evenbooks core schema, part 91: impairment of fixed assets (Module 9c).
 --
 -- When an asset is worth less than its carrying amount (damaged, idle, obsolete), it is written down (IFRS for SMEs,
 -- section 27): Dr the asset's depreciation and impairment expense, Cr its accumulated depreciation, in one entry of its

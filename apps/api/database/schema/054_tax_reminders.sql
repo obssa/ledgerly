@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 54: reminders of tax returns that are due (Module 7).
+-- Evenbooks core schema, part 54: reminders of tax returns that are due (Module 7).
 --
 -- From the filing calendar (TaxCalendar: the country pack's due dates), the people who file tax get an email when a
 -- return is due within ten days, and again the day it is overdue, unless the company turned the reminders off

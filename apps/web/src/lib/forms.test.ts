@@ -21,9 +21,9 @@ describe("formStateFromError", () => {
 
   it("never shows server details for other failures", () => {
     expect(formStateFromError(new ApiError(500, "SQLSTATE[...] secret"))).toEqual({
-      error: "Ledgerly could not be reached. Try again in a minute.",
+      error: "Evenbooks could not be reached. Try again in a minute.",
     });
-    expect(formStateFromError(new TypeError("fetch failed")).error).toBe("Ledgerly could not be reached. Try again in a minute.");
+    expect(formStateFromError(new TypeError("fetch failed")).error).toBe("Evenbooks could not be reached. Try again in a minute.");
   });
 });
 

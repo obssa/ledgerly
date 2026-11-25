@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 86: attachments on journal entries (Module 6).
+-- Evenbooks core schema, part 86: attachments on journal entries (Module 6).
 --
 -- A journal entry may carry the files behind it, as invoices, bills and expenses do (063): the board minute behind an
 -- accrual, the loan schedule behind an interest entry, the bank's letter behind a correction. Rules (063's, widened):

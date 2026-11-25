@@ -90,7 +90,7 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
         </Select>
         <FiscalStartFields calendars={settings.options.calendars} defaultCalendar={settings.calendar} defaultMonth={settings.fiscal_year_start_month}
           calendarDisabled={locked("calendar")} monthDisabled={locked("fiscal_year_start_month")} />
-        {field("conversion_date", "Conversion date", { type: "date", hint: "Last bank statement date before Ledgerly" })}
+        {field("conversion_date", "Conversion date", { type: "date", hint: "Last bank statement date before Evenbooks" })}
       </fieldset>
 
       <h3 className="mb-1 mt-7 text-[15px] font-bold">Approval</h3>

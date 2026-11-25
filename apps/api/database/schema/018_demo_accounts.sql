@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 18: demo sign-in (one shared account per role in a demo company).
+-- Evenbooks core schema, part 18: demo sign-in (one shared account per role in a demo company).
 --
 -- Which accounts are demo accounts is decided here, not by anything a request can change:
 --   - only the owner role writes this table (the deploy's `ledgerly:demo-setup`); the application role can only read it,

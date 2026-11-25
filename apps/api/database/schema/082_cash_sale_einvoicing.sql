@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 82: cash sales sent to the tax authority, and credited (Module 2).
+-- Evenbooks core schema, part 82: cash sales sent to the tax authority, and credited (Module 2).
 --
 -- A cash sale (070) is now registered with the tax authority like an invoice. Once registered it is no longer voided:
 -- it is corrected with a credit note, as an invoice is. A cash sale was paid on the spot, so its credit note owes the

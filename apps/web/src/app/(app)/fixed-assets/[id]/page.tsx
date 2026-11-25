@@ -37,7 +37,7 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
             <caption className="px-3 pt-2 text-left text-[14px] font-bold">Posted</caption>
             <thead><tr><th scope="col">Month to</th><th scope="col" className="!text-right">Charge</th></tr></thead>
             <tbody>
-              {a.opening_depreciation !== "0.00" && <tr><td>Before Ledgerly</td><td className="num text-right">{formatAmount(a.opening_depreciation)}</td></tr>}
+              {a.opening_depreciation !== "0.00" && <tr><td>Before Evenbooks</td><td className="num text-right">{formatAmount(a.opening_depreciation)}</td></tr>}
               {a.posted.length === 0 && a.opening_depreciation === "0.00" && <tr><td colSpan={2} className="text-muted">Nothing yet.</td></tr>}
               {a.posted.map((p) => <tr key={p.period_end}><td className="num"><Link href={`/journal/${encodeURIComponent(p.entry_id)}`} className="hover:underline">{p.period_end}</Link></td><td className="num text-right">{formatAmount(p.amount)}</td></tr>)}
             </tbody>

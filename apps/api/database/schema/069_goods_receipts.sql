@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 69: goods received notes and the three-way match (Module 3).
+-- Evenbooks core schema, part 69: goods received notes and the three-way match (Module 3).
 --
 -- A goods received note says what of an issued purchase order arrived, and when. Its stock lines come into the
 -- warehouse at the order's cost (Dr Inventory, Cr Goods received not invoiced) on the day they arrive. The bill for

@@ -1,6 +1,6 @@
--- Ledgerly core schema, part 53: Ledgerly's own subscriptions, without a payment provider (Module 11).
+-- Evenbooks core schema, part 53: Evenbooks' own subscriptions, without a payment provider (Module 11).
 --
--- A company's organisation has a plan and a status (001, 006). Customers pay Ledgerly by bank transfer; the operator
+-- A company's organisation has a plan and a status (001, 006). Customers pay Evenbooks by bank transfer; the operator
 -- records it (ledgerly:subscription, run as the owner role), which sets the subscription active until a date. Rules here:
 --   1. Every change of plan, status or dates is kept in subscription_events, which the application cannot read or write.
 --   2. Time moves a subscription only towards less: a trial past its end is suspended; an active one past its paid-until

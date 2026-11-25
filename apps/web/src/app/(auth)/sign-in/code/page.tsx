@@ -9,7 +9,7 @@ export default function SignInCodePage() {
   return (
     <>
       <h1 className="text-[24px] font-extrabold tracking-tight">Enter your code</h1>
-      <p className="mt-1.5 text-sm text-muted">Open your authenticator app and type the six-digit code for Ledgerly.</p>
+      <p className="mt-1.5 text-sm text-muted">Open your authenticator app and type the six-digit code for Evenbooks.</p>
       <AuthForm
         action={verifyCode}
         submit="Sign in"

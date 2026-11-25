@@ -17,7 +17,7 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 /**
- * The staff console (SECURITY.md S8, schema 066), for Ledgerly's own support staff only, from allow-listed addresses
+ * The staff console (SECURITY.md S8, schema 066), for Evenbooks' own support staff only, from allow-listed addresses
  * (StaffOnly). Signing in always takes the password and an authenticator code. Looking into a customer's books takes a
  * support session for that one company, with a reason, for up to two hours, and inside it everything is read in a
  * read-only transaction under row-level security for that company: staff can never post, change or delete anything in
@@ -83,7 +83,7 @@ final class StaffController extends Controller
         }
         $secret = Totp::generateSecret();
 
-        return response()->json(['email' => $row->email, 'name' => $row->name, 'secret' => $secret, 'otpauth_uri' => Totp::uri($secret, $row->email, 'Ledgerly staff')]);
+        return response()->json(['email' => $row->email, 'name' => $row->name, 'secret' => $secret, 'otpauth_uri' => Totp::uri($secret, $row->email, 'Evenbooks staff')]);
     }
 
     /** A password and the authenticator, proved with its first code: the account can then sign in. */

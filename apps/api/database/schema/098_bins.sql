@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 98: bins (Module 4).
+-- Evenbooks core schema, part 98: bins (Module 4).
 --
 -- A bin is a place inside a warehouse ("A-01", "Cold room", "Shelf 3"). Each stock item can be given the bin it is
 -- kept in, one per warehouse, so a stock count can be taken one bin at a time: the count sheet lists what each bin

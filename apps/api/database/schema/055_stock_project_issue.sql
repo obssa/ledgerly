@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 55: stock issued to a project (Module 9a, job costing).
+-- Evenbooks core schema, part 55: stock issued to a project (Module 9a, job costing).
 --
 -- Materials taken from a warehouse for a project leave stock at their cost and become a cost of that project: the move
 -- names the project, and the posting tags the cost line with it, so the project's profit counts them. Rules here:

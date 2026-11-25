@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Ledgerly design tokens. Inter for every word and figure (tabular figures wherever numbers line up in columns),
+ * Evenbooks design tokens. Inter for every word and figure (tabular figures wherever numbers line up in columns),
  * a deep-green menu, teal for money and actions. Status colours (good, warn, bad) mean only that.
  */
 @theme {

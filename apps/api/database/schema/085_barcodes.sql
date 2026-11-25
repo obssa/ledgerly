@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 85: barcodes (Module 4).
+-- Evenbooks core schema, part 85: barcodes (Module 4).
 --
 -- An item may carry the barcode printed on it, and each of its other units (072) its own (a carton of 12 has a barcode
 -- of its own). Scanning or typing one on an invoice, a cash sale, a quote, an order or a bill picks the item in that

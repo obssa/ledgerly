@@ -75,7 +75,7 @@ final class CompanyController extends Controller
             'calendar' => ['nullable', Rule::in(['gregorian', 'ethiopian'])],
             'timezone' => ['nullable', 'timezone'],
             'fiscal_year_start_month' => ['required', 'integer', 'between:1,12'],
-            // Last bank statement date before switching to Ledgerly: opening balances are entered as at this date.
+            // Last bank statement date before switching to Evenbooks: opening balances are entered as at this date.
             // The company's time zone is not set yet: no later than today anywhere (UTC+14).
             'conversion_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:' . now('Pacific/Kiritimati')->format('Y-m-d')],
         ]);

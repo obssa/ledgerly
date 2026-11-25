@@ -9,7 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Module 11: the company's subscription to Ledgerly as its people see it: plan, status, when the trial ends or what is
+ * Module 11: the company's subscription to Evenbooks as its people see it: plan, status, when the trial ends or what is
  * paid until, whether the books are read-only. Owners and admins also see how to pay. Changing it is the operator's
  * (ledgerly:subscription, as the owner role); the application cannot (053).
  */

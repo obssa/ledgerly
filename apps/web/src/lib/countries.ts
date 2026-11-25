@@ -1,5 +1,5 @@
 /**
- * Ledgerly can be used in any country. Countries with their own pack (tax rates, tax rules, e-invoicing)
+ * Evenbooks can be used in any country. Countries with their own pack (tax rates, tax rules, e-invoicing)
  * are listed first; every other country uses the general setup, where the company picks its currency and
  * enters its own tax rates.
  */

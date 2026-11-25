@@ -30,7 +30,7 @@ export function formStateFromError(error: unknown): FormState {
   if (error instanceof ApiError && error.status === 0) {
     return { error: "This is the demo: there is no server to sign in to." };
   }
-  return { error: "Ledgerly could not be reached. Try again in a minute." };
+  return { error: "Evenbooks could not be reached. Try again in a minute." };
 }
 
 /** Text from a form field; empty means not given. */

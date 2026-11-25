@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time setup of the cPanel account for Ledgerly (docs/runbook/cpanel.md). Safe to run again: it creates
+# One-time setup of the cPanel account for Evenbooks (docs/runbook/cpanel.md). Safe to run again: it creates
 # what is missing and never overwrites existing settings or data.
 #
 #   bash ~/ledgerly/deploy/provision.sh
@@ -30,11 +30,11 @@ chmod 700 "$ROOT/shared"
 if [ ! -e "$ROOT/current" ]; then
   P="$ROOT/releases/000000-placeholder"
   mkdir -p "$P/api/public" "$P/web"
-  printf '<!doctype html><title>Ledgerly</title><p>Ledgerly is being deployed.</p>\n' > "$P/api/public/index.html"
+  printf '<!doctype html><title>Evenbooks</title><p>Evenbooks is being deployed.</p>\n' > "$P/api/public/index.html"
   cat > "$P/web/server.js" <<'JS'
 require("http").createServer((req, res) => {
   res.writeHead(503, { "content-type": "text/html", "retry-after": "60" });
-  res.end("<!doctype html><title>Ledgerly</title><p>Ledgerly is being deployed.</p>");
+  res.end("<!doctype html><title>Evenbooks</title><p>Evenbooks is being deployed.</p>");
 }).listen(process.env.PORT || 3000);
 JS
   ln -sfn "$P" "$ROOT/current"
@@ -46,7 +46,9 @@ if [ ! -f "$ROOT/shared/api.env" ]; then
   [ -n "$WEB_PASSWORD" ] || { echo "No DB_PASSWORD in ~/.ledgerly-db-secrets: create the database logins first (runbook step 1)."; exit 1; }
   APP_KEY="base64:$(openssl rand -base64 32)"
   ( umask 077; cat > "$ROOT/shared/api.env" <<EOF
-APP_NAME=Ledgerly
+APP_NAME=Evenbooks
+# Cache keys keep their first name: renaming the product must not empty rate limits or sign-ins in progress.
+CACHE_PREFIX=ledgerly-cache-
 APP_ENV=production
 APP_KEY=$APP_KEY
 APP_DEBUG=false
@@ -96,7 +98,7 @@ EOF2
   echo "created shared/api.env (restricted login only)"
 fi
 
-# The account's default PHP is older than Ledgerly needs. cPanel picks PHP per folder through an .htaccess
+# The account's default PHP is older than Evenbooks needs. cPanel picks PHP per folder through an .htaccess
 # handler, so the API's folder gets its own; release.sh puts it into every release.
 if [ ! -f "$ROOT/shared/api.htaccess" ]; then
   printf '# PHP 8.3 for the API folder (cPanel per-directory handler)\nAddHandler %s .php .php8 .phtml\n' \
@@ -110,9 +112,10 @@ if [ ! -f "$ROOT/shared/web.env" ]; then
 fi
 # Settings added after the first install: appended once, never changed.
 grep -q '^DB_CACHE_CONNECTION=' "$ROOT/shared/api.env" || printf '\n# The cache on its own database session (rate limits survive a rolled-back request)\nDB_CACHE_CONNECTION=cache\n' >> "$ROOT/shared/api.env"
+grep -q '^CACHE_PREFIX=' "$ROOT/shared/api.env" || printf '\n# Cache keys keep their first name: renaming the product must not empty rate limits or sign-ins in progress\nCACHE_PREFIX=ledgerly-cache-\n' >> "$ROOT/shared/api.env"
 # Email (confirmation and reset links, SECURITY.md S3) goes out through the server's own mail system. The
 # domain already publishes SPF and DKIM for this server. No mailbox or password is needed to send.
-grep -q '^MAIL_MAILER=' "$ROOT/shared/api.env" || printf '\n# Email through the server (sendmail); SPF and DKIM are published for the domain\nMAIL_MAILER=sendmail\nMAIL_FROM_ADDRESS=%s\nMAIL_FROM_NAME=Ledgerly\n' "${MAIL_FROM:-no-reply@evenbooks.net}" >> "$ROOT/shared/api.env"
+grep -q '^MAIL_MAILER=' "$ROOT/shared/api.env" || printf '\n# Email through the server (sendmail); SPF and DKIM are published for the domain\nMAIL_MAILER=sendmail\nMAIL_FROM_ADDRESS=%s\nMAIL_FROM_NAME=Evenbooks\n' "${MAIL_FROM:-no-reply@evenbooks.net}" >> "$ROOT/shared/api.env"
 # One secret on both sides: with it the web server may tell the API which visitor it acts for, so sign-in
 # limits count people, not the web server (SECURITY.md S16).
 if ! grep -q '^WEB_SERVER_KEY=.' "$ROOT/shared/api.env" || ! grep -q '^LEDGERLY_WEB_KEY=.' "$ROOT/shared/web.env"; then
@@ -131,8 +134,8 @@ grep -q '^LEDGERLY_WEB_URL=' "$ROOT/shared/web.env" || printf 'LEDGERLY_WEB_URL=
 
 [ -f "$ROOT/deploy/web-app.js" ] && cp "$ROOT/deploy/web-app.js" "$WEB_APP_ROOT/app.js"
 
-# Ledgerly's two cron jobs (scheduler, queue). The crontab is shared with any other app on this cPanel account:
-# cron.sh adds Ledgerly's lines or brings older ones up to date and changes no other line, and leaves
+# Evenbooks' two cron jobs (scheduler, queue). The crontab is shared with any other app on this cPanel account:
+# cron.sh adds Evenbooks' lines or brings older ones up to date and changes no other line, and leaves
 # the crontab alone if it cannot be read. Each job runs at most once at a time and for a bounded time.
 LEDGERLY_ROOT="$ROOT" PHP_BIN="$PHP" bash "$ROOT/deploy/cron.sh"
 

@@ -3,7 +3,7 @@ import "./globals.css";
 import { DomGuard } from "@/components/DomGuard";
 
 export const metadata: Metadata = {
-  title: { default: "Ledgerly", template: "%s · Ledgerly" },
+  title: { default: "Evenbooks", template: "%s · Evenbooks" },
   description: "Accounting for African businesses: invoicing, banking, mobile money, VAT and e-invoicing.",
 };
 

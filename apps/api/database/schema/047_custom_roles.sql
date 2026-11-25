@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 47: custom roles (Module 11).
+-- Evenbooks core schema, part 47: custom roles (Module 11).
 --
 -- A membership with the role 'custom' works only with the permissions stored on it (001, config/permissions.php).
 -- Rules here, for everyone (staff included):

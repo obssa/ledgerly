@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 6: state machines.
+-- Evenbooks core schema, part 6: state machines.
 --
 -- Every record with a status has a closed list of states (a CHECK on its table) and a closed list of
 -- allowed moves (the rows below). A trigger refuses any other move, whatever code attempts it.

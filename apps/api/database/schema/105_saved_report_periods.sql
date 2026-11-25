@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 105: saved and scheduled reports roll with QuickBooks' report periods.
+-- Evenbooks core schema, part 105: saved and scheduled reports roll with QuickBooks' report periods.
 --
 -- A saved report keeps a custom range (its dates) or a rolling period, worked out each time in the company's calendar
 -- (app/Support/ReportPeriods.php, the same rules as the web app's period list). 045 allowed five rolling periods; now

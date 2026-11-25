@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 77: recurring invoices (Module 2).
+-- Evenbooks core schema, part 77: recurring invoices (Module 2).
 --
 -- A recurring invoice repeats an invoice on a schedule: the monthly retainer, the rent a tenant pays, a subscription.
 -- Each time it comes due it makes an ordinary invoice (dated that day, due by the customer's terms) from the template's

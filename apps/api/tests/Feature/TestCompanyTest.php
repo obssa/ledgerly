@@ -12,7 +12,7 @@ use Tests\RefreshLedgerDatabase;
 use Tests\TestCase;
 
 /**
- * Test companies (104): real books the operator keeps for trying Ledgerly out. The operator makes one, with its owners,
+ * Test companies (104): real books the operator keeps for trying Evenbooks out. The operator makes one, with its owners,
  * out of the shared demo (`ledgerly:test-company`); its active owners, and nobody else, may start it fresh and fill it
  * with the sample books. Nothing is deleted, and every change is in the audit log.
  */

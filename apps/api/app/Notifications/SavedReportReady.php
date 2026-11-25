@@ -28,7 +28,7 @@ final class SavedReportReady extends Notification
         return (new MailMessage)
             ->subject("{$this->name} for {$this->company} is ready")
             ->greeting("Hello {$notifiable->name},")
-            ->line("Your scheduled report {$this->name} for {$this->company} ({$this->covers}) is ready in Ledgerly.")
+            ->line("Your scheduled report {$this->name} for {$this->company} ({$this->covers}) is ready in Evenbooks.")
             ->action('Open the report', self::url($this->savedReportId))
             ->line('You get this email because you scheduled the report. Change or stop the schedule under Reports, Saved reports.');
     }

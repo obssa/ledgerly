@@ -57,10 +57,10 @@ final class EnterOpeningDocument
         if ($type === 'bill' && $number === null && ! $this->numbers->isAutomatic($company->getKey(), 'bill')) {
             throw ValidationException::withMessages(['number' => ['Type our number for the bill: numbering is manual.']]);
         }
-        // An old number in the company's own automatic series would one day collide with a number Ledgerly gives.
+        // An old number in the company's own automatic series would one day collide with a number Evenbooks gives.
         $own = $this->numbers->settings($company->getKey(), $type);
         if ($number !== null && $own['mode'] === 'automatic' && $own['prefix'] !== '' && str_starts_with($number, $own['prefix'])) {
-            throw ValidationException::withMessages(['number' => ["Numbers starting with {$own['prefix']} are Ledgerly's own: keep the old number with another prefix, such as OLD-{$number}."]]);
+            throw ValidationException::withMessages(['number' => ["Numbers starting with {$own['prefix']} are Evenbooks' own: keep the old number with another prefix, such as OLD-{$number}."]]);
         }
         if ($number !== null && Document::query()->where(['type' => $type, 'number' => $number])->exists()) {
             throw ValidationException::withMessages(['number' => ["{$number} is already used by another {$type}."]]);

@@ -1,4 +1,4 @@
-# Billing: Ledgerly's own subscriptions
+# Billing: Evenbooks' own subscriptions
 
 Release one has plans and a trial, with no payment provider. Customers pay by bank transfer; you record each payment.
 

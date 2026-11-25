@@ -15,7 +15,7 @@ use App\Domain\Compliance\SubmissionResult;
  * system in real time BEFORE it is issued, and carries the Invoice Registration Number (IRN) and QR code
  * it gets back (receipts: a Receipt Registration Number). Invoicing software must be authorised by the
  * Ministry. The implementation schedule (Article 29) and the technical specification are not yet
- * published (checked 13 Nov 2026), so Ledgerly cannot be authorised yet.
+ * published (checked 13 Nov 2026), so Evenbooks cannot be authorised yet.
  *
  * Until then submissions stay queued: invoices post to the books normally and are registered the day
  * this connector goes live, without re-keying. When it does, an invoice for a taxpayer in scope must not
