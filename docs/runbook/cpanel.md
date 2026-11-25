@@ -23,7 +23,7 @@ managed PostgreSQL before the first paying customer; `deploy.yml` already publis
 ~/ledgerly/releases/<sha>/{api,web}    one folder per release (newest 5 kept)
 ~/ledgerly/current -> releases/<sha>   what is live
 ~/ledgerly/shared/api.env              API settings: restricted login only, mode 600
-~/ledgerly/shared/web.env              LEDGERLY_API_URL, LEDGERLY_WEB_URL, LEDGERLY_WEB_KEY
+~/ledgerly/shared/web.env              LEDGERLY_API_URL, LEDGERLY_WEB_URL, LEDGERLY_WEB_KEY, LEDGERLY_BEHIND_CLOUDFLARE
 ~/ledgerly/shared/api.htaccess         PHP 8.3 handler, put in front of every release's public/.htaccess
 ~/ledgerly/shared/storage/             uploads and logs, kept across releases
 ~/ledgerly/deploy/                     scripts, refreshed by every deploy
