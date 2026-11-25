@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysInMonth, formatEthiopian, fromGregorian, toGregorian } from "./ethiopian";
+import { daysInMonth, ethiopianMonthFor, formatEthiopian, fromGregorian, gregorianMonthFor, toGregorian } from "./ethiopian";
 
 // The same dates as apps/api/tests/Unit/FiscalCalendarTest.php: the web and the API must agree.
 describe("Ethiopian calendar", () => {
@@ -24,5 +24,12 @@ describe("Ethiopian calendar", () => {
     expect(daysInMonth(2019, 13)).toBe(6);
     expect(daysInMonth(2019, 1)).toBe(30);
     expect(() => toGregorian(2018, 13, 6)).toThrow(RangeError);
+  });
+
+  it("matches a fiscal start month across calendars by season", () => {
+    expect(ethiopianMonthFor(7)).toBe(11);   // July: Hamle, the tax year's start
+    expect(ethiopianMonthFor(9)).toBe(1);    // September: Meskerem
+    expect(ethiopianMonthFor(1)).toBe(5);    // January: Tir
+    for (let m = 1; m <= 12; m++) expect(gregorianMonthFor(ethiopianMonthFor(m))).toBe(m);
   });
 });

@@ -2,6 +2,16 @@ import { describe, expect, it } from "vitest";
 import { savedReportBody, savedReportUrl } from "./saved-reports";
 
 describe("savedReportUrl", () => {
+  it("opens a rolling period as itself, so the page names it and moves with the calendar", () => {
+    expect(savedReportUrl({ report: "profit-and-loss", period: "last_fiscal_year", covers: { from: "2025-07-01", to: "2026-06-30" }, options: {} }))
+      .toBe("/reports?range=last_fiscal_year");
+    expect(savedReportUrl({ report: "sales", period: "since_30_days_ago", covers: { from: "2026-10-27", to: null }, options: { group: "item" } }))
+      .toBe("/reports/sales?range=since_30_days_ago&group=item");
+    expect(savedReportUrl({ report: "profit-and-loss", period: "year_to_date", covers: {}, options: {} })).toBe("/reports?range=this_fiscal_year_to_date");
+    expect(savedReportUrl({ report: "profit-and-loss", period: "custom", covers: { from: "2026-01-01", to: "2026-03-31" }, options: {} })).toBe("/reports?from=2026-01-01&to=2026-03-31");
+    expect(savedReportUrl({ report: "balance-sheet", period: "last_month", covers: { as_of: "2026-10-31" }, options: {} })).toBe("/reports/balance-sheet?as_of=2026-10-31");
+  });
+
   it("opens a period report for the dates it covers, with its options", () => {
     expect(savedReportUrl({ report: "sales", covers: { from: "2026-11-01", to: "2026-11-17" }, options: { group: "salesperson" } }))
       .toBe("/reports/sales?from=2026-11-01&to=2026-11-17&group=salesperson");

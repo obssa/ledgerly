@@ -1385,7 +1385,7 @@ export interface SavedReport {
   schedule: "none" | "weekly" | "monthly";
   next_send_on: string | null;
   last_sent_at: string | null;
-  covers: { from?: string; to?: string; as_of?: string };
+  covers: { from?: string | null; to?: string | null; as_of?: string | null };
 }
 
 /** Module 11: a person in the company, invited, active or deactivated. */

@@ -1,3 +1,4 @@
+import { RANGE_PRESETS } from "./periods";
 /* Module 10: saved reports: which page shows each report, and the link that opens a saved one for its period today. */
 
 export const SAVEABLE: Record<string, { label: string; path: string; atADate?: boolean }> = {
@@ -19,10 +20,8 @@ export const SAVEABLE: Record<string, { label: string; path: string; atADate?: b
   "stock-ageing": { label: "Stock ageing", path: "/reports/stock-ageing", atADate: true },
 };
 
-export const PERIODS: [string, string][] = [
-  ["this_month", "This month"], ["last_month", "Last month"], ["this_quarter", "This quarter"], ["last_quarter", "Last quarter"],
-  ["year_to_date", "Fiscal year to date"], ["custom", "Custom dates"],
-];
+/** Every period the report pages offer (lib/periods.ts), worked out again each time the report is opened or sent. */
+export const PERIODS: [string, string][] = RANGE_PRESETS.map((p) => [p.key, p.key === "custom" ? "Custom dates" : p.label]);
 
 export const SCHEDULES: [string, string][] = [["none", "Not sent"], ["weekly", "Every Monday"], ["monthly", "On the 1st of each month"]];
 
@@ -30,11 +29,14 @@ export const SCHEDULES: [string, string][] = [["none", "Not sent"], ["weekly", "
 export const OPTION_KEYS = ["group", "kind", "account_id", "warehouse_id", "rows", "columns", "measure", "account_type", "project_id", "location_id", "class_id"] as const;
 
 /** The report page for a saved report, for the dates its period covers today, with its options. */
-export function savedReportUrl(r: { report: string; covers: { from?: string; to?: string; as_of?: string }; options: Record<string, string> }): string {
+export function savedReportUrl(r: { report: string; period?: string; covers: { from?: string | null; to?: string | null; as_of?: string | null }; options: Record<string, string> }): string {
   const page = SAVEABLE[r.report];
   if (!page) return "/reports";
   const q = new URLSearchParams();
+  // A rolling period opens as itself ("Last fiscal year"), so the page names it and moves with the calendar.
+  const rolling = r.period && r.period !== "custom" ? (r.period === "year_to_date" ? "this_fiscal_year_to_date" : r.period) : null;
   if (page.atADate) q.set("as_of", r.covers.as_of ?? r.covers.to ?? "");
+  else if (rolling) q.set("range", rolling);
   else {
     q.set("from", r.covers.from ?? "");
     q.set("to", r.covers.to ?? "");

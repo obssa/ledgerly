@@ -154,7 +154,7 @@ final class SavedReportController extends Controller
         return ['id' => $r->id, 'name' => $r->name, 'report' => $r->report, 'period' => $r->period, 'period_label' => SavedReports::periodLabel($r->period),
             'from_date' => $r->from_date, 'to_date' => $r->to_date, 'options' => json_decode((string) $r->options, true) ?: (object) [],
             'schedule' => $r->schedule, 'next_send_on' => $r->next_send_on, 'last_sent_at' => $r->last_sent_at,
-            'covers' => in_array($r->report, SavedReports::AT_A_DATE, true) ? ['as_of' => $dates['to']] : $dates];
+            'covers' => in_array($r->report, SavedReports::AT_A_DATE, true) ? ['as_of' => SavedReports::asOf($r->period, $dates, $this->current->today())] : $dates];
     }
 
     /** @return array<string, mixed> */

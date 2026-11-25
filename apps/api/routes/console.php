@@ -105,7 +105,14 @@ Artisan::command('ledgerly:send-saved-reports', function (\App\Domain\Reports\Sa
                 $send = $member !== null && $member->can('reports.view');
                 if ($send) {
                     $dates = $saved->period($row->company_id, $report->period, $report->from_date, $report->to_date, $today);
-                    $covers = in_array($report->report, \App\Domain\Reports\SavedReports::AT_A_DATE, true) ? "at {$dates['to']}" : "{$dates['from']} to {$dates['to']}";
+                    // An open end ("All dates", "Since 30 days ago") is said in words, not as an empty date.
+                    $covers = in_array($report->report, \App\Domain\Reports\SavedReports::AT_A_DATE, true) ? 'at ' . \App\Domain\Reports\SavedReports::asOf($report->period, $dates, $today)
+                        : match (true) {
+                            $dates['from'] === null && $dates['to'] === null => 'all dates',
+                            $dates['to'] === null => "from {$dates['from']}",
+                            $dates['from'] === null => "up to {$dates['to']}",
+                            default => "{$dates['from']} to {$dates['to']}",
+                        };
                     \App\Models\User::query()->findOrFail($row->user_id)->notify(new \App\Notifications\SavedReportReady($report->id, $report->name, (string) $company->legal_name, $covers));
                     $audit->record($row->company_id, 'saved_report_sent', 'saved_report', $report->id, null, ['name' => $report->name, 'covers' => $covers], userId: $row->user_id);
                 }

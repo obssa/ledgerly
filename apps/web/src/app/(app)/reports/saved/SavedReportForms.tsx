@@ -4,13 +4,14 @@ import { useActionState, useState } from "react";
 import { PERIODS, SAVEABLE, SCHEDULES } from "@/lib/saved-reports";
 import { removeSavedReport, saveReport } from "./actions";
 
-type Initial = { report?: string; from?: string; to?: string; options: Record<string, string> };
+type Initial = { report?: string; range?: string; from?: string; to?: string; options: Record<string, string> };
 
 /** Save a report: its name, period (rolling or custom dates) and whether it is emailed to you weekly or monthly. */
 export function SavedReportForm({ initial }: { initial: Initial }) {
   const [state, action, pending] = useActionState(saveReport, undefined);
   const [report, setReport] = useState(initial.report && SAVEABLE[initial.report] ? initial.report : "profit-and-loss");
-  const [period, setPeriod] = useState(initial.to ? "custom" : "last_month");
+  // Saved from a report page: its preset ("Last fiscal year"), or its own dates; otherwise last month.
+  const [period, setPeriod] = useState(initial.range && PERIODS.some(([v]) => v === initial.range) && initial.range !== "custom" ? initial.range : initial.to ? "custom" : "last_month");
   const bad = (n: string) => Boolean(state?.fields?.[n]);
   const atADate = Boolean(SAVEABLE[report]?.atADate);
   return (
