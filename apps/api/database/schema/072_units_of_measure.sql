@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 72: units of measure (Module 4).
+-- Evenbooks core schema, part 72: units of measure (Module 4).
 --
 -- An item is counted in its own unit (items.unit: each, kg, bag); stock, its cost and every stock move are always in
 -- that unit. An item may also be bought or sold in other units, each a fixed number of the item's own: a carton of 12,

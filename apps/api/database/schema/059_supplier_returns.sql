@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 59: goods returned to a supplier on a supplier credit (Module 4).
+-- Evenbooks core schema, part 59: goods returned to a supplier on a supplier credit (Module 4).
 --
 -- A supplier credit can say the goods went back (restock). Its stock lines then leave the warehouse the bill's goods
 -- came into (purchase_return moves naming the supplier credit) at the weighted average; the credit's entry takes the

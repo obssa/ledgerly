@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 35: the year-end close (Module 6).
+-- Evenbooks core schema, part 35: the year-end close (Module 6).
 --
 -- Closing a fiscal year moves the year's profit or loss into retained earnings with one closing entry dated the year's
 -- last day, so income and expense accounts start the next year at nothing. Rules here:

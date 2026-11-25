@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { api } from "./api";
 
 /*
- * The staff console (SECURITY.md S8): Ledgerly's own support staff, apart from customers. Their sign-in lives in its
+ * The staff console (SECURITY.md S8): Evenbooks' own support staff, apart from customers. Their sign-in lives in its
  * own HttpOnly cookie, sent only to /staff pages, and is a token the API's database checks on every call; the API also
  * answers staff routes only from allow-listed addresses (the visitor's, passed on by this server).
  */

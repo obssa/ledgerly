@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 2: the general ledger.
+-- Evenbooks core schema, part 2: the general ledger.
 -- Rules enforced here, in the database, so no code path can bypass them:
 --   1. Every journal entry balances (sum of debits = sum of credits) and has at least two lines.
 --   2. Posted entries and lines are immutable; corrections are reversing entries. Lines can only be

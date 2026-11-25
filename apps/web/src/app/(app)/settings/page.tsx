@@ -114,7 +114,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <Card label="Company data">
               <h2 className="text-[19px] font-bold">Company data</h2>
               <p className="mt-1.5 text-sm text-muted">
-                Everything the company keeps in Ledgerly, as CSV files in one ZIP: to keep a copy or take your books
+                Everything the company keeps in Evenbooks, as CSV files in one ZIP: to keep a copy or take your books
                 elsewhere. Owners and admins.
               </p>
               {/* A plain link: the answer is a file, not a page. */}

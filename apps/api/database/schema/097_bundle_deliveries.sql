@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 97: bundles delivered on delivery notes (Module 4).
+-- Evenbooks core schema, part 97: bundles delivered on delivery notes (Module 4).
 --
 -- A bundle on a confirmed sales order (073) can now leave on a delivery note (071) as a stock item does: the note's
 -- line names the bundle and its order line, and the bundle's stock parts leave the warehouse that day, each its

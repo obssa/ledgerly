@@ -94,7 +94,7 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
         <Select name="fiscal_year_start_month" label="Fiscal year starts in" defaultValue={String(settings.fiscal_year_start_month)} disabled={locked("fiscal_year_start_month")}>
           {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
         </Select>
-        {field("conversion_date", "Conversion date", { type: "date", hint: "Last bank statement date before Ledgerly" })}
+        {field("conversion_date", "Conversion date", { type: "date", hint: "Last bank statement date before Evenbooks" })}
       </fieldset>
 
       <h3 className="mb-1 mt-7 text-[15px] font-bold">Approval</h3>

@@ -6,7 +6,7 @@ import { demoFill, demoStartFresh } from "./actions";
 
 /**
  * Two buttons: empty books (a new company, the old one archived) or the sample books put in. For the demo's owner, and
- * for the owners of a test company (real books the team tries Ledgerly out on).
+ * for the owners of a test company (real books the team tries Evenbooks out on).
  */
 export function DemoBooks({ kind }: { kind: "demo" | "test" }) {
   const [fresh, startFresh, starting] = useActionState(demoStartFresh, undefined);

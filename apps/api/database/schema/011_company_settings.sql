@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 11: company profile and the settings the books are built on (Module 1).
+-- Evenbooks core schema, part 11: company profile and the settings the books are built on (Module 1).
 --
 -- 1. The profile gains its legal form and postal address.
 -- 2. The foundation of the books (country, base currency, framework, calendar, fiscal year start, conversion date)

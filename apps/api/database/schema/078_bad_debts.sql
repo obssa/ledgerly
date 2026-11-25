@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 78: bad debts written off (Module 2).
+-- Evenbooks core schema, part 78: bad debts written off (Module 2).
 --
 -- A customer who will not pay: what an invoice still owes, or part of it, is written off. One entry moves it out of
 -- accounts receivable into bad debts (Dr Bad debts, Cr Accounts receivable, at the invoice's own rate, so nothing is

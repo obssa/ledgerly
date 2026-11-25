@@ -23,12 +23,12 @@ final class VerifyEmailAddress extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Confirm your email address for Ledgerly')
+            ->subject('Confirm your email address for Evenbooks')
             ->greeting("Hello {$notifiable->name},")
-            ->line('Confirm this email address to finish setting up your Ledgerly account.')
+            ->line('Confirm this email address to finish setting up your Evenbooks account.')
             ->action('Confirm email address', self::url($this->token))
             ->line('The link works once and for ' . self::duration($this->minutes) . '.')
-            ->line('If you did not create a Ledgerly account, you can ignore this email.');
+            ->line('If you did not create an Evenbooks account, you can ignore this email.');
     }
 
     public static function url(string $token): string

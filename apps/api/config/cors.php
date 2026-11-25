@@ -1,7 +1,7 @@
 <?php
 
 /*
-| SECURITY.md S5. Browsers may call the API only from Ledgerly's own web app (FRONTEND_URL); no wildcard and no
+| SECURITY.md S5. Browsers may call the API only from Evenbooks' own web app (FRONTEND_URL); no wildcard and no
 | credentials, as the API uses bearer tokens and no cookies. The web app calls the API from its own server, where
 | CORS does not apply, so this only shuts the door on pages of other sites.
 */

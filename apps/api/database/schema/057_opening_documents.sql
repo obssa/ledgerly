@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 57: open invoices and bills brought in at conversion (Module 1).
+-- Evenbooks core schema, part 57: open invoices and bills brought in at conversion (Module 1).
 --
 -- What customers still owed and what the company still owed suppliers on the conversion date come in as the
 -- invoices and bills behind them, so receivables and payables always equal their detail: each one keeps its own

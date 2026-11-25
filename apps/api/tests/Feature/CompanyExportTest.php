@@ -31,10 +31,10 @@ final class CompanyExportTest extends TestCase
         RateLimiter::clear('company-export:' . $a['user']);
 
         $response = $this->get('/api/v1/company/export', ['X-Company-Id' => $a['company']])->assertOk()->assertHeader('Content-Type', 'application/zip');
-        $this->assertStringContainsString('ledgerly-abyssinia-coffee-', (string) $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('evenbooks-abyssinia-coffee-', (string) $response->headers->get('Content-Disposition'));
         $files = $this->unzip($response->baseResponse);
 
-        // Every company table is in it, but not Ledgerly's own machinery or link hashes.
+        // Every company table is in it, but not Evenbooks' own machinery or link hashes.
         foreach (array_keys(app(CompanyExport::class)->tables()) as $table) {
             if ($table !== 'memberships') {
                 $this->assertArrayHasKey("{$table}.csv", $files, "{$table} is missing from the export");

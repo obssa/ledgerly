@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 89: item variants (Module 4).
+-- Evenbooks core schema, part 89: item variants (Module 4).
 --
 -- An item sold in sizes, colours or other options is a parent with variants: each variant is an item of its own (its
 -- own stock, SKU, barcode and prices), named by its options ("M / Red") and grouped under the parent. Rules:

@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 93: grants for NGOs (Module 9a).
+-- Evenbooks core schema, part 93: grants for NGOs (Module 9a).
 --
 -- A grant is a project funded by a donor: the award, the donor's reference, and its budget, one line per expense
 -- account. A restricted grant is spent only on its budget lines: once it has a budget, an expense tagged with the

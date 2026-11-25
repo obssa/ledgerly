@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 50: retention held and released (Module 9a, construction).
+-- Evenbooks core schema, part 50: retention held and released (Module 9a, construction).
 --
 -- A customer may hold back part of an invoice (retention) until the work is complete or a defects period ends. Holding
 -- it moves that part out of what is owed now: the invoice's open amount goes down and the ledger moves it from accounts

@@ -1,8 +1,8 @@
--- Ledgerly core schema, part 61: a separate tax depreciation schedule per fixed asset (Module 9c).
+-- Evenbooks core schema, part 61: a separate tax depreciation schedule per fixed asset (Module 9c).
 --
 -- The books depreciate an asset as it wears out (IFRS for SMEs); the tax return allows depreciation by the tax law's
 -- rules, which may differ. An asset can say how tax depreciates it: straight line over a number of months, or a
--- reducing balance at an annual rate, from the same start, to nothing, with what was claimed before Ledgerly. It is a
+-- reducing balance at an annual rate, from the same start, to nothing, with what was claimed before Evenbooks. It is a
 -- schedule only: nothing posts, and it never changes the books. No rate is built in: the company's tax adviser gives
 -- them. Without a tax method, the tax schedule is the book one.
 

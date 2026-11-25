@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 102: guards for lifecycles the database did not check.
+-- Evenbooks core schema, part 102: guards for lifecycles the database did not check.
 --
 -- 1. Projects and leases become state machines like the others (006): the list is in state_transitions and in
 --    config/state_machines.php.

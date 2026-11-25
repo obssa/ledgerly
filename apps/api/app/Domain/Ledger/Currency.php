@@ -7,7 +7,7 @@ namespace App\Domain\Ledger;
 use InvalidArgumentException;
 
 /**
- * ISO 4217 currencies. Ledgerly accepts every active currency so a company in any country can keep its
+ * ISO 4217 currencies. Evenbooks accepts every active currency so a company in any country can keep its
  * books and invoice in any other currency.
  *
  * Product rule: every amount is stored and shown to exactly 2 decimal places, whatever the currency.

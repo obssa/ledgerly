@@ -24,7 +24,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Module 1, opening balances: the trial balance on the conversion date (the last bank statement date before the
- * company switched to Ledgerly), posted as one journal entry through the PostingService.
+ * company switched to Evenbooks), posted as one journal entry through the PostingService.
  *
  * If the lines do not balance, the difference goes to Opening balance equity and is flagged, so the books balance
  * and someone looks at it before the first period is closed. Entering them again reverses the previous opening entry

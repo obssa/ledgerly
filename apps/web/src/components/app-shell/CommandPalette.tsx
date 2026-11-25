@@ -79,7 +79,7 @@ export function CommandPalette() {
         <kbd className="hidden rounded-md border border-line bg-canvas px-1.5 py-0.5 font-sans text-[11px] font-semibold text-muted sm:inline">Ctrl K</kbd>
       </button>
 
-      <dialog ref={dialog} aria-label="Search Ledgerly" onClick={(e) => e.target === dialog.current && close()}
+      <dialog ref={dialog} aria-label="Search Evenbooks" onClick={(e) => e.target === dialog.current && close()}
         className="m-auto mt-[12vh] w-[min(640px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(12,36,32,0.28)] backdrop:bg-[#0c2420]/40 backdrop:backdrop-blur-[2px]">
         <div className="flex items-center gap-3 border-b border-line px-4">
           <Icon name="search" className="size-[18px] text-muted" />

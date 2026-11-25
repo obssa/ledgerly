@@ -43,7 +43,7 @@ export function Sidebar({ company }: { company: ReactNode }) {
               <rect width="28" height="28" rx="8" fill="#34D399" />
               <path d="M8 19V9M8 19h12M13 15l3-4 4 3" stroke="#0C2420" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="text-[19px] font-extrabold tracking-tight text-white">Ledgerly</span>
+            <span className="text-[19px] font-extrabold tracking-tight text-white">Evenbooks</span>
           </Link>
           <button type="button" onClick={() => setDrawer(false)} className="grid size-9 place-items-center rounded-lg text-side-label hover:bg-side-hover hover:text-white lg:hidden" aria-label="Close the menu">
             <Icon name="close" />

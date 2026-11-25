@@ -71,7 +71,7 @@ export function AssetForm({ asset, options, locked }: { asset?: FixedAsset; opti
           ? input("useful_life_months", "Useful life (months)", asset?.useful_life_months, { fixed: true })
           : input("annual_rate", "Annual rate (%)", asset?.annual_rate ? String(Number(asset.annual_rate) * 100) : "", { fixed: true })}
         {input("depreciation_starts_on", "Depreciated from", asset?.depreciation_starts_on, { type: "date", hint: "Empty: the month after it is acquired", fixed: true })}
-        {input("opening_depreciation", "Depreciated before Ledgerly", asset?.opening_depreciation, { hint: "For an asset brought in with the opening balances", fixed: true })}
+        {input("opening_depreciation", "Depreciated before Evenbooks", asset?.opening_depreciation, { hint: "For an asset brought in with the opening balances", fixed: true })}
       </div>
       <fieldset className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 rounded-xl border border-line p-3">
         <legend className="px-1 text-[13px] font-semibold">For tax (a schedule beside the books: nothing posts)</legend>
@@ -86,7 +86,7 @@ export function AssetForm({ asset, options, locked }: { asset?: FixedAsset; opti
         {taxMethod === "straight_line" && input("tax_useful_life_months", "Over (months)", asset?.tax?.useful_life_months)}
         {taxMethod === "reducing_balance" && input("tax_annual_rate", "Tax rate (%)", asset?.tax?.annual_rate ? String(Number(asset.tax.annual_rate) * 100) : "",
           { hint: "As your tax adviser gives it" })}
-        {taxMethod !== "" && input("tax_opening_depreciation", "Allowed for tax before Ledgerly", asset?.tax?.opening_depreciation)}
+        {taxMethod !== "" && input("tax_opening_depreciation", "Allowed for tax before Evenbooks", asset?.tax?.opening_depreciation)}
       </fieldset>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         {select("asset_account_id", "Kept on", options.assetAccounts, asset?.asset_account.id ?? pick(options.assetAccounts, "1500"))}

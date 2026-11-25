@@ -29,13 +29,13 @@ export const IMPORT_KINDS = {
   },
   "open-invoices": {
     label: "Open invoices",
-    columns: ["Customer (as named in Ledgerly)", "Invoice number (from the old books)", "Date", "Due date", "Amount (still open)", "Currency", "Rate"],
+    columns: ["Customer (as named in Evenbooks)", "Invoice number (from the old books)", "Date", "Due date", "Amount (still open)", "Currency", "Rate"],
     example: "Customer,Invoice number,Date,Due date,Amount\nKaldi Cafe,OLD-0042,15/06/2026,15/07/2026,11500",
     required: "Customer, Invoice number, Date and Amount are required: what each customer still owed on the conversion date. Dates as 2026-06-15 or 15/06/2026.",
   },
   "open-bills": {
     label: "Open bills",
-    columns: ["Supplier (as named in Ledgerly)", "Supplier invoice number", "Date", "Due date", "Amount (still open)", "Currency", "Rate", "Number (ours, if numbered by hand)"],
+    columns: ["Supplier (as named in Evenbooks)", "Supplier invoice number", "Date", "Due date", "Amount (still open)", "Currency", "Rate", "Number (ours, if numbered by hand)"],
     example: "Supplier,Supplier invoice number,Date,Amount\nAddis Packaging,AP-55,20/06/2026,4000",
     required: "Supplier, Supplier invoice number, Date and Amount are required: what was still owed to each supplier on the conversion date.",
   },

@@ -1,7 +1,7 @@
 <?php
 
 /*
-| Ledgerly's own subscriptions (053), without a payment provider: customers pay by bank transfer and the operator records
+| Evenbooks' own subscriptions (053), without a payment provider: customers pay by bank transfer and the operator records
 | it (`php artisan ledgerly:subscription`, as the owner role: .github/workflows/billing.yml). Prices and plan limits are
 | the business's to set; nothing here charges anyone.
 |

@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 96: serial numbers (Module 4).
+-- Evenbooks core schema, part 96: serial numbers (Module 4).
 --
 -- A stock item may be tracked by serial number (phones, machines, anything with a warranty): each unit is a batch of
 -- one (074), named by its serial number. Every move of such an item moves one unit of one serial; a document line of

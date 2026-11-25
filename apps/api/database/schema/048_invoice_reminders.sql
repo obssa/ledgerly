@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 48: payment reminders for overdue invoices (Module 2, collections).
+-- Evenbooks core schema, part 48: payment reminders for overdue invoices (Module 2, collections).
 --
 -- A company may turn on reminders (companies.settings.reminders: {"enabled": true, "days": [7, 30]}): an email to
 -- the customer a set number of days after an invoice falls due, while something is still owed. Someone may also send

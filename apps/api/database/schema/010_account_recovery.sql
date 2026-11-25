@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 10: one-time links sent by email (SECURITY.md S3).
+-- Evenbooks core schema, part 10: one-time links sent by email (SECURITY.md S3).
 --
 -- user_email_tokens holds the links for confirming an email address and for resetting a password:
 --   - only a SHA-256 hash of the token is stored, so reading the table gives nothing that can be used;

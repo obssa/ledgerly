@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 25: stock on invoices and bills (Module 4).
+-- Evenbooks core schema, part 25: stock on invoices and bills (Module 4).
 --
 -- An invoice or bill with stock items names the warehouse the goods leave from or arrive in. On posting, each stock
 -- line moves stock (024 values it): a bill brings goods in at their cost (Dr Inventory instead of an expense), an

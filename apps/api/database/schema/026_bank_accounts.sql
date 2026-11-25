@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 26: bank, wallet and cash accounts (Module 5).
+-- Evenbooks core schema, part 26: bank, wallet and cash accounts (Module 5).
 --
 -- A money account is a ledger account of subtype bank, mobile_money or cash, in the company's currency or a foreign one.
 -- This part adds where it is (the bank, the account number, the branch) and one rule for every account:

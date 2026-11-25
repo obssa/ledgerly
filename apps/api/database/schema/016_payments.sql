@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 16: payments received and their allocations (Module 2).
+-- Evenbooks core schema, part 16: payments received and their allocations (Module 2).
 --
 -- Builds on 006: inserting an allocation lowers the invoice's amount due (and its status follows), deleting one
 -- (when a payment is reversed) puts it back. This part adds:

@@ -228,7 +228,7 @@ final class FixedAssetController extends Controller
             'tax_annual_rate' => ['required_if:tax_method,reducing_balance', 'nullable', 'decimal:0,6', 'gt:0', 'lt:1'],
             'tax_opening_depreciation' => ['nullable', 'decimal:0,2', 'min:0', 'lte:cost'],
         ], ['tax_useful_life_months.required_if' => 'Give the months tax depreciates it over.', 'tax_annual_rate.required_if' => 'Give the tax rate, such as 0.25 for 25%.',
-            'tax_opening_depreciation.lte' => 'Tax depreciation before Ledgerly is never more than the cost.','asset_account_id.exists' => 'Choose a fixed asset account.', 'depreciation_account_id.exists' => 'Choose an accumulated depreciation (contra asset) account.',
+            'tax_opening_depreciation.lte' => 'Tax depreciation before Evenbooks is never more than the cost.','asset_account_id.exists' => 'Choose a fixed asset account.', 'depreciation_account_id.exists' => 'Choose an accumulated depreciation (contra asset) account.',
             'useful_life_months.required_if' => 'Give the useful life in months.', 'annual_rate.required_if' => 'Give the annual rate, such as 0.25 for 25%.']);
         $companyId = $this->current->id();
         if (DB::table('fixed_assets')->where(['company_id' => $companyId, 'code' => $data['code']])->when($before, fn ($q) => $q->where('id', '<>', $before->id))->exists()) {
@@ -237,7 +237,7 @@ final class FixedAssetController extends Controller
         $residual = BigDecimal::of($data['residual_value'] ?? '0');
         $opening = BigDecimal::of($data['opening_depreciation'] ?? '0');
         if ($residual->plus($opening)->isGreaterThan($data['cost'])) {
-            throw ValidationException::withMessages(['residual_value' => ['The residual value and the depreciation before Ledgerly add up to more than the cost.']]);
+            throw ValidationException::withMessages(['residual_value' => ['The residual value and the depreciation before Evenbooks add up to more than the cost.']]);
         }
 
         return [

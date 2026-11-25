@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 4: tax-authority e-invoicing and the audit log.
+-- Evenbooks core schema, part 4: tax-authority e-invoicing and the audit log.
 
 CREATE TABLE einvoice_submissions (
     id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),

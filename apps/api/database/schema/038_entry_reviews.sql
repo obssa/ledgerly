@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 38: the review queue of unusual entries (Module 6, accountant tools).
+-- Evenbooks core schema, part 38: the review queue of unusual entries (Module 6, accountant tools).
 --
 -- The queue flags entries worth a second look (a manual journal moving cash, a large or round amount, an entry posted
 -- long after its date or at night, opening balance equity used after the conversion). Whoever reviews one marks it

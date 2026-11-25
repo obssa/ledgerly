@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 92: revaluation of fixed assets (Module 9c).
+-- Evenbooks core schema, part 92: revaluation of fixed assets (Module 9c).
 --
 -- IFRS for SMEs (17.15B to 17.15D) lets property, plant and equipment be carried at a revalued amount: its fair value
 -- on the day, less the depreciation after it. Revaluing an asset carried at C to a fair value F moves it by F - C, in

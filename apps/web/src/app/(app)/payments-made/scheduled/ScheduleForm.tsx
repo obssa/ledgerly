@@ -11,7 +11,7 @@ export interface ScheduleBill { id: string; number: string | null; reference: st
 
 /**
  * Plans a payment to one supplier for a later day: tick the bills (all that is due, or type less), pick the day, the
- * account and the method. Nothing goes into the books now; on the day, Ledgerly reminds the person who planned it,
+ * account and the method. Nothing goes into the books now; on the day, Evenbooks reminds the person who planned it,
  * and the payment is recorded when someone confirms the money went out.
  */
 export function ScheduleForm({ supplier, currency, bills, accounts, today, initial, demo }: {

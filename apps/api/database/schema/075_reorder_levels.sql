@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 75: minimum and maximum levels, suggested purchase orders (Module 4).
+-- Evenbooks core schema, part 75: minimum and maximum levels, suggested purchase orders (Module 4).
 --
 -- A stock item's reorder point (024) is its minimum: at or below it, counting what is on order and what the open sales
 -- orders hold, it is running low. Its maximum level is what an order brings it back up to, and its preferred supplier

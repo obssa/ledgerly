@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 14: locations and dimensions (Module 1).
+-- Evenbooks core schema, part 14: locations and dimensions (Module 1).
 --
 -- Three kinds a company tags its transactions with, so reports can be cut by them:
 --   location  a branch, shop or site          (journal_lines.location_id, documents.location_id)

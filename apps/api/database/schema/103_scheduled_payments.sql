@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 103: scheduled supplier payments (Module 3).
+-- Evenbooks core schema, part 103: scheduled supplier payments (Module 3).
 --
 -- A payment planned for a later day: which supplier, which of their bills and how much of each, from which money
 -- account, by which method. It is a plan, not money: nothing is in the books until someone confirms, on or after the

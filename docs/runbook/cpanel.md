@@ -1,6 +1,6 @@
-# Running Ledgerly on the cPanel account
+# Running Evenbooks on the cPanel account
 
-Staging and early access run on Ledgerly's own cPanel account, `evenbojk` on `vesper.hostns.io`. It moved there on
+Staging and early access run on Evenbooks' own cPanel account, `evenbojk` on `vesper.hostns.io`. It moved there on
 25 Nov 2026 from an account shared with nine other sites, which sat at its process limit. Shared hosting is fine
 until real customers sign in, but it cannot meet SECURITY.md **S11** (encrypted off-site backups with point-in-time
 restore) or **S12** (database on a private network, connection pooling). Move the API and database to a VPS or
@@ -30,7 +30,7 @@ managed PostgreSQL before the first paying customer; `deploy.yml` already publis
 ~/ledgerly-web/app.js                  Node.js entry: starts current/web/server.js
 ```
 
-Nothing else runs on the account. `cron.sh` still changes only Ledgerly's own crontab lines, so another app can be
+Nothing else runs on the account. `cron.sh` still changes only Evenbooks' own crontab lines, so another app can be
 added later without either one overwriting the other's.
 
 ## How a deploy works
@@ -113,12 +113,12 @@ Done once; the deploy needs all of it. **Status (25 Nov 2026): steps 1 to 6 done
 
 Symptom: the deploy fails with `fork: Resource temporarily unavailable` or `Connection reset by peer` right after
 connecting, and SSH logs in but cannot run anything. The site may keep answering (its processes are already running).
-On the old shared account the cause was other sites; on this one it can only be Ledgerly.
+On the old shared account the cause was other sites; on this one it can only be Evenbooks.
 
 1. cPanel → *Resource Usage*: the *Number of processes* (NPROC) and *Entry processes* graphs show when it filled up;
    its snapshot lists the processes at the time.
 2. Free the account. Either ask the host to end this account's stuck processes, or in cPanel turn off the two
-   Ledgerly lines under *Cron Jobs* for a few minutes and restart the app under *Setup Node.js App*.
+   Evenbooks lines under *Cron Jobs* for a few minutes and restart the app under *Setup Node.js App*.
 3. Re-run the failed deploy (Actions → deploy → Re-run failed jobs). Each release prints the process count by program
    name at its start (`== Processes on this account`), and `cron.sh` puts the cron lines back as they should be.
 

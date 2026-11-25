@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 30: petty cash floats and cash counts (Module 5).
+-- Evenbooks core schema, part 30: petty cash floats and cash counts (Module 5).
 --
 -- A cash box or petty cash account can keep a float: the amount it is topped up to. Its cash is counted now and then,
 -- by a named person. Rules here:

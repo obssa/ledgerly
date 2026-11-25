@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 9: authenticator codes at sign-in (SECURITY.md S2).
+-- Evenbooks core schema, part 9: authenticator codes at sign-in (SECURITY.md S2).
 --
 -- users.mfa_secret (001) holds the authenticator secret, encrypted by the application. This file adds:
 --   mfa_confirmed_at   set when the user proved the authenticator works; only then is a code asked at sign-in

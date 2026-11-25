@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 67: sales orders delivered in parts (Module 2).
+-- Evenbooks core schema, part 67: sales orders delivered in parts (Module 2).
 --
 -- A confirmed sales order is invoiced as its goods go out, in as many invoices as it takes: each invoice line made
 -- from it names the order line it delivers (source_line_id). What is still to deliver is the back-order, and what

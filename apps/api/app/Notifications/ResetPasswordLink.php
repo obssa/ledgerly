@@ -23,9 +23,9 @@ final class ResetPasswordLink extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Reset your Ledgerly password')
+            ->subject('Reset your Evenbooks password')
             ->greeting("Hello {$notifiable->name},")
-            ->line('Someone asked to reset the password of your Ledgerly account.')
+            ->line('Someone asked to reset the password of your Evenbooks account.')
             ->action('Choose a new password', self::url($this->token))
             ->line('The link works once and for ' . VerifyEmailAddress::duration($this->minutes) . '. Choosing a new password signs you out everywhere.')
             ->line('If this was not you, ignore this email: your password stays as it is.');

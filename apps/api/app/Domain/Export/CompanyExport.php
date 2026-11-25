@@ -7,12 +7,12 @@ namespace App\Domain\Export;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Module 11: everything a company keeps in Ledgerly, as one CSV per table in a ZIP, so the books can be taken
+ * Module 11: everything a company keeps in Evenbooks, as one CSV per table in a ZIP, so the books can be taken
  * elsewhere (SECURITY.md S15). Read as the application inside the company's context, so row-level security
  * still decides what is in it, and every query also names the company.
  *
  * The tables are every company table the database knows (so a new module's table is never forgotten), less the
- * ones that are Ledgerly's own machinery or hold link hashes. Table and column names come from the database
+ * ones that are Evenbooks' own machinery or hold link hashes. Table and column names come from the database
  * catalog, never from a request.
  */
 final class CompanyExport
@@ -143,7 +143,7 @@ final class CompanyExport
     private function readme(array $counts): string
     {
         $lines = [
-            'Ledgerly company data export',
+            'Evenbooks company data export',
             'Made ' . now()->toIso8601String(),
             '',
             'One CSV file per table (UTF-8, comma separated, first line the column names). Amounts are exact decimals;',

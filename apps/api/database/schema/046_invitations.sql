@@ -1,7 +1,7 @@
--- Ledgerly core schema, part 46: invitation links (Module 11).
+-- Evenbooks core schema, part 46: invitation links (Module 11).
 --
 -- An owner or admin invites someone by email: an 'invited' membership (001, 008) and a one-time link to accept it.
--- Someone without a Ledgerly account gets one from the invitation, without a usable password until they accept and
+-- Someone without an Evenbooks account gets one from the invitation, without a usable password until they accept and
 -- choose it. Rules here:
 --   1. Only a SHA-256 hash of the link's token is kept; the link works once, until it expires (at most 14 days).
 --   2. A link is made only by an owner or admin of the invitation's company, only for an invitation still open.

@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 58: goods returned on a credit note (Module 4).
+-- Evenbooks core schema, part 58: goods returned on a credit note (Module 4).
 --
 -- A credit note can say the goods came back (restock). Its stock lines then come back into the warehouse at the cost
 -- they left with on the invoice (sale_return moves naming the credit note), and its entry takes that cost off cost of

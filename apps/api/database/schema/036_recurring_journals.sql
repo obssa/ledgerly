@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 36: recurring and auto-reversing manual journals (Module 6).
+-- Evenbooks core schema, part 36: recurring and auto-reversing manual journals (Module 6).
 --
 -- A recurring journal is a manual journal posted on a schedule (rent, depreciation, a standing accrual). Each posting is
 -- an ordinary manual journal (032 applies), naming its template. Rules here:

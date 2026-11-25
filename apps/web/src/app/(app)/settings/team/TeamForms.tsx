@@ -35,7 +35,7 @@ const Messages = ({ state }: { state?: { error?: string; notice?: string } }) =>
   </>
 );
 
-/** Invite someone by email with a role; someone without a Ledgerly account also gets their name on it. */
+/** Invite someone by email with a role; someone without an Evenbooks account also gets their name on it. */
 export function InviteForm({ roles, grantable }: { roles: string[]; grantable: Grantable[] }) {
   const [state, action, pending] = useActionState(inviteMember, undefined);
   const [role, setRole] = useState("bookkeeper");
@@ -55,7 +55,7 @@ export function InviteForm({ roles, grantable }: { roles: string[]; grantable: G
       {role === "custom" && <PermissionPicker grantable={grantable} chosen={[]} id="invite" />}
       <div className="flex flex-wrap items-center gap-2">
         <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Inviting…" : "Send invitation"}</button>
-        <span className="text-[13px] text-muted">They get an email with a link that works once, for 7 days. The name is needed only for someone new to Ledgerly.</span>
+        <span className="text-[13px] text-muted">They get an email with a link that works once, for 7 days. The name is needed only for someone new to Evenbooks.</span>
       </div>
     </form>
   );

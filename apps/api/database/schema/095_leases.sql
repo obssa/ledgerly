@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 95: leases, as the lessee (Module 9, IFRS for SMEs section 20).
+-- Evenbooks core schema, part 95: leases, as the lessee (Module 9, IFRS for SMEs section 20).
 --
 -- A lease is a number of equal monthly payments, in arrears (at each month's end) or in advance (at its start).
 --   A finance lease (the risks and rewards of the asset pass to the company) is recognised at commencement at the

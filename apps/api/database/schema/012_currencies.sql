@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 12: foreign currencies and exchange rates (Module 1).
+-- Evenbooks core schema, part 12: foreign currencies and exchange rates (Module 1).
 --
 -- company_currencies: the foreign currencies a company works in. A document in another currency than the base
 -- currency must use one of them.

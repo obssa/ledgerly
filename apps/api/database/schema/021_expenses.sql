@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 21: expenses paid on the spot (Module 3).
+-- Evenbooks core schema, part 21: expenses paid on the spot (Module 3).
 --
 -- An expense is a supplier's receipt paid at once, by cash, card, bank or wallet: fuel, utilities, small purchases.
 -- It is a document of its own (type 'expense', numbered EXP-) that posts in one entry, Dr cost and input VAT,

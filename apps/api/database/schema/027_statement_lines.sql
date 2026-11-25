@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 27: bank statement lines and their review (Module 5).
+-- Evenbooks core schema, part 27: bank statement lines and their review (Module 5).
 --
 -- An imported statement line (bank_transactions) is evidence: what the bank says happened. It is reviewed by matching it
 -- to an entry already in the books, categorising it (a new entry), or excluding it with a reason. Rules here:

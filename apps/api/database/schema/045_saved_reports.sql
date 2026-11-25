@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 45: saved and scheduled reports (Module 10).
+-- Evenbooks core schema, part 45: saved and scheduled reports (Module 10).
 --
 -- A person saves a report with its period (a custom range, or one that rolls: this month, last month, this or last
 -- quarter, the fiscal year to date) and its options, and may have it sent weekly or monthly. Sending is an email to

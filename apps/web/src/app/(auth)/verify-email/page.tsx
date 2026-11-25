@@ -43,7 +43,7 @@ async function Result({ searchParams }: Pick<PageProps<"/verify-email">, "search
       >
         {message}
       </p>
-      <Link href="/" className="btn btn-primary mt-5 w-full justify-center">{ok ? "Continue to Ledgerly" : "Go to Ledgerly"}</Link>
+      <Link href="/" className="btn btn-primary mt-5 w-full justify-center">{ok ? "Continue to Evenbooks" : "Go to Evenbooks"}</Link>
     </>
   );
 }

@@ -68,7 +68,7 @@
     "connector": "ethiopia_mor",
     "model": "Clearance: each invoice is registered in real time before it is issued and receives an Invoice Registration Number (IRN) and QR code; receipts receive a Receipt Registration Number (RRN).",
     "legal_basis": "Electronic Invoicing System Administration Directive No. 1142/2026",
-    "status": "Directive in force; the Ministry's implementation schedule (Article 29) and technical specification are not yet published. Software must be authorised by the Ministry. Invoices stay queued until Ledgerly is authorised."
+    "status": "Directive in force; the Ministry's implementation schedule (Article 29) and technical specification are not yet published. Software must be authorised by the Ministry. Invoices stay queued until Evenbooks is authorised."
   },
   "payment_methods": [
     "bank_transfer",
@@ -98,7 +98,7 @@
       "note": "Withhold when one payment is above the threshold; 30% when the supplier has no TIN."
     },
     "cash_payment_limit": "50000.00",
-    "cash_payment_limit_note": "Payments above ETB 50,000 must go through a bank or an authorised electronic channel; Ledgerly warns when a cash payment is above the limit.",
+    "cash_payment_limit_note": "Payments above ETB 50,000 must go through a bank or an authorised electronic channel; Evenbooks warns when a cash payment is above the limit.",
     "books_required_note": "Category A taxpayers (annual turnover above ETB 2,000,000), VAT-registered businesses and professional service providers must keep books of account.",
     "filing": {
       "vat": {

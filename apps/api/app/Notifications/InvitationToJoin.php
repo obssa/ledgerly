@@ -29,10 +29,10 @@ final class InvitationToJoin extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject("{$this->invitedBy} invited you to {$this->company} on Ledgerly")
+            ->subject("{$this->invitedBy} invited you to {$this->company} on Evenbooks")
             ->greeting("Hello {$notifiable->name},")
-            ->line("{$this->invitedBy} invited you to work in {$this->company} on Ledgerly as {$this->roleWords()}.")
-            ->line($this->newAccount ? 'Accept to choose your password and sign in.' : 'Accept, then sign in with your Ledgerly account as usual.')
+            ->line("{$this->invitedBy} invited you to work in {$this->company} on Evenbooks as {$this->roleWords()}.")
+            ->line($this->newAccount ? 'Accept to choose your password and sign in.' : 'Accept, then sign in with your Evenbooks account as usual.')
             ->action('Accept the invitation', self::url($this->token))
             ->line("The link works once and for {$this->days} days. If you were not expecting this, you can ignore this email.");
     }

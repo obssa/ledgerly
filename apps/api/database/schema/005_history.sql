@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 5: permanent edit history. (Applied before 006_rls.sql.)
+-- Evenbooks core schema, part 5: permanent edit history. (Applied before 006_rls.sql.)
 --
 --   1. document_versions: a full snapshot of a posted document is saved before every edit. Append-only.
 --   2. A posted document (and its lines) can only change after its current version is in document_versions:

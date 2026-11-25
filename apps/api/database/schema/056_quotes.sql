@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 56: quotes and sales orders (Module 2).
+-- Evenbooks core schema, part 56: quotes and sales orders (Module 2).
 --
 -- A quote is drafted, sent to the customer (it takes its number then), accepted or declined, expires after its
 -- valid-until date (due_date) while it waits for an answer, and is converted to a sales order or an invoice. A sales

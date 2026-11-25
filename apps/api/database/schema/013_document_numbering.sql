@@ -1,4 +1,4 @@
--- Ledgerly core schema, part 13: document numbering (Module 1).
+-- Evenbooks core schema, part 13: document numbering (Module 1).
 --
 -- With automatic numbering a draft has no number: the number is taken when the document is posted, from a
 -- per-company counter (company_sequences) locked for that instant, in the same transaction as the posting. A
