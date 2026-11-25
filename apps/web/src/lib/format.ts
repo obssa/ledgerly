@@ -29,3 +29,13 @@ export function toEthiopian(date: Date): { year: number; month: number; day: num
   const day = (n % 30) + 1;
   return { year, month, day, label: `${months[month - 1]} ${day}, ${year}` };
 }
+
+/**
+ * A day written out in the company's own calendar (Settings, Calendar), and only that one: "Wednesday, 25 November
+ * 2026" for Gregorian, "Wednesday, Hidar 16, 2019" for Ethiopian. The date is a UTC midnight, as the API's dates are.
+ */
+export function formatLongDate(date: Date, calendar: "gregorian" | "ethiopian"): string {
+  const weekday = date.toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
+  if (calendar === "ethiopian") return `${weekday}, ${toEthiopian(date).label}`;
+  return date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
