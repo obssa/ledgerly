@@ -2,19 +2,23 @@ import { Card, PageTitle } from "@/components/ui";
 import { getFinancialHealth, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel, showRatio } from "@/lib/reports";
-import { PeriodForm, ReportsNav } from "../ReportsNav";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { CLOSED_RANGE_PRESETS } from "@/lib/periods";
+import { ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Financial health" };
 
 /** Module 10: the financial health (liquidity) pack, each measure with how it is worked out. */
 export default async function FinancialHealthPage({ searchParams }: PageProps<"/reports/financial-health">) {
-  const period = await getReportPeriod(await searchParams);
+  const q = await searchParams;
+  // Ratios over a number of days need a start and an end: no open-ended presets here.
+  const period = await getReportPeriod(q, "this_fiscal_year_to_date", CLOSED_RANGE_PRESETS);
   const h = await getFinancialHealth(period);
 
   return (
     <>
       <PageTitle eyebrow="Reports / Management" title="Financial health" />
-      <PeriodForm from={period.from} to={period.to} />
+      <DateRangeFilter picked={period.picked} keep={q} allowed={CLOSED_RANGE_PRESETS} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/financial-health" />
         {!h ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (

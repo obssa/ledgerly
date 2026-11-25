@@ -1,15 +1,18 @@
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
-import { getBalanceSheet, getCompanySettings, getCompanyToday } from "@/lib/data";
+import { AsOfFilter } from "@/components/DateRangeFilter";
+import { asOfLabel } from "@/lib/periods";
+import { getBalanceSheet, getCompanySettings, getReportAsOf } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { isDate, yearEarlier } from "@/lib/reports";
-import { ExportLink, PeriodForm, ReportsNav } from "../ReportsNav";
+import { yearEarlier } from "@/lib/reports";
+import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Balance sheet" };
 
 /** Module 10: the balance sheet at a date, with Assets = Liabilities + Equity checked and any difference shown. */
 export default async function BalanceSheetPage({ searchParams }: PageProps<"/reports/balance-sheet">) {
   const q = await searchParams;
-  const asOf = isDate(q.as_of) ? q.as_of : await getCompanyToday();
+  const at = await getReportAsOf(q);
+  const asOf = at.asOf;
   // Comparison with last year (compare=year): the balance sheet a year earlier, account by account.
   const lastYear = q.compare === "year";
   const before = yearEarlier(asOf);
@@ -40,7 +43,7 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
   return (
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Balance sheet" actions={<ExportLink report="balance-sheet" params={{ as_of: asOf }} />} />
-      <PeriodForm to={asOf} single />
+      <AsOfFilter picked={at.picked} keep={q} />
       <Segmented label="Compare with" size="sm" items={[
         { key: "one", href: `/reports/balance-sheet?as_of=${asOf}`, label: "This date only", active: !lastYear },
         { key: "year", href: `/reports/balance-sheet?as_of=${asOf}&compare=year`, label: `Against ${before}`, active: lastYear },
@@ -50,7 +53,7 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
         {!bs ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Balance sheet">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[13px] text-muted">As at <span className="num">{asOf}</span> · {cur}</div>
+              <div className="text-[13px] text-muted">{asOfLabel(asOf, at.ctx.calendar)} · {cur}</div>
               {bs.equation.balanced ? <Pill tone="good">Assets = Liabilities + Equity</Pill> : <Pill tone="bad">Out by {formatAmount(bs.equation.difference, cur)}</Pill>}
             </div>
             <div className="overflow-x-auto">

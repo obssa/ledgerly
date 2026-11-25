@@ -48,13 +48,3 @@ export function ExportLink({ report, params }: { report: string; params: Record<
   );
 }
 
-/** From and to: a plain GET form, so it works without JavaScript. */
-export function PeriodForm({ from, to, single }: { from?: string; to: string; single?: boolean }) {
-  return (
-    <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
-      {!single && <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={from} /></div>}
-      <div><label className="field-label" htmlFor={single ? "as_of" : "to"}>{single ? "As at" : "To"}</label><input className="field" id={single ? "as_of" : "to"} name={single ? "as_of" : "to"} type="date" defaultValue={to} /></div>
-      <button type="submit" className="btn">Show</button>
-    </form>
-  );
-}

@@ -63,4 +63,25 @@ final class CustomReportTest extends TestCase
         $this->postJson('/api/v1/saved-reports', ['name' => 'Odd', 'report' => 'custom', 'period' => 'this_quarter', 'options' => ['rows' => 'password']], $h)
             ->assertUnprocessable();
     }
+
+    /** "All dates" (the web app sends the widest dates for an open end) is a period like any other, except for monthly or quarterly columns. */
+    public function test_all_dates_is_a_period_but_monthly_columns_stay_within_five_years(): void
+    {
+        config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
+        $a = $this->companyWithRecords('a@example.test', 'Abyssinia Coffee');
+        $h = ['X-Company-Id' => $a['company']];
+        $all = ['from' => '1900-01-01', 'to' => '2999-12-31'];
+        $everything = (string) $this->owner()->table('journal_lines')->where(['company_id' => $a['company'], 'account_id' => $a['sales']])
+            ->selectRaw('coalesce(sum(credit - debit), 0)::numeric(20,2)::text AS v')->value('v');
+
+        $rows = $this->getJson('/api/v1/reports/custom?' . http_build_query($all + ['rows' => 'account']), $h)->assertOk()->json('rows');
+        $this->assertSame($everything, collect($rows)->firstWhere('key', $a['sales'])['total']);
+        foreach (['reports/sales', 'reports/purchases', 'reports/profit-by-dimension', 'reports/cash-flow', 'reports/changes-in-equity', 'reports/financial-health', 'reports/stock-movement'] as $report) {
+            $this->getJson("/api/v1/{$report}?" . http_build_query($all), $h)->assertOk();
+        }
+
+        $this->getJson('/api/v1/reports/custom?' . http_build_query($all + ['columns' => 'month']), $h)->assertUnprocessable()->assertJsonValidationErrors('to');
+        $this->getJson('/api/v1/reports/custom?' . http_build_query(['from' => '2026-12-31', 'to' => '2026-07-08']), $h)->assertUnprocessable()->assertJsonValidationErrors('to');
+        $this->getJson('/api/v1/reports/cash-flow?' . http_build_query(['from' => '2026-12-31', 'to' => '2026-07-08']), $h)->assertUnprocessable()->assertJsonValidationErrors('to');
+    }
 }

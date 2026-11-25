@@ -1,8 +1,9 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { rangeLabel } from "@/lib/periods";
 import { Card, PageTitle } from "@/components/ui";
 import { getCustomReport, getDimensions, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { CUSTOM_COLUMNS, CUSTOM_MEASURES, CUSTOM_ROWS, CUSTOM_TYPES, columnLabel, customOptions } from "@/lib/reports";
-import { periodLabel } from "@/lib/reports";
 import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Custom report" };
@@ -16,7 +17,7 @@ export default async function CustomReportPage({ searchParams }: PageProps<"/rep
   const q = await searchParams;
   const o = customOptions(q);
   const period = await getReportPeriod(q);
-  const [r, dims] = await Promise.all([getCustomReport({ ...o, ...period }), getDimensions()]);
+  const [r, dims] = await Promise.all([getCustomReport({ ...o, from: period.from, to: period.to }), getDimensions()]);
   const ofKind = (kind: string) => (dims ?? []).filter((d) => d.kind === kind && d.is_active);
   const rowLabel = CUSTOM_ROWS.find(([v]) => v === o.rows)?.[1] ?? "Account";
   const select = (name: string, label: string, options: readonly (readonly [string, string])[], value: string | undefined, empty?: string) => (
@@ -29,8 +30,8 @@ export default async function CustomReportPage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Custom report" actions={<ExportLink report="custom" params={{ ...o, ...period }} />} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
+      <PageTitle eyebrow="Reports / Management" title="Custom report" actions={<ExportLink report="custom" params={{ ...o, from: period.from, to: period.to }} />} />
+      <DateRangeFilter picked={period.picked} keep={q} fields={["account_type", "class_id", "columns", "location_id", "measure", "project_id", "rows"]}>
         {select("rows", "Rows", CUSTOM_ROWS, o.rows)}
         {select("columns", "Columns", CUSTOM_COLUMNS, o.columns)}
         {select("measure", "Figure", CUSTOM_MEASURES, o.measure)}
@@ -38,15 +39,12 @@ export default async function CustomReportPage({ searchParams }: PageProps<"/rep
         {ofKind("project").length > 0 && select("project_id", "Project", ofKind("project").map((d) => [d.id, `${d.code} ${d.name}`] as const), o.project_id, "All")}
         {ofKind("location").length > 0 && select("location_id", "Location", ofKind("location").map((d) => [d.id, `${d.code} ${d.name}`] as const), o.location_id, "All")}
         {ofKind("class").length > 0 && select("class_id", "Class", ofKind("class").map((d) => [d.id, `${d.code} ${d.name}`] as const), o.class_id, "All")}
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={period.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={period.to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      </DateRangeFilter>
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/custom" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Custom report">
-            <div className="px-3 pt-2 text-[13px] text-muted">{periodLabel(r.from, r.to)} · {r.currency} · {CUSTOM_MEASURES.find(([v]) => v === o.measure)?.[1]}</div>
+            <div className="px-3 pt-2 text-[13px] text-muted">{rangeLabel(period.picked, period.ctx.calendar)} · {r.currency} · {CUSTOM_MEASURES.find(([v]) => v === o.measure)?.[1]}</div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">{rowLabel}</th>

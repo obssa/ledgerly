@@ -1,12 +1,12 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getAuditLog, getCompanySettings } from "@/lib/data";
+import { getAuditLog, getCompanySettings, getReportPeriod } from "@/lib/data";
 import { actionLabel, changesOf } from "@/lib/history";
 import { ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Changes" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const KIND: Record<string, string> = { invoice: "Invoice", credit_note: "Credit note", bill: "Bill", vendor_credit: "Supplier credit", expense: "Expense", sales_receipt: "Cash sale", company: "Books" };
 const HREF: Record<string, string> = { invoice: "/invoices", credit_note: "/invoices", bill: "/bills", vendor_credit: "/bills", expense: "/expenses", sales_receipt: "/sales-receipts" };
 
@@ -17,7 +17,8 @@ const HREF: Record<string, string> = { invoice: "/invoices", credit_note: "/invo
  */
 export default async function ChangesReport({ searchParams }: PageProps<"/reports/changes">) {
   const q = await searchParams;
-  const filters = { from: date(q.from), to: date(q.to), user_id: typeof q.user_id === "string" && /^[0-9a-f-]{36}$/.test(q.user_id) ? q.user_id : undefined,
+  const period = await getReportPeriod(q, "all");
+  const filters = { from: period.picked.from ?? undefined, to: period.picked.to ?? undefined, user_id: typeof q.user_id === "string" && /^[0-9a-f-]{36}$/.test(q.user_id) ? q.user_id : undefined,
     before_id: typeof q.before_id === "string" && /^\d{1,18}$/.test(q.before_id) ? q.before_id : undefined };
   const [log, settings] = await Promise.all([getAuditLog({ ...filters, group: "document_changes" }), getCompanySettings()]);
   const zone = settings.timezone || "Africa/Addis_Ababa";
@@ -32,16 +33,13 @@ export default async function ChangesReport({ searchParams }: PageProps<"/report
         <div className="min-w-0 flex-[4_1_560px]">
           {!log ? <p className="text-[14px] text-muted">Shown to owners, admins and accountants.</p> : (
             <>
-              <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
-                <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={filters.from} /></div>
-                <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={filters.to} /></div>
+              <DateRangeFilter picked={period.picked} keep={q} fields={["user_id"]}>
                 <div><label className="field-label" htmlFor="user_id">Changed by</label>
                   <select className="field" id="user_id" name="user_id" defaultValue={filters.user_id ?? ""}>
                     <option value="">Anyone</option>
                     {log.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select></div>
-                <button type="submit" className="btn">Show</button>
-              </form>
+              </DateRangeFilter>
               <Card className="!p-2" label="Changes">
                 <div className="overflow-x-auto">
                   <table className="tbl">

@@ -77,7 +77,8 @@ final class CustomerController extends Controller
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
         $to = $q['to'] ?? app(CurrentCompany::class)->today();
-        $from = $q['from'] ?? now()->subDays(90)->format('Y-m-d');
+        // 90 days back from the company's today (its time zone), not the server's clock.
+        $from = $q['from'] ?? (new \DateTimeImmutable(app(CurrentCompany::class)->today()))->modify('-90 days')->format('Y-m-d');
         $company = $current->get();
 
         return response()->json([

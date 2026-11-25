@@ -57,15 +57,16 @@ final class FinancialStatementController extends Controller
         return response()->json([...$this->statements->health($this->current->id(), $from, $to), 'currency' => $this->current->get()->base_currency]);
     }
 
-    /** @return array{0: string, 1: string} from and to: the current fiscal year to today unless given; up to five years */
+    /** @return array{0: string, 1: string} from and to: the current fiscal year to today unless given */
     private function period(Request $request): array
     {
         $q = $request->validate(['from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d']]);
         $to = $q['to'] ?? $this->current->today();
         $from = $q['from'] ?? (DB::table('fiscal_years')->where('company_id', $this->current->id())->where('starts_on', '<=', $to)->where('ends_on', '>=', $to)->value('starts_on')
             ?? (new \DateTimeImmutable($to))->modify('first day of this month')->format('Y-m-d'));
-        if ($to < $from || (new \DateTimeImmutable($from))->diff(new \DateTimeImmutable($to))->days > 1830) {
-            throw ValidationException::withMessages(['to' => ['A report covers up to five years, ending on or after it starts.']]);
+        // Any span, "All dates" included (the web app sends the widest dates for an open end): it ends on or after it starts.
+        if ($to < $from) {
+            throw ValidationException::withMessages(['to' => ['A report ends on or after it starts.']]);
         }
 
         return [(string) $from, $to];

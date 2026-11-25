@@ -1,19 +1,20 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getJournal, getJournalRequests } from "@/lib/data";
+import { getJournal, getJournalRequests, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Journal entries" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const SOURCES = [["", "Everything"], ["manual", "Manual journals"], ["invoice", "Invoices"], ["bill", "Bills"], ["expense", "Expenses"], ["payment", "Payments"],
   ["transfer", "Transfers"], ["deposit", "Deposits"], ["stock_adjustment", "Stock adjustments"], ["reversal", "Reversals"], ["opening", "Opening balances"], ["closing", "Year-end close"], ["adjustment", "Audit adjustments"]] as const;
 
 /** Module 6: every entry of the books, newest first, by date, source or memo; manual journals posted from here. */
 export default async function JournalPage({ searchParams }: PageProps<"/journal">) {
   const q = await searchParams;
+  const period = await getReportPeriod(q, "all");
   const filters = {
-    from: date(q.from), to: date(q.to),
+    from: (period.picked.from ?? undefined), to: (period.picked.to ?? undefined),
     source: typeof q.source === "string" && /^[a-z_]+$/.test(q.source) ? q.source : undefined,
     search: typeof q.search === "string" && q.search.trim() ? q.search.trim().slice(0, 100) : undefined,
     page: typeof q.page === "string" && /^\d{1,4}$/.test(q.page) ? q.page : undefined,
@@ -47,9 +48,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
           </div>
         </Card>
       )}
-      <form className="mb-4 flex flex-wrap items-end gap-2.5">
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={filters.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={filters.to} /></div>
+      <DateRangeFilter picked={period.picked} keep={q} fields={["earlier", "search", "source"]}>
         <div>
           <label className="field-label" htmlFor="source">Made by</label>
           <select className="field" id="source" name="source" defaultValue={filters.source ?? ""}>{SOURCES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
@@ -58,8 +57,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         <label className="flex h-[42px] items-center gap-2 text-sm" title="An edited invoice or bill shows as its entry as it stands now. Tick to list the entries each edit replaced as well; they are always kept.">
           <input type="checkbox" name="earlier" value="1" defaultChecked={filters.earlier === "1"} className="size-4" /> Show earlier entries of edited documents
         </label>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      </DateRangeFilter>
       <Card className="!p-2" label="Entries">
         <div className="overflow-x-auto">
           <table className="tbl">

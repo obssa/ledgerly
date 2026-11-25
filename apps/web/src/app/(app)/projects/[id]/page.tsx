@@ -1,7 +1,8 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCustomers, getExpenseAccounts, getProject, getTimeOptions } from "@/lib/data";
+import { getCustomers, getExpenseAccounts, getProject, getTimeOptions, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { milestoneTotal, PROJECT_BILLING, PROJECT_STATUSES } from "@/lib/projects";
 import { GrantForm } from "../GrantForm";
@@ -11,7 +12,6 @@ import { AddMilestone, MilestoneControls } from "../MilestoneForms";
 
 export const metadata = { title: "Project" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const STATUS = Object.fromEntries(PROJECT_STATUSES) as Record<string, string>;
 const BILLING = Object.fromEntries(PROJECT_BILLING) as Record<string, string>;
 const DOC: Record<string, [string, string]> = {
@@ -32,7 +32,8 @@ const MILESTONE = { planned: "Planned", drafted: "On a draft invoice", invoiced:
 export default async function ProjectPage({ params, searchParams }: PageProps<"/projects/[id]">) {
   const { id } = await params;
   const q = await searchParams;
-  const period = { from: date(q.from), to: date(q.to) };
+  const range = await getReportPeriod(q, "all");
+  const period = { from: range.picked.from ?? undefined, to: range.picked.to ?? undefined };
   const [p, customers, timeOptions, expenseAccounts] = await Promise.all([getProject(id, period), getCustomers({}), getTimeOptions(), getExpenseAccounts()]);
   if (!p) notFound();
 
@@ -40,12 +41,9 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
     <>
       <PageTitle eyebrow={<><Link href="/projects" className="hover:underline">Projects</Link> / <span className="num">{p.code}</span></>}
         title={<>{p.name} <Pill tone={p.status === "active" ? "good" : p.status === "on_hold" ? "warn" : "neutral"}>{STATUS[p.status] ?? p.status}</Pill></>} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5">
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={period.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={period.to} /></div>
-        <button type="submit" className="btn">Show</button>
+      <DateRangeFilter picked={range.picked} keep={q} fields={[]}>
         {(period.from || period.to) && <Link href={`/projects/${encodeURIComponent(p.id)}`} className="btn">All time</Link>}
-      </form>
+      </DateRangeFilter>
       <Card className="mb-4" label="Profit">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">
           <div><dt className="text-muted">Income</dt><dd className="num text-[18px] font-bold">{formatAmount(p.income)}</dd></div>

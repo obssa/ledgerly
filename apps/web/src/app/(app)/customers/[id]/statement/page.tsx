@@ -1,19 +1,19 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle } from "@/components/ui";
-import { getCustomerStatement } from "@/lib/data";
+import { getCustomerStatement, getReportPeriod } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Customer statement" };
 
 const KIND: Record<string, string> = { invoice: "Invoice", credit_note: "Credit note", payment: "Payment", reversal: "Reversal", opening: "Opening", manual: "Journal" };
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
-
 /** The customer's statement for a period: what they owed before it, every movement, and what they owe at the end. */
 export default async function CustomerStatementPage({ params, searchParams }: PageProps<"/customers/[id]/statement">) {
   const { id } = await params;
   const q = await searchParams;
-  const statement = await getCustomerStatement(id, { from: date(q.from), to: date(q.to) });
+  const period = await getReportPeriod(q, "last_90_days");
+  const statement = await getCustomerStatement(id, { from: period.from, to: period.to });
   if (!statement) notFound();
 
   return (
@@ -22,11 +22,9 @@ export default async function CustomerStatementPage({ params, searchParams }: Pa
         eyebrow={<><Link href={`/customers/${encodeURIComponent(id)}`} className="hover:underline">{statement.customer.name}</Link> / Statement</>}
         title={<>Statement · <span className="num">{statement.from}</span> to <span className="num">{statement.to}</span></>}
       />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={statement.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={statement.to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      <DateRangeFilter picked={period.picked} keep={q} fields={[]}>
+
+      </DateRangeFilter>
       <Card className="max-w-[1000px]" label="Statement">
         <div className="mb-4 text-sm">
           <div className="font-bold">{statement.customer.name}</div>

@@ -1,6 +1,8 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { CLOSED_RANGE_PRESETS } from "@/lib/periods";
 import Link from "next/link";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
-import { getTaxCentre } from "@/lib/data";
+import { getTaxCentre, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { FileReturn } from "./TaxForms";
 import { Worksheet } from "./Worksheet";
@@ -8,7 +10,6 @@ import type { FilingStatus } from "@/lib/api";
 
 export const metadata = { title: "Tax centre" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const KINDS = [["vat", "VAT"], ["withholding", "Withholding tax"], ["tot", "Turnover tax"]] as const;
 const STATUS: Record<FilingStatus, [string, "good" | "warn" | "bad" | "neutral"]> = {
   paid: ["Filed and paid", "good"], filed: ["Filed, not paid", "warn"], overdue: ["Overdue", "bad"], due_soon: ["Due soon", "warn"], due: ["Due", "neutral"], open: ["Period open", "neutral"],
@@ -17,8 +18,9 @@ const STATUS: Record<FilingStatus, [string, "good" | "warn" | "bad" | "neutral"]
 /** Module 7: the VAT and withholding worksheets of any period, built from the ledger, filing a return and the returns filed. */
 export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">) {
   const q = await searchParams;
+  const period = await getReportPeriod(q, "last_month", CLOSED_RANGE_PRESETS);
   const kind = q.kind === "withholding" || q.kind === "tot" ? q.kind : "vat";
-  const centre = await getTaxCentre({ kind, from: date(q.from), to: date(q.to) });
+  const centre = await getTaxCentre({ kind, from: period.from, to: period.to });
 
   return (
     <>
@@ -30,12 +32,9 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
         </p>
       ) : (
         <>
-          <form className="mb-4 flex flex-wrap items-end gap-2.5">
+          <DateRangeFilter picked={period.picked} keep={q} allowed={CLOSED_RANGE_PRESETS} fields={["kind"]}>
             <input type="hidden" name="kind" value={kind} />
-            <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={centre.sheet.from} /></div>
-            <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={centre.sheet.to} /></div>
-            <button type="submit" className="btn">Show</button>
-          </form>
+      </DateRangeFilter>
           {(centre.calendar.overdue > 0 || centre.calendar.due_soon > 0) && (
             <p role="status" className={`mb-4 rounded-lg px-3 py-2 text-[13px] font-semibold ${centre.calendar.overdue > 0 ? "bg-bad-tint text-bad" : "bg-warn-tint text-warn"}`}>
               {centre.calendar.overdue > 0 && <>{centre.calendar.overdue} return{centre.calendar.overdue === 1 ? "" : "s"} overdue. </>}

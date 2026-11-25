@@ -2,7 +2,9 @@ import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCashFlow, getDirectCashFlow, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel } from "@/lib/reports";
-import { ExportLink, PeriodForm, ReportsNav } from "../ReportsNav";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { periodQuery } from "@/lib/periodParams";
+import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Cash flow statement" };
 
@@ -13,14 +15,14 @@ export default async function CashFlowPage({ searchParams }: PageProps<"/reports
   const params = await searchParams;
   const period = await getReportPeriod(params);
   const direct = params.method === "direct";
-  const link = (method: string) => `/reports/cash-flow?${new URLSearchParams({ from: period.from, to: period.to, ...(method === "direct" ? { method } : {}) })}`;
-  if (direct) return <DirectPage period={period} link={link} />;
-  const cf = await getCashFlow(period);
+  const link = (method: string) => `/reports/cash-flow?${new URLSearchParams({ ...periodQuery(period.picked), ...(method === "direct" ? { method } : {}) })}`;
+  if (direct) return <DirectPage period={period} params={params} link={link} />;
+  const cf = await getCashFlow({ from: period.from, to: period.to });
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" actions={<ExportLink report="cash-flow" params={period} />} />
-      <PeriodForm from={period.from} to={period.to} />
+      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" actions={<ExportLink report="cash-flow" params={{ from: period.from, to: period.to }} />} />
+      <DateRangeFilter picked={period.picked} keep={params} />
       <MethodLinks link={link} direct={false} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/cash-flow" />
@@ -64,14 +66,14 @@ function MethodLinks({ link, direct }: { link: (method: string) => string; direc
 }
 
 /** The direct method: what the cash accounts received and paid, by what it was for. */
-async function DirectPage({ period, link }: { period: { from: string; to: string }; link: (method: string) => string }) {
-  const cf = await getDirectCashFlow(period);
+async function DirectPage({ period, params, link }: { period: Awaited<ReturnType<typeof getReportPeriod>>; params: Record<string, string | string[] | undefined>; link: (method: string) => string }) {
+  const cf = await getDirectCashFlow({ from: period.from, to: period.to });
   const sections = [["Operating activities", ["customers", "suppliers", "employees", "taxes", "other"], "operating"], ["Investing activities", ["investing"], "investing"],
     ["Financing activities", ["financing"], "financing"]] as const;
   return (
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" />
-      <PeriodForm from={period.from} to={period.to} />
+      <DateRangeFilter picked={period.picked} keep={params} />
       <MethodLinks link={link} direct />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/cash-flow" />

@@ -1,8 +1,8 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { actionLabel, changesOf } from "@/lib/audit";
-import { getAuditLog, verifyAuditLog } from "@/lib/data";
-import { isDate } from "@/lib/reports";
+import { getAuditLog, verifyAuditLog, getReportPeriod } from "@/lib/data";
 import { ExportLink } from "../reports/ReportsNav";
 
 export const metadata = { title: "Audit log" };
@@ -13,7 +13,8 @@ const uuid = (v: unknown) => (typeof v === "string" && /^[0-9a-f-]{36}$/.test(v)
 /** Module 10/11: every change, post, void, approval and export, who did it, when, what it was before and after, and why. */
 export default async function AuditLogPage({ searchParams }: PageProps<"/audit">) {
   const q = await searchParams;
-  const filters = { from: isDate(q.from) ? q.from : undefined, to: isDate(q.to) ? q.to : undefined, action: word(q.action), user_id: uuid(q.user_id),
+  const period = await getReportPeriod(q, "all");
+  const filters = { from: (period.picked.from ?? undefined), to: (period.picked.to ?? undefined), action: word(q.action), user_id: uuid(q.user_id),
     subject_id: uuid(q.subject_id), before_id: typeof q.before_id === "string" && /^\d{1,18}$/.test(q.before_id) ? q.before_id : undefined };
   const [log, check] = await Promise.all([getAuditLog(filters), q.verify === "1" ? verifyAuditLog() : Promise.resolve(null)]);
   const more = log?.next_before_id ? `/audit?${new URLSearchParams(Object.entries({ ...filters, before_id: String(log.next_before_id) }).filter(([, v]) => v) as [string, string][]).toString()}` : null;
@@ -24,17 +25,14 @@ export default async function AuditLogPage({ searchParams }: PageProps<"/audit">
         actions={log ? <ExportLink report="audit-log" params={{ from: filters.from, to: filters.to, action: filters.action, user_id: filters.user_id }} /> : undefined} />
       {!log ? <p className="text-[14px] text-muted">The audit log is not available in the demo.</p> : (
         <>
-          <form className="mb-4 flex flex-wrap items-end gap-2.5">
-            <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={filters.from} /></div>
-            <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={filters.to} /></div>
+          <DateRangeFilter picked={period.picked} keep={q} fields={["action", "user_id"]}>
             <div className="min-w-[180px]"><label className="field-label" htmlFor="user_id">Who</label>
               <select className="field" id="user_id" name="user_id" defaultValue={filters.user_id ?? ""}><option value="">Everyone</option>
                 {log.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
             <div className="min-w-[200px]"><label className="field-label" htmlFor="action">What</label>
               <select className="field" id="action" name="action" defaultValue={filters.action ?? ""}><option value="">Everything</option>
                 {log.actions.map((a) => <option key={a} value={a}>{actionLabel(a)}</option>)}</select></div>
-            <button type="submit" className="btn">Show</button>
-          </form>
+      </DateRangeFilter>
           <Card className="mb-4" label="Integrity">
             <div className="flex flex-wrap items-center gap-3">
               {check ? (check.intact

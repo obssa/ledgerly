@@ -2,29 +2,22 @@ import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { getTagReport } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { todayIn } from "@/lib/dates";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { getReportPeriod } from "@/lib/data";
 import { ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Profit by tag" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
-
 /** Module 1 (094): income, expenses and profit of the transactions each tag is on, by account. */
 export default async function ProfitByTagPage({ searchParams }: PageProps<"/reports/by-tag">) {
   const q = await searchParams;
-  const today = todayIn();
-  const to = date(q.to) ?? today;
-  const from = date(q.from) ?? `${to.slice(0, 4)}-01-01`;
-  const r = await getTagReport(from, to);
+  const period = await getReportPeriod(q);
+  const r = await getTagReport(period.from, period.to);
 
   return (
     <>
       <PageTitle eyebrow="Reports / Management" title="Profit by tag" actions={<Link href="/tags" className="btn">Manage tags</Link>} />
-      <form className="mb-3 flex flex-wrap items-end gap-2.5">
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      <DateRangeFilter picked={period.picked} keep={q} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/by-tag" />
         <div className="min-w-0 flex-[4_1_560px]">

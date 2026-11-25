@@ -1,7 +1,8 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { rangeLabel } from "@/lib/periods";
 import { Card, PageTitle } from "@/components/ui";
 import { getProfitByDimension, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { periodLabel } from "@/lib/reports";
 import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Profit by location, class or project" };
@@ -13,24 +14,21 @@ export default async function ProfitByDimensionPage({ searchParams }: PageProps<
   const q = await searchParams;
   const kind = KINDS.some(([k]) => k === q.kind) ? (q.kind as string) : "location";
   const period = await getReportPeriod(q);
-  const r = await getProfitByDimension({ kind, ...period });
+  const r = await getProfitByDimension({ kind, from: period.from, to: period.to });
   const label = KINDS.find(([k]) => k === kind)?.[1] ?? "Location";
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Profit by location, class or project" actions={<ExportLink report="profit-by-dimension" params={{ kind, ...period }} />} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
+      <PageTitle eyebrow="Reports / Management" title="Profit by location, class or project" actions={<ExportLink report="profit-by-dimension" params={{ kind, from: period.from, to: period.to }} />} />
+      <DateRangeFilter picked={period.picked} keep={q} fields={["kind"]}>
         <div><label className="field-label" htmlFor="kind">By</label>
           <select className="field" id="kind" name="kind" defaultValue={kind}>{KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={period.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={period.to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      </DateRangeFilter>
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/profit-by-dimension" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Profit by dimension">
-            <div className="px-3 pt-2 text-[13px] text-muted">{periodLabel(r.from, r.to)} · {r.currency} · by {label.toLowerCase()}</div>
+            <div className="px-3 pt-2 text-[13px] text-muted">{rangeLabel(period.picked, period.ctx.calendar)} · {r.currency} · by {label.toLowerCase()}</div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">{label}</th><th scope="col" className="!text-right">Income</th><th scope="col" className="!text-right">Cost of sales</th>
