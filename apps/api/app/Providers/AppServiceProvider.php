@@ -18,6 +18,13 @@ use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /**
+     * API requests a minute per signed-in session. The overview alone makes 17 (six of them the income chart's
+     * months) and signing in onto it 34, so 120 ran out for someone simply moving around the app. 300 is about
+     * fifteen pages a minute, more than a person reads, and still five a second for anyone scripting the API.
+     */
+    public const API_REQUESTS_PER_MINUTE = 300;
+
     public function register(): void
     {
         // scoped(): a fresh instance per request and per queued job (safe under Octane/Horizon).
@@ -54,7 +61,7 @@ class AppServiceProvider extends ServiceProvider
                 ? 'demo-token:' . $token->getKey()
                 : ($request->user()?->getAuthIdentifier() ?? ClientAddress::of($request));
 
-            return Limit::perMinute(120)->by('api|' . $key);
+            return Limit::perMinute(self::API_REQUESTS_PER_MINUTE)->by('api|' . $key);
         });
         RateLimiter::for('auth', fn (Request $request) => Limit::perMinute(10)
             ->by('auth|' . ClientAddress::of($request)));
