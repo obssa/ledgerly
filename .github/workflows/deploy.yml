@@ -2,7 +2,7 @@
 #
 #   images  → ghcr.io/<owner>/ledgerly-{api,web}:<sha>, with provenance and SBOM (for a container host later)
 #   bundle  → one release archive: the API with production packages, the web app as a Next.js standalone server
-#   cpanel  → https://ledgerly.orcamind.dev (web) and https://ledgerly-api.orcamind.dev (API) on the cPanel
+#   cpanel  → https://app.evenbooks.net (web) and https://api.evenbooks.net (API) on the cPanel
 #             account: upload, migrate as the owner, check the database roles, switch, smoke test, roll back on
 #             failure. Skipped until the repository variable DEPLOY_ENABLED is "true" (docs/runbook/cpanel.md).
 #
@@ -127,19 +127,19 @@ jobs:
         with: { name: release, path: 'ledgerly-${{ env.SHA }}.tar.gz', retention-days: 14 }
 
   cpanel:
-    name: deploy to ledgerly.orcamind.dev
+    name: deploy to app.evenbooks.net
     needs: bundle
     if: vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
       name: live
-      url: ${{ vars.DEPLOY_WEB_URL || 'https://ledgerly.orcamind.dev' }}
+      url: ${{ vars.DEPLOY_WEB_URL || 'https://app.evenbooks.net' }}
     env:
       SHA: ${{ needs.bundle.outputs.sha }}
       PHP_BIN: ${{ vars.DEPLOY_PHP_BIN || '/opt/alt/php83/usr/bin/php' }}
-      WEB_URL: ${{ vars.DEPLOY_WEB_URL || 'https://ledgerly.orcamind.dev' }}
-      API_URL: ${{ vars.DEPLOY_API_URL || 'https://ledgerly-api.orcamind.dev' }}
+      WEB_URL: ${{ vars.DEPLOY_WEB_URL || 'https://app.evenbooks.net' }}
+      API_URL: ${{ vars.DEPLOY_API_URL || 'https://api.evenbooks.net' }}
     steps:
       - uses: actions/checkout@v7
         with: { ref: '${{ env.SHA }}' }   # the deploy scripts of the release being deployed
@@ -184,4 +184,4 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          { echo "### ledgerly.orcamind.dev"; echo "- Release: \`$SHA\`"; echo "- Web: $WEB_URL"; echo "- API: $API_URL"; echo "- Result: ${{ job.status }}"; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### app.evenbooks.net"; echo "- Release: \`$SHA\`"; echo "- Web: $WEB_URL"; echo "- API: $API_URL"; echo "- Result: ${{ job.status }}"; } >> "$GITHUB_STEP_SUMMARY"

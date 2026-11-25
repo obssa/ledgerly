@@ -10,7 +10,7 @@
 #   flock -n    a run that finds the previous one still going does nothing (one process, gone at once)
 #   timeout     a run that outlives its time is stopped (TERM, then KILL); its transaction rolls back
 #
-# The crontab is shared with every other app on this account (bakery-ops). Only lines that run Ledgerly's own
+# The crontab is shared with any other app on the account. Only lines that run Ledgerly's own
 # commands from this ROOT are replaced; every other line stays as it is. If the crontab cannot be read for any
 # reason other than "there is none yet", or flock/timeout are missing, nothing is changed.
 set -euo pipefail

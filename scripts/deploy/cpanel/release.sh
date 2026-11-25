@@ -30,7 +30,7 @@ IFS= read -r OWNER_PASSWORD || true
 BUNDLE="$ROOT/incoming/ledgerly-$SHA.tar.gz"
 [ -f "$BUNDLE" ] || { echo "No upload at $BUNDLE"; exit 1; }
 
-# How much of the account's process limit is in use (shared with bakery-ops): counts by program name only, never
+# How much of the account's process limit is in use (shared with any other app on it): counts by program name only, never
 # arguments, so nothing private reaches the deploy log. When this nears the limit, nothing new can start.
 echo "== Processes on this account: $(ps -u "$(id -un)" --no-headers 2>/dev/null | wc -l) (limit $(ulimit -u))"
 ps -u "$(id -un)" -o comm= 2>/dev/null | sort | uniq -c | sort -rn | head -8 || true
