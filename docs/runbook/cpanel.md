@@ -1,46 +1,37 @@
 # Running Ledgerly on the cPanel account
 
-Staging and early access run on the cPanel account behind Cloudflare. This is fine until real customers sign
-in: shared hosting cannot meet SECURITY.md **S11** (encrypted off-site backups with point-in-time restore) or
-**S12** (database on a private network, connection pooling). Move the API and database to a VPS or managed
-PostgreSQL before the first paying customer; `deploy.yml` already publishes container images for that.
+Staging and early access run on Ledgerly's own cPanel account, `evenbojk` on `vesper.hostns.io`. It moved there on
+25 Nov 2026 from an account shared with nine other sites, which sat at its process limit. Shared hosting is fine
+until real customers sign in, but it cannot meet SECURITY.md **S11** (encrypted off-site backups with point-in-time
+restore) or **S12** (database on a private network, connection pooling). Move the API and database to a VPS or
+managed PostgreSQL before the first paying customer; `deploy.yml` already publishes container images for that.
 
 ## What runs where
 
 | Address | What | On the server |
 |---|---|---|
-| https://ledgerly.orcamind.dev | Web app (Next.js server) | cPanel *Setup Node.js App*: Node 22, app root `~/ledgerly-web`, startup file `app.js` |
-| https://ledgerly-api.orcamind.dev | API (Laravel) | subdomain, document root `~/ledgerly/current/api/public`, PHP 8.3 through `shared/api.htaccess` (the account default is 8.1) |
-| PostgreSQL 13 | `orcamiib_ledgerly`, schema `ledgerly` | owner login `orcamiib_lowner` (deploy only), app login `orcamiib_lweb` |
+| https://evenbooks.net | The public website. Until there is one, a temporary (302) redirect to the app | `~/public_html/.htaccess`; `/.well-known/` stays reachable for certificates |
+| https://app.evenbooks.net | Web app (Next.js server) | *Setup Node.js App*: Node 22, app root `~/ledgerly-web`, startup file `app.js`, document root `~/app.evenbooks.net` |
+| https://api.evenbooks.net | API (Laravel) | subdomain, document root `~/ledgerly/current/api/public`, PHP 8.3 through `shared/api.htaccess` |
+| PostgreSQL 13 | `evenbojk_ledgerly`, schema `ledgerly` | owner login `evenbojk_lowner` (deploy only), app login `evenbojk_lweb` |
 | cron | `schedule:run` and `queue:work` every minute, each under `flock -n` (one at a time) and `timeout` (55 and 10 minutes at most) | no Redis or long-running workers on shared hosting; a run that never ends must not be joined by another every minute |
-| Email | confirmation and password-reset links, from `no-reply@orcamind.dev` | the server's `sendmail` (`MAIL_MAILER=sendmail` in `shared/api.env`); the domain publishes SPF and DKIM for this server |
+| Email | confirmation and password-reset links, from `no-reply@evenbooks.net` | the server's `sendmail` (`MAIL_MAILER=sendmail` in `shared/api.env`); SPF and DKIM for `evenbooks.net` from cPanel, *Email Deliverability* |
+| DNS | `evenbooks.net` and its subdomains | the host's nameservers (`ns1/ns2.hostns.io`), edited in cPanel, *Zone Editor*. No Cloudflare proxy, so `api.env` trusts no proxy (`TRUSTED_PROXIES` unset) |
 | Demo sign-in | one button per role on the sign-in page, into a shared demo company | repository variable `DEMO_LOGINS` (`true`/`false`): each deploy writes it to `shared/api.env` and, when on, runs `ledgerly:demo-setup` as the owner (SECURITY.md, Demo sign-in) |
 
 ```
 ~/ledgerly/releases/<sha>/{api,web}    one folder per release (newest 5 kept)
 ~/ledgerly/current -> releases/<sha>   what is live
 ~/ledgerly/shared/api.env              API settings: restricted login only, mode 600
-~/ledgerly/shared/web.env              LEDGERLY_API_URL
+~/ledgerly/shared/web.env              LEDGERLY_API_URL, LEDGERLY_WEB_URL, LEDGERLY_WEB_KEY
 ~/ledgerly/shared/api.htaccess         PHP 8.3 handler, put in front of every release's public/.htaccess
 ~/ledgerly/shared/storage/             uploads and logs, kept across releases
 ~/ledgerly/deploy/                     scripts, refreshed by every deploy
 ~/ledgerly-web/app.js                  Node.js entry: starts current/web/server.js
 ```
 
-## Living next to bakery-ops
-
-Both apps run under the same cPanel account (`orcamiib`). What keeps them apart, and what they share:
-
-| | Ledgerly | bakery-ops | Shared? |
-|---|---|---|---|
-| Address | `ledgerly.orcamind.dev`, `ledgerly-api.orcamind.dev` | `bakery-ops.orcamind.dev` | no |
-| Files | `~/ledgerly`, `~/ledgerly-web` | `~/bakery-ops.orcamind.dev` | no: every Ledgerly script works only inside its own folders |
-| Database | `orcamiib_ledgerly` (logins `_lowner`, `_lweb`) | its own | no: separate database and logins; nothing in Ledgerly names another database, and pg_hba lets each login into its own database only |
-| Deploy | this repository, its own SSH key and secrets | its own repository and key | no: either key can be revoked alone |
-| PHP version | 8.3 | 8.3 | no: the account default is 8.1 and each app picks its version with an `AddHandler` line in its own `.htaccess` (bakery-ops in `public/.htaccess`, Ledgerly through `shared/api.htaccess`, added to every release). Leave the account default alone |
-| Crontab | 2 lines | its own lines | **yes, one file**. `cron.sh` (run by `provision.sh` and every release) adds Ledgerly's two lines or brings older ones up to date, and changes no other line. It keeps a copy in `shared/crontab.before-ledgerly` (first change) and `shared/crontab.previous` (last change), and touches nothing if the crontab cannot be read or `flock`/`timeout` are missing. The host rewrites each saved line to start with `sleep $((RANDOM % 60)) &&`; lines are recognised by their command, so running it again changes nothing |
-| CPU, memory, processes | Node.js app, PHP requests, cron | the same | **yes, one account quota** (CloudLinux LVE). Check cPanel → *Resource Usage* after the first week; if either app hits the limits, that is the moment to move Ledgerly to its own server |
-| PostgreSQL server | one database on it | possibly one too | the server, not the data; advisory locks and row-level security are per database |
+Nothing else runs on the account. `cron.sh` still changes only Ledgerly's own crontab lines, so another app can be
+added later without either one overwriting the other's.
 
 ## How a deploy works
 
@@ -58,46 +49,52 @@ Then `smoke.sh` checks both addresses from outside. If it fails, `rollback.sh` p
 
 ## One-time setup
 
-Done once; the deploy needs all of it. **Status (15 Nov 2026): all done; live.**
+Done once; the deploy needs all of it. **Status (25 Nov 2026): steps 1 to 6 done on `evenbojk@vesper.hostns.io`.**
 
 > The server's firewall (LFD) blocks an IP for a while after connections that never log in. `ssh-keyscan`
-> is one of those; so is probing ports. Scan the host key once, then only make real logins. If you are
-> blocked, every port times out from your IP while the sites still answer through Cloudflare. Only the host
-> can unblock you (client area or a support ticket); there is no command for it inside the account.
+> against the server is one of those; so is probing ports. Read the host key from inside the server instead
+> (step 2), then only make real logins. If you are blocked, every port times out from your IP. Only the host can
+> unblock you (client area or a support ticket).
 >
-> On Windows, run the shell commands below in Git Bash, not PowerShell: PowerShell has no `<` redirect
-> and drops the empty passphrase in `ssh-keygen -N ""`.
+> On Windows, run the shell commands below in Git Bash, not PowerShell.
 
-1. **Database** (done 14 Nov 2026): database `orcamiib_ledgerly`, logins `orcamiib_lowner` and `orcamiib_lweb`,
-   both given "all privileges" on it, passwords in `~/.ledgerly-db-secrets`. **Do not revoke the app login's
-   privileges**: on this server a login can connect only as a member of the database-owner role (pg_hba
-   `samerole`); without it the API gets `no pg_hba.conf entry`. `shared/api.env` sets
-   `DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true`, so the role check accepts that membership and still refuses
-   anything that would get past row-level security (SECURITY.md finding 23).
-2. **SSH key for GitHub Actions**: add the public key to `~/.ssh/authorized_keys` (cPanel → SSH Access).
-3. **GitHub secrets** (repository → Settings → Secrets and variables → Actions):
-   `DEPLOY_HOST=gin.hostns.io`, `DEPLOY_PORT=22`, `DEPLOY_USER=orcamiib`, `DEPLOY_SSH_KEY` (private key),
-   `DEPLOY_KNOWN_HOSTS` (`ssh-keyscan gin.hostns.io`, compared with the fingerprints from
-   `for f in /etc/ssh/ssh_host_*_key.pub; do ssh-keygen -lf $f; done` on the server), and
-   `DEPLOY_DB_OWNER_PASSWORD` (the `DB_OWNER_PASSWORD` line of `~/.ledgerly-db-secrets`).
-4. **Provision**: copy `scripts/deploy/` to `~/ledgerly/deploy/` and run `bash ~/ledgerly/deploy/provision.sh`.
-   It creates the folders, a placeholder release, `shared/api.env` (new `APP_KEY`, restricted login) and
-   `shared/web.env`, and the two cron lines. Safe to run again.
-5. **Delete the password file**: `rm ~/.ledgerly-db-secrets`. From now on the owner password exists only in
-   the GitHub secret, and the app password only in `shared/api.env`.
-6. **Domains**:
-   - cPanel → Domains → create `ledgerly-api.orcamind.dev`, document root `ledgerly/current/api/public`.
-     **Create it in the cPanel web interface**, not with `uapi` over SSH: the host copies new subdomains to its
-     Cloudflare integration from a hook that fails when run from the shell (`entrap_domain_hook.sh: Permission
-     denied`), and the address then never resolves.
-   - DNS is the host's Cloudflare integration (client area → Cloudflare → Manage DNS), not a Cloudflare account
-     of our own. Check that `ledgerly-api` is listed and proxied (orange).
-   - PHP: the folder gets 8.3 from `shared/api.htaccess` (written by `provision.sh`). Without it the account
-     default, 8.1, answers and every request is a 500 from Composer's platform check.
-   - cPanel → Setup Node.js App → create: Node 22, production, app root `ledgerly-web`, app URL
-     `ledgerly.orcamind.dev`, startup file `app.js`.
-7. **Turn the deploy on**: repository variable `DEPLOY_ENABLED=true`. Optional variables: `DEPLOY_PHP_BIN`
-   (default `/opt/alt/php83/usr/bin/php`), `DEPLOY_WEB_URL`, `DEPLOY_API_URL`.
+1. **Check the account** (cPanel, *Terminal*): PostgreSQL answers on `127.0.0.1:5432`, `psql` and `pg_dump`
+   exist, PHP 8.3 has `pdo_pgsql`, `bcmath`, `mbstring` and `gd` (`zip`, `intl` and `sodium` are not needed),
+   Node 22 is under `/opt/alt/alt-nodejs22`, and `flock`, `timeout`, `crontab` and `openssl` exist.
+2. **SSH key for GitHub Actions**: a key used only for this server. Add its public half to
+   `~/.ssh/authorized_keys`. Read the host key fingerprints from inside the server, in cPanel's *Terminal*:
+   `ssh-keyscan -t ed25519,rsa localhost | ssh-keygen -lf -` (the `/etc/ssh` key files are not readable from the
+   account). Make the first real login with `StrictHostKeyChecking=accept-new` into a known-hosts file of its own,
+   compare its fingerprint with those, and use that file as `DEPLOY_KNOWN_HOSTS`.
+3. **Database**, over SSH with cPanel's own API, passwords made on the server and never shown:
+   `uapi Postgresql create_database name=<user>_ledgerly`, `create_user` for `<user>_lowner` and `<user>_lweb`
+   (`openssl rand -hex 24` each), `grant_all_privileges` for both, and both passwords written to
+   `~/.ledgerly-db-secrets` (mode 600) as `DB_PASSWORD=` and `DB_OWNER_PASSWORD=`. **Do not revoke the app
+   login's privileges**: a login can connect only as a member of the database-owner role (pg_hba `samerole`).
+   `shared/api.env` sets `DB_ALLOW_OWNER_ROLE_MEMBERSHIP=true`, so the role check accepts that membership and
+   still refuses anything that would get past row-level security (SECURITY.md finding 23).
+4. **Placeholder, then addresses.** Create `~/ledgerly/current` (a link to a placeholder release, as
+   `provision.sh` does) **before** the API subdomain, or cPanel makes a real folder where the link must go.
+   - `uapi SubDomain addsubdomain domain=api rootdomain=evenbooks.net dir=ledgerly/current/api/public disallowdot=1`,
+     and the same for `app` with `dir=app.evenbooks.net`. The host's Cloudflare hook prints
+     `entrap_domain_hook.sh ... Permission denied`; that does not matter while the domain's DNS is the host's own
+     nameservers (check with `nslookup api.evenbooks.net ns1.hostns.io`).
+   - `cloudlinux-selector create --json --interpreter nodejs --version 22 --app-root ledgerly-web
+     --domain app.evenbooks.net --app-uri / --app-mode production --startup-file app.js`
+   - LiteSpeed serves a real file ahead of the Node.js app: keep `index.html` out of the app's document root.
+   - `uapi SSL start_autossl_check` for the certificates.
+5. **Provision**: copy `scripts/deploy/cpanel/` to `~/ledgerly/deploy/` and run
+   `bash ~/ledgerly/deploy/provision.sh`. Set `BEHIND_CLOUDFLARE=true` only if Cloudflare's proxy is in front.
+   It creates the folders, `shared/api.env` (new `APP_KEY`, restricted login), `shared/web.env`, the web-server
+   key and the two cron lines. Safe to run again: it never overwrites existing settings.
+6. **Main domain**: until there is a website, `~/public_html/.htaccess` sends everything except `/.well-known/`
+   to `https://app.evenbooks.net` with a 302.
+7. **GitHub secrets** (repository, Settings, Secrets and variables, Actions): `DEPLOY_HOST`, `DEPLOY_PORT`,
+   `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`, and `DEPLOY_DB_OWNER_PASSWORD`, piped from the server's
+   `~/.ledgerly-db-secrets` straight into `gh secret set` so it is never displayed. Then delete that file: the
+   owner password exists only in the GitHub secret, and the app password only in `shared/api.env`.
+8. **Turn the deploy on**: repository variables `DEPLOY_ENABLED=true`, `DEPLOY_WEB_URL` and `DEPLOY_API_URL`
+   (defaults: the addresses above), and optionally `DEPLOY_PHP_BIN` (default `/opt/alt/php83/usr/bin/php`).
 
 ## Day to day
 
@@ -105,7 +102,7 @@ Done once; the deploy needs all of it. **Status (15 Nov 2026): all done; live.**
 |---|---|
 | Deploy | merge to `main`; or Actions → deploy → Run workflow |
 | Roll back the code | `bash ~/ledgerly/deploy/rollback.sh` (migrations are never reversed) |
-| Is it healthy? | `curl https://ledgerly-api.orcamind.dev/up`; `cd ~/ledgerly/current/api && /opt/alt/php83/usr/bin/php artisan ledgerly:check-database-roles` |
+| Is it healthy? | `curl https://api.evenbooks.net/up`; `cd ~/ledgerly/current/api && /opt/alt/php83/usr/bin/php artisan ledgerly:check-database-roles` |
 | Logs | `~/ledgerly/shared/storage/logs/laravel-*.log`; Node.js app log in cPanel → Setup Node.js App |
 | Which release is live? | `cat ~/ledgerly/current/REVISION` |
 | Change a setting | edit `~/ledgerly/shared/api.env`, then `php artisan config:cache` in `current/api` |
@@ -114,7 +111,7 @@ Done once; the deploy needs all of it. **Status (15 Nov 2026): all done; live.**
 
 Symptom: the deploy fails with `fork: Resource temporarily unavailable` or `Connection reset by peer` right after
 connecting, and SSH logs in but cannot run anything. The site may keep answering (its processes are already running).
-The limit is the whole account's, shared with bakery-ops, so the cause can be either app.
+On the old shared account the cause was other sites; on this one it can only be Ledgerly.
 
 1. cPanel → *Resource Usage*: the *Number of processes* (NPROC) and *Entry processes* graphs show when it filled up;
    its snapshot lists the processes at the time.

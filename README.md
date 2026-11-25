@@ -160,7 +160,7 @@ touches 1 of 16 partitions).
 
 ## Deploying
 
-**Now: the cPanel account** (https://ledgerly.orcamind.dev, API at https://ledgerly-api.orcamind.dev). `deploy.yml`
+**Now: its own cPanel account** (https://app.evenbooks.net, API at https://api.evenbooks.net; https://evenbooks.net is kept for the public website). `deploy.yml`
 uploads each green `main` over SSH, migrates as the owner, refuses to go live unless the app login is properly
 restricted, switches atomically, smoke-tests and rolls back on failure. Setup and operations:
 [`docs/runbook/cpanel.md`](docs/runbook/cpanel.md). Shared hosting is for staging and early access only (S11, S12).

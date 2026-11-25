@@ -13,11 +13,14 @@ U="$(whoami)"
 ROOT="${LEDGERLY_ROOT:-$HOME/ledgerly}"
 WEB_APP_ROOT="${LEDGERLY_WEB_APP_ROOT:-$HOME/ledgerly-web}"
 PHP="${PHP_BIN:-/opt/alt/php83/usr/bin/php}"
-API_URL="${API_URL:-https://ledgerly-api.orcamind.dev}"
-WEB_URL="${WEB_URL:-https://ledgerly.orcamind.dev}"
+API_URL="${API_URL:-https://api.evenbooks.net}"
+WEB_URL="${WEB_URL:-https://app.evenbooks.net}"
 DB_NAME="${DB_NAME:-${U}_ledgerly}"
 DB_OWNER="${DB_OWNER:-${U}_lowner}"
 DB_WEB="${DB_WEB:-${U}_lweb}"
+# true only when Cloudflare's proxy sits in front of both addresses. Otherwise no proxy is trusted: a request
+# could claim any visitor's address in X-Forwarded-For and dodge the sign-in lockout.
+BEHIND_CLOUDFLARE="${BEHIND_CLOUDFLARE:-false}"
 
 mkdir -p "$ROOT/releases" "$ROOT/incoming" "$ROOT/deploy" "$WEB_APP_ROOT/tmp" \
          "$ROOT/shared/storage/app" "$ROOT/shared/storage/logs" "$ROOT/shared/storage/framework/cache" "$ROOT/shared/storage/framework/views"
@@ -78,18 +81,23 @@ FILESYSTEM_DISK=local
 
 SANCTUM_STATEFUL_DOMAINS=${WEB_URL#https://}
 SANCTUM_TOKEN_MINUTES=720
-# Cloudflare sits in front (https://www.cloudflare.com/ips/): trusting its ranges gives each client its own
-# sign-in lockout and lets the API see HTTPS.
-TRUSTED_PROXIES=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
 
 EINVOICE_FORCE_SANDBOX=true
 EOF
   )
+  if [ "$BEHIND_CLOUDFLARE" = true ]; then
+    cat >> "$ROOT/shared/api.env" <<'EOF2'
+
+# Cloudflare sits in front (https://www.cloudflare.com/ips/): trusting its ranges gives each client its own
+# sign-in lockout and lets the API see HTTPS.
+TRUSTED_PROXIES=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
+EOF2
+  fi
   echo "created shared/api.env (restricted login only)"
 fi
 
 # The account's default PHP is older than Ledgerly needs. cPanel picks PHP per folder through an .htaccess
-# handler (bakery-ops does the same), so the API's folder gets its own; release.sh puts it into every release.
+# handler, so the API's folder gets its own; release.sh puts it into every release.
 if [ ! -f "$ROOT/shared/api.htaccess" ]; then
   printf '# PHP 8.3 for the API folder (cPanel per-directory handler)\nAddHandler %s .php .php8 .phtml\n' \
     "${PHP_HANDLER:-application/x-httpd-alt-php83___lsphp}" > "$ROOT/shared/api.htaccess"
@@ -104,7 +112,7 @@ fi
 grep -q '^DB_CACHE_CONNECTION=' "$ROOT/shared/api.env" || printf '\n# The cache on its own database session (rate limits survive a rolled-back request)\nDB_CACHE_CONNECTION=cache\n' >> "$ROOT/shared/api.env"
 # Email (confirmation and reset links, SECURITY.md S3) goes out through the server's own mail system. The
 # domain already publishes SPF and DKIM for this server. No mailbox or password is needed to send.
-grep -q '^MAIL_MAILER=' "$ROOT/shared/api.env" || printf '\n# Email through the server (sendmail); SPF and DKIM are published for the domain\nMAIL_MAILER=sendmail\nMAIL_FROM_ADDRESS=%s\nMAIL_FROM_NAME=Ledgerly\n' "${MAIL_FROM:-no-reply@orcamind.dev}" >> "$ROOT/shared/api.env"
+grep -q '^MAIL_MAILER=' "$ROOT/shared/api.env" || printf '\n# Email through the server (sendmail); SPF and DKIM are published for the domain\nMAIL_MAILER=sendmail\nMAIL_FROM_ADDRESS=%s\nMAIL_FROM_NAME=Ledgerly\n' "${MAIL_FROM:-no-reply@evenbooks.net}" >> "$ROOT/shared/api.env"
 # One secret on both sides: with it the web server may tell the API which visitor it acts for, so sign-in
 # limits count people, not the web server (SECURITY.md S16).
 if ! grep -q '^WEB_SERVER_KEY=.' "$ROOT/shared/api.env" || ! grep -q '^LEDGERLY_WEB_KEY=.' "$ROOT/shared/web.env"; then
@@ -120,8 +128,8 @@ grep -q '^LEDGERLY_WEB_URL=' "$ROOT/shared/web.env" || printf 'LEDGERLY_WEB_URL=
 
 [ -f "$ROOT/deploy/web-app.js" ] && cp "$ROOT/deploy/web-app.js" "$WEB_APP_ROOT/app.js"
 
-# Ledgerly's two cron jobs (scheduler, queue). The crontab is shared with every other app on this cPanel account
-# (bakery-ops): cron.sh adds Ledgerly's lines or brings older ones up to date and changes no other line, and leaves
+# Ledgerly's two cron jobs (scheduler, queue). The crontab is shared with any other app on this cPanel account:
+# cron.sh adds Ledgerly's lines or brings older ones up to date and changes no other line, and leaves
 # the crontab alone if it cannot be read. Each job runs at most once at a time and for a bounded time.
 LEDGERLY_ROOT="$ROOT" PHP_BIN="$PHP" bash "$ROOT/deploy/cron.sh"
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs on the CI runner after a release went live: checks the public addresses answer as they should.
-#   bash scripts/deploy/cpanel/smoke.sh https://ledgerly.orcamind.dev https://ledgerly-api.orcamind.dev <sha>
+#   bash scripts/deploy/cpanel/smoke.sh https://app.evenbooks.net https://api.evenbooks.net <sha>
 set -euo pipefail
 WEB="${1:?web url}"
 API="${2:?api url}"
@@ -27,7 +27,7 @@ headers="$(curl -sI --max-time 20 "$API/api/v1/companies")"
 for h in x-content-type-options x-frame-options cache-control strict-transport-security; do
   grep -qi "^$h:" <<<"$headers" || { echo "FAIL API response lacks $h"; exit 1; }
 done
-echo "ok  API security headers (HSTS means HTTPS is seen through Cloudflare)"
+echo "ok  API security headers (HSTS means the API sees the request as HTTPS)"
 
 wait_for "$WEB/sign-in" 200   # the first request also starts the Node.js app
 page="$(curl -s --max-time 20 "$WEB/sign-in")"
