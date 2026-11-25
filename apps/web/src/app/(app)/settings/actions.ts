@@ -141,5 +141,5 @@ export async function demoFill(): Promise<FormState> {
     if (error instanceof ApiError && error.status === 422) return { error: (error.body as { message?: string }).message ?? "Not possible right now." };
     return refusal(error);
   }
-  return { notice: "Filling with demo data. It is ready in a minute or two: refresh to see it." };
+  return { notice: "Filling with the sample books. They are ready in a minute or two: refresh to see them." };
 }

@@ -1,0 +1,51 @@
+name: test-company
+
+# A test company (schema 104): real books the team tries Ledgerly out on, whose owners may empty them and fill them
+# with the sample. Run by hand, as the owner role (whose password lives only in this repository's secrets and is given
+# to this one run). Accounts made now get a generated password written only to shared/test-accounts.txt on the server
+# (mode 600): never to this run's log, never by email.
+on:
+  workflow_dispatch:
+    inputs:
+      company:
+        description: The company id
+        required: true
+      owners:
+        description: Owners as email|Name, separated by ; (e.g. a@x.com|Ana Test;b@x.com|Ben Test)
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  test-company:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: live
+    steps:
+      - uses: actions/checkout@v7
+      - name: SSH with a pinned host key
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$HOST" && test -n "$USER" && test -n "$KEY" && test -n "$KNOWN_HOSTS" || { echo "Deploy secrets are incomplete"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host target\n  HostName %s\n  Port %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$HOST" "$PORT" "$USER" > ~/.ssh/config
+          scp scripts/deploy/cpanel/test-company.sh target:ledgerly/deploy/test-company.sh
+      - name: Make the test company
+        env:
+          OWNER_PASSWORD: ${{ secrets.DEPLOY_DB_OWNER_PASSWORD }}
+          PHP_BIN: ${{ vars.DEPLOY_PHP_BIN || '/opt/alt/php83/usr/bin/php' }}
+          COMPANY: ${{ inputs.company }}
+          OWNERS: ${{ inputs.owners }}
+          BY: ${{ github.actor }}
+        run: |
+          # The inputs reach the server as quoted arguments, and test-company.sh checks each against a fixed pattern.
+          q() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+          printf '%s\n' "$OWNER_PASSWORD" | ssh target "PHP_BIN=$(q "$PHP_BIN") bash ~/ledgerly/deploy/test-company.sh $(q "$COMPANY") $(q "$OWNERS") $(q "$BY")"

@@ -5603,6 +5603,104 @@ RESET ROLE;
 DELETE FROM demo_accounts;
 SET ROLE ledgerly_web;
 
+-- T130: test companies (104). Only the owner role marks one; the application reads only its own company's mark. Only
+-- an active owner, from inside a test company, starts it fresh, at most once a minute; the old company must be
+-- archived first; then every active member joins the new company with the same role, the new company is a test
+-- company, and the start is finished once, by the owner who began it. Access Co (company C) is the test company:
+-- c1 an owner, c2 an admin. Everything inside is rolled back; the mark is removed after.
+RESET ROLE;
+INSERT INTO test_companies (company_id, marked_by) VALUES ('00000000-0000-0000-0000-00000000000c', 'guard tests');
+SET ROLE ledgerly_web;
+DO $$
+DECLARE
+  co     constant uuid := '00000000-0000-0000-0000-00000000000c';
+  owner_ constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  admin_ constant uuid := '00000000-0000-0000-0000-0000000000c2';
+  other  constant uuid := '00000000-0000-0000-0000-00000000000a';
+  org    uuid;
+  fresh  uuid;
+  before_count integer;
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', co::text, true), set_config('app.user_id', admin_::text, true);
+    BEGIN
+      PERFORM test_company_fresh_start_begin();
+      RAISE EXCEPTION 'FAIL T130a: an admin (not an owner) started a test company fresh';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    BEGIN
+      INSERT INTO test_companies (company_id, marked_by) VALUES (gen_random_uuid(), 'the app');
+      RAISE EXCEPTION 'FAIL T130b: the application role marked a test company';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    BEGIN
+      DELETE FROM test_companies WHERE company_id = co;
+      IF EXISTS (SELECT 1 FROM test_companies WHERE company_id = co) IS NOT TRUE THEN
+        RAISE EXCEPTION 'FAIL T130c: the application role removed a test company mark';
+      END IF;
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+
+    -- Company A is not a test company, and cannot see company C's mark.
+    PERFORM set_config('app.company_id', other::text, true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    IF EXISTS (SELECT 1 FROM test_companies) THEN
+      RAISE EXCEPTION 'FAIL T130d: company A saw another company''s test mark';
+    END IF;
+    BEGIN
+      PERFORM test_company_fresh_start_begin();
+      RAISE EXCEPTION 'FAIL T130e: the owner of a company that is not a test company started it fresh';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+
+    PERFORM set_config('app.company_id', co::text, true), set_config('app.user_id', owner_::text, true);
+    SELECT organisation_id INTO org FROM companies WHERE id = co;
+    SELECT count(*) INTO before_count FROM memberships WHERE company_id = co AND status = 'active';
+    fresh := test_company_fresh_start_begin();
+    BEGIN
+      PERFORM test_company_fresh_start_begin();
+      RAISE EXCEPTION 'FAIL T130f: a test company was started fresh twice within a minute';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    -- The new company and its first owner, as the company setup makes them.
+    PERFORM set_config('app.company_id', fresh::text, true);
+    INSERT INTO companies (id, organisation_id, legal_name, country_code, base_currency) VALUES (fresh, org, 'Fresh test books', 'ET', 'ETB');
+    INSERT INTO memberships (company_id, user_id, role, status) VALUES (fresh, owner_, 'owner', 'active');
+    BEGIN
+      PERFORM test_company_fresh_start_finish(fresh);
+      RAISE EXCEPTION 'FAIL T130g: the members moved before the old test company was archived';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    PERFORM set_config('app.company_id', co::text, true);
+    UPDATE companies SET status = 'live' WHERE id = co;
+    UPDATE companies SET status = 'archived' WHERE id = co;
+
+    PERFORM set_config('app.company_id', fresh::text, true), set_config('app.user_id', admin_::text, true);
+    BEGIN
+      PERFORM test_company_fresh_start_finish(fresh);
+      RAISE EXCEPTION 'FAIL T130h: someone other than the owner who began it finished a fresh start';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+
+    PERFORM set_config('app.user_id', owner_::text, true);
+    PERFORM test_company_fresh_start_finish(fresh);
+    IF (SELECT count(*) FROM memberships WHERE company_id = fresh AND status = 'active') <> before_count
+       OR NOT EXISTS (SELECT 1 FROM memberships WHERE company_id = fresh AND user_id = admin_ AND role = 'admin' AND status = 'active')
+       OR NOT EXISTS (SELECT 1 FROM test_companies WHERE company_id = fresh) THEN
+      RAISE EXCEPTION 'FAIL T130i: the members did not all join the new test company with their roles, or it is not marked';
+    END IF;
+    BEGIN
+      PERFORM test_company_fresh_start_finish(fresh);
+      RAISE EXCEPTION 'FAIL T130j: a fresh start of a test company was finished twice';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    BEGIN
+      PERFORM test_company_fresh_start_begin();
+      RAISE EXCEPTION 'FAIL T130k: the company just made by a fresh start was started fresh again within the minute';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    RAISE EXCEPTION 'T130 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T130 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T130 only an owner of a test company starts it fresh, once its old company is archived, and every member moves with their role';
+END $$;
+RESET ROLE;
+DELETE FROM test_companies;
+SET ROLE ledgerly_web;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN
