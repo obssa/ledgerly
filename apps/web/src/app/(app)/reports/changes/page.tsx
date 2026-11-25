@@ -1,3 +1,5 @@
+import { rangeLabel } from "@/lib/periods";
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -41,6 +43,7 @@ export default async function ChangesReport({ searchParams }: PageProps<"/report
                   </select></div>
               </DateRangeFilter>
               <Card className="!p-2" label="Changes">
+                <div className="px-3 pt-3"><ReportHeader title="Changes: who changed what" period={rangeLabel(period.picked, period.ctx.calendar)} /></div>
                 <div className="overflow-x-auto">
                   <table className="tbl">
                     <thead><tr><th scope="col">When</th><th scope="col">Document</th><th scope="col">What happened</th><th scope="col">By</th><th scope="col">What changed</th><th scope="col">Reason</th></tr></thead>
@@ -81,6 +84,7 @@ export default async function ChangesReport({ searchParams }: PageProps<"/report
                   </table>
                 </div>
                 {log.more && log.next_before_id && <p className="p-3"><Link href={more(log.next_before_id)} className="btn">Earlier changes</Link></p>}
+                <ReportFooter basis={null} currency={null} />
               </Card>
             </>
           )}

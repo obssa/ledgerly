@@ -1,3 +1,4 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCashForecast } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
@@ -26,6 +27,7 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
         <ReportsNav current="/reports/cash-forecast" />
         {!f ? <p className="text-[14px] text-muted">Not available in the demo or for your role.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Cash forecast">
+            <ReportHeader title="Cash forecast" period={`The next ${span} weeks, from ${f.as_of}`} />
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="text-[13px] text-muted">From {f.as_of} · cash held now <span className="num font-semibold">{formatAmount(f.opening)}</span></div>
               {f.goes_below_zero && f.lowest
@@ -70,6 +72,7 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
               </table>
             </div>
             <p className="mt-3 text-[13px] text-muted">Read from the books as they stand: posted invoices and bills still owed, by due date, post-dated cheques held, and active recurring entries: a recurring journal&rsquo;s bank and cash lines on each date, a recurring invoice&rsquo;s total by the customer&rsquo;s terms after each date; and confirmed sales and purchase orders, for what is not yet on a posted invoice or bill, by the date wanted plus the contact&rsquo;s terms. A bill with a supplier payment scheduled goes out on the planned day instead of its due date. Drafts are not counted.</p>
+            <ReportFooter basis={null} />
           </Card>
         )}
       </div>

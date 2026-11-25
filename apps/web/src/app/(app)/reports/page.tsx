@@ -1,3 +1,4 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { Card, PageTitle, Segmented } from "@/components/ui";
 import type { ProfitAndLossRow } from "@/lib/api";
 import { parse } from "@/lib/decimal";
@@ -5,7 +6,7 @@ import { getCompanySettings, getProfitAndLoss, getReportPeriod, getShellContext 
 import { formatAmount } from "@/lib/format";
 import { periodLabel, previousPeriod, samePeriodLastYear } from "@/lib/reports";
 import { rangeLabel } from "@/lib/periods";
-import { periodQuery } from "@/lib/periodParams";
+import { periodQuery, exportPeriod } from "@/lib/periodParams";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { ExportLink, ReportsNav } from "./ReportsNav";
 
@@ -34,7 +35,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
   const before = closed ? (lastYear ? samePeriodLastYear(period.from, period.to) : previousPeriod(period.from, period.to)) : null;
   // Accrual (when invoiced or billed), or cash (basis=cash): when the money moved.
   const cash = q.basis === "cash";
-  const [pl, { companyName }, settings] = await Promise.all([
+  const [pl, , settings] = await Promise.all([
     getProfitAndLoss({ from: period.from, to: period.to, ...(before ? { compare_from: before.from, compare_to: before.to } : {}), ...(cash ? { basis: "cash" as const } : {}) }), getShellContext(), getCompanySettings(),
   ]);
   const link = (o: { year?: boolean; cash?: boolean }) =>
@@ -81,7 +82,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" actions={<ExportLink report="profit-and-loss" params={{ from: period.from, to: period.to }} />} />
+      <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" actions={<ExportLink report="profit-and-loss" params={{ ...exportPeriod(period.picked) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} />
       <div className="mb-4 flex flex-wrap gap-x-3">
         <Segmented label="Compare with" size="sm" className="!mb-2" items={[
@@ -96,11 +97,9 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports" />
         <Card className="min-w-0 flex-[4_1_560px]" label="Profit and loss statement">
-          <div className="mb-3 text-center">
-            <div className="text-[17px] font-extrabold">{companyName}</div>
-            <div className="text-[13px] text-muted">Profit and loss{cash ? " on the cash basis" : ""} · {rangeLabel(period.picked, period.ctx.calendar)} · {currency}</div>
-            {cash && <div className="mt-1 text-[12px] text-muted">Income and expenses when the money moved: invoices and bills as they are paid, cash sales and expenses on their day.</div>}
-          </div>
+          <ReportHeader title={cash ? "Profit and loss (cash basis)" : "Profit and loss"} period={rangeLabel(period.picked, period.ctx.calendar)}
+            filters={[before ? `Compared with ${periodLabel(before.from, before.to)}` : null]} />
+          {cash && <p className="mb-3 text-center text-[12px] text-muted">Income and expenses when the money moved: invoices and bills as they are paid, cash sales and expenses on their day.</p>}
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead><tr><th scope="col">Account</th><th scope="col" className="!text-right">This period</th><th scope="col" className="!text-right">{before ? periodLabel(before.from, before.to) : "No comparison"}</th><th scope="col" className="!text-right">Change</th></tr></thead>
@@ -118,6 +117,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
             </table>
           </div>
           <p className="mt-3 text-[13px] text-muted">Read from the ledger. A closed year still shows the profit it made: closing entries are left out.</p>
+          <ReportFooter basis={cash ? "cash" : undefined} currency={currency} />
         </Card>
         <aside className="flex min-w-0 flex-[1_1_240px] flex-col gap-4">
           <Card><div className="text-[13px] text-muted">Gross margin</div><div className="num mt-1.5 text-[26px] font-semibold">{margin(t.gross_profit.current, t.income.current)}</div></Card>

@@ -178,4 +178,7 @@ a {
   .tbl th { background: none; }
   .tbl tr { break-inside: avoid; }
   .tbl thead { display: table-header-group; }
+  /* A report heads itself (company, report, period): the shell's printed company line would say it twice. */
+  body:has(.report-header) .printed-company { display: none; }
+  .report-header, .report-footer { break-inside: avoid; }
 }

@@ -1,4 +1,6 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import Link from "next/link";
+import { asOfLabel } from "@/lib/periods";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
 import { getReportAsOf, getStockAgeing, getWarehouses } from "@/lib/data";
@@ -40,7 +42,7 @@ export default async function StockAgeingPage({ searchParams }: PageProps<"/repo
               ))}
             </div>
             <Card className="!p-2" label="Stock on hand by days since it last sold">
-              <div className="px-3 pt-2 text-[13px] text-muted">On hand at {r.as_of} · {r.warehouse?.name ?? "All warehouses"} · values in {r.currency} at cost</div>
+              <div className="px-3 pt-3"><ReportHeader title="Stock ageing" period={asOfLabel(r.as_of, at.ctx.calendar)} filters={[r.warehouse?.name ?? "All warehouses", "Values at cost"]} /></div>
               <div className="overflow-x-auto">
                 <table className="tbl">
                   <thead><tr><th scope="col">Item</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Value</th>
@@ -66,6 +68,7 @@ export default async function StockAgeingPage({ searchParams }: PageProps<"/repo
                   <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={2}>Total</td><td className="num text-right">{formatAmount(r.total_value)}</td><td colSpan={4} /></tr></tfoot>
                 </table>
               </div>
+              <ReportFooter basis={null} currency={r.currency} />
             </Card>
           </div>
         )}

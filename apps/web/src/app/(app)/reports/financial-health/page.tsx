@@ -1,7 +1,9 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { Card, PageTitle } from "@/components/ui";
 import { getFinancialHealth, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { periodLabel, showRatio } from "@/lib/reports";
+import { showRatio } from "@/lib/reports";
+import { rangeLabel } from "@/lib/periods";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { CLOSED_RANGE_PRESETS } from "@/lib/periods";
 import { ReportsNav } from "../ReportsNav";
@@ -23,7 +25,7 @@ export default async function FinancialHealthPage({ searchParams }: PageProps<"/
         <ReportsNav current="/reports/financial-health" />
         {!h ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <div className="min-w-0 flex-[4_1_560px]">
-            <div className="mb-3 text-[13px] text-muted">Balances at <span className="num">{h.to}</span>; margins, DSO and DPO for {periodLabel(h.from, h.to)} ({h.days} days) · {h.currency}</div>
+            <ReportHeader title="Financial health" period={rangeLabel(period.picked, period.ctx.calendar)} filters={[`Balances at the end; margins, DSO and DPO over ${h.days} days`]} />
             <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
               {[
                 ["Current ratio", showRatio(h.ratios.current_ratio), `Current assets ${formatAmount(h.figures.current_assets)} ÷ current liabilities ${formatAmount(h.figures.current_liabilities)}`],
@@ -40,6 +42,7 @@ export default async function FinancialHealthPage({ searchParams }: PageProps<"/
                   <div className="text-[13px] text-muted">{label}</div>
                   <div className="num mt-1.5 text-[26px] font-semibold">{value}</div>
                   <p className="mt-2 text-[12px] text-muted">{how}</p>
+                  <ReportFooter currency={h.currency} />
                 </Card>
               ))}
             </div>

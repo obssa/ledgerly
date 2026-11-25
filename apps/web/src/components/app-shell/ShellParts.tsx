@@ -9,7 +9,7 @@ import { Icon } from "./Icon";
 /** On paper only: whose books a printed report is from. */
 export async function PrintedCompany() {
   const { companyName } = await getShellContext();
-  return <p className="hidden text-[13px] font-bold print:block">{companyName}</p>;
+  return <p className="printed-company hidden text-[13px] font-bold print:block">{companyName}</p>;
 }
 
 export async function CompanyBadge() {

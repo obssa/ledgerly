@@ -1,9 +1,10 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCashFlow, getDirectCashFlow, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { periodLabel } from "@/lib/reports";
+import { rangeLabel } from "@/lib/periods";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
-import { periodQuery } from "@/lib/periodParams";
+import { periodQuery, exportPeriod } from "@/lib/periodParams";
 import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Cash flow statement" };
@@ -21,7 +22,7 @@ export default async function CashFlowPage({ searchParams }: PageProps<"/reports
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" actions={<ExportLink report="cash-flow" params={{ from: period.from, to: period.to }} />} />
+      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" actions={<ExportLink report="cash-flow" params={{ ...exportPeriod(period.picked) }} />} />
       <DateRangeFilter picked={period.picked} keep={params} />
       <MethodLinks link={link} direct={false} />
       <div className="flex flex-wrap items-start gap-4">
@@ -29,7 +30,7 @@ export default async function CashFlowPage({ searchParams }: PageProps<"/reports
         {!cf ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Cash flow statement">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[13px] text-muted">{periodLabel(cf.from, cf.to)} · {cf.currency} · indirect method</div>
+              <ReportHeader title="Cash flow statement (indirect method)" period={rangeLabel(period.picked, period.ctx.calendar)} />
               {cf.balanced ? <Pill tone="good">Agrees with the cash accounts</Pill> : <Pill tone="bad">Does not agree with the cash accounts</Pill>}
             </div>
             <div className="overflow-x-auto">
@@ -49,6 +50,7 @@ export default async function CashFlowPage({ searchParams }: PageProps<"/reports
               Cash is the cash, bank and mobile-money accounts (receipts not yet banked included). Investing is property, plant and equipment at cost; financing is
               loans and capital; everything else on the balance sheet is working capital, with depreciation added back as a charge that used no cash.
             </p>
+            <ReportFooter basis={null} currency={cf.currency} />
           </Card>
         )}
       </div>
@@ -80,7 +82,7 @@ async function DirectPage({ period, params, link }: { period: Awaited<ReturnType
         {!cf ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Cash flow statement, direct method">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[13px] text-muted">{periodLabel(cf.from, cf.to)} · {cf.currency} · direct method</div>
+              <ReportHeader title="Cash flow statement (direct method)" period={rangeLabel(period.picked, period.ctx.calendar)} />
               {cf.balanced ? <Pill tone="good">Agrees with the cash accounts</Pill> : <Pill tone="bad">Does not agree with the cash accounts</Pill>}
             </div>
             <div className="overflow-x-auto">
@@ -100,6 +102,7 @@ async function DirectPage({ period, params, link }: { period: Awaited<ReturnType
               Every entry that moved a cash, bank or mobile-money account is shown by its other side: sales and receivables are received from customers, expenses,
               stock and payables are paid to suppliers, and so on. Money moved between the company&apos;s own cash accounts cancels out.
             </p>
+            <ReportFooter basis={null} currency={cf.currency} />
           </Card>
         )}
       </div>

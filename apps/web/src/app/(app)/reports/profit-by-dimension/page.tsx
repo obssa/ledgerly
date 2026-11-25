@@ -1,3 +1,5 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
+import { exportPeriod } from "@/lib/periodParams";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { rangeLabel } from "@/lib/periods";
 import { Card, PageTitle } from "@/components/ui";
@@ -19,7 +21,7 @@ export default async function ProfitByDimensionPage({ searchParams }: PageProps<
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Profit by location, class or project" actions={<ExportLink report="profit-by-dimension" params={{ kind, from: period.from, to: period.to }} />} />
+      <PageTitle eyebrow="Reports / Management" title="Profit by location, class or project" actions={<ExportLink report="profit-by-dimension" params={{ kind, ...exportPeriod(period.picked) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["kind"]}>
         <div><label className="field-label" htmlFor="kind">By</label>
           <select className="field" id="kind" name="kind" defaultValue={kind}>{KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
@@ -28,7 +30,7 @@ export default async function ProfitByDimensionPage({ searchParams }: PageProps<
         <ReportsNav current="/reports/profit-by-dimension" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Profit by dimension">
-            <div className="px-3 pt-2 text-[13px] text-muted">{rangeLabel(period.picked, period.ctx.calendar)} · {r.currency} · by {label.toLowerCase()}</div>
+            <div className="px-3 pt-3"><ReportHeader title={`Profit by ${label.toLowerCase()}`} period={rangeLabel(period.picked, period.ctx.calendar)} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">{label}</th><th scope="col" className="!text-right">Income</th><th scope="col" className="!text-right">Cost of sales</th>
@@ -51,6 +53,7 @@ export default async function ProfitByDimensionPage({ searchParams }: PageProps<
               </table>
             </div>
             <p className="px-3 pb-2 text-[13px] text-muted">Each line counts where it was tagged; lines with no {label.toLowerCase()} are shown as not tagged. The total is the profit and loss of the period.</p>
+            <ReportFooter currency={r.currency} />
           </Card>
         )}
       </div>

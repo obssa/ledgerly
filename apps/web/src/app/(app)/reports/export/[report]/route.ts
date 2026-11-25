@@ -1,21 +1,25 @@
 import { ApiError, ledgerly } from "@/lib/api";
 import { toCsv } from "@/lib/csv";
 import { getReportPeriod } from "@/lib/data";
-import { EXPORTABLE, exportRows, type ExportableReport } from "@/lib/report-exports";
+import { asOfLabel, rangeLabel } from "@/lib/periods";
+import { EXPORTABLE, ON_A_BASIS, exportRows, reportTitle, type ExportableReport } from "@/lib/report-exports";
+import { exportFileName, footerRows, headerRows, preparedLabel, type ReportIdentity } from "@/lib/reportHeader";
 import { isDate } from "@/lib/reports";
 import { getSession } from "@/lib/session";
 import { toXlsx } from "@/lib/xlsx";
 
 /*
- * Module 10: a report as a CSV file, or with ?format=xlsx as an Excel workbook (src/lib/xlsx.ts). The report is read from the API under the person's own session (so their role
- * decides what they get), and the export is recorded in the audit log before the file is handed over (who, when, which
- * report, which period, how many rows). A UTF-8 byte order mark lets spreadsheets read Amharic names.
+ * Module 10: a report as a CSV file, or with ?format=xlsx as an Excel workbook (src/lib/xlsx.ts). The report is read from
+ * the API under the person's own session (so their role decides what they get), and the export is recorded in the audit
+ * log before the file is handed over (who, when, which report, which period, how many rows). The file opens with the
+ * report's header (company, report, period, filters) and ends with its footer (basis, currency, prepared when and by
+ * whom), as on screen and on paper (lib/reportHeader.ts). A UTF-8 byte order mark lets spreadsheets read Amharic names.
  */
 
 export async function GET(request: Request, { params }: { params: Promise<{ report: string }> }): Promise<Response> {
   const { report } = await params;
   if (!(EXPORTABLE as readonly string[]).includes(report)) return new Response("No such report.", { status: 404 });
-  const { token, companyId } = await getSession();
+  const { token, companyId, name: person } = await getSession();
   if (!token || !companyId) return new Response("Sign in to export reports.", { status: 401 });
   const ctx = { token, companyId };
   const q = new URL(request.url).searchParams;
@@ -25,26 +29,45 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
   const format = q.get("format") === "xlsx" ? "xlsx" : "csv";
 
   try {
-    const period = await getReportPeriod({ from: q.get("from") ?? undefined, to: q.get("to") ?? undefined });
-    const asOf = isDate(q.get("as_of")) ? (q.get("as_of") as string) : period.to;
+    // The period as the page had it: a preset ("All dates", "Last month") or dates (lib/periodParams.ts).
+    const period = await getReportPeriod(Object.fromEntries(q.entries()));
+    const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing"].includes(report);
+    const asOf = isDate(q.get("as_of")) ? (q.get("as_of") as string) : (period.picked.to ?? period.ctx.today);
     const options = { kind: word("kind"), group: word("group"), account_id: id, action: word("action"), user_id: uuid("user_id"), warehouse_id: uuid("warehouse_id"),
       rows: word("rows"), columns: word("columns"), measure: word("measure"), account_type: word("account_type"),
       project_id: uuid("project_id"), location_id: uuid("location_id"), class_id: uuid("class_id") };
-    const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing"].includes(report);
-    const { title, rows } = await exportRows(report as ExportableReport, { ...period, as_of: asOf, ...options }, ctx);
+    const [{ rows }, settings] = await Promise.all([
+      exportRows(report as ExportableReport, { from: period.from, to: period.to, as_of: asOf, ...options }, ctx),
+      ledgerly.companySettings(ctx).catch(() => null),
+    ]);
     await ledgerly.recordExport({
       report, format, ...(pointInTime ? { as_of: asOf } : { from: period.from, to: period.to }),
       options: Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)), rows: Math.max(0, rows.length - 1),
     }, ctx);
-    const name = `${title}-${pointInTime ? asOf : `${period.from}-to-${period.to}`}.${format}`.replace(/[^a-z0-9.-]/gi, "");
+
+    const calendar = settings?.calendar ?? period.ctx.calendar;
+    const title = reportTitle(report as ExportableReport, options);
+    const identity: ReportIdentity = {
+      company: settings?.trading_name || settings?.legal_name || "Evenbooks", legalName: settings?.legal_name ?? null,
+      title,
+      period: pointInTime ? asOfLabel(asOf, calendar) : rangeLabel(period.picked, calendar),
+      basis: ON_A_BASIS.includes(report as ExportableReport) ? (q.get("basis") === "cash" ? "cash" : settings?.accounting_basis ?? "accrual") : null,
+      currency: settings?.base_currency ?? null,
+      prepared: preparedLabel(new Date(), settings?.timezone || "Africa/Addis_Ababa", calendar, person),
+    };
+    const top = headerRows(identity);
+    const sheet = [...top, ...rows, ...footerRows(identity)];
+    const file = exportFileName(identity, format);
+    // A plain-ASCII name for old browsers, the real one (en dashes, Amharic) for the rest (RFC 6266).
+    const disposition = `attachment; filename="${file.replace(/[^\x20-\x7e]/g, "-").replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(file)}`;
     if (format === "xlsx") {
-      const workbook = toXlsx(title.replace(/-/g, " "), rows);
+      const workbook = toXlsx(title, sheet, top.length);
       return new Response(workbook.buffer as ArrayBuffer, {
-        headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
+        headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": disposition, "Cache-Control": "no-store" },
       });
     }
-    return new Response(`﻿${toCsv(rows)}`, {
-      headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}"`, "Cache-Control": "no-store" },
+    return new Response(`﻿${toCsv(sheet)}`, {
+      headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": disposition, "Cache-Control": "no-store" },
     });
   } catch (error) {
     if (error instanceof ApiError && error.status >= 400 && error.status < 500) return new Response(error.message, { status: error.status });

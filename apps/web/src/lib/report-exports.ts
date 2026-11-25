@@ -49,7 +49,8 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: "trial-balance", rows: [["Code", "Account", "Type", "Debit", "Credit"], ...tb.data.map((r) => [r.code, r.name, r.type, r.debit, r.credit])] };
     }
     case "general-ledger": {
-      const gl = await ledgerly.generalLedger({ from: p.from, to: p.to, account_id: p.account_id }, ctx);
+      // The same lines as on screen: the location, class and project filters too.
+      const gl = await ledgerly.generalLedger({ from: p.from, to: p.to, account_id: p.account_id, location_id: p.location_id, class_id: p.class_id, project_id: p.project_id }, ctx);
       const rows: Cell[][] = [["Account code", "Account", "Date", "Entry", "Description", "Contact", "Debit", "Credit", "Balance"]];
       for (const a of gl.accounts) {
         rows.push([a.code, a.name, gl.from, null, "Brought forward", null, null, null, a.opening]);
@@ -125,3 +126,29 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return ageing("ap-ageing", await ledgerly.apAgeing(p.as_of, ctx));
   }
 }
+
+const GROUP_WORDS: Record<string, string> = { contact: "", item: "item", month: "month", salesperson: "salesperson", location: "location", class: "class", project: "project" };
+
+/** What a report is called in its header and file name ("Sales by customer", "Profit by location"). */
+export function reportTitle(report: ExportableReport, o: { group?: string; kind?: string } = {}): string {
+  switch (report) {
+    case "profit-and-loss": return "Profit and loss";
+    case "balance-sheet": return "Balance sheet";
+    case "trial-balance": return "Trial balance";
+    case "general-ledger": return "General ledger";
+    case "cash-flow": return "Cash flow statement";
+    case "changes-in-equity": return "Statement of changes in equity";
+    case "profit-by-dimension": return `Profit by ${GROUP_WORDS[o.kind ?? "location"] || "location"}`;
+    case "sales": return `Sales by ${o.group && o.group !== "contact" ? GROUP_WORDS[o.group] ?? o.group : "customer"}`;
+    case "purchases": return `Purchases by ${o.group && o.group !== "contact" ? GROUP_WORDS[o.group] ?? o.group : "supplier"}`;
+    case "ar-ageing": return "Accounts receivable ageing summary";
+    case "ap-ageing": return "Accounts payable ageing summary";
+    case "audit-log": return "Audit log";
+    case "stock-movement": return "Stock movement";
+    case "stock-ageing": return "Stock ageing";
+    case "custom": return "Custom report";
+  }
+}
+
+/** Reports kept on the books' basis (accrual unless the company or the report says cash): their footer says which. */
+export const ON_A_BASIS: readonly ExportableReport[] = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "changes-in-equity", "profit-by-dimension", "custom"];

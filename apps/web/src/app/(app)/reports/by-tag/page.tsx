@@ -1,3 +1,5 @@
+import { rangeLabel } from "@/lib/periods";
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { getTagReport } from "@/lib/data";
@@ -23,7 +25,9 @@ export default async function ProfitByTagPage({ searchParams }: PageProps<"/repo
         <div className="min-w-0 flex-[4_1_560px]">
           {!r ? <p className="text-[14px] text-muted">Not available in the demo or for your role.</p> : r.data.length === 0 ? (
             <Card label="Profit by tag"><p className="text-sm text-muted">No tags yet. Add them under Tags, then put them on invoices, bills, expenses and journal entries.</p></Card>
-          ) : r.data.map((t) => (
+          ) : (<>
+            <ReportHeader title="Profit by tag" period={rangeLabel(period.picked, period.ctx.calendar)} />
+            {r.data.map((t) => (
             <Card key={t.id} className="mb-4 !p-2" label={t.name}>
               <div className="flex flex-wrap items-baseline justify-between gap-2 px-3 pt-2">
                 <h2 className="text-[15px] font-bold">{t.name}{!t.is_active && <span className="ml-1 text-[12px] font-normal text-muted">(off)</span>}</h2>
@@ -43,7 +47,9 @@ export default async function ProfitByTagPage({ searchParams }: PageProps<"/repo
                 </table>
               </div>
             </Card>
-          ))}
+            ))}
+            <ReportFooter basis={null} />
+          </>)}
           <p className="text-[13px] text-muted">From the ledger: a tagged document&rsquo;s own entries (a corrected one included), tagged journal entries, and their reversals. A transaction with two tags counts under each.</p>
         </div>
       </div>

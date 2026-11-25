@@ -1,3 +1,5 @@
+import { asOfLabel } from "@/lib/periods";
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
@@ -25,6 +27,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
             </p>
           )}
           <Card className="!p-2" label="Inventory valuation">
+            <div className="px-3 pt-3"><ReportHeader title="Inventory valuation" period={asOfLabel(asOf, at.ctx.calendar)} filters={["Values at cost"]} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col">Warehouse</th><th scope="col" className="!text-right">Quantity</th><th scope="col" className="!text-right">Value</th></tr></thead>
@@ -46,6 +49,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
                 </tfoot>
               </table>
             </div>
+            <ReportFooter basis={null} />
           </Card>
         </>
       )}

@@ -1,3 +1,4 @@
+import { exportPeriod } from "@/lib/periodParams";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -22,7 +23,7 @@ export default async function AuditLogPage({ searchParams }: PageProps<"/audit">
   return (
     <>
       <PageTitle eyebrow="Reports / Audit" title="Audit log"
-        actions={log ? <ExportLink report="audit-log" params={{ from: filters.from, to: filters.to, action: filters.action, user_id: filters.user_id }} /> : undefined} />
+        actions={log ? <ExportLink report="audit-log" params={{ ...exportPeriod(period.picked), action: filters.action, user_id: filters.user_id }} /> : undefined} />
       {!log ? <p className="text-[14px] text-muted">The audit log is not available in the demo.</p> : (
         <>
           <DateRangeFilter picked={period.picked} keep={q} fields={["action", "user_id"]}>
