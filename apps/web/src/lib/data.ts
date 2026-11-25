@@ -1594,12 +1594,19 @@ export interface ShellContext {
 /** The company being worked on, and who is signed in, for the app shell. */
 /** Today in the company's time zone: the same date the API takes as today (CurrentCompany::today()). */
 export async function getCompanyToday(): Promise<string> {
+  return (await getCompanyDay()).today;
+}
+
+/** Today in the company's time zone and the calendar its dates are shown in, from one settings request. */
+export async function getCompanyDay(): Promise<{ today: string; calendar: CompanySettings["calendar"] }> {
   await connection();
-  if (isDemoMode()) return todayIn(demoCompanySettings.timezone);
+  if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar };
   try {
-    return todayIn((await withApi((ctx) => ledgerly.companySettings(ctx))).timezone);
+    const settings = await withApi((ctx) => ledgerly.companySettings(ctx));
+    return { today: todayIn(settings.timezone), calendar: settings.calendar };
   } catch (error) {
-    if (error instanceof ApiError) return todayIn();   // a role without company.view still gets a date; redirects pass through
+    // A role without company.view still gets a date (Gregorian, the default); redirects pass through.
+    if (error instanceof ApiError) return { today: todayIn(), calendar: "gregorian" };
     throw error;
   }
 }

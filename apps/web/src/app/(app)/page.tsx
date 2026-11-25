@@ -4,10 +4,10 @@ import { AgeingBar, BalanceLine, PairedColumns, type ColumnPoint } from "@/compo
 import { Icon } from "@/components/app-shell/Icon";
 import { demoAccounts, demoKpis } from "@/lib/demo";
 import { ApiError, isDemoMode, type ArAgeing, type BankAccount, type CashForecast, type Kpis } from "@/lib/api";
-import { getApAgeing, getArAgeing, getBankAccounts, getCashForecast, getCompanyToday, getInvoices, getKpis, getProfitAndLoss } from "@/lib/data";
+import { getApAgeing, getArAgeing, getBankAccounts, getCashForecast, getCompanyDay, getInvoices, getKpis, getProfitAndLoss } from "@/lib/data";
 import { getSession } from "@/lib/session";
 import { parse, toString } from "@/lib/decimal";
-import { formatAmount, formatMoney, toEthiopian } from "@/lib/format";
+import { formatAmount, formatLongDate, formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Overview" };
 
@@ -45,7 +45,8 @@ const greeting = (hour: number) => (hour < 12 ? "Good morning" : hour < 17 ? "Go
 export default async function OverviewPage() {
   const invoices = await getInvoices(); // first: decides demo mode for this request
   const demo = isDemoMode();
-  const todayIso = demo ? "2026-11-02" : await getCompanyToday();
+  // Today, written in the calendar chosen in Settings (Gregorian or Ethiopian), never both.
+  const { today: todayIso, calendar } = demo ? { today: "2026-11-02", calendar: "gregorian" as const } : await getCompanyDay();
   const today = new Date(`${todayIso}T00:00:00Z`);
   const hour = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Africa/Addis_Ababa" }));
   const firstName = demo ? "Hana" : ((await getSession()).name ?? "").split(" ")[0];
@@ -79,7 +80,7 @@ export default async function OverviewPage() {
   return (
     <>
       <PageTitle
-        eyebrow={`${today.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })} · ${toEthiopian(today).label}`}
+        eyebrow={formatLongDate(today, calendar)}
         title={firstName ? `${greeting(hour)}, ${firstName}` : greeting(hour)}
         description="Where the business stands today: cash, who owes whom, and what the next weeks look like."
         actions={

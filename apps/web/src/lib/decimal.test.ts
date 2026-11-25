@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CURRENCIES, documentAmounts, lineAmounts, parse, toString } from "./decimal";
-import { formatAmount, toEthiopian } from "./format";
+import { formatAmount, formatLongDate, toEthiopian } from "./format";
 
 // Same cases as apps/api/tests/Unit/TaxCalculatorTest.php: browser preview and API must agree.
 describe("tax maths (mirrors TaxCalculator)", () => {
@@ -61,6 +61,14 @@ describe("formatting", () => {
     expect([newYear.year, newYear.month, newYear.day]).toEqual([2019, 1, 1]);
     const pagume = toEthiopian(new Date("2023-09-11T00:00:00Z"));
     expect([pagume.year, pagume.month, pagume.day]).toEqual([2015, 13, 6]);
+  });
+
+  it("writes a day in the company's calendar only, never both", () => {
+    const day = new Date("2026-11-25T00:00:00Z");
+    expect(formatLongDate(day, "gregorian")).toBe("Wednesday, 25 November 2026");
+    expect(formatLongDate(day, "ethiopian")).toBe("Wednesday, Hidar 16, 2019");
+    expect(formatLongDate(day, "gregorian")).not.toContain("Hidar");
+    expect(formatLongDate(day, "ethiopian")).not.toContain("November");
   });
 
   it("offers every currency, with no duplicates", () => {
