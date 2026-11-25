@@ -1,21 +1,21 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { AccountTabs } from "./AccountTabs";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getBankAccounts, getBankRegister, getCashCounts } from "@/lib/data";
+import { getBankAccounts, getBankRegister, getCashCounts, getReportPeriod } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { ArchiveBankAccount, EditBankAccount } from "../BankingForms";
 import { CashCountForm, FloatForm, TopUpForm } from "../PettyCashForms";
 
 export const metadata = { title: "Bank account" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
-
 /** One money account: every entry on it in a period with the running balance, and its details. */
 export default async function BankAccountPage({ params, searchParams }: PageProps<"/banking/[id]">) {
   const { id } = await params;
   const q = await searchParams;
-  const register = await getBankRegister(id, { from: date(q.from), to: date(q.to) });
+  const period = await getReportPeriod(q, "last_90_days");
+  const register = await getBankRegister(id, { from: period.from, to: period.to });
   if (!register) notFound();
   const a = register.account;
   const isCash = a.kind === "cash";
@@ -27,11 +27,9 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
       <PageTitle eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / Account</>}
         title={<><span className="num">{a.code}</span> {a.name} {!a.is_active && <Pill>Archived</Pill>}</>} />
       <AccountTabs id={a.id} current="register" kind={a.kind} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={register.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={register.to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      <DateRangeFilter picked={period.picked} keep={q} fields={[]}>
+
+      </DateRangeFilter>
       <Card className="!p-2" label="Register">
         <div className="overflow-x-auto">
           <table className="tbl">

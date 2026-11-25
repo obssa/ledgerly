@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanyToday, getStockAgeing, getWarehouses } from "@/lib/data";
+import { AsOfFilter } from "@/components/DateRangeFilter";
+import { getReportAsOf, getStockAgeing, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { STOCK_BANDS, isDate } from "@/lib/reports";
+import { STOCK_BANDS } from "@/lib/reports";
 import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Stock ageing" };
@@ -12,20 +13,19 @@ const uuid = (v: unknown) => (typeof v === "string" && /^[0-9a-f-]{36}$/.test(v)
 /** Module 4/10: what is on hand at a date, by days since it last sold: slow-moving (91 to 180 days) and dead stock (over 180, or never sold). */
 export default async function StockAgeingPage({ searchParams }: PageProps<"/reports/stock-ageing">) {
   const q = await searchParams;
-  const asOf = isDate(q.as_of) ? q.as_of : await getCompanyToday();
+  const at = await getReportAsOf(q);
+  const asOf = at.asOf;
   const warehouseId = uuid(q.warehouse_id);
   const [r, warehouses] = await Promise.all([getStockAgeing({ as_of: asOf, warehouse_id: warehouseId }), getWarehouses()]);
 
   return (
     <>
       <PageTitle eyebrow="Reports / Inventory" title="Stock ageing" actions={<ExportLink report="stock-ageing" params={{ as_of: asOf, warehouse_id: warehouseId }} />} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
+      <AsOfFilter picked={at.picked} keep={q} fields={["warehouse_id"]}>
         <div className="min-w-[180px]"><label className="field-label" htmlFor="warehouse_id">Warehouse</label>
           <select className="field" id="warehouse_id" name="warehouse_id" defaultValue={warehouseId ?? ""}><option value="">All warehouses</option>
             {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></div>
-        <div><label className="field-label" htmlFor="as_of">As at</label><input className="field" id="as_of" name="as_of" type="date" defaultValue={asOf} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      </AsOfFilter>
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/stock-ageing" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, or for that date.</p> : (

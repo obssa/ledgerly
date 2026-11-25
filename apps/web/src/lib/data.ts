@@ -7,7 +7,8 @@ import type { BankPaymentFile, Bin, LeaseDetail, LeaseRegister, Tag, TagKind, Ta
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { todayIn } from "@/lib/dates";
-import { isDate } from "./reports";
+import type { AsOfPreset, PeriodContext, RangePreset } from "./periods";
+import { apiDates, pickAsOf, pickRange, type PickedAsOf, type PickedRange } from "./periodParams";
 import { sortSessions, type SignedInSession } from "./sessions";
 import type { Subscription } from "./subscription";
 
@@ -1467,15 +1468,43 @@ export async function getTrialBalance(asOf: string): Promise<TrialBalanceRow[] |
   return (await withApi((ctx) => ledgerly.trialBalance(asOf, ctx))).data;
 }
 
-/** The period a report shows by default: the current fiscal year to today (the company's), or the month if none. */
-export async function getReportPeriod(q: { from?: unknown; to?: unknown }): Promise<{ from: string; to: string }> {
-  const today = await getCompanyToday();
-  const to = isDate(q.to) ? q.to : today;
-  if (isDate(q.from)) return { from: q.from, to };
-  if (isDemoMode()) return { from: `${to.slice(0, 4)}-01-01`, to };
-  const years = await withApi((ctx) => ledgerly.fiscalYears(ctx)).catch(() => ({ data: [] as FiscalYear[] }));
-  const year = years.data.find((y) => y.starts_on <= to && y.ends_on >= to);
-  return { from: year?.starts_on ?? `${to.slice(0, 7)}-01`, to };
+/**
+ * What report periods are worked out from: the company's today (its time zone), its calendar, its fiscal year start
+ * and fiscal years. One settings request; a role that may not read the settings gets the fiscal years alone.
+ */
+export async function getPeriodContext(): Promise<PeriodContext> {
+  await connection();
+  if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar, fiscalStartMonth: demoCompanySettings.fiscal_year_start_month, fiscalYears: demoCompanySettings.fiscal_years };
+  try {
+    const s = await withApi((ctx) => ledgerly.companySettings(ctx));
+    return { today: todayIn(s.timezone), calendar: s.calendar, fiscalStartMonth: s.fiscal_year_start_month, fiscalYears: s.fiscal_years };
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error;
+    const years = await withApi((ctx) => ledgerly.fiscalYears(ctx)).catch(() => ({ data: [] as FiscalYear[] }));
+    const first = years.data[0]?.starts_on;
+    return { today: todayIn(), calendar: "gregorian", fiscalStartMonth: first ? Number(first.slice(5, 7)) : 1, fiscalYears: years.data };
+  }
+}
+
+type Query = Record<string, string | string[] | undefined>;
+
+/**
+ * The period a report shows (lib/periodParams.ts): the preset or dates in its URL, else `fallback` (by default the
+ * current fiscal year to date). `from`/`to` are what the API is sent (open ends widened); `picked` is what the page and
+ * its header say ("All dates", "Last month").
+ */
+export async function getReportPeriod(q: Query, fallback: RangePreset = "this_fiscal_year_to_date", allowed?: readonly RangePreset[]):
+  Promise<{ from: string; to: string; picked: PickedRange; ctx: PeriodContext }> {
+  const ctx = await getPeriodContext();
+  const picked = pickRange(q, ctx, fallback, allowed);
+  return { ...apiDates(picked), picked, ctx };
+}
+
+/** The date a report "as of" shows: the preset or date in its URL, else `fallback` (today). */
+export async function getReportAsOf(q: Query, fallback: AsOfPreset = "today"): Promise<{ asOf: string; picked: PickedAsOf; ctx: PeriodContext }> {
+  const ctx = await getPeriodContext();
+  const picked = pickAsOf(q, ctx, fallback);
+  return { asOf: picked.asOf, picked, ctx };
 }
 
 /** Module 10 statements; null in the demo, or when the period is refused. */

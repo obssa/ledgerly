@@ -42,7 +42,9 @@ final class AnalysisReportController extends Controller
             'location_id' => ['nullable', 'uuid'],
             'class_id' => ['nullable', 'uuid'],
         ]);
-        [$from, $to] = $this->period($request);
+        // Month or quarter columns over all dates would be hundreds of columns: those stay within five years.
+        $byPeriod = in_array($o['columns'] ?? 'total', ['month', 'quarter'], true);
+        [$from, $to] = $this->period($request, $byPeriod ? 1830 : null);
         $options = ['rows' => $o['rows'] ?? 'account', 'columns' => $o['columns'] ?? 'total', 'measure' => $o['measure'] ?? 'natural',
             'account_type' => $o['account_type'] ?? null];
         // A dimension is the company's own, or the filter finds nothing: a request cannot read another company's.
@@ -79,15 +81,18 @@ final class AnalysisReportController extends Controller
             ...$this->reports->documents($this->current->id(), $side, $group, $from, $to)]);
     }
 
-    /** @return array{0: string, 1: string} the current fiscal year to today unless given; up to five years */
-    private function period(Request $request): array
+    /** @return array{0: string, 1: string} the current fiscal year to today unless given; any span unless $maxDays */
+    private function period(Request $request, ?int $maxDays = null): array
     {
         $q = $request->validate(['from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d']]);
         $to = $q['to'] ?? $this->current->today();
         $from = $q['from'] ?? (DB::table('fiscal_years')->where('company_id', $this->current->id())->where('starts_on', '<=', $to)->where('ends_on', '>=', $to)->value('starts_on')
             ?? (new \DateTimeImmutable($to))->modify('first day of this month')->format('Y-m-d'));
-        if ($to < $from || (new \DateTimeImmutable($from))->diff(new \DateTimeImmutable($to))->days > 1830) {
-            throw ValidationException::withMessages(['to' => ['A report covers up to five years, ending on or after it starts.']]);
+        if ($to < $from) {
+            throw ValidationException::withMessages(['to' => ['A report ends on or after it starts.']]);
+        }
+        if ($maxDays !== null && (new \DateTimeImmutable($from))->diff(new \DateTimeImmutable($to))->days > $maxDays) {
+            throw ValidationException::withMessages(['to' => ['Monthly or quarterly columns cover up to five years: choose a shorter period, or a total column.']]);
         }
 
         return [(string) $from, $to];

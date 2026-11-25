@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
-import { getInventoryValuation } from "@/lib/data";
+import { AsOfFilter } from "@/components/DateRangeFilter";
+import { getInventoryValuation, getReportAsOf } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Inventory valuation" };
 
 /** Stock at a date, per item and warehouse, next to the inventory account in the ledger. */
 export default async function InventoryValuationPage({ searchParams }: PageProps<"/reports/inventory-valuation">) {
-  const { as_of } = await searchParams;
-  const asOf = typeof as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(as_of) ? as_of : undefined;
+  const q = await searchParams;
+  const at = await getReportAsOf(q);
+  const asOf = at.asOf;
   const v = await getInventoryValuation(asOf);
 
   return (
@@ -16,10 +18,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
       <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Inventory</>} title="Inventory valuation" />
       {v === null ? <Card><p className="text-sm text-muted">Not available in the demo.</p></Card> : (
         <>
-          <form className="mb-4 flex flex-wrap items-end gap-2.5">
-            <div><label className="field-label" htmlFor="as_of">At</label><input className="field" id="as_of" name="as_of" type="date" defaultValue={v.as_of} /></div>
-            <button type="submit" className="btn">Show</button>
-          </form>
+          <AsOfFilter picked={at.picked} keep={q} />
           {v.difference !== "0.00" && (
             <p role="alert" className="mb-4 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">
               The inventory account differs from the stock by {formatAmount(v.difference)}: a journal entry was posted to it directly. Correct it with a stock adjustment.

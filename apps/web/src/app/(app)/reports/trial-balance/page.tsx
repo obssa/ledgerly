@@ -1,31 +1,30 @@
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getTrialBalance, getCompanyToday } from "@/lib/data";
+import { AsOfFilter } from "@/components/DateRangeFilter";
+import { resolveRange } from "@/lib/periods";
+import { getTrialBalance, getReportAsOf } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ExportLink } from "../ReportsNav";
-import { defaultPeriod, trialTotals } from "@/lib/ledger";
+import { trialTotals } from "@/lib/ledger";
 
 export const metadata = { title: "Trial balance" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
-
 /** Module 6: every account's balance at a date, debits against credits; each account opens its general ledger. */
 export default async function TrialBalancePage({ searchParams }: PageProps<"/reports/trial-balance">) {
-  const asked = date((await searchParams).as_of);   // read the request first: the date below is then per request
-  const asOf = asked ?? (await getCompanyToday());
+  const q = await searchParams;
+  const at = await getReportAsOf(q);
+  const asOf = at.asOf;
   const rows = await getTrialBalance(asOf);
   const totals = trialTotals(rows ?? []);
-  const from = defaultPeriod(asOf).from;
+  // Each account opens its ledger for the fiscal year up to this date.
+  const from = resolveRange("this_fiscal_year", { ...at.ctx, today: asOf })?.from ?? asOf;
 
   return (
     <>
       <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>}
         title={<>Trial balance {rows && (totals.balanced ? <Pill tone="good">Balanced</Pill> : <Pill tone="bad">Out of balance</Pill>)}</>}
         actions={<ExportLink report="trial-balance" params={{ as_of: asOf }} />} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
-        <div><label className="field-label" htmlFor="as_of">As at</label><input className="field" id="as_of" name="as_of" type="date" defaultValue={asOf} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      <AsOfFilter picked={at.picked} keep={q} />
       {!rows ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <Card className="!p-2" label="Trial balance">
           <div className="overflow-x-auto">

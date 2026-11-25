@@ -1,19 +1,19 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle } from "@/components/ui";
-import { getSupplierStatement } from "@/lib/data";
+import { getSupplierStatement, getReportPeriod } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Supplier statement" };
 
 const KIND: Record<string, string> = { bill: "Bill", payment: "Payment", reversal: "Reversal", opening: "Opening", manual: "Journal" };
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
-
 /** What the company owed a supplier before a period, every bill and payment in it, and what it owes at the end. */
 export default async function SupplierStatementPage({ params, searchParams }: PageProps<"/suppliers/[id]/statement">) {
   const { id } = await params;
   const q = await searchParams;
-  const statement = await getSupplierStatement(id, { from: date(q.from), to: date(q.to) });
+  const period = await getReportPeriod(q, "last_90_days");
+  const statement = await getSupplierStatement(id, { from: period.from, to: period.to });
   if (!statement) notFound();
 
   return (
@@ -22,11 +22,9 @@ export default async function SupplierStatementPage({ params, searchParams }: Pa
         eyebrow={<><Link href={`/suppliers/${encodeURIComponent(id)}`} className="hover:underline">{statement.supplier.name}</Link> / Statement</>}
         title={<>Statement · <span className="num">{statement.from}</span> to <span className="num">{statement.to}</span></>}
       />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={statement.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={statement.to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      <DateRangeFilter picked={period.picked} keep={q} fields={[]}>
+
+      </DateRangeFilter>
       <Card className="max-w-[1000px]" label="Statement">
         <div className="mb-4 text-sm">
           <div className="font-bold">{statement.supplier.name}</div>

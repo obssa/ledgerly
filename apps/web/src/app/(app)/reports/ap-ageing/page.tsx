@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
-import { getApAgeing } from "@/lib/data";
+import { AsOfFilter } from "@/components/DateRangeFilter";
+import { getApAgeing, getReportAsOf } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ExportLink } from "../ReportsNav";
 import { AgeingDetail, AgeingViews } from "../AgeingDetail";
@@ -14,9 +15,10 @@ const COLUMNS = [
 
 /** What the company owes suppliers by how late it is. Each supplier's total is their balance on accounts payable. */
 export default async function ApAgeingPage({ searchParams }: PageProps<"/reports/ap-ageing">) {
-  const { as_of, view } = await searchParams;
-  const detail = view === "detail";
-  const asOf = typeof as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(as_of) ? as_of : undefined;
+  const q = await searchParams;
+  const detail = q.view === "detail";
+  const at = await getReportAsOf(q);
+  const asOf = at.asOf;
   const ageing = await getApAgeing(asOf);
 
   return (
@@ -27,14 +29,7 @@ export default async function ApAgeingPage({ searchParams }: PageProps<"/reports
       ) : (
         <>
           <AgeingViews base="/reports/ap-ageing" asOf={asOf} detail={detail} />
-          <form className="mb-4 flex flex-wrap items-end gap-2.5">
-            {detail && <input type="hidden" name="view" value="detail" />}
-            <div>
-              <label className="field-label" htmlFor="as_of">Days late counted at</label>
-              <input className="field" id="as_of" name="as_of" type="date" defaultValue={ageing.as_of} />
-            </div>
-            <button type="submit" className="btn">Show</button>
-          </form>
+          <AsOfFilter picked={at.picked} keep={q} label="Days late counted at" />
           {detail ? <AgeingDetail ageing={ageing} kind="bill" baseCurrency={ageing.currency ?? ""} /> : (
           <Card className="!p-2" label="AP ageing">
             <div className="overflow-x-auto">

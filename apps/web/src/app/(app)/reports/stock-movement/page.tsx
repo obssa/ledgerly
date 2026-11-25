@@ -1,8 +1,9 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { rangeLabel } from "@/lib/periods";
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { getReportPeriod, getStockMovement, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { periodLabel } from "@/lib/reports";
 import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Stock movement" };
@@ -14,25 +15,22 @@ export default async function StockMovementPage({ searchParams }: PageProps<"/re
   const q = await searchParams;
   const period = await getReportPeriod(q);
   const warehouseId = uuid(q.warehouse_id);
-  const [r, warehouses] = await Promise.all([getStockMovement({ ...period, warehouse_id: warehouseId }), getWarehouses()]);
+  const [r, warehouses] = await Promise.all([getStockMovement({ from: period.from, to: period.to, warehouse_id: warehouseId }), getWarehouses()]);
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Inventory" title="Stock movement" actions={<ExportLink report="stock-movement" params={{ ...period, warehouse_id: warehouseId }} />} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
+      <PageTitle eyebrow="Reports / Inventory" title="Stock movement" actions={<ExportLink report="stock-movement" params={{ from: period.from, to: period.to, warehouse_id: warehouseId }} />} />
+      <DateRangeFilter picked={period.picked} keep={q} fields={["warehouse_id"]}>
         <div className="min-w-[180px]"><label className="field-label" htmlFor="warehouse_id">Warehouse</label>
           <select className="field" id="warehouse_id" name="warehouse_id" defaultValue={warehouseId ?? ""}><option value="">All warehouses</option>
             {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></div>
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={period.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={period.to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      </DateRangeFilter>
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/stock-movement" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Stock movement">
             <div className="px-3 pt-2 text-[13px] text-muted">
-              {periodLabel(r.from, r.to)} · {r.warehouse?.name ?? "All warehouses (transfers between them left out)"} · values in {r.currency} at cost
+              {rangeLabel(period.picked, period.ctx.calendar)} · {r.warehouse?.name ?? "All warehouses (transfers between them left out)"} · values in {r.currency} at cost
             </div>
             <div className="overflow-x-auto">
               <table className="tbl">

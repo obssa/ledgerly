@@ -1460,7 +1460,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   if (!base) throw new ApiError(0, "LEDGERLY_API_URL is not set (demo mode)");
 
   const url = new URL(`/api/v1/${path.replace(/^\//, "")}`, base);
-  for (const [k, v] of Object.entries(opts.query ?? {})) if (v !== undefined) url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries(opts.query ?? {})) if (typeof v === "string") url.searchParams.set(k, v);   // strings only: a page may hand over a richer object
 
   // Loaded here, not at the top: this module is also imported by tests and for its types.
   const visitor = await import("./visitor").then((m) => m.visitorHeaders()).catch(() => ({}));

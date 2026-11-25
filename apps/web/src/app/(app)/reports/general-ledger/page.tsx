@@ -1,13 +1,13 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
-import { getChart, getDimensions, getGeneralLedger, getCompanyToday } from "@/lib/data";
+import { getChart, getDimensions, getGeneralLedger, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ExportLink } from "../ReportsNav";
-import { defaultPeriod, drCr } from "@/lib/ledger";
+import { drCr } from "@/lib/ledger";
 
 export const metadata = { title: "General ledger" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const uuid = (v: unknown) => (typeof v === "string" && /^[0-9a-f-]{36}$/.test(v) ? v : undefined);
 
 function Balance({ value }: { value: string }) {
@@ -18,9 +18,9 @@ function Balance({ value }: { value: string }) {
 /** Module 6: every posted line of a period, account by account, with the balance carried forward and a running balance. */
 export default async function GeneralLedgerPage({ searchParams }: PageProps<"/reports/general-ledger">) {
   const q = await searchParams;
-  const period = defaultPeriod(await getCompanyToday());
+  const period = await getReportPeriod(q);
   const filters = {
-    from: date(q.from) ?? period.from, to: date(q.to) ?? period.to,
+    from: period.from, to: period.to,
     account_id: uuid(q.account_id), location_id: uuid(q.location_id), class_id: uuid(q.class_id), project_id: uuid(q.project_id),
   };
   const [gl, chart, dimensions] = await Promise.all([getGeneralLedger(filters), getChart(true), getDimensions()]);
@@ -30,9 +30,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
     <>
       <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>} title="General ledger"
         actions={<ExportLink report="general-ledger" params={{ from: filters.from, to: filters.to, account_id: filters.account_id }} />} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={filters.from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={filters.to} /></div>
+      <DateRangeFilter picked={period.picked} keep={q} fields={["account_id", "location_id", "class_id", "project_id"]}>
         <div className="min-w-[220px]">
           <label className="field-label" htmlFor="account_id">Account</label>
           <select className="field" id="account_id" name="account_id" defaultValue={filters.account_id ?? ""}>
@@ -49,8 +47,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
             </select>
           </div>
         ))}
-        <button type="submit" className="btn">Show</button>
-      </form>
+      </DateRangeFilter>
       {!gl && <p className="text-[14px] text-muted">{chart.demo ? "Not available in the demo." : "Check the dates: the period ends on or after it starts."}</p>}
       {gl?.truncated && <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">Only the first lines of a long period are shown: choose a shorter period or one account.</p>}
       {gl && gl.accounts.length === 0 && <p className="text-[14px] text-muted">Nothing posted in this period.</p>}

@@ -4,7 +4,10 @@ import { parse } from "@/lib/decimal";
 import { getCompanySettings, getProfitAndLoss, getReportPeriod, getShellContext } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel, previousPeriod, samePeriodLastYear } from "@/lib/reports";
-import { ExportLink, PeriodForm, ReportsNav } from "./ReportsNav";
+import { rangeLabel } from "@/lib/periods";
+import { periodQuery } from "@/lib/periodParams";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { ExportLink, ReportsNav } from "./ReportsNav";
 
 export const metadata = { title: "Profit and loss" };
 
@@ -26,14 +29,16 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
   const period = await getReportPeriod(q);
   // Against the period just before, or (compare=year) the same period last year.
   const lastYear = q.compare === "year";
-  const before = lastYear ? samePeriodLastYear(period.from, period.to) : previousPeriod(period.from, period.to);
+  // An open period (All dates, Since 30 days ago) has no period before it to compare with.
+  const closed = Boolean(period.picked.from && period.picked.to);
+  const before = closed ? (lastYear ? samePeriodLastYear(period.from, period.to) : previousPeriod(period.from, period.to)) : null;
   // Accrual (when invoiced or billed), or cash (basis=cash): when the money moved.
   const cash = q.basis === "cash";
   const [pl, { companyName }, settings] = await Promise.all([
-    getProfitAndLoss({ ...period, compare_from: before.from, compare_to: before.to, ...(cash ? { basis: "cash" as const } : {}) }), getShellContext(), getCompanySettings(),
+    getProfitAndLoss({ from: period.from, to: period.to, ...(before ? { compare_from: before.from, compare_to: before.to } : {}), ...(cash ? { basis: "cash" as const } : {}) }), getShellContext(), getCompanySettings(),
   ]);
   const link = (o: { year?: boolean; cash?: boolean }) =>
-    `/reports?from=${period.from}&to=${period.to}${(o.year ?? lastYear) ? "&compare=year" : ""}${(o.cash ?? cash) ? "&basis=cash" : ""}`;
+    `/reports?${new URLSearchParams({ ...periodQuery(period.picked), ...((o.year ?? lastYear) ? { compare: "year" } : {}), ...((o.cash ?? cash) ? { basis: "cash" } : {}) })}`;
   const currency = settings.base_currency;
   const t = pl.totals;
   // No income yet (a new company) means no margin, not a division by zero.
@@ -76,8 +81,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" actions={<ExportLink report="profit-and-loss" params={period} />} />
-      <PeriodForm from={period.from} to={period.to} />
+      <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss" actions={<ExportLink report="profit-and-loss" params={{ from: period.from, to: period.to }} />} />
+      <DateRangeFilter picked={period.picked} keep={q} />
       <div className="mb-4 flex flex-wrap gap-x-3">
         <Segmented label="Compare with" size="sm" className="!mb-2" items={[
           { key: "before", href: link({ year: false }), label: "Against the period before", active: !lastYear },
@@ -93,12 +98,12 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         <Card className="min-w-0 flex-[4_1_560px]" label="Profit and loss statement">
           <div className="mb-3 text-center">
             <div className="text-[17px] font-extrabold">{companyName}</div>
-            <div className="text-[13px] text-muted">Profit and loss{cash ? " on the cash basis" : ""} · {periodLabel(period.from, period.to)} · {currency}</div>
+            <div className="text-[13px] text-muted">Profit and loss{cash ? " on the cash basis" : ""} · {rangeLabel(period.picked, period.ctx.calendar)} · {currency}</div>
             {cash && <div className="mt-1 text-[12px] text-muted">Income and expenses when the money moved: invoices and bills as they are paid, cash sales and expenses on their day.</div>}
           </div>
           <div className="overflow-x-auto">
             <table className="tbl">
-              <thead><tr><th scope="col">Account</th><th scope="col" className="!text-right">This period</th><th scope="col" className="!text-right">{periodLabel(before.from, before.to)}</th><th scope="col" className="!text-right">Change</th></tr></thead>
+              <thead><tr><th scope="col">Account</th><th scope="col" className="!text-right">This period</th><th scope="col" className="!text-right">{before ? periodLabel(before.from, before.to) : "No comparison"}</th><th scope="col" className="!text-right">Change</th></tr></thead>
               <tbody>
                 {section("Income", pl.sections.income, t.income)}
                 {section("Cost of goods sold", pl.sections.cost_of_sales, t.cost_of_sales)}

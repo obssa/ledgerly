@@ -2,19 +2,21 @@ import { Card, PageTitle } from "@/components/ui";
 import { getChangesInEquity, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel } from "@/lib/reports";
-import { ExportLink, PeriodForm, ReportsNav } from "../ReportsNav";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Changes in equity" };
 
 /** Module 10: the statement of changes in equity for a period. */
 export default async function ChangesInEquityPage({ searchParams }: PageProps<"/reports/changes-in-equity">) {
-  const period = await getReportPeriod(await searchParams);
+  const q = await searchParams;
+  const period = await getReportPeriod(q);
   const soce = await getChangesInEquity(period);
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Changes in equity" actions={<ExportLink report="changes-in-equity" params={period} />} />
-      <PeriodForm from={period.from} to={period.to} />
+      <PageTitle eyebrow="Reports / Financial statements" title="Changes in equity" actions={<ExportLink report="changes-in-equity" params={{ from: period.from, to: period.to }} />} />
+      <DateRangeFilter picked={period.picked} keep={q} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/changes-in-equity" />
         {!soce ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (

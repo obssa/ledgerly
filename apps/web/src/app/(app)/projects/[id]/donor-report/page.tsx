@@ -1,18 +1,18 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getDonorReport } from "@/lib/data";
+import { getDonorReport, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Donor report" };
-
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 
 /** Module 9a (093): what a grant was spent on against its budget, what it brought in, and the funds left, for its donor. */
 export default async function DonorReportPage({ params, searchParams }: PageProps<"/projects/[id]/donor-report">) {
   const { id } = await params;
   const q = await searchParams;
-  const r = await getDonorReport(id, { from: date(q.from), to: date(q.to) });
+  const period = await getReportPeriod(q, "all");
+  const r = await getDonorReport(id, { from: (period.picked.from ?? undefined), to: (period.picked.to ?? undefined) });
   if (!r) notFound();
   const back = `/projects/${encodeURIComponent(r.project.id)}`;
 
@@ -20,11 +20,9 @@ export default async function DonorReportPage({ params, searchParams }: PageProp
     <>
       <PageTitle eyebrow={<><Link href="/projects" className="hover:underline">Projects</Link> / <Link href={back} className="num hover:underline">{r.project.code}</Link></>}
         title="Donor report" />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={r.from ?? undefined} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={r.to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      <DateRangeFilter picked={period.picked} keep={q} fields={[]}>
+
+      </DateRangeFilter>
       <Card className="mb-4" label="Grant">
         <div className="mb-3 text-center">
           <div className="text-[17px] font-extrabold">{r.project.name}</div>

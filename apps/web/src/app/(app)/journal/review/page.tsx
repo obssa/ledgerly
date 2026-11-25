@@ -1,13 +1,13 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { CLOSED_RANGE_PRESETS } from "@/lib/periods";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { ReviewFlag } from "@/lib/api";
-import { getReviewQueue } from "@/lib/data";
+import { getReviewQueue, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ReviewEntry } from "../JournalForms";
 
 export const metadata = { title: "Review queue" };
-
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 
 /** Short names for the reasons an entry is in the queue; the API gives the full sentence. */
 const LABELS: Record<ReviewFlag, string> = {
@@ -18,7 +18,8 @@ const LABELS: Record<ReviewFlag, string> = {
 /** Module 6, accountant tools: entries worth a second look, why, and marking them reviewed. Nothing is blocked. */
 export default async function ReviewQueuePage({ searchParams }: PageProps<"/journal/review">) {
   const q = await searchParams;
-  const filters = { from: date(q.from), to: date(q.to), reviewed: q.reviewed === "1" ? "1" : undefined };
+  const period = await getReportPeriod(q, "last_90_days", CLOSED_RANGE_PRESETS);
+  const filters = { from: period.from, to: period.to, reviewed: q.reviewed === "1" ? "1" : undefined };
   const queue = await getReviewQueue(filters);
 
   return (
@@ -26,12 +27,9 @@ export default async function ReviewQueuePage({ searchParams }: PageProps<"/jour
       <PageTitle eyebrow={<><Link href="/journal" className="hover:underline">Journal entries</Link> / Review</>} title="Review queue" />
       {!queue ? <p className="text-[14px] text-muted">Not available in the demo, or check the dates.</p> : (
         <>
-          <form className="mb-4 flex flex-wrap items-end gap-2.5">
-            <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={queue.from} /></div>
-            <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={queue.to} /></div>
+          <DateRangeFilter picked={period.picked} keep={q} allowed={CLOSED_RANGE_PRESETS} fields={["reviewed"]}>
             <label className="flex items-center gap-2 pb-2 text-[14px]"><input type="checkbox" name="reviewed" value="1" defaultChecked={filters.reviewed === "1"} /> Show reviewed entries too</label>
-            <button type="submit" className="btn">Show</button>
-          </form>
+      </DateRangeFilter>
           <Card className="mb-4" label="Why entries are here">
             <ul className="grid gap-1.5 text-[14px]">
               {(Object.keys(LABELS) as ReviewFlag[]).map((f) => (

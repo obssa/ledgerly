@@ -27,8 +27,9 @@ final class StockReportController extends Controller
         $to = $q['to'] ?? $this->current->today();
         $from = $q['from'] ?? (DB::table('fiscal_years')->where('company_id', $this->current->id())->where('starts_on', '<=', $to)->where('ends_on', '>=', $to)->value('starts_on')
             ?? (new \DateTimeImmutable($to))->modify('first day of this month')->format('Y-m-d'));
-        if ($to < $from || (new \DateTimeImmutable((string) $from))->diff(new \DateTimeImmutable($to))->days > 1830) {
-            throw ValidationException::withMessages(['to' => ['A report covers up to five years, ending on or after it starts.']]);
+        // Any span, "All dates" included (the web app sends the widest dates for an open end): it ends on or after it starts.
+        if ($to < $from) {
+            throw ValidationException::withMessages(['to' => ['A report ends on or after it starts.']]);
         }
 
         return response()->json(['from' => (string) $from, 'to' => $to, 'warehouse' => $warehouse, 'currency' => $this->current->get()->base_currency,

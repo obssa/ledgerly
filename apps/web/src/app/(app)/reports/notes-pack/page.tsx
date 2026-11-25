@@ -2,7 +2,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { getBalanceSheet, getCashFlow, getChangesInEquity, getNotes, getProfitAndLoss, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { periodLabel } from "@/lib/reports";
-import { PeriodForm } from "../ReportsNav";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { PrintPack } from "./PrintPack";
 
 export const metadata = { title: "Financial statements and notes" };
@@ -15,8 +15,12 @@ const METHOD: Record<string, string> = { straight_line: "straight line", reducin
  * on one page to print or save as a PDF for the owners, the bank or the auditor.
  */
 export default async function NotesPackPage({ searchParams }: PageProps<"/reports/notes-pack">) {
-  const period = await getReportPeriod(await searchParams);
-  const [notes, pl, bs, cf, ce] = await Promise.all([getNotes(period), getProfitAndLoss(period), getBalanceSheet(period.to), getCashFlow(period), getChangesInEquity(period)]);
+  const q = await searchParams;
+  const period = await getReportPeriod(q);
+  const dates = { from: period.from, to: period.to };
+  // The statement of financial position is at the end of the period: today when the period has no end.
+  const at = period.picked.to ?? period.ctx.today;
+  const [notes, pl, bs, cf, ce] = await Promise.all([getNotes(dates), getProfitAndLoss(dates), getBalanceSheet(at), getCashFlow(dates), getChangesInEquity(dates)]);
   if (!notes) {
     return (
       <>
@@ -33,7 +37,7 @@ export default async function NotesPackPage({ searchParams }: PageProps<"/report
   return (
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Financial statements and notes" actions={<PrintPack />} />
-      <div className="print:hidden"><PeriodForm from={period.from} to={period.to} /></div>
+      <div className="print:hidden"><DateRangeFilter picked={period.picked} keep={q} /></div>
       <div className="flex max-w-[900px] flex-col gap-4">
         <Card label="Cover">
           <h2 className="text-[22px] font-extrabold">{notes.company}</h2>
@@ -59,7 +63,7 @@ export default async function NotesPackPage({ searchParams }: PageProps<"/report
 
         {bs && (
           <Card label="Statement of financial position">
-            <h2 className="mb-2 text-[17px] font-bold">Statement of financial position at {period.to}</h2>
+            <h2 className="mb-2 text-[17px] font-bold">Statement of financial position at {at}</h2>
             <table className="tbl"><tbody>
               {bs.sections.assets.map((a) => row(`${a.code} ${a.name}`, a.amount))}
               {row("Total assets", bs.equation.assets, true)}

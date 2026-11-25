@@ -1,8 +1,9 @@
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Card, PageTitle } from "@/components/ui";
-import { getBinCard, getItem, getWarehouses, getCompanyToday } from "@/lib/data";
+import { getBinCard, getItem, getWarehouses, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Bin card" };
@@ -10,18 +11,17 @@ export const metadata = { title: "Bin card" };
 const KIND: Record<string, string> = { opening: "Opening", purchase: "Received", sale: "Sold", sale_return: "Returned in", purchase_return: "Returned out",
   transfer_in: "Transfer in", transfer_out: "Transfer out", adjustment: "Adjustment", production: "Production", project_issue: "Issued to a project",
   landed_cost: "Landed cost" };
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
 const uuid = (v: unknown) => (typeof v === "string" && /^[0-9a-f-]{36}$/i.test(v) ? v : undefined);
 
 /** The stock card of one item in one warehouse: every move in and out, with the running quantity and value. */
 export default async function BinCardPage({ searchParams }: PageProps<"/inventory/bin-card">) {
   const q = await searchParams;
+  const period = await getReportPeriod(q, "this_fiscal_year_to_date");
   const itemId = uuid(q.item);
   const warehouseId = uuid(q.warehouse);
   if (!itemId || !warehouseId) notFound();
   await connection();
-  const to = date(q.to) ?? (await getCompanyToday());
-  const from = date(q.from) ?? `${to.slice(0, 4)}-01-01`;
+  const { from, to } = period;
   const [item, warehouses, card] = await Promise.all([getItem(itemId), getWarehouses(), getBinCard({ item_id: itemId, warehouse_id: warehouseId, from, to })]);
   if (!item || !card) notFound();
   const warehouse = warehouses.find((w) => w.id === warehouseId);
@@ -30,12 +30,9 @@ export default async function BinCardPage({ searchParams }: PageProps<"/inventor
     <>
       <PageTitle eyebrow={<><Link href={`/products/${encodeURIComponent(item.id)}`} className="hover:underline">{item.name}</Link> / Bin card</>}
         title={<>Bin card · {warehouse?.name ?? "Warehouse"}</>} />
-      <form className="mb-4 flex flex-wrap items-end gap-2.5 print:hidden">
+      <DateRangeFilter picked={period.picked} keep={q} fields={["item", "warehouse"]}>
         <input type="hidden" name="item" value={itemId} /><input type="hidden" name="warehouse" value={warehouseId} />
-        <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={from} /></div>
-        <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={to} /></div>
-        <button type="submit" className="btn">Show</button>
-      </form>
+      </DateRangeFilter>
       <Card className="!p-2" label="Bin card">
         <div className="overflow-x-auto">
           <table className="tbl">
