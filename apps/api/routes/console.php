@@ -506,3 +506,145 @@ Artisan::command('ledgerly:staff {email : the staff member\'s email} {--name= : 
 
     return 0;
 })->purpose('Make, re-invite or switch off a Ledgerly staff account (owner role)');
+
+/*
+| A test company (104): real books the operator keeps for trying Ledgerly out, run as the owner role. It
+|  - adds each --owner as an active owner of the company: an account that does not exist yet is made with a
+|    generated password, written only to --accounts-file (mode 600), never printed or mailed;
+|  - takes the company out of the shared demo, if it was in it: its demo accounts stop being demo accounts, lose
+|    their membership and their sign-ins, and get a retired address so a later demo setup can make new ones;
+|  - drops " (demo)" from its name and marks it as a test company, so its owners may start it fresh and fill it with
+|    the sample books (DemoBooksController).
+| Every change is in the company's audit log. Safe to run again. Usually through .github/workflows/test-company.yml.
+*/
+Artisan::command('ledgerly:test-company {company : the company id}
+        {--owner=* : an owner as "email|Name"; repeat for more}
+        {--accounts-file= : where to write the passwords of accounts made now (mode 600)}
+        {--by=operator : who is doing this}', function () {
+    $db = DB::connection('owner');
+    $companyId = (string) $this->argument('company');
+    $by = preg_match('/^[A-Za-z0-9-]{1,40}$/', (string) $this->option('by')) === 1 ? (string) $this->option('by') : 'operator';
+    if (! \Illuminate\Support\Str::isUuid($companyId)) {
+        $this->error('Give the company id.');
+
+        return 1;
+    }
+    $company = $db->table('companies')->where('id', $companyId)->first(['id', 'legal_name', 'status']);
+    if ($company === null || $company->status === 'archived') {
+        $this->error('No such company, or it is archived.');
+
+        return 1;
+    }
+
+    $owners = [];
+    foreach ((array) $this->option('owner') as $given) {
+        [$email, $name] = array_map('trim', explode('|', (string) $given, 2) + [1 => '']);
+        $email = mb_strtolower($email);
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || preg_match("/^[A-Za-z0-9 .'-]{2,120}$/", $name) !== 1) {
+            $this->error('Each --owner is "email|Name": a valid email, and a name of letters, digits, spaces and . \' - only.');
+
+            return 1;
+        }
+        $owners[$email] = $name;
+    }
+    $file = (string) ($this->option('accounts-file') ?? '');
+    if ($file === '' && $owners !== []) {
+        $this->error('Give --accounts-file: new accounts get a password that is written only there.');
+
+        return 1;
+    }
+
+    // Letters and digits only (nothing a shell or a form mangles), 20 of them: about 119 bits.
+    $password = function (): string {
+        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+        do {
+            $p = '';
+            for ($i = 0; $i < 20; $i++) {
+                $p .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+            }
+        } while (! preg_match('/[A-Z]/', $p) || ! preg_match('/[a-z]/', $p) || ! preg_match('/\d/', $p));
+
+        return $p;
+    };
+
+    $made = [];
+    $summary = $db->transaction(function () use ($db, $company, $owners, $password, $by, &$made) {
+        $audit = function (string $action, string $subjectType, ?string $subjectId, ?array $before, ?array $after) use ($db, $company, $by) {
+            $db->table('audit_log')->insert([
+                'company_id' => $company->id, 'user_id' => null, 'actor_type' => 'system', 'action' => $action,
+                'subject_type' => $subjectType, 'subject_id' => $subjectId,
+                'before' => $before === null ? null : json_encode($before, JSON_THROW_ON_ERROR),
+                'after' => $after === null ? null : json_encode($after, JSON_THROW_ON_ERROR),
+                'reason' => "Test company set up by the operator ({$by})",
+            ]);
+        };
+
+        // 1. The owners first: a company always keeps an active owner (008), and the demo's owner is about to go.
+        foreach ($owners as $email => $name) {
+            $user = $db->table('users')->where('email', $email)->first(['id']);
+            if ($user === null) {
+                $id = (string) \Illuminate\Support\Str::uuid();
+                $plain = $password();
+                $db->table('users')->insert(['id' => $id, 'name' => $name, 'email' => $email,
+                    'password' => \Illuminate\Support\Facades\Hash::make($plain), 'email_verified_at' => now()]);
+                $made[] = ['email' => $email, 'name' => $name, 'password' => $plain];
+            } else {
+                $id = (string) $user->id;
+            }
+            $membership = $db->table('memberships')->where(['company_id' => $company->id, 'user_id' => $id])->first(['role', 'status']);
+            if ($membership === null) {
+                $db->table('memberships')->insert(['company_id' => $company->id, 'user_id' => $id, 'role' => 'owner', 'status' => 'active']);
+                $audit('member_added', 'membership', $id, null, ['email' => $email, 'role' => 'owner', 'status' => 'active']);
+            } elseif ($membership->role !== 'owner' || $membership->status !== 'active') {
+                $db->table('memberships')->where(['company_id' => $company->id, 'user_id' => $id])->update(['role' => 'owner', 'status' => 'active']);
+                $audit('member_role_changed', 'membership', $id, ['role' => $membership->role, 'status' => $membership->status], ['role' => 'owner', 'status' => 'active']);
+            }
+        }
+
+        // 2. Out of the shared demo: its accounts are no longer demo accounts, members, or signed in anywhere.
+        $demo = $db->table('demo_accounts')->where('company_id', $company->id)->pluck('user_id')->map(fn ($u) => (string) $u)->all();
+        if ($demo !== []) {
+            $db->table('demo_accounts')->where('company_id', $company->id)->delete();
+            $db->table('memberships')->where('company_id', $company->id)->whereIn('user_id', $demo)->where('status', '<>', 'deactivated')
+                ->update(['status' => 'deactivated']);
+            $db->table('personal_access_tokens')->where('tokenable_type', \App\Models\User::class)->whereIn('tokenable_id', $demo)->delete();
+            $stamp = now()->format('YmdHis');
+            foreach ($db->table('users')->whereIn('id', $demo)->get(['id', 'email']) as $u) {
+                if (str_ends_with((string) $u->email, '@demo.ledgerly.invalid')) {
+                    $local = strstr((string) $u->email, '@', true);
+                    $db->table('users')->where('id', $u->id)->update(['email' => "{$local}.retired-{$stamp}@demo.ledgerly.invalid"]);
+                }
+            }
+            $audit('demo_accounts_removed', 'company', $company->id, ['demo_accounts' => count($demo)], ['demo_accounts' => 0]);
+        }
+
+        // 3. Its own name, and the mark.
+        $name = preg_replace('/\s*\(demo\)\s*$/i', '', (string) $company->legal_name);
+        if ($name !== $company->legal_name && $name !== '') {
+            $db->table('companies')->where('id', $company->id)->update(['legal_name' => $name, 'updated_at' => now()]);
+            $audit('company_updated', 'company', $company->id, ['legal_name' => $company->legal_name], ['legal_name' => $name]);
+        }
+        if (! $db->table('test_companies')->where('company_id', $company->id)->exists()) {
+            $db->table('test_companies')->insert(['company_id' => $company->id, 'marked_by' => $by]);
+            $audit('test_company_marked', 'company', $company->id, null, ['test_company' => true]);
+        }
+
+        return ['demo_removed' => count($demo), 'name' => $name];
+    });
+
+    if ($made !== []) {
+        $old = umask(077);
+        try {
+            $lines = array_map(fn ($a) => "{$a['name']}\t{$a['email']}\t{$a['password']}", $made);
+            file_put_contents($file, implode("\n", $lines) . "\n", FILE_APPEND);
+            chmod($file, 0600);
+        } finally {
+            umask($old);
+        }
+    }
+    $this->info("Test company: {$summary['name']} ({$company->id}).");
+    $this->info(count($owners) . ' owner(s) checked; ' . count($made) . ' new account(s), their passwords written to the accounts file only.');
+    $this->info("Demo accounts taken out of it: {$summary['demo_removed']}.");
+
+    return 0;
+})->purpose('Make a company a test company with the given owners, out of the shared demo (owner role)');

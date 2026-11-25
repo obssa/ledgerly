@@ -106,6 +106,8 @@ Done once; the deploy needs all of it. **Status (25 Nov 2026): steps 1 to 6 done
 | Logs | `~/ledgerly/shared/storage/logs/laravel-*.log`; Node.js app log in cPanel → Setup Node.js App |
 | Which release is live? | `cat ~/ledgerly/current/REVISION` |
 | Change a setting | edit `~/ledgerly/shared/api.env`, then `php artisan config:cache` in `current/api` |
+| Make a test company | Actions → test-company → Run workflow: the company id, and owners as `email|Name;email|Name`. New accounts' passwords go to `~/ledgerly/shared/test-accounts.txt` (mode 600) only: read it once, hand them over, delete it |
+| Demo sign-in on or off | repository variable `DEMO_LOGINS` (`true`/`false`), applied by the next deploy |
 
 ### When the account runs out of processes
 

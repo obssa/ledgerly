@@ -17,6 +17,8 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const [settings, currencies, numbering, dimensions, subscription] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering(), getDimensions(), getSubscription()]);
   const year = settings.fiscal_years.at(-1);
   const { demo } = await getSession();   // the demo role's label: the demo's own buttons are its owner's
+  // The same two buttons for the owners of a test company (104), which is real books, not the demo.
+  const booksButtons = demo === "Owner" ? "demo" : settings.can.test_books ? "test" : null;
 
   return (
     <>
@@ -37,7 +39,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </Card>
 
         <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
-          {demo === "Owner" && <DemoBooks />}
+          {booksButtons && <DemoBooks kind={booksButtons} />}
           <LogoCard hasLogo={Boolean(settings.has_logo)} manage={settings.can.manage} flag={typeof logo === "string" ? logo : undefined} />
 
           <Card label="Period lock">

@@ -262,6 +262,7 @@ final class CompanySettingsController extends Controller
         $pack = CountryPack::load($company->country_code);
         $booksStarted = $this->booksStarted($company);
         $membership = app(CurrentCompany::class)->membership();
+        $testCompany = DB::table('test_companies')->where('company_id', $company->getKey())->exists();
 
         return [
             'id' => $company->getKey(),
@@ -273,6 +274,7 @@ final class CompanySettingsController extends Controller
             'books_closed_until' => $company->books_closed_until?->format('Y-m-d'),
             'books_started' => $booksStarted,
             'has_logo' => DB::table('company_logos')->where('company_id', $company->getKey())->exists(),   // 100
+            'test_company' => $testCompany,   // 104: real books its owners may empty and fill with the sample
             'locked_fields' => $booksStarted ? self::FOUNDATION : [],
             'fiscal_years' => DB::table('fiscal_years')->where('company_id', $company->getKey())
                 ->orderBy('starts_on')->get(['starts_on', 'ends_on', 'status']),
@@ -283,6 +285,8 @@ final class CompanySettingsController extends Controller
                 'reopen_periods' => (bool) $membership?->can('periods.reopen'),
                 'enter_rates' => (bool) $membership?->can('accounting.rates'),
                 'manage_dimensions' => (bool) $membership?->can('accounting.dimensions'),
+                // Start fresh / Fill with sample data: an active owner of a test company (DemoBooksController).
+                'test_books' => $testCompany && $membership?->role === 'owner' && $membership->status === 'active',
             ],
             'options' => [
                 'tax_id_label' => $pack->taxIdLabel,

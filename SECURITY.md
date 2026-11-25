@@ -155,6 +155,18 @@ Every visitor shares the demo data and can change it. Turn demo sign-in off (`DE
 customers use the same database. When e-invoicing goes live (`EINVOICE_FORCE_SANDBOX=false`), keep the demo company on the
 sandbox connector first.
 
+### Test companies (104)
+Real books the team tries Ledgerly out on: real accounts with their own password and authenticator, tax reminders and a
+subscription, like any company. Unlike others, their owners may empty them and fill them with the sample books.
+| Control | State |
+|---|---|
+| Which companies are test companies is a table only the owner role writes (`ledgerly:test-company`, workflow `test-company`); the application reads only its own company's mark | Tested (T130) |
+| Start fresh and Fill exist only for an active owner of a test company (or the demo's owner); anyone else gets 404, and the database functions check again | Tested (`TestCompanyTest`, T130) |
+| Start fresh deletes nothing: the old company is archived (read-only) and every active member joins the new one with the same role; once a minute along the chain | Tested |
+| Taking a company out of the demo removes its demo accounts, switches off their membership and sign-ins, and retires their addresses, so demo sign-in can be turned on again later without touching it | Tested |
+| Accounts the operator makes get a 20-character generated password written only to a mode-600 file on the server, never to the run's log or by email; it is read once and the file deleted | Written |
+| Every change (owners added, demo removed, name, mark, start fresh, fill) is in the company's audit log | Tested |
+
 ### Requests
 | Control | State |
 |---|---|

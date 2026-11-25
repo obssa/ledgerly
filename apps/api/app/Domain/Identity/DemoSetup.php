@@ -37,6 +37,9 @@ final class DemoSetup
 
     private string $company = '';
 
+    /** Who the sample books are written as: the owner who pressed Fill (a test company), else the demo's owner. */
+    private ?string $actingUser = null;
+
     public function __construct(private readonly HttpKernel $kernel)
     {
     }
@@ -85,7 +88,7 @@ final class DemoSetup
     }
 
     /**
-     * "Fill with demo data" (FillDemoData): the whole sample into an empty demo company, as its owner, from inside a
+     * "Fill with sample data" (FillDemoData): the whole sample into an empty demo or test company, as the owner who asked, from inside a
      * tenant transaction on the application's own connection (no owner role at run time).
      */
     public function fill(string $company, string $ownerUserId): void
@@ -100,7 +103,17 @@ final class DemoSetup
         } finally {
             $user->tokens()->where('name', 'demo-setup')->delete();
         }
-        $this->addSamples(DB::connection(), $company, fn (string $m) => null);
+        $this->actingUser = $ownerUserId;
+        try {
+            $this->addSamples(DB::connection(), $company, fn (string $m) => null);
+        } finally {
+            $this->actingUser = null;
+        }
+    }
+
+    private function sampleUser(ConnectionInterface $owner): User
+    {
+        return User::query()->findOrFail($this->actingUser ?? $owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
     }
 
     private function newUser(ConnectionInterface $owner, string $role): string
@@ -168,7 +181,7 @@ final class DemoSetup
         if ($owner->table('contacts')->where(['company_id' => $company, 'is_vendor' => true])->exists()) {
             return;
         }
-        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $user = $this->sampleUser($owner);
         $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
         $this->company = $company;
 
@@ -223,7 +236,7 @@ final class DemoSetup
         if ($bills->count() < 2) {
             return; // the sample bills were changed by visitors: leave the demo as it is
         }
-        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $user = $this->sampleUser($owner);
         $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
         $this->company = $company;
 
@@ -253,7 +266,7 @@ final class DemoSetup
         if ($bill === null) {
             return; // the sample bill was paid or changed by visitors
         }
-        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $user = $this->sampleUser($owner);
         $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
         $this->company = $company;
 
@@ -278,7 +291,7 @@ final class DemoSetup
         if ($owner->table('items')->where(['company_id' => $company, 'type' => 'inventory'])->exists()) {
             return;
         }
-        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $user = $this->sampleUser($owner);
         $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
         $this->company = $company;
 
@@ -313,7 +326,7 @@ final class DemoSetup
         if ($owner->table('documents')->where(['company_id' => $company, 'type' => 'expense'])->exists()) {
             return;
         }
-        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $user = $this->sampleUser($owner);
         $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
         $this->company = $company;
 
@@ -349,7 +362,7 @@ final class DemoSetup
         if ($owner->table('bank_transactions')->where('company_id', $company)->exists()) {
             return;
         }
-        $user = User::query()->findOrFail($owner->table('demo_accounts')->where('role', 'owner')->value('user_id'));
+        $user = $this->sampleUser($owner);
         $this->token = $user->createToken('demo-setup', ['*'], now()->addMinutes(30))->plainTextToken;
         $this->company = $company;
 

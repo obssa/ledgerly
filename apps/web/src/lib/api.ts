@@ -62,7 +62,9 @@ export interface CompanySettings {
   late_interest?: { rate: string | null; account_id: string | null };
   /** How invoices look on paper and as PDF files. */
   invoice_template?: { accent: string | null; payment_details: string | null; footer: string | null };
-  can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean; manage_dimensions: boolean };
+  /** 104: real books its owners may empty and fill with the sample (can.test_books). */
+  test_company?: boolean;
+  can: { manage: boolean; close_periods: boolean; reopen_periods: boolean; enter_rates: boolean; manage_dimensions: boolean; test_books?: boolean };
   options: { tax_id_label: string; calendars: string[]; legal_forms: string[]; income_accounts?: { id: string; code: string; name: string }[] };
 }
 
