@@ -123,6 +123,9 @@ if ! grep -q '^WEB_SERVER_KEY=.' "$ROOT/shared/api.env" || ! grep -q '^LEDGERLY_
   unset WEB_KEY
   echo "created the web-server key (api.env and web.env)"
 fi
+# Behind Cloudflare the web app reads the visitor's address from Cloudflare's header; otherwise from the address
+# the web server added last to X-Forwarded-For (apps/web/src/lib/clientAddress.ts). Appended once, never changed.
+grep -q '^LEDGERLY_BEHIND_CLOUDFLARE=' "$ROOT/shared/web.env" || printf 'LEDGERLY_BEHIND_CLOUDFLARE=%s\n' "$BEHIND_CLOUDFLARE" >> "$ROOT/shared/web.env"
 # The web app's public address, for redirects (apps/web/src/proxy.ts).
 grep -q '^LEDGERLY_WEB_URL=' "$ROOT/shared/web.env" || printf 'LEDGERLY_WEB_URL=%s\n' "$WEB_URL" >> "$ROOT/shared/web.env"
 
