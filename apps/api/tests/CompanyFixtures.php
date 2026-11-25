@@ -291,6 +291,7 @@ trait CompanyFixtures
             'api/v1/reports/profit-and-loss' => ['from' => '2026-07-08', 'to' => '2027-07-07'],
             'api/v1/exchange-rates' => ['currency' => 'USD', 'from' => '2026-07-08', 'to' => '2027-07-07'],
             'api/v1/payments-received/{payment}/reverse', 'api/v1/payments-made/{paymentMade}/reverse', 'api/v1/refunds/{refund}/reverse' => [],
+            'api/v1/reports/transactions' => ['report' => 'transactions'],   // every posted entry: the widest of the transaction reports
             'api/v1/reports/bin-card' => ['item_id' => $ids['item'], 'warehouse_id' => $ids['warehouse'], 'from' => '2026-07-08', 'to' => '2027-07-07'],
             default => [],
         };
