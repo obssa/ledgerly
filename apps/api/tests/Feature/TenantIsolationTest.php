@@ -46,7 +46,7 @@ final class TenantIsolationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Every company route, twice over, as one user: more than the API's 120 a minute. Not what this test is about.
+        // Every company route, twice over, as one user: more than the API's limit of requests a minute. Not what this test is about.
         $this->withoutMiddleware([ThrottleRequests::class, ThrottleRequestsWithRedis::class]);
         config(['einvoicing.force_sandbox' => true, 'queue.default' => 'sync']);
 

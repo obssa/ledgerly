@@ -160,7 +160,7 @@ sandbox connector first.
 |---|---|
 | All input validated; no string-built SQL anywhere (`grep` clean on 14 Nov) | Reviewed by hand |
 | Idempotency keys belong to one user and one request body | Written |
-| Rate limit 120 requests a minute per user; 10 a minute on sign-in and registration | Written |
+| Rate limit 300 requests a minute per signed-in session (`ApiRateLimitTest`; 120 ran out in normal use: the overview alone makes 17); 10 a minute on sign-in and registration | Written |
 | API responses: no caching, no framing, no sniffing, HTTPS only; errors always JSON, plain 404s | Tested: `ApiResponsesTest` |
 | Web app: no framing, no sniffing, HTTPS only; no tokens in `localStorage` (none found) | Build passes |
 | Amounts are decimal strings end to end, never floating point | Tested (unit tests) |
