@@ -1372,6 +1372,12 @@ export interface AuditLog {
   people: { id: string; name: string }[];
 }
 
+/** Module 10: a transaction report (Invoice list, Open invoices, Transaction list by date …): every row has every field. */
+export interface TransactionReportData {
+  report: string; from: string; to: string; currency: string; truncated: boolean;
+  rows: import("./transactionColumns").TxRow[];
+}
+
 /** Module 10: a report saved by the person signed in, with the dates its period covers today. */
 export interface SavedReport {
   id: string;
@@ -1856,6 +1862,8 @@ export const ledgerly = {
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/bounce`, { ...ctx, method: "POST", body }),
   reversePayment: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
+  transactionReport: (q: { report: string; from?: string; to?: string; contact_id?: string; status?: string; created_by?: string }, ctx: RequestOptions) =>
+    api<TransactionReportData>("reports/transactions", { ...ctx, query: q }),
   arAgeing: (asOf: string | undefined, ctx: RequestOptions) => api<ArAgeing>("reports/ar-ageing", { ...ctx, query: { as_of: asOf } }),
   customerStatement: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) =>
     api<CustomerStatement>(`customers/${encodeURIComponent(id)}/statement`, { ...ctx, query: q }),

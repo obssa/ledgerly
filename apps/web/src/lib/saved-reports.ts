@@ -18,6 +18,13 @@ export const SAVEABLE: Record<string, { label: string; path: string; atADate?: b
   "inventory-valuation": { label: "Inventory valuation", path: "/reports/inventory-valuation", atADate: true },
   "stock-movement": { label: "Stock movement", path: "/reports/stock-movement" },
   "stock-ageing": { label: "Stock ageing", path: "/reports/stock-ageing", atADate: true },
+  "transaction-list": { label: "Transaction list by date", path: "/reports/transaction-list" },
+  "invoice-list": { label: "Invoice list", path: "/reports/invoice-list" },
+  "open-invoices": { label: "Open invoices", path: "/reports/open-invoices" },
+  "bill-list": { label: "Bill list", path: "/reports/bill-list" },
+  "unpaid-bills": { label: "Unpaid bills", path: "/reports/unpaid-bills" },
+  "payments-received": { label: "Payments received", path: "/reports/payments-received" },
+  "payments-made": { label: "Payments made", path: "/reports/payments-made" },
 };
 
 /** Every period the report pages offer (lib/periods.ts), worked out again each time the report is opened or sent. */
@@ -26,7 +33,8 @@ export const PERIODS: [string, string][] = RANGE_PRESETS.map((p) => [p.key, p.ke
 export const SCHEDULES: [string, string][] = [["none", "Not sent"], ["weekly", "Every Monday"], ["monthly", "On the 1st of each month"]];
 
 /** The report options a saved report keeps (each report takes some of them; the API checks which). */
-export const OPTION_KEYS = ["group", "kind", "account_id", "warehouse_id", "rows", "columns", "measure", "account_type", "project_id", "location_id", "class_id"] as const;
+export const OPTION_KEYS = ["group", "kind", "account_id", "warehouse_id", "rows", "columns", "measure", "account_type", "project_id", "location_id", "class_id",
+  "cols", "sort", "dir", "status"] as const;
 
 /** The report page for a saved report, for the dates its period covers today, with its options. */
 export function savedReportUrl(r: { report: string; period?: string; covers: { from?: string | null; to?: string | null; as_of?: string | null }; options: Record<string, string> }): string {

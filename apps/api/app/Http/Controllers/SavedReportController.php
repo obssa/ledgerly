@@ -85,7 +85,7 @@ final class SavedReportController extends Controller
             'to' => ['required_if:period,custom', 'nullable', 'date_format:Y-m-d'],
             'schedule' => ['nullable', Rule::in(SavedReports::SCHEDULES)],
             'options' => ['nullable', 'array'],
-            'options.*' => ['nullable', 'string', 'max:60'],
+            'options.*' => ['nullable', 'string', 'max:400'],   // a column list is the longest
         ]);
         $custom = $data['period'] === 'custom';
         $atADate = in_array($data['report'], SavedReports::AT_A_DATE, true);
@@ -121,6 +121,8 @@ final class SavedReportController extends Controller
                 continue;
             }
             $ok = match (true) {
+                $allowed === 'columns' => is_string($value) && $value !== ''
+                    && array_diff(explode(',', $value), \App\Domain\Reports\TransactionReport::COLUMNS) === [],
                 $allowed !== 'uuid' => in_array($value, $allowed, true),
                 $key === 'account_id' => \Illuminate\Support\Str::isUuid($value) && Account::query()->whereKey($value)->exists(),
                 default => \Illuminate\Support\Str::isUuid($value) && Warehouse::query()->whereKey($value)->exists(),

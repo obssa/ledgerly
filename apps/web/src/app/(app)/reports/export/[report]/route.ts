@@ -35,7 +35,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
     const asOf = isDate(q.get("as_of")) ? (q.get("as_of") as string) : (period.picked.to ?? period.ctx.today);
     const options = { kind: word("kind"), group: word("group"), account_id: id, action: word("action"), user_id: uuid("user_id"), warehouse_id: uuid("warehouse_id"),
       rows: word("rows"), columns: word("columns"), measure: word("measure"), account_type: word("account_type"),
-      project_id: uuid("project_id"), location_id: uuid("location_id"), class_id: uuid("class_id") };
+      project_id: uuid("project_id"), location_id: uuid("location_id"), class_id: uuid("class_id"),
+      // A transaction report's Customize choices (each checked against its own list in lib/transactionColumns.ts).
+      cols: /^[a-z_,]{1,400}$/.test(q.get("cols") ?? "") ? (q.get("cols") as string) : undefined, sort: word("sort"), dir: word("dir"), status: word("status") };
     const [{ rows }, settings] = await Promise.all([
       exportRows(report as ExportableReport, { from: period.from, to: period.to, as_of: asOf, ...options }, ctx),
       ledgerly.companySettings(ctx).catch(() => null),

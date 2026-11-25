@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\DB;
 final class SavedReports
 {
     public const REPORTS = ['profit-and-loss', 'balance-sheet', 'trial-balance', 'general-ledger', 'cash-flow', 'changes-in-equity',
-        'financial-health', 'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-movement', 'stock-ageing', 'custom'];
+        'financial-health', 'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-movement', 'stock-ageing', 'custom',
+        'transaction-list', 'invoice-list', 'open-invoices', 'bill-list', 'unpaid-bills', 'payments-received', 'payments-made'];
 
     /** Reports of one date (the period's last day): the rest cover the period. */
     public const AT_A_DATE = ['balance-sheet', 'trial-balance', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-ageing'];
@@ -35,7 +36,15 @@ final class SavedReports
         'stock-ageing' => ['warehouse_id' => 'uuid'],
         'custom' => ['rows' => CustomReport::ROWS, 'columns' => CustomReport::COLUMNS, 'measure' => CustomReport::MEASURES,
             'account_type' => CustomReport::ACCOUNT_TYPES, 'project_id' => 'uuid', 'location_id' => 'uuid', 'class_id' => 'uuid'],
+        // The transaction reports keep their Customize choices: columns (in order), sort, direction, grouping, status.
+        'transaction-list' => self::TX_OPTIONS, 'open-invoices' => self::TX_OPTIONS, 'unpaid-bills' => self::TX_OPTIONS,
+        'payments-received' => self::TX_OPTIONS, 'payments-made' => self::TX_OPTIONS,
+        'invoice-list' => self::TX_OPTIONS + ['status' => ['open', 'overdue', 'paid', 'draft', 'void']],
+        'bill-list' => self::TX_OPTIONS + ['status' => ['open', 'overdue', 'paid', 'draft', 'void']],
     ];
+
+    private const TX_OPTIONS = ['cols' => 'columns', 'sort' => TransactionReport::COLUMNS, 'dir' => ['asc', 'desc'],
+        'group' => ['none', 'name', 'type', 'month', 'status']];
 
     /**
      * The dates a saved report covers on a day: a custom range as saved; a rolling one from that day, in the company's

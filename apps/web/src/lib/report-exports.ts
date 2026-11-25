@@ -1,4 +1,5 @@
 import "server-only";
+import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, totals, typeLabel, type TxColumn, type TxRow } from "./transactionColumns";
 import { ledgerly } from "./api";
 import type { Cell } from "./csv";
 
@@ -9,11 +10,13 @@ import type { Cell } from "./csv";
 
 type Ctx = { token: string; companyId: string };
 type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
-  rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string };
+  rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
+  cols?: string; sort?: string; dir?: string; status?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
-  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing", "custom"] as const;
+  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing", "custom",
+  "transaction-list", "invoice-list", "open-invoices", "bill-list", "unpaid-bills", "payments-received", "payments-made"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 const ageing = (title: string, r: Awaited<ReturnType<typeof ledgerly.arAgeing>>): Export => ({
@@ -78,6 +81,18 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: `profit-by-${r.kind}`, rows: [["Code", r.kind, "Income", "Cost of sales", "Expenses", "Profit", "Margin %"],
         ...r.rows.map((x) => [x.code, x.name, x.income, x.cost_of_sales, x.expenses, x.profit, x.margin]),
         [null, "Total", r.totals.income, r.totals.cost_of_sales, r.totals.expenses, r.totals.profit, null]] };
+    }
+    case "transaction-list": case "invoice-list": case "open-invoices": case "bill-list": case "unpaid-bills": case "payments-received": case "payments-made": {
+      // The columns, order and sort chosen on screen (Customize), and a total of the amount columns.
+      const def = TX_REPORTS[report];
+      const data = await ledgerly.transactionReport({ report: def.api, from: p.from, to: p.to, ...(p.status ? { status: p.status } : {}) }, ctx);
+      const cols = pickColumns({ cols: p.cols }, def.columns);
+      const order = pickSort({ sort: p.sort, dir: p.dir }, cols);
+      const list = sortRows(data.rows, order.sort, order.dir);
+      const sum = totals(list, cols);
+      const value = (r: TxRow, c: TxColumn): Cell => (c === "type" ? typeLabel(r.type) : c === "status" ? statusLabel(r.status) : r[c] ?? null);
+      return { title: report, rows: [cols.map((c) => column(c).label), ...list.map((r) => cols.map((c) => value(r, c))),
+        ...(list.length > 0 ? [cols.map((c, i) => (i === 0 ? "Total" : sum[c] ?? null))] : [])] };
     }
     case "custom": {
       const r = await ledgerly.customReport({ from: p.from, to: p.to, rows: p.rows, columns: p.columns, measure: p.measure, account_type: p.account_type,
@@ -147,6 +162,8 @@ export function reportTitle(report: ExportableReport, o: { group?: string; kind?
     case "stock-movement": return "Stock movement";
     case "stock-ageing": return "Stock ageing";
     case "custom": return "Custom report";
+    case "transaction-list": case "invoice-list": case "open-invoices": case "bill-list": case "unpaid-bills": case "payments-received": case "payments-made":
+      return TX_REPORTS[report].title;
   }
 }
 

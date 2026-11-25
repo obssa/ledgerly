@@ -8,6 +8,8 @@ const CYCLE: { stage: string; reports: [string, string][] }[] = [
     ["Changes in equity", "/reports/changes-in-equity"], ["Statements and notes (to print)", "/reports/notes-pack"], ["Cash forecast (13 weeks)", "/reports/cash-forecast"]] },
   { stage: "Ledger and trial balance", reports: [["Trial balance", "/reports/trial-balance"], ["General ledger", "/reports/general-ledger"], ["Journal report", "/journal"],
     ["Audit adjustments", "/close"]] },
+  { stage: "Transactions", reports: [["Transaction list by date", "/reports/transaction-list"], ["Invoice list", "/reports/invoice-list"], ["Open invoices", "/reports/open-invoices"],
+    ["Payments received", "/reports/payments-received"], ["Bill list", "/reports/bill-list"], ["Unpaid bills", "/reports/unpaid-bills"], ["Payments made", "/reports/payments-made"]] },
   { stage: "Customers and suppliers", reports: [["Sales analysis", "/reports/sales"], ["AR ageing summary", "/reports/ar-ageing"], ["AR ageing detail", "/reports/ar-ageing?view=detail"], ["Customer statements", "/customers"],
     ["Purchases analysis", "/reports/purchases"], ["AP ageing summary", "/reports/ap-ageing"], ["AP ageing detail", "/reports/ap-ageing?view=detail"], ["Supplier statements", "/suppliers"]] },
   { stage: "Inventory and assets", reports: [["Inventory valuation", "/reports/inventory-valuation"], ["Stock movement", "/reports/stock-movement"],

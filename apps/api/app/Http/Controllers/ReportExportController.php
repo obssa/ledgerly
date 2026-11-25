@@ -17,7 +17,8 @@ use Illuminate\Validation\Rule;
 final class ReportExportController extends Controller
 {
     public const REPORTS = ['profit-and-loss', 'balance-sheet', 'trial-balance', 'general-ledger', 'cash-flow', 'changes-in-equity',
-        'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'audit-log', 'stock-movement', 'stock-ageing', 'custom'];
+        'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'audit-log', 'stock-movement', 'stock-ageing', 'custom',
+        'transaction-list', 'invoice-list', 'open-invoices', 'bill-list', 'unpaid-bills', 'payments-received', 'payments-made'];
 
     public function __construct(private readonly CurrentCompany $current, private readonly AuditLogger $audit)
     {

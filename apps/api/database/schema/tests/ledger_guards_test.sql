@@ -2419,6 +2419,13 @@ DO $$ BEGIN
     INSERT INTO saved_reports (company_id, user_id, name, report, period) VALUES
       (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'Since a month ago', 'sales', 'since_30_days_ago'),
       (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'Last fiscal year', 'profit-and-loss', 'last_fiscal_year');
+    INSERT INTO saved_reports (company_id, user_id, name, report, period, options) VALUES
+      (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'Open invoices by customer', 'open-invoices', 'all', '{"cols": "date,number,name,open_balance", "group": "name"}');
+    BEGIN
+      INSERT INTO saved_reports (company_id, user_id, name, report, period) VALUES
+        (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'Not a report', 'secret-list', 'all');
+      RAISE EXCEPTION 'FAIL T131c: a report that does not exist was saved';
+    EXCEPTION WHEN check_violation THEN NULL; END;
     BEGIN
       INSERT INTO saved_reports (company_id, user_id, name, report, period) VALUES
         (app_company_id(), '00000000-0000-0000-0000-0000000000f1', 'Bogus', 'sales', 'since_the_dawn_of_time');
@@ -2433,7 +2440,7 @@ DO $$ BEGIN
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM <> 'T131 done' THEN RAISE; END IF;
   END;
-  RAISE NOTICE 'PASS T131 saved reports roll with every report period, and nothing else';
+  RAISE NOTICE 'PASS T131 saved reports roll with every report period, the transaction reports among them, and nothing else';
 END $$;
 
 -- T72: saved and scheduled reports (045). Saved by the person signed in, an active member; seen only by them; a custom
