@@ -54,10 +54,18 @@ final class SavedReportTest extends TestCase
     public function test_rolling_periods_and_schedules_fall_on_the_right_days(): void
     {
         $saved = app(SavedReports::class);
-        $on = fn (string $period) => array_values($saved->period($this->c['company'], $period, null, null, '2026-11-17'));
-        $this->assertSame(['2026-11-01', '2026-11-17'], $on('this_month'));
+        // Inside the company, as every caller is: its calendar and fiscal year are read under its own row security.
+        $on = fn (string $period) => \App\Domain\Tenancy\Support\DatabaseTenantContext::run(null, $this->c['company'],
+            fn () => array_values($saved->period($this->c['company'], $period, null, null, '2026-11-17')));
+        // As the report pages: This month is the whole month, This month to date runs to today (ReportPeriods).
+        $this->assertSame(['2026-11-01', '2026-11-30'], $on('this_month'));
+        $this->assertSame(['2026-11-01', '2026-11-17'], $on('this_month_to_date'));
         $this->assertSame(['2026-10-01', '2026-10-31'], $on('last_month'));
-        $this->assertSame(['2026-10-01', '2026-11-17'], $on('this_quarter'));
+        $this->assertSame(['2026-10-01', '2026-12-31'], $on('this_quarter'));
+        $this->assertSame(['2026-10-01', '2026-11-17'], $on('this_quarter_to_date'));
+        $this->assertSame(['2025-07-01', '2026-06-30'], $on('last_fiscal_year'));
+        $this->assertSame(['2026-10-18', null], $on('since_30_days_ago'));
+        $this->assertSame([null, null], $on('all'));
         $this->assertSame(['2026-07-01', '2026-09-30'], $on('last_quarter'));
         // The fiscal year to date starts on the company's own fiscal year (read in its context, through the API).
         Carbon::setTestNow(Carbon::parse('2026-11-17 09:00:00', 'UTC'));
@@ -80,7 +88,7 @@ final class SavedReportTest extends TestCase
             ->assertJsonPath('covers', ['as_of' => '2027-07-07'])->assertJsonPath('schedule', 'none')->assertJsonPath('next_send_on', null);
         $sales = $this->postJson('/api/v1/saved-reports', ['name' => 'Sales by salesperson', 'report' => 'sales', 'period' => 'this_month', 'schedule' => 'weekly',
             'options' => ['group' => 'salesperson', 'kind' => 'project']], $this->h)->assertCreated()
-            ->assertJsonPath('options', ['group' => 'salesperson'])->assertJsonPath('covers', ['from' => '2026-11-01', 'to' => '2026-11-17'])
+            ->assertJsonPath('options', ['group' => 'salesperson'])->assertJsonPath('covers', ['from' => '2026-11-01', 'to' => '2026-11-30'])
             ->assertJsonPath('next_send_on', '2026-11-23');
         $this->assertSame(['Monthly P&L', 'Sales by salesperson', 'Year-end balance sheet'], collect($this->getJson('/api/v1/saved-reports', $this->h)->assertOk()->json('data'))->pluck('name')->all());
 

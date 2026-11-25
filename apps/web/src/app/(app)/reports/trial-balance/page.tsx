@@ -1,7 +1,8 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
-import { resolveRange } from "@/lib/periods";
+import { asOfLabel, resolveRange } from "@/lib/periods";
 import { getTrialBalance, getReportAsOf } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ExportLink } from "../ReportsNav";
@@ -27,6 +28,7 @@ export default async function TrialBalancePage({ searchParams }: PageProps<"/rep
       <AsOfFilter picked={at.picked} keep={q} />
       {!rows ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <Card className="!p-2" label="Trial balance">
+          <div className="px-3 pt-3"><ReportHeader title="Trial balance" period={asOfLabel(asOf, at.ctx.calendar)} /></div>
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead><tr><th scope="col">Code</th><th scope="col">Account</th><th scope="col" className="!text-right">Debit</th><th scope="col" className="!text-right">Credit</th></tr></thead>
@@ -44,6 +46,7 @@ export default async function TrialBalancePage({ searchParams }: PageProps<"/rep
               <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={2}>Total</td><td className="num text-right">{formatAmount(totals.debit)}</td><td className="num text-right">{formatAmount(totals.credit)}</td></tr></tfoot>
             </table>
           </div>
+          <ReportFooter />
         </Card>
       )}
     </>

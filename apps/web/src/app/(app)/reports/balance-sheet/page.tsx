@@ -1,3 +1,4 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
 import { asOfLabel } from "@/lib/periods";
@@ -53,7 +54,7 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
         {!bs ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Balance sheet">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[13px] text-muted">{asOfLabel(asOf, at.ctx.calendar)} · {cur}</div>
+              <ReportHeader title="Balance sheet" period={asOfLabel(asOf, at.ctx.calendar)} filters={[lastYear ? `Compared with ${before}` : null]} />
               {bs.equation.balanced ? <Pill tone="good">Assets = Liabilities + Equity</Pill> : <Pill tone="bad">Out by {formatAmount(bs.equation.difference, cur)}</Pill>}
             </div>
             <div className="overflow-x-auto">
@@ -72,6 +73,7 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
                 </tbody>
               </table>
             </div>
+            <ReportFooter currency={cur} />
           </Card>
         )}
       </div>

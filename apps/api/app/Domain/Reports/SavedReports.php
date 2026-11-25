@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Reports;
 
+use App\Support\ReportPeriods;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -14,12 +15,14 @@ use Illuminate\Support\Facades\DB;
 final class SavedReports
 {
     public const REPORTS = ['profit-and-loss', 'balance-sheet', 'trial-balance', 'general-ledger', 'cash-flow', 'changes-in-equity',
-        'financial-health', 'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-movement', 'stock-ageing', 'custom'];
+        'financial-health', 'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-movement', 'stock-ageing', 'custom',
+        'transaction-list', 'invoice-list', 'open-invoices', 'bill-list', 'unpaid-bills', 'payments-received', 'payments-made'];
 
     /** Reports of one date (the period's last day): the rest cover the period. */
     public const AT_A_DATE = ['balance-sheet', 'trial-balance', 'ar-ageing', 'ap-ageing', 'inventory-valuation', 'stock-ageing'];
 
-    public const PERIODS = ['custom', 'this_month', 'last_month', 'this_quarter', 'last_quarter', 'year_to_date'];
+    /** A custom range, or any report period the pages offer (ReportPeriods, schema 105); year_to_date is kept for older saves. */
+    public const PERIODS = ['custom', 'year_to_date', ...ReportPeriods::PRESETS];
 
     public const SCHEDULES = ['none', 'weekly', 'monthly'];
 
@@ -33,28 +36,49 @@ final class SavedReports
         'stock-ageing' => ['warehouse_id' => 'uuid'],
         'custom' => ['rows' => CustomReport::ROWS, 'columns' => CustomReport::COLUMNS, 'measure' => CustomReport::MEASURES,
             'account_type' => CustomReport::ACCOUNT_TYPES, 'project_id' => 'uuid', 'location_id' => 'uuid', 'class_id' => 'uuid'],
+        // The transaction reports keep their Customize choices: columns (in order), sort, direction, grouping, status.
+        'transaction-list' => self::TX_OPTIONS, 'open-invoices' => self::TX_OPTIONS, 'unpaid-bills' => self::TX_OPTIONS,
+        'payments-received' => self::TX_OPTIONS, 'payments-made' => self::TX_OPTIONS,
+        'invoice-list' => self::TX_OPTIONS + ['status' => ['open', 'overdue', 'paid', 'draft', 'void']],
+        'bill-list' => self::TX_OPTIONS + ['status' => ['open', 'overdue', 'paid', 'draft', 'void']],
     ];
 
+    private const TX_OPTIONS = ['cols' => 'columns', 'sort' => TransactionReport::COLUMNS, 'dir' => ['asc', 'desc'],
+        'group' => ['none', 'name', 'type', 'month', 'status']];
+
     /**
-     * The dates a saved report covers on a day: a custom range as saved; a rolling one from that day.
+     * The dates a saved report covers on a day: a custom range as saved; a rolling one from that day, in the company's
+     * calendar and fiscal year (ReportPeriods, the same rules as the report pages). An open end is null ("All dates",
+     * "Since 30 days ago").
      *
-     * @return array{from: string, to: string}
+     * @return array{from: ?string, to: ?string}
      */
     public function period(string $companyId, string $period, ?string $from, ?string $to, string $today): array
     {
-        $day = new DateTimeImmutable($today);
-        [$f, $t] = match ($period) {
-            'custom' => [$from ?? $to, $to],
-            'this_month' => [$day->modify('first day of this month')->format('Y-m-d'), $today],
-            'last_month' => [$day->modify('first day of last month')->format('Y-m-d'), $day->modify('last day of last month')->format('Y-m-d')],
-            'this_quarter' => [$this->quarterStart($day)->format('Y-m-d'), $today],
-            'last_quarter' => [$this->quarterStart($day)->modify('-3 months')->format('Y-m-d'), $this->quarterStart($day)->modify('-1 day')->format('Y-m-d')],
-            'year_to_date' => [(string) (DB::table('fiscal_years')->where('company_id', $companyId)->where('starts_on', '<=', $today)->where('ends_on', '>=', $today)->value('starts_on')
-                ?? $day->format('Y') . '-01-01'), $today],
-            default => throw new \InvalidArgumentException('Unknown period'),
-        };
+        if ($period === 'custom') {
+            return ['from' => $from ?? $to, 'to' => $to];
+        }
+        $company = DB::table('companies')->where('id', $companyId)->first(['calendar', 'fiscal_year_start_month']);
+        $years = DB::table('fiscal_years')->where('company_id', $companyId)->orderBy('starts_on')->get(['starts_on', 'ends_on'])
+            ->map(fn ($y) => ['starts_on' => (string) $y->starts_on, 'ends_on' => (string) $y->ends_on])->all();
+        $periods = new ReportPeriods($today, (string) ($company->calendar ?? 'gregorian'), (int) ($company->fiscal_year_start_month ?? 1), $years);
 
-        return ['from' => (string) $f, 'to' => (string) $t];
+        return $periods->resolve($period === 'year_to_date' ? 'this_fiscal_year_to_date' : $period);
+    }
+
+    /**
+     * The date a report "as of" shows for a period: its last day. A rolling period never looks past today (a balance
+     * sheet for "This month" is today's, not the month end's yet to come); a custom date is shown as chosen.
+     *
+     * @param  array{from: ?string, to: ?string}  $dates
+     */
+    public static function asOf(string $period, array $dates, string $today): string
+    {
+        if ($dates['to'] === null) {
+            return $today;
+        }
+
+        return $period !== 'custom' && $dates['to'] > $today ? $today : $dates['to'];
     }
 
     /** The next day a schedule sends after a day: the Monday after for weekly, the first of the next month for monthly. */
@@ -73,15 +97,9 @@ final class SavedReports
     public static function periodLabel(string $period): string
     {
         return match ($period) {
-            'this_month' => 'This month', 'last_month' => 'Last month', 'this_quarter' => 'This quarter', 'last_quarter' => 'Last quarter',
-            'year_to_date' => 'Fiscal year to date', default => 'Custom dates',
+            'custom' => 'Custom dates',
+            'year_to_date' => 'Fiscal year to date',
+            default => ReportPeriods::LABELS[$period] ?? 'Custom dates',
         };
-    }
-
-    private function quarterStart(DateTimeImmutable $day): DateTimeImmutable
-    {
-        $month = intdiv((int) $day->format('n') - 1, 3) * 3 + 1;
-
-        return new DateTimeImmutable(sprintf('%s-%02d-01', $day->format('Y'), $month));
     }
 }

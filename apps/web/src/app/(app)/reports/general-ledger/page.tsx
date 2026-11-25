@@ -1,5 +1,8 @@
+import { rangeLabel } from "@/lib/periods";
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "next/link";
+import { exportPeriod } from "@/lib/periodParams";
 import { Card, PageTitle } from "@/components/ui";
 import { getChart, getDimensions, getGeneralLedger, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
@@ -29,7 +32,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
   return (
     <>
       <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>} title="General ledger"
-        actions={<ExportLink report="general-ledger" params={{ from: filters.from, to: filters.to, account_id: filters.account_id }} />} />
+        actions={<ExportLink report="general-ledger" params={{ ...exportPeriod(period.picked), account_id: filters.account_id, location_id: filters.location_id, class_id: filters.class_id, project_id: filters.project_id }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["account_id", "location_id", "class_id", "project_id"]}>
         <div className="min-w-[220px]">
           <label className="field-label" htmlFor="account_id">Account</label>
@@ -51,6 +54,8 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
       {!gl && <p className="text-[14px] text-muted">{chart.demo ? "Not available in the demo." : "Check the dates: the period ends on or after it starts."}</p>}
       {gl?.truncated && <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">Only the first lines of a long period are shown: choose a shorter period or one account.</p>}
       {gl && gl.accounts.length === 0 && <p className="text-[14px] text-muted">Nothing posted in this period.</p>}
+      {gl && gl.accounts.length > 0 && <ReportHeader title="General ledger" period={rangeLabel(period.picked, period.ctx.calendar)}
+        filters={[filters.account_id ? chart.data.find((c) => c.id === filters.account_id)?.name : "Every account"]} />}
       {gl?.accounts.map((a) => (
         <Card key={a.account_id} className="mb-4 !p-2" label={`${a.code} ${a.name}`}>
           <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-2">
@@ -89,6 +94,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
           </div>
         </Card>
       ))}
+      {gl && gl.accounts.length > 0 && <ReportFooter />}
     </>
   );
 }

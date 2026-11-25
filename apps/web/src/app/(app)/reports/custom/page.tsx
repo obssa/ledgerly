@@ -1,3 +1,5 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
+import { exportPeriod } from "@/lib/periodParams";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { rangeLabel } from "@/lib/periods";
 import { Card, PageTitle } from "@/components/ui";
@@ -30,7 +32,7 @@ export default async function CustomReportPage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Custom report" actions={<ExportLink report="custom" params={{ ...o, from: period.from, to: period.to }} />} />
+      <PageTitle eyebrow="Reports / Management" title="Custom report" actions={<ExportLink report="custom" params={{ ...o, ...exportPeriod(period.picked) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["account_type", "class_id", "columns", "location_id", "measure", "project_id", "rows"]}>
         {select("rows", "Rows", CUSTOM_ROWS, o.rows)}
         {select("columns", "Columns", CUSTOM_COLUMNS, o.columns)}
@@ -44,7 +46,7 @@ export default async function CustomReportPage({ searchParams }: PageProps<"/rep
         <ReportsNav current="/reports/custom" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Custom report">
-            <div className="px-3 pt-2 text-[13px] text-muted">{rangeLabel(period.picked, period.ctx.calendar)} · {r.currency} · {CUSTOM_MEASURES.find(([v]) => v === o.measure)?.[1]}</div>
+            <div className="px-3 pt-3"><ReportHeader title="Custom report" period={rangeLabel(period.picked, period.ctx.calendar)} filters={[CUSTOM_MEASURES.find(([v]) => v === o.measure)?.[1]]} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">{rowLabel}</th>
@@ -66,6 +68,7 @@ export default async function CustomReportPage({ searchParams }: PageProps<"/rep
               </table>
             </div>
             <p className="px-3 pb-2 text-[13px] text-muted">From the ledger lines of the period, year-end closing left out. &quot;By its own side&quot; shows assets and expenses as debits less credits, and liabilities, equity and income as credits less debits.</p>
+            <ReportFooter currency={r.currency} />
           </Card>
         )}
       </div>

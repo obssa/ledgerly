@@ -1,4 +1,5 @@
 import "server-only";
+import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, totals, typeLabel, type TxColumn, type TxRow } from "./transactionColumns";
 import { ledgerly } from "./api";
 import type { Cell } from "./csv";
 
@@ -9,11 +10,13 @@ import type { Cell } from "./csv";
 
 type Ctx = { token: string; companyId: string };
 type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
-  rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string };
+  rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
+  cols?: string; sort?: string; dir?: string; status?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
-  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing", "custom"] as const;
+  "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing", "custom",
+  "transaction-list", "invoice-list", "open-invoices", "bill-list", "unpaid-bills", "payments-received", "payments-made"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 const ageing = (title: string, r: Awaited<ReturnType<typeof ledgerly.arAgeing>>): Export => ({
@@ -49,7 +52,8 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: "trial-balance", rows: [["Code", "Account", "Type", "Debit", "Credit"], ...tb.data.map((r) => [r.code, r.name, r.type, r.debit, r.credit])] };
     }
     case "general-ledger": {
-      const gl = await ledgerly.generalLedger({ from: p.from, to: p.to, account_id: p.account_id }, ctx);
+      // The same lines as on screen: the location, class and project filters too.
+      const gl = await ledgerly.generalLedger({ from: p.from, to: p.to, account_id: p.account_id, location_id: p.location_id, class_id: p.class_id, project_id: p.project_id }, ctx);
       const rows: Cell[][] = [["Account code", "Account", "Date", "Entry", "Description", "Contact", "Debit", "Credit", "Balance"]];
       for (const a of gl.accounts) {
         rows.push([a.code, a.name, gl.from, null, "Brought forward", null, null, null, a.opening]);
@@ -77,6 +81,18 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: `profit-by-${r.kind}`, rows: [["Code", r.kind, "Income", "Cost of sales", "Expenses", "Profit", "Margin %"],
         ...r.rows.map((x) => [x.code, x.name, x.income, x.cost_of_sales, x.expenses, x.profit, x.margin]),
         [null, "Total", r.totals.income, r.totals.cost_of_sales, r.totals.expenses, r.totals.profit, null]] };
+    }
+    case "transaction-list": case "invoice-list": case "open-invoices": case "bill-list": case "unpaid-bills": case "payments-received": case "payments-made": {
+      // The columns, order and sort chosen on screen (Customize), and a total of the amount columns.
+      const def = TX_REPORTS[report];
+      const data = await ledgerly.transactionReport({ report: def.api, from: p.from, to: p.to, ...(p.status ? { status: p.status } : {}) }, ctx);
+      const cols = pickColumns({ cols: p.cols }, def.columns);
+      const order = pickSort({ sort: p.sort, dir: p.dir }, cols);
+      const list = sortRows(data.rows, order.sort, order.dir);
+      const sum = totals(list, cols);
+      const value = (r: TxRow, c: TxColumn): Cell => (c === "type" ? typeLabel(r.type) : c === "status" ? statusLabel(r.status) : r[c] ?? null);
+      return { title: report, rows: [cols.map((c) => column(c).label), ...list.map((r) => cols.map((c) => value(r, c))),
+        ...(list.length > 0 ? [cols.map((c, i) => (i === 0 ? "Total" : sum[c] ?? null))] : [])] };
     }
     case "custom": {
       const r = await ledgerly.customReport({ from: p.from, to: p.to, rows: p.rows, columns: p.columns, measure: p.measure, account_type: p.account_type,
@@ -125,3 +141,31 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return ageing("ap-ageing", await ledgerly.apAgeing(p.as_of, ctx));
   }
 }
+
+const GROUP_WORDS: Record<string, string> = { contact: "", item: "item", month: "month", salesperson: "salesperson", location: "location", class: "class", project: "project" };
+
+/** What a report is called in its header and file name ("Sales by customer", "Profit by location"). */
+export function reportTitle(report: ExportableReport, o: { group?: string; kind?: string } = {}): string {
+  switch (report) {
+    case "profit-and-loss": return "Profit and loss";
+    case "balance-sheet": return "Balance sheet";
+    case "trial-balance": return "Trial balance";
+    case "general-ledger": return "General ledger";
+    case "cash-flow": return "Cash flow statement";
+    case "changes-in-equity": return "Statement of changes in equity";
+    case "profit-by-dimension": return `Profit by ${GROUP_WORDS[o.kind ?? "location"] || "location"}`;
+    case "sales": return `Sales by ${o.group && o.group !== "contact" ? GROUP_WORDS[o.group] ?? o.group : "customer"}`;
+    case "purchases": return `Purchases by ${o.group && o.group !== "contact" ? GROUP_WORDS[o.group] ?? o.group : "supplier"}`;
+    case "ar-ageing": return "Accounts receivable ageing summary";
+    case "ap-ageing": return "Accounts payable ageing summary";
+    case "audit-log": return "Audit log";
+    case "stock-movement": return "Stock movement";
+    case "stock-ageing": return "Stock ageing";
+    case "custom": return "Custom report";
+    case "transaction-list": case "invoice-list": case "open-invoices": case "bill-list": case "unpaid-bills": case "payments-received": case "payments-made":
+      return TX_REPORTS[report].title;
+  }
+}
+
+/** Reports kept on the books' basis (accrual unless the company or the report says cash): their footer says which. */
+export const ON_A_BASIS: readonly ExportableReport[] = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "changes-in-equity", "profit-by-dimension", "custom"];

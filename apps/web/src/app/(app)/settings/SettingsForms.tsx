@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useId, type ReactNode } from "react";
+import { FiscalStartFields } from "@/components/FiscalStartFields";
 import type { CompanySettings, Currencies, Dimension, Numbering } from "@/lib/api";
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
@@ -11,7 +12,6 @@ import { todayIn } from "@/lib/dates";
 
 type Settings = CompanySettings & { demo: boolean };
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 const LEGAL_FORMS: Record<string, string> = {
   sole_proprietor: "Sole proprietor",
@@ -88,12 +88,8 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
         <Select name="base_currency" label="Currency of the books" defaultValue={settings.base_currency} disabled={locked("base_currency")}>
           {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </Select>
-        <Select name="calendar" label="Calendar" defaultValue={settings.calendar} disabled={locked("calendar")}>
-          {settings.options.calendars.map((c) => <option key={c} value={c}>{c === "ethiopian" ? "Ethiopian" : "Gregorian"}</option>)}
-        </Select>
-        <Select name="fiscal_year_start_month" label="Fiscal year starts in" defaultValue={String(settings.fiscal_year_start_month)} disabled={locked("fiscal_year_start_month")}>
-          {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-        </Select>
+        <FiscalStartFields calendars={settings.options.calendars} defaultCalendar={settings.calendar} defaultMonth={settings.fiscal_year_start_month}
+          calendarDisabled={locked("calendar")} monthDisabled={locked("fiscal_year_start_month")} />
         {field("conversion_date", "Conversion date", { type: "date", hint: "Last bank statement date before Evenbooks" })}
       </fieldset>
 

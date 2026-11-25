@@ -16,7 +16,7 @@ export default async function SavedReportsPage({ searchParams }: PageProps<"/rep
   const one = (k: string) => (typeof q[k] === "string" ? (q[k] as string) : undefined);
   const options = Object.fromEntries(OPTION_KEYS.map((k) => [k, one(k)]).filter(([, v]) => v && OPTION.test(v))) as Record<string, string>;
   const asOf = one("as_of");
-  const initial = { report: one("report"), from: isDate(one("from")) ? one("from") : undefined, to: isDate(one("to")) ? one("to") : isDate(asOf) ? asOf : undefined, options };
+  const initial = { report: one("report"), range: one("range"), from: isDate(one("from")) ? one("from") : undefined, to: isDate(one("to")) ? one("to") : isDate(asOf) ? asOf : undefined, options };
   const saved = await getSavedReports();
   const schedule = Object.fromEntries(SCHEDULES);
 

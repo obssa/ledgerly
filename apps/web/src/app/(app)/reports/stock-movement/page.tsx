@@ -1,3 +1,5 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
+import { exportPeriod } from "@/lib/periodParams";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { rangeLabel } from "@/lib/periods";
 import Link from "next/link";
@@ -19,7 +21,7 @@ export default async function StockMovementPage({ searchParams }: PageProps<"/re
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Inventory" title="Stock movement" actions={<ExportLink report="stock-movement" params={{ from: period.from, to: period.to, warehouse_id: warehouseId }} />} />
+      <PageTitle eyebrow="Reports / Inventory" title="Stock movement" actions={<ExportLink report="stock-movement" params={{ ...exportPeriod(period.picked), warehouse_id: warehouseId }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["warehouse_id"]}>
         <div className="min-w-[180px]"><label className="field-label" htmlFor="warehouse_id">Warehouse</label>
           <select className="field" id="warehouse_id" name="warehouse_id" defaultValue={warehouseId ?? ""}><option value="">All warehouses</option>
@@ -29,9 +31,8 @@ export default async function StockMovementPage({ searchParams }: PageProps<"/re
         <ReportsNav current="/reports/stock-movement" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Stock movement">
-            <div className="px-3 pt-2 text-[13px] text-muted">
-              {rangeLabel(period.picked, period.ctx.calendar)} · {r.warehouse?.name ?? "All warehouses (transfers between them left out)"} · values in {r.currency} at cost
-            </div>
+            <div className="px-3 pt-3"><ReportHeader title="Stock movement" period={rangeLabel(period.picked, period.ctx.calendar)}
+              filters={[r.warehouse?.name ?? "All warehouses (transfers between them left out)", "Values at cost"]} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead>
@@ -62,6 +63,7 @@ export default async function StockMovementPage({ searchParams }: PageProps<"/re
                 </tfoot>
               </table>
             </div>
+            <ReportFooter basis={null} currency={r.currency} />
           </Card>
         )}
       </div>

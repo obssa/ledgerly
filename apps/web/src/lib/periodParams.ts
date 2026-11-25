@@ -64,3 +64,8 @@ export function periodQuery(p: PickedRange): Record<string, string> {
 export function asOfQuery(p: PickedAsOf): Record<string, string> {
   return p.preset === "custom" ? { range: "custom", as_of: p.asOf } : { range: p.preset };
 }
+
+/** For a report's export, print and save links: the preset (so the file says "All dates" or "Last month"), and its own dates. */
+export function exportPeriod(p: PickedRange): Record<string, string | undefined> {
+  return { ...periodQuery(p), from: p.from ?? undefined, to: p.to ?? undefined };
+}

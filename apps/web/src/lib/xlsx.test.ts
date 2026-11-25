@@ -53,4 +53,13 @@ describe("xlsx", () => {
     const files = unzip(toXlsx("Profit/loss: a very long report name over the limit", [["x"]]));
     expect(files["xl/workbook.xml"]).toContain('<sheet name="Profit loss  a very long report"');
   });
+
+  it("puts title rows above the headings: the headings bold and frozen, the period kept as text", () => {
+    const xml = sheetXml([["Abyssinia Coffee"], ["Profit and loss"], ["1 July 2026 – 26 November 2026"], ["2026"], [], ["Account", "Amount"], ["Sales", "100.00"]], 5);
+    expect(xml).toContain('<pane ySplit="6" topLeftCell="A7"');
+    expect(xml).toContain('<c r="A1" t="inlineStr" s="1">');                 // the company, bold
+    expect(xml).toContain('<c r="A6" t="inlineStr" s="1">');                 // the headings, bold
+    expect(xml).toContain('<c r="A4" t="inlineStr"><is><t xml:space="preserve">2026<');   // a title row is text
+    expect(xml).toContain('<c r="B7" s="2"><v>100.00</v></c>');              // a figure is a number
+  });
 });

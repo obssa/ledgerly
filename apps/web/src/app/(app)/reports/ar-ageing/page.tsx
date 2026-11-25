@@ -1,3 +1,5 @@
+import { asOfLabel } from "@/lib/periods";
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
@@ -30,6 +32,7 @@ export default async function ArAgeingPage({ searchParams }: PageProps<"/reports
         <>
           <AgeingViews base="/reports/ar-ageing" asOf={asOf} detail={detail} />
           <AsOfFilter picked={at.picked} keep={q} label="Days late counted at" />
+          <ReportHeader title={`Accounts receivable ageing ${detail ? "detail" : "summary"}`} period={asOfLabel(asOf, at.ctx.calendar)} />
           {detail ? <AgeingDetail ageing={ageing} kind="invoice" baseCurrency={ageing.currency ?? ""} /> : (
           <Card className="!p-2" label="AR ageing">
             <div className="overflow-x-auto">
@@ -65,6 +68,7 @@ export default async function ArAgeingPage({ searchParams }: PageProps<"/reports
             </div>
           </Card>
           )}
+          <ReportFooter basis={null} currency={ageing.currency ?? undefined} />
           <p className="mt-3 text-[13px] text-muted">Amounts in the company&apos;s currency, each invoice at its own rate. The total equals the receivable account in the trial balance.</p>
         </>
       )}

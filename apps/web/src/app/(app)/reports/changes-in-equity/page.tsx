@@ -1,7 +1,9 @@
+import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
+import { exportPeriod } from "@/lib/periodParams";
 import { Card, PageTitle } from "@/components/ui";
 import { getChangesInEquity, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { periodLabel } from "@/lib/reports";
+import { rangeLabel } from "@/lib/periods";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { ExportLink, ReportsNav } from "../ReportsNav";
 
@@ -15,13 +17,13 @@ export default async function ChangesInEquityPage({ searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Changes in equity" actions={<ExportLink report="changes-in-equity" params={{ from: period.from, to: period.to }} />} />
+      <PageTitle eyebrow="Reports / Financial statements" title="Changes in equity" actions={<ExportLink report="changes-in-equity" params={{ ...exportPeriod(period.picked) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/changes-in-equity" />
         {!soce ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Statement of changes in equity">
-            <div className="mb-3 text-[13px] text-muted">{periodLabel(soce.from, soce.to)} · {soce.currency} · profit for the period {formatAmount(soce.net_profit, soce.currency)}</div>
+            <ReportHeader title="Statement of changes in equity" period={rangeLabel(period.picked, period.ctx.calendar)} filters={[`Profit for the period ${formatAmount(soce.net_profit, soce.currency)}`]} />
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">Equity</th><th scope="col" className="!text-right">At the start</th><th scope="col" className="!text-right">Movement</th><th scope="col" className="!text-right">At the end</th></tr></thead>
@@ -41,6 +43,7 @@ export default async function ChangesInEquityPage({ searchParams }: PageProps<"/
               </table>
             </div>
             <p className="mt-3 text-[13px] text-muted">Retained earnings are shown with the profit, closed or not, so the total is the same before and after a year-end close.</p>
+            <ReportFooter currency={soce.currency} />
           </Card>
         )}
       </div>

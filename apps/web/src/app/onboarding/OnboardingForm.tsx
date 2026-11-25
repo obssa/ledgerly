@@ -4,8 +4,7 @@ import { useActionState } from "react";
 import { createCompany, resendVerification } from "@/app/(auth)/actions";
 import { COUNTRIES, INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
-
-const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+import { FiscalStartFields } from "@/components/FiscalStartFields";
 
 /** Creates the company through POST /api/v1/companies (createCompany), then opens its books. */
 /** organisation: from the company switcher, the new company joins the same organisation (the API checks who may). */
@@ -67,19 +66,7 @@ export function OnboardingForm({ organisation = null }: { organisation?: string 
         <Field id="phone" label="Phone" type="tel" invalid={bad("phone")} />
         <Field id="email" label="Company email" type="email" invalid={bad("email")} />
         <Field id="website" label="Website" type="url" invalid={bad("website")} />
-        <div>
-          <label className="field-label" htmlFor="calendar">Calendar</label>
-          <select className="field" id="calendar" name="calendar" defaultValue="gregorian">
-            <option value="gregorian">Gregorian</option>
-            <option value="ethiopian">Ethiopian (year starts in Hamle)</option>
-          </select>
-        </div>
-        <div>
-          <label className="field-label" htmlFor="fiscal_year_start_month">Fiscal year starts in</label>
-          <select className="field" id="fiscal_year_start_month" name="fiscal_year_start_month" defaultValue="7">
-            {months.map((m, i) => <option key={m} value={i + 1}>{m}{i === 6 ? " (usual in Ethiopia)" : ""}</option>)}
-          </select>
-        </div>
+        <FiscalStartFields calendars={["gregorian", "ethiopian"]} defaultCalendar="gregorian" defaultMonth={7} ethiopianLabel="Ethiopian (tax year from Hamle)" />
         <div>
           <label className="field-label" htmlFor="conversion_date">Last bank statement date</label>
           <input className="field" id="conversion_date" name="conversion_date" type="date" />

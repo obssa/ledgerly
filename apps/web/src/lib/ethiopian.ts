@@ -53,3 +53,14 @@ export function formatEthiopian(iso: string): string {
   const e = fromGregorian(iso);
   return `${ETHIOPIAN_MONTHS[e.month - 1]} ${e.day}, ${e.year}`;
 }
+
+/** Roughly which Gregorian months each Ethiopian month falls in (Meskerem starts about 11 September). */
+export const ETHIOPIAN_MONTH_HINTS = ["September–October", "October–November", "November–December", "December–January", "January–February",
+  "February–March", "March–April", "April–May", "May–June", "June–July", "July–August", "August–September"] as const;
+
+/**
+ * The month of the other calendar that starts in the same season, for a fiscal-year start picker whose calendar
+ * changes: July (7) is Hamle (11), September (9) is Meskerem (1), and back.
+ */
+export const ethiopianMonthFor = (gregorianMonth: number): number => ((gregorianMonth + 3) % 12) + 1;
+export const gregorianMonthFor = (ethiopianMonth: number): number => ((ethiopianMonth + 7) % 12) + 1;

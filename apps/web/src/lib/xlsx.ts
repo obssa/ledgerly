@@ -5,7 +5,8 @@ import type { Cell } from "./csv";
 /*
  * Module 10: a report as an Excel workbook (.xlsx), one sheet, written here so no library is needed. Amounts and
  * counts become numbers Excel can add up (two decimals shown with thousands separators); everything else is text,
- * stored as inline strings, which Excel never runs as a formula. The first row (the headings) is bold.
+ * stored as inline strings, which Excel never runs as a formula. Title rows (company, report, period) may come first:
+ * the headings are then at `headingRow`, bold, with the panes frozen under them, and the company name is bold too.
  */
 
 const NUMBER = /^-?\d+(\.\d+)?$/;
@@ -27,33 +28,34 @@ export function columnName(index: number): string {
   return name;
 }
 
-function cellXml(value: Cell, ref: string, heading: boolean): string {
+function cellXml(value: Cell, ref: string, text: boolean, bold: boolean): string {
   if (value === null || value === undefined || value === "") return "";
-  const text = String(value);
-  if (!heading && (typeof value === "number" || NUMBER.test(text))) {
-    const style = text.includes(".") ? ' s="2"' : "";
-    return `<c r="${ref}"${style}><v>${text}</v></c>`;
+  const s = String(value);
+  if (!text && (typeof value === "number" || NUMBER.test(s))) {
+    const style = s.includes(".") ? ' s="2"' : "";
+    return `<c r="${ref}"${style}><v>${s}</v></c>`;
   }
-  return `<c r="${ref}" t="inlineStr"${heading ? ' s="1"' : ""}><is><t xml:space="preserve">${escapeXml(text)}</t></is></c>`;
+  return `<c r="${ref}" t="inlineStr"${bold ? ' s="1"' : ""}><is><t xml:space="preserve">${escapeXml(s)}</t></is></c>`;
 }
 
-export function sheetXml(rows: Cell[][]): string {
+export function sheetXml(rows: Cell[][], headingRow = 0): string {
+  // Title rows and the headings are text, never numbers (a year in a period is not a figure to add up).
   const body = rows.map((row, r) =>
-    `<row r="${r + 1}">${row.map((v, c) => cellXml(v, `${columnName(c)}${r + 1}`, r === 0)).join("")}</row>`).join("");
+    `<row r="${r + 1}">${row.map((v, c) => cellXml(v, `${columnName(c)}${r + 1}`, r <= headingRow, r === headingRow || (r === 0 && headingRow > 0))).join("")}</row>`).join("");
   const widest = Math.max(1, ...rows.map((r) => r.length));
   const cols = Array.from({ length: widest }, (_, c) => {
     const width = Math.min(60, Math.max(10, ...rows.map((r) => String(r[c] ?? "").length + 2)));
     return `<col min="${c + 1}" max="${c + 1}" width="${width}" customWidth="1"/>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${cols}</cols><sheetData>${body}</sheetData></worksheet>`;
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="${headingRow + 1}" topLeftCell="A${headingRow + 2}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${cols}</cols><sheetData>${body}</sheetData></worksheet>`;
 }
 
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 
 /** The workbook's files, by name. The sheet name is cut to Excel's 31 characters and cleared of the ones it refuses. */
-export function workbookFiles(sheetName: string, rows: Cell[][]): Record<string, string> {
+export function workbookFiles(sheetName: string, rows: Cell[][], headingRow = 0): Record<string, string> {
   const name = escapeXml((sheetName.replace(/[\\/?*[\]:]/g, " ").trim() || "Report").slice(0, 31));
   return {
     "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -65,7 +67,7 @@ export function workbookFiles(sheetName: string, rows: Cell[][]): Record<string,
     "xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
     "xl/styles.xml": STYLES,
-    "xl/worksheets/sheet1.xml": sheetXml(rows),
+    "xl/worksheets/sheet1.xml": sheetXml(rows, headingRow),
   };
 }
 
@@ -117,6 +119,6 @@ export function zip(files: Record<string, string>): Uint8Array {
   return new Uint8Array(Buffer.concat([...parts, directory, end]));
 }
 
-export function toXlsx(sheetName: string, rows: Cell[][]): Uint8Array {
-  return zip(workbookFiles(sheetName, rows));
+export function toXlsx(sheetName: string, rows: Cell[][], headingRow = 0): Uint8Array {
+  return zip(workbookFiles(sheetName, rows, headingRow));
 }
