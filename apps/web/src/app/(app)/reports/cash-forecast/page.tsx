@@ -2,7 +2,7 @@ import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCashForecast } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { ReportsNav } from "../ReportsNav";
+import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Cash forecast" };
 
@@ -21,7 +21,7 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Cash forecast" />
+      <PageTitle eyebrow="Reports / Financial statements" title="Cash forecast" actions={<ExportLink report="cash-forecast" params={{ weeks: String(span) }} />} />
       <Segmented label="Weeks" size="sm" items={SPANS.map((w) => ({ key: String(w), href: `/reports/cash-forecast?weeks=${w}`, label: `${w} weeks`, active: span === w }))} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/cash-forecast" />

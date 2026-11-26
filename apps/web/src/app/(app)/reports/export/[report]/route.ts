@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
   try {
     // The period as the page had it: a preset ("All dates", "Last month") or dates (lib/periodParams.ts).
     const period = await getReportPeriod(Object.fromEntries(q.entries()));
-    const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing"].includes(report);
+    const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing", "inventory-valuation", "cash-forecast"].includes(report);
     const asOf = isDate(q.get("as_of")) ? (q.get("as_of") as string) : (period.picked.to ?? period.ctx.today);
     const options = { kind: word("kind"), group: word("group"), account_id: id, action: word("action"), user_id: uuid("user_id"), warehouse_id: uuid("warehouse_id"),
       rows: word("rows"), columns: word("columns"), measure: word("measure"), account_type: word("account_type"),
@@ -42,9 +42,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
       view: word("view"), source: word("source"), by: word("by"), pct: q.get("pct") === "1" ? "1" : undefined,
       // The profit and loss as the page had it: its comparison and basis; an open period ("All dates") has none to compare with.
       compare: q.get("compare") === "year" ? "year" : undefined, basis: q.get("basis") === "cash" ? "cash" : undefined,
-      open: period.picked.from && period.picked.to ? undefined : "1", interval: /^\d{1,3}$/.test(q.get("interval") ?? "") ? (q.get("interval") as string) : undefined,
+      open: period.picked.from && period.picked.to ? undefined : "1",
+      // The cash flow method, the forecast's weeks, and a statement's customer or supplier (loaded by the API through the company).
+      method: q.get("method") === "direct" ? "direct" : undefined, weeks: /^\d{1,2}$/.test(q.get("weeks") ?? "") ? (q.get("weeks") as string) : undefined,
+      contact_id: uuid("contact_id"), interval: /^\d{1,3}$/.test(q.get("interval") ?? "") ? (q.get("interval") as string) : undefined,
       periods: /^\d{1,2}$/.test(q.get("periods") ?? "") ? (q.get("periods") as string) : undefined };
-    const [{ rows }, settings] = await Promise.all([
+    const [{ rows, heading, period: periodText }, settings] = await Promise.all([
       exportRows(report as ExportableReport, { from: period.from, to: period.to, as_of: asOf, ...options, calendar: period.ctx.calendar }, ctx),
       ledgerly.companySettings(ctx).catch(() => null),
     ]);
@@ -54,11 +57,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
     }, ctx);
 
     const calendar = settings?.calendar ?? period.ctx.calendar;
-    const title = reportTitle(report as ExportableReport, options);
+    const title = heading ?? reportTitle(report as ExportableReport, options);
     const identity: ReportIdentity = {
       company: settings?.trading_name || settings?.legal_name || "Evenbooks", legalName: settings?.legal_name ?? null,
       title,
-      period: pointInTime ? asOfLabel(asOf, calendar) : rangeLabel(period.picked, calendar),
+      period: periodText ?? (pointInTime ? asOfLabel(asOf, calendar) : rangeLabel(period.picked, calendar)),
       basis: ON_A_BASIS.includes(report as ExportableReport) ? (q.get("basis") === "cash" ? "cash" : settings?.accounting_basis ?? "accrual") : null,
       currency: settings?.base_currency ?? null,
       prepared: preparedLabel(new Date(), settings?.timezone || "Africa/Addis_Ababa", calendar, person),

@@ -74,7 +74,8 @@ async function DirectPage({ period, params, link }: { period: Awaited<ReturnType
     ["Financing activities", ["financing"], "financing"]] as const;
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" />
+      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement"
+        actions={<ExportLink report="cash-flow" params={{ ...exportPeriod(period.picked), method: "direct" }} />} />
       <DateRangeFilter picked={period.picked} keep={params} />
       <MethodLinks link={link} direct />
       <div className="flex flex-wrap items-start gap-4">

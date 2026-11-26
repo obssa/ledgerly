@@ -5,6 +5,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
 import { getInventoryValuation, getReportAsOf } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
+import { ExportLink } from "../ReportsNav";
 
 export const metadata = { title: "Inventory valuation" };
 
@@ -17,7 +18,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Inventory</>} title="Inventory valuation" />
+      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Inventory</>} title="Inventory valuation" actions={<ExportLink report="inventory-valuation" params={{ as_of: asOf }} />} />
       {v === null ? <Card><p className="text-sm text-muted">Not available in the demo.</p></Card> : (
         <>
           <AsOfFilter picked={at.picked} keep={q} />
