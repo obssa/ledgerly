@@ -39,10 +39,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
       // A transaction report's Customize choices (each checked against its own list in lib/transactionColumns.ts).
       cols: /^[a-z_,]{1,400}$/.test(q.get("cols") ?? "") ? (q.get("cols") as string) : undefined, sort: word("sort"), dir: word("dir"), status: word("status"),
       // The ageing's view and periods (lib/ageing.ts checks the ranges).
-      view: word("view"), source: word("source"), interval: /^\d{1,3}$/.test(q.get("interval") ?? "") ? (q.get("interval") as string) : undefined,
+      view: word("view"), source: word("source"), by: word("by"), pct: q.get("pct") === "1" ? "1" : undefined, interval: /^\d{1,3}$/.test(q.get("interval") ?? "") ? (q.get("interval") as string) : undefined,
       periods: /^\d{1,2}$/.test(q.get("periods") ?? "") ? (q.get("periods") as string) : undefined };
     const [{ rows }, settings] = await Promise.all([
-      exportRows(report as ExportableReport, { from: period.from, to: period.to, as_of: asOf, ...options }, ctx),
+      exportRows(report as ExportableReport, { from: period.from, to: period.to, as_of: asOf, ...options, calendar: period.ctx.calendar }, ctx),
       ledgerly.companySettings(ctx).catch(() => null),
     ]);
     await ledgerly.recordExport({

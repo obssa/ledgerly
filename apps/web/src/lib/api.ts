@@ -1291,6 +1291,16 @@ export interface ProfitAndLossRow {
   previous: string | null;
 }
 
+/** GET /reports/profit-and-loss/columns: the profit and loss with QuickBooks' "Display columns by". */
+export type PnlColumnsBy = "period" | "contact" | "location" | "class" | "project";
+export interface ProfitAndLossColumns {
+  from: string; to: string; by: PnlColumnsBy; currency: string;
+  /** In order; a period column's key is its position ("1", "2" ...) and its label its first day (the page names it). */
+  columns: { key: string; label: string }[];
+  sections: Record<"income" | "cost_of_sales" | "expenses", { account_id: string; code: string; name: string; values: string[]; total: string }[]>;
+  totals: Record<"income" | "cost_of_sales" | "gross_profit" | "expenses" | "net_profit", { values: string[]; total: string }>;
+}
+
 export interface ProfitAndLoss {
   /** Accrual (when invoiced or billed) or cash (when the money moved). */
   basis?: "accrual" | "cash";
@@ -2191,6 +2201,8 @@ export const ledgerly = {
   subscription: (ctx: RequestOptions) => api<Subscription>("subscription", ctx),
   documentAnalysis: (side: "sales" | "purchases", q: { group: string; from?: string; to?: string }, ctx: RequestOptions) =>
     api<DocumentAnalysis>(`reports/${side}`, { ...ctx, query: q }),
+  profitAndLossColumns: (q: { from: string; to: string; by: PnlColumnsBy; starts?: string }, ctx: RequestOptions) =>
+    api<ProfitAndLossColumns>("reports/profit-and-loss/columns", { ...ctx, query: q }),
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string; basis?: "accrual" | "cash" }, ctx: RequestOptions) =>
     api<ProfitAndLoss>("reports/profit-and-loss", { ...ctx, query: q }),
 };

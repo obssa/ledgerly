@@ -13,6 +13,7 @@ use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 final class LedgerController extends Controller
@@ -172,6 +173,47 @@ final class LedgerController extends Controller
         ]);
 
         return response()->json($reports->binCard($this->current->id(), $q['item_id'], $q['warehouse_id'], $q['from'], $q['to']));
+    }
+
+    /**
+     * The profit and loss with QuickBooks' "Display columns by" (Module 10): a column per period, whose first days the
+     * page sends in the company's calendar (months, quarters or years), or per customer or supplier, location, class or
+     * project. Accrual basis; at most 60 columns.
+     */
+    public function profitAndLossColumns(Request $request, \App\Domain\Reports\ProfitAndLossColumns $report): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $q = $request->validate([
+            'from' => ['required', 'date_format:Y-m-d'],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'by' => ['required', Rule::in(\App\Domain\Reports\ProfitAndLossColumns::BY)],
+            // The first day of each column, in order, comma-separated: "2026-07-01,2026-08-01,...".
+            'starts' => ['required_if:by,period', 'nullable', 'string', 'max:' . (11 * \App\Domain\Reports\ProfitAndLossColumns::MAX_COLUMNS),
+                'regex:/^\d{4}-\d{2}-\d{2}(,\d{4}-\d{2}-\d{2})*$/'],
+        ]);
+        $starts = isset($q['starts']) ? explode(',', $q['starts']) : [];
+        foreach ($starts as $day) {
+            if (\DateTimeImmutable::createFromFormat('!Y-m-d', $day)?->format('Y-m-d') !== $day) {
+                throw ValidationException::withMessages(['starts' => ["{$day} is not a date."]]);
+            }
+        }
+        if (count($starts) > \App\Domain\Reports\ProfitAndLossColumns::MAX_COLUMNS) {
+            throw ValidationException::withMessages(['starts' => ['More than 60 columns: choose a shorter period or longer columns.']]);
+        }
+        if ($q['by'] === 'period') {
+            // The periods follow each other through the report's period: the first starts on its first day.
+            $sorted = $starts;
+            sort($sorted);
+            if ($starts === [] || $starts[0] !== $q['from'] || $sorted !== $starts || count(array_unique($starts)) !== count($starts) || end($starts) > $q['to']) {
+                throw ValidationException::withMessages(['starts' => ['Each column starts after the one before it, the first on the first day of the period.']]);
+            }
+        }
+        try {
+            return response()->json(['from' => $q['from'], 'to' => $q['to'], 'by' => $q['by'], 'currency' => $this->current->get()->base_currency,
+                ...$report->run($this->current->id(), $q['from'], $q['to'], $q['by'], $starts)]);
+        } catch (\LengthException) {
+            throw ValidationException::withMessages(['by' => ['More than 60 columns: choose a shorter period or fewer columns.']]);
+        }
     }
 
     public function profitAndLoss(Request $request, ReportService $reports): JsonResponse

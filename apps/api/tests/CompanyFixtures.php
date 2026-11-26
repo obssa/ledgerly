@@ -287,6 +287,7 @@ trait CompanyFixtures
         $query = match ($route->uri()) {
             'api/v1/reports/trial-balance', 'api/v1/reports/balance-sheet' => ['as_of' => '2026-12-31'],
             'api/v1/reports/general-ledger' => ['from' => '2026-07-08', 'to' => '2027-07-07'],
+            'api/v1/reports/profit-and-loss/columns' => ['from' => '2026-07-08', 'to' => '2027-07-07', 'by' => 'contact'],
             'api/v1/revaluations/preview' => ['as_of' => '2026-11-08'],
             'api/v1/reports/profit-and-loss' => ['from' => '2026-07-08', 'to' => '2027-07-07'],
             'api/v1/exchange-rates' => ['currency' => 'USD', 'from' => '2026-07-08', 'to' => '2027-07-07'],
