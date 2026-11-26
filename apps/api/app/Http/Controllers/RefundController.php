@@ -21,16 +21,20 @@ use Illuminate\Validation\Rule;
  */
 final class RefundController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly CurrentCompany $current)
     {
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('payments.view');
+        $range = $this->dateRange($request);
 
         return response()->json(Payment::query()->where('kind', 'refund')
             ->with(['contact:id,name', 'allocations.document:id,number'])
+            ->when(true, fn ($q) => $this->withinDates($q, 'payment_date', $range))   // the period asked for (FiltersByDate)
             ->orderByDesc('payment_date')->orderByDesc('created_at')
             ->cursorPaginate(50));
     }

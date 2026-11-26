@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class GoodsReceiptController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly GoodsReceiving $receiving, private readonly CurrentCompany $current)
     {
     }
@@ -26,6 +28,7 @@ final class GoodsReceiptController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('bills.view');
+        $range = $this->dateRange($request);
         $filters = $request->validate([
             'status' => ['nullable', 'in:posted,void'],
             'purchase_order_id' => ['nullable', 'uuid'],
@@ -41,6 +44,7 @@ final class GoodsReceiptController extends Controller
             ->when($filters['purchase_order_id'] ?? null, fn ($q, $id) => $q->where('g.purchase_order_id', $id))
             ->select(['g.id', 'g.number', 'g.received_on', 'g.reference', 'g.status', 'g.purchase_order_id', 'o.number as order_number',
                 'c.name as supplier', 'w.name as warehouse', 'v.value'])
+            ->when(true, fn ($q) => $this->withinDates($q, 'g.received_on', $range))   // the period asked for (FiltersByDate)
             ->orderByDesc('g.received_on')->orderByDesc('g.number')
             ->cursorPaginate(50));
     }

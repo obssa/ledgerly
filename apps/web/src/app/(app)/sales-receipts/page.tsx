@@ -1,18 +1,24 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getSalesReceipts } from "@/lib/data";
+import { getSalesReceipts, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Cash sales" };
 
 /** Module 2: sales paid on the spot (070), newest first. */
-export default async function SalesReceiptsPage() {
-  const receipts = await getSalesReceipts();
+export default async function SalesReceiptsPage({ searchParams }: PageProps<"/sales-receipts">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const receipts = await getSalesReceipts(listQuery(q, period.picked));
 
   return (
     <>
       <PageTitle eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / Cash sales</>} title="Cash sales"
         actions={<Link href="/sales-receipts/new" className="btn btn-primary">+ Record a cash sale</Link>} />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Cash sales">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -41,6 +47,7 @@ export default async function SalesReceiptsPage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/sales-receipts" picked={period.picked} next={receipts.next} prev={receipts.prev} />
     </>
   );
 }

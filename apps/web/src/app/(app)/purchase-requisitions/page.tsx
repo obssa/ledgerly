@@ -1,18 +1,24 @@
+import { ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getRequisitions } from "@/lib/data";
+import { getRequisitions, getReportPeriod } from "@/lib/data";
 import { REQUISITION_STATUS } from "./status";
 
 export const metadata = { title: "Purchase requisitions" };
 
 /** Module 3, purchase requisitions (084): one's own requests, or everyone's for those who decide or order. */
-export default async function RequisitionsPage() {
-  const list = await getRequisitions();
+export default async function RequisitionsPage({ searchParams }: PageProps<"/purchase-requisitions">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const list = await getRequisitions(listQuery(q, period.picked));
   if (!list) redirect("/no-access");
   return (
     <>
       <PageTitle eyebrow="Money out" title="Purchase requisitions" actions={<Link href="/purchase-requisitions/new" className="btn btn-primary">+ Ask for something</Link>} />
+      <ListPeriod picked={period.picked} />
       <Card className="max-w-[1000px]" label="Purchase requisitions">
         <p className="mb-3 text-sm text-muted">
           Ask for something to be bought; someone who approves bills decides, and an approved request becomes a purchase order to a supplier.

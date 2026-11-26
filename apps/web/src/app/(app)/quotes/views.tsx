@@ -1,8 +1,10 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { QuoteDetail, QuoteKind, QuoteStatus } from "@/lib/api";
-import { getInvoiceOptions, getQuote, getQuotes } from "@/lib/data";
+import { getInvoiceOptions, getQuote, getQuotes, getReportPeriod } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { InvoiceForm } from "../invoices/new/InvoiceForm";
 import { QuoteActions } from "./QuoteActions";
@@ -34,8 +36,9 @@ const eyebrow = (kind: QuoteKind, last?: string) => (
   <><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / {last ? <><Link href={WORDS[kind].path} className="hover:underline">{WORDS[kind].title}</Link> / {last}</> : WORDS[kind].title}</>
 );
 
-export async function QuoteList({ kind }: { kind: QuoteKind }) {
-  const rows = await getQuotes(kind);
+export async function QuoteList({ kind, q = {} }: { kind: QuoteKind; q?: Record<string, string | string[] | undefined> }) {
+  const period = await getReportPeriod(q, "all");
+  const rows = await getQuotes(kind, listQuery(q, period.picked));
   const w = WORDS[kind];
 
   return (
@@ -44,6 +47,7 @@ export async function QuoteList({ kind }: { kind: QuoteKind }) {
         {kind === "sales_order" && <Link href="/sales-orders/back-orders" className="btn">Back-orders</Link>}
         <Link href={`${w.path}/new`} className="btn btn-primary">{w.newLabel}</Link>
       </>} />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label={w.title}>
         {rows.length === 0 ? (
           <p className="p-3 text-sm text-muted">
@@ -74,6 +78,7 @@ export async function QuoteList({ kind }: { kind: QuoteKind }) {
           </div>
         )}
       </Card>
+      <ListPager path={kind === "quote" ? "/quotes" : "/sales-orders"} picked={period.picked} next={rows.next} prev={rows.prev} />
     </>
   );
 }

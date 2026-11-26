@@ -1,8 +1,10 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { Bill } from "@/lib/api";
-import { getBills, getCompanyToday } from "@/lib/data";
+import { getBills, getCompanyToday, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Bills" };
@@ -17,8 +19,11 @@ function status(b: Bill, today: string) {
 }
 
 /** Module 3: what suppliers have billed, newest first, and what is still to pay. */
-export default async function BillsPage() {
-  const bills = await getBills();
+export default async function BillsPage({ searchParams }: PageProps<"/bills">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const bills = await getBills(listQuery(q, period.picked));
   await connection();
   const today = await getCompanyToday();
 
@@ -26,6 +31,7 @@ export default async function BillsPage() {
     <>
       <PageTitle eyebrow="Money out" title="Bills and purchases"
         actions={<Link href="/bills/new" className="btn btn-primary">+ New bill</Link>} />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Bills">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -55,6 +61,7 @@ export default async function BillsPage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/bills" picked={period.picked} next={bills.next} prev={bills.prev} />
     </>
   );
 }
