@@ -109,6 +109,26 @@ Done once; the deploy needs all of it. **Status (25 Nov 2026): steps 1 to 6 done
 | Make a test company | Actions → test-company → Run workflow: the company id, and owners as `email|Name;email|Name`. New accounts' passwords go to `~/ledgerly/shared/test-accounts.txt` (mode 600) only: read it once, hand them over, delete it |
 | Demo sign-in on or off | repository variable `DEMO_LOGINS` (`true`/`false`), applied by the next deploy |
 
+### Speed: what this host does, and what Evenbooks does about it
+
+Measured on 26 Nov 2026 (vesper.hostns.io, 32 cores, shared). Visitors reach Cloudflare's edge first (Djibouti for
+Ethiopia), which serves the script files from its cache; pages and API calls go on to the server in England.
+
+| The host | Effect | What handles it |
+|---|---|---|
+| PHP stops after 60 s without a request (`LSAPI_PGRP_MAX_IDLE=60`) and drops its compiled code (no `opcache.file_cache`) | the first API call after a pause took 1.1 s instead of 0.13 s | `web-app.js` calls `/up` every 30 s (`LEDGERLY_KEEP_WARM_SECONDS`); cron can't, the host delays each cron job by up to a minute |
+| At most 10 PHP workers per account (`LSAPI_CHILDREN=10`) | calls beyond 10 at once wait in line | pages share their lookups within a request (`lib/data.ts`, `cache()`); the overview makes two rounds of at most 9 calls |
+| Passenger takes over the Node.js app's `listen()` | Next.js fetched redirected pages from `0.0.0.0:3000` and failed, so every form that moves on took two round trips | `web-app.js` gives Next.js a private listener on 127.0.0.1 |
+| DNS for the domain is Cloudflare's | the web server's own API calls would go out to Cloudflare and back | `release.sh` writes `LEDGERLY_API_ADDRESS` (cPanel's address for the API's domain, checked over HTTPS) into `shared/web.env`; `web-app.js` connects there, certificate still checked |
+| The server is shared and busy (load 40–53 on 32 cores; the old server ran at about 21) | everything waits for CPU; the API's health check takes 60–550 ms | nothing in code: ask the host for a quieter server, or move to a VPS |
+
+LiteSpeed already replaces Cloudflare's address with the visitor's own (a request through Cloudflare is logged under
+the visitor's address), so sign-in limits and the audit log need no Cloudflare setting (`LEDGERLY_BEHIND_CLOUDFLARE`
+stays `false`).
+
+Every folder of the web app with pages below it has a `loading.tsx`: a click shows the page's outline at once
+instead of leaving the old page up until the next one is ready. A new folder with pages below it needs one too.
+
 ### When the account runs out of processes
 
 Symptom: the deploy fails with `fork: Resource temporarily unavailable` or `Connection reset by peer` right after

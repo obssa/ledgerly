@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { Card, PageTitle, Pill, Stat } from "@/components/ui";
 import { AgeingBar, BalanceLine, PairedColumns, type ColumnPoint } from "@/components/charts";
 import { Icon } from "@/components/app-shell/Icon";
@@ -43,10 +44,22 @@ const sum = (...values: string[]) => toString(values.reduce((acc, v) => acc + pa
 const greeting = (hour: number) => (hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening");
 
 export default async function OverviewPage() {
-  const invoices = await getInvoices(); // first: decides demo mode for this request
+  await connection(); // per request: one built image runs in demo mode or against an API
   const demo = isDemoMode();
+  // One round for everything that doesn't depend on today; the profit and loss by month follows once today is known.
+  const firstRound = demo ? null : Promise.all([
+    getKpis(),
+    getCashForecast(13),
+    optional(() => getArAgeing()),
+    optional(() => getApAgeing()),
+    optional(() => getBankAccounts()),
+  ]);
+  firstRound?.catch(() => {}); // awaited below; a failure is reported there, not as an unhandled rejection
   // Today, written in the calendar chosen in Settings (Gregorian or Ethiopian), never both.
-  const { today: todayIso, calendar } = demo ? { today: "2026-11-02", calendar: "gregorian" as const } : await getCompanyDay();
+  const [invoices, { today: todayIso, calendar }] = await Promise.all([
+    getInvoices(),
+    demo ? { today: "2026-11-02", calendar: "gregorian" as const } : getCompanyDay(),
+  ]);
   const today = new Date(`${todayIso}T00:00:00Z`);
   const hour = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Africa/Addis_Ababa" }));
   const firstName = demo ? "Hana" : ((await getSession()).name ?? "").split(" ")[0];
@@ -57,16 +70,9 @@ export default async function OverviewPage() {
     .slice(0, 6);
 
   const months = lastMonths(todayIso);
-  const [kpis, forecast, ar, ap, banks, pnl] = demo
-    ? [null, null, null, null, null, null]
-    : await Promise.all([
-        getKpis(),
-        getCashForecast(13),
-        optional(() => getArAgeing()),
-        optional(() => getApAgeing()),
-        optional(() => getBankAccounts()),
-        Promise.all(months.map((m) => optional(() => getProfitAndLoss({ from: m.from, to: m.to })))),
-      ]);
+  const [[kpis, forecast, ar, ap, banks], pnl] = firstRound
+    ? await Promise.all([firstRound, Promise.all(months.map((m) => optional(() => getProfitAndLoss({ from: m.from, to: m.to }))))])
+    : [[null, null, null, null, null], null];
 
   const currency = kpis?.currency ?? "ETB";
   const columns: ColumnPoint[] | null = pnl && pnl.every(Boolean)

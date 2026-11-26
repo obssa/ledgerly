@@ -91,6 +91,25 @@ if [ -n "$PREVIOUS" ] && [ -d "$PREVIOUS/web/.next/static" ] && [ -d "$REL/web/.
   find "$REL/web/.next/static" -type f -mtime +14 -delete || true
 fi
 
+echo "== The API's address on this server, for the web app's calls to it (web-app.js, pinApiAddress)"
+# Read from cPanel's own record of the API's domain on every release, so a move to another server or address can't
+# leave an old one behind. If cPanel can't tell, the setting is removed and the web app uses public DNS (slower
+# behind Cloudflare, never wrong).
+API_HOST="$(sed -n 's|^LEDGERLY_API_URL=https\{0,1\}://\([^/:]*\).*|\1|p' "$ROOT/shared/web.env" | head -1)"
+API_ADDRESS=""
+if [ -n "$API_HOST" ] && command -v uapi >/dev/null 2>&1; then
+  API_ADDRESS="$(uapi --output=json DomainInfo single_domain_data domain="$API_HOST" 2>/dev/null | grep -oE '"ip":"[0-9.]+"' | head -1 | cut -d'"' -f4 || true)"
+fi
+sed -i '/^LEDGERLY_API_ADDRESS=/d' "$ROOT/shared/web.env"
+# Only an address where the API answers over HTTPS, with a valid certificate for its name.
+if [[ $API_ADDRESS =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] \
+  && [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' --resolve "$API_HOST:443:$API_ADDRESS" "https://$API_HOST/up" || true)" = 200 ]; then
+  printf 'LEDGERLY_API_ADDRESS=%s\n' "$API_ADDRESS" >> "$ROOT/shared/web.env"
+  echo "$API_HOST is reached at $API_ADDRESS from here"
+else
+  echo "WARNING: cPanel did not give an address for '$API_HOST'; the web app looks it up in public DNS"
+fi
+
 echo "== Switch"
 ln -sfn "$REL" "$ROOT/current.next" && mv -Tf "$ROOT/current.next" "$ROOT/current"
 [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$REL" ] && printf '%s\n' "$PREVIOUS" > "$ROOT/shared/previous-release"

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { Sidebar } from "@/components/app-shell/Sidebar";
 import { Topbar } from "@/components/app-shell/Topbar";
+import PageLoading from "@/components/PageLoading";
 import { CompanyBadge, PrintedCompany, UserMenu } from "@/components/app-shell/ShellParts";
 import { isDemoMode } from "@/lib/api";
 import { getSession } from "@/lib/session";
@@ -75,23 +76,9 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
             <PrintedCompany />
           </Suspense>
           {/* Pages read the session and call the API per request (src/lib/data.ts). */}
-          <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
+          <Suspense fallback={<PageLoading />}>{children}</Suspense>
         </main>
       </div>
-    </div>
-  );
-}
-
-/** While a page loads: the shape of a page, not a word. */
-function PageSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading" className="mt-2 animate-pulse">
-      <div className="h-7 w-64 rounded-lg bg-line-soft" />
-      <div className="mt-3 h-4 w-96 max-w-full rounded bg-line-soft" />
-      <div className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
-        {[0, 1, 2, 3].map((i) => <div key={i} className="h-[112px] rounded-[14px] border border-line bg-surface" />)}
-      </div>
-      <div className="mt-4 h-72 rounded-[14px] border border-line bg-surface" />
     </div>
   );
 }

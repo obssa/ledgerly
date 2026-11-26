@@ -1,5 +1,6 @@
 import "server-only";
 import type { DocumentHistory } from "./history";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
@@ -19,6 +20,17 @@ import type { Subscription } from "./subscription";
  * connection() first: whether this is demo mode is decided per request, so one built image can run either
  * way. Callers render inside a <Suspense> boundary (src/app/(app)/layout.tsx).
  */
+/**
+ * Lookups that several parts of one page make (the company menu, the user menu, the printed header, the subscription
+ * notice, the report period, the page itself): asked of the API once per request, not once per part. React's cache()
+ * lasts for one server request, so a change shows on the next page. The overview alone asked for the company list
+ * three times and the settings twice.
+ */
+const companiesOf = cache((token: string) => ledgerly.companies(token));
+const settingsOf = cache((token: string, companyId: string) => ledgerly.companySettings({ token, companyId }));
+const fiscalYearsOf = cache((token: string, companyId: string) => ledgerly.fiscalYears({ token, companyId }));
+const subscriptionOf = cache((token: string, companyId: string) => ledgerly.subscription({ token, companyId }));
+
 async function withApi<T>(call: (ctx: { token: string; companyId: string }) => Promise<T>): Promise<T> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
@@ -66,7 +78,7 @@ export async function getDeviceSessions(): Promise<SignedInSession[] | null> {
 export async function getCompanySettings(): Promise<CompanySettings & { demo: boolean }> {
   await connection();
   if (isDemoMode()) return { ...demoCompanySettings, demo: true };
-  return { ...(await withApi((ctx) => ledgerly.companySettings(ctx))), demo: false };
+  return { ...(await withApi((ctx) => settingsOf(ctx.token, ctx.companyId))), demo: false };
 }
 
 export async function getCurrencies(): Promise<Currencies> {
@@ -1476,11 +1488,11 @@ export async function getPeriodContext(): Promise<PeriodContext> {
   await connection();
   if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar, fiscalStartMonth: demoCompanySettings.fiscal_year_start_month, fiscalYears: demoCompanySettings.fiscal_years };
   try {
-    const s = await withApi((ctx) => ledgerly.companySettings(ctx));
+    const s = await withApi((ctx) => settingsOf(ctx.token, ctx.companyId));
     return { today: todayIn(s.timezone), calendar: s.calendar, fiscalStartMonth: s.fiscal_year_start_month, fiscalYears: s.fiscal_years };
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
-    const years = await withApi((ctx) => ledgerly.fiscalYears(ctx)).catch(() => ({ data: [] as FiscalYear[] }));
+    const years = await withApi((ctx) => fiscalYearsOf(ctx.token, ctx.companyId)).catch(() => ({ data: [] as FiscalYear[] }));
     const first = years.data[0]?.starts_on;
     return { today: todayIn(), calendar: "gregorian", fiscalStartMonth: first ? Number(first.slice(5, 7)) : 1, fiscalYears: years.data };
   }
@@ -1593,7 +1605,7 @@ export async function getSubscription(): Promise<Subscription | null> {
   if (isDemoMode()) return null;
   const { token, companyId } = await getSession();
   if (!token || !companyId) return null;
-  return ledgerly.subscription({ token, companyId }).catch(() => null);
+  return subscriptionOf(token, companyId).catch(() => null);
 }
 export const getDocumentAnalysis = (side: "sales" | "purchases", q: { group: string; from: string; to: string }): Promise<DocumentAnalysis | null> =>
   statement((ctx) => ledgerly.documentAnalysis(side, q, ctx));
@@ -1643,7 +1655,7 @@ export async function getCompanyDay(): Promise<{ today: string; calendar: Compan
   await connection();
   if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar };
   try {
-    const settings = await withApi((ctx) => ledgerly.companySettings(ctx));
+    const settings = await withApi((ctx) => settingsOf(ctx.token, ctx.companyId));
     return { today: todayIn(settings.timezone), calendar: settings.calendar };
   } catch (error) {
     // A role without company.view still gets a date (Gregorian, the default); redirects pass through.
@@ -1666,7 +1678,7 @@ export async function getShellContext(): Promise<ShellContext> {
     };
   }
   const { name, companyId, demo } = await getSession();
-  const { data } = await withApi(({ token }) => ledgerly.companies(token));
+  const { data } = await withApi(({ token }) => companiesOf(token));
   const company: Company | undefined = data.find((c) => c.id === companyId);
   if (!company) redirect("/onboarding");
   // The demo was started fresh by its owner: everyone in the demo goes on in the new demo company.
