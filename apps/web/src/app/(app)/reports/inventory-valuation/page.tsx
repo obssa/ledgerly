@@ -5,6 +5,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
 import { getInventoryValuation, getReportAsOf } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
+import { perUnit } from "@/lib/decimal";
 import { ExportLink } from "../ReportsNav";
 
 export const metadata = { title: "Inventory valuation" };
@@ -31,7 +32,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
             <div className="px-3 pt-3"><ReportHeader title="Inventory valuation" period={asOfLabel(asOf, at.ctx.calendar)} filters={["Values at cost"]} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
-                <thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col">Warehouse</th><th scope="col" className="!text-right">Quantity</th><th scope="col" className="!text-right">Value</th></tr></thead>
+                <thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col">Warehouse</th><th scope="col" className="!text-right">Quantity</th><th scope="col" className="!text-right">Average cost</th><th scope="col" className="!text-right">Value</th></tr></thead>
                 <tbody>
                   {v.rows.length === 0 && <tr><td colSpan={5} className="text-muted">No stock at this date.</td></tr>}
                   {v.rows.map((r) => (
@@ -40,6 +41,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
                       <td className="num">{r.sku ?? "—"}</td>
                       <td>{r.warehouse}</td>
                       <td className="num text-right">{formatAmount(r.quantity)} {r.unit}</td>
+                      <td className="num text-right text-muted">{perUnit(r.value, r.quantity) === null ? "—" : formatAmount(perUnit(r.value, r.quantity)!)}</td>
                       <td className="num text-right">{formatAmount(r.value)}</td>
                     </tr>
                   ))}

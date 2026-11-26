@@ -74,6 +74,23 @@ function divRound(numerator: bigint, denominator: bigint): bigint {
   return negative ? -q : q;
 }
 
+/** An amount per unit, to 2 decimals (half-up): value 450.00 over 3 units is 150.00. null for no units. */
+export function perUnit(amount: string, quantity: string): string | null {
+  const q = parse(quantity);
+  if (q === 0n) return null;
+  return toString(divRound(parse(amount) * FACTOR, q));
+}
+
+/** A change as a percentage of the earlier figure, to one decimal: "+12.5%", "−3.0%"; a dash with nothing to compare. */
+export function percentChange(current: string, previous: string | null): string {
+  if (previous === null) return "—";
+  const p = parse(previous);
+  if (p === 0n) return "—";
+  const tenths = divRound((parse(current) - p) * 1000n, p < 0n ? -p : p);
+  const abs = tenths < 0n ? -tenths : tenths;
+  return `${tenths >= 0n ? "+" : "−"}${abs / 10n}.${abs % 10n}%`;
+}
+
 export interface LineInput {
   quantity: string;
   unitPrice: string;

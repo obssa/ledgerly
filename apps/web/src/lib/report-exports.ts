@@ -3,7 +3,9 @@ import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, total
 import { ledgerly } from "./api";
 import { DISPLAY_BY, columnsRequest, percentOf, pickDisplayBy } from "./pnlColumns";
 import type { Calendar } from "./periods";
-import { periodLabel, previousPeriod, samePeriodLastYear, yearEarlier } from "./reports";
+import { periodLabel, previousPeriod, samePeriodLastYear } from "./reports";
+import { shiftDay } from "./periods";
+import { perUnit, percentChange } from "./decimal";
 import { STATEMENT_DEFAULTS, statementColumns, statementRow } from "./ledgerColumns";
 import { AGE_COLUMNS, AGE_DEFAULTS, AGE_FOREIGN, DEFAULT_BUCKETS, ageRows, bucketLabel, groupAgeRows, pickPeriods, type AgeColumn, type AgeRow } from "./ageing";
 import { chooseColumns, withoutUnusedForeign } from "./columns";
@@ -98,19 +100,25 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: "profit-and-loss", rows };
     }
     case "balance-sheet": {
-      // Against the same date a year earlier when the page compared (compare=year), every account in either year.
+      // Against the same date a month, quarter or year earlier when the page compared, every account in either; % change.
       const asOf = p.as_of ?? p.to ?? "";
-      const [bs, prior] = await Promise.all([ledgerly.balanceSheet(asOf, ctx), p.compare === "year" ? ledgerly.balanceSheet(yearEarlier(asOf), ctx) : Promise.resolve(null)]);
-      const rows: Cell[][] = [["Section", "Code", "Account", asOf, ...(prior ? [yearEarlier(asOf)] : [])]];
+      const back = ({ month: 1, quarter: 3, year: 12 } as Record<string, number>)[p.compare ?? ""];
+      const then = back ? shiftDay(asOf, -back, p.calendar ?? "gregorian") : null;
+      const pct = Boolean(then) && p.pct === "1";
+      const [bs, prior] = await Promise.all([ledgerly.balanceSheet(asOf, ctx), then ? ledgerly.balanceSheet(then, ctx) : Promise.resolve(null)]);
+      const change = (a: string | null, b: string | null): Cell[] => (pct ? [percentChange(a ?? "0.00", b)] : []);
+      const rows: Cell[][] = [["Section", "Code", "Account", asOf, ...(prior && then ? [then] : []), ...(pct ? ["% change"] : [])]];
       for (const [section, key] of [["Assets", "assets"], ["Liabilities", "liabilities"], ["Equity", "equity"]] as const) {
         const now = new Map(bs.sections[key].map((r) => [r.code, r]));
-        const then = new Map((prior?.sections[key] ?? []).map((r) => [r.code, r]));
-        for (const code of [...new Set([...now.keys(), ...then.keys()])].sort()) {
-          rows.push([section, code, (now.get(code) ?? then.get(code))!.name, now.get(code)?.amount ?? null, ...(prior ? [then.get(code)?.amount ?? null] : [])]);
+        const earlier = new Map((prior?.sections[key] ?? []).map((r) => [r.code, r]));
+        for (const code of [...new Set([...now.keys(), ...earlier.keys()])].sort()) {
+          rows.push([section, code, (now.get(code) ?? earlier.get(code))!.name, now.get(code)?.amount ?? null, ...(prior ? [earlier.get(code)?.amount ?? null] : []),
+            ...change(now.get(code)?.amount ?? null, earlier.get(code)?.amount ?? null)]);
         }
       }
-      rows.push(["Equity", null, "Profit not yet closed to retained earnings", bs.equation.profit_to_date, ...(prior ? [prior.equation.profit_to_date] : [])],
-        ["Check", null, "Difference", bs.equation.difference, ...(prior ? [prior.equation.difference] : [])]);
+      rows.push(["Equity", null, "Profit not yet closed to retained earnings", bs.equation.profit_to_date, ...(prior ? [prior.equation.profit_to_date] : []),
+        ...change(bs.equation.profit_to_date, prior?.equation.profit_to_date ?? null)],
+        ["Check", null, "Difference", bs.equation.difference, ...(prior ? [prior.equation.difference] : []), ...(pct ? [null] : [])]);
       return { title: "balance-sheet", rows };
     }
     case "trial-balance": {
@@ -240,9 +248,10 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
     }
     case "inventory-valuation": {
       const v = await ledgerly.inventoryValuation(p.as_of, ctx);
-      return { title: "inventory-valuation", rows: [["SKU", "Item", "Unit", "Warehouse", "Quantity", "Value"],
-        ...v.rows.map((r) => [r.sku, r.name, r.unit, r.warehouse, r.quantity, r.value]),
-        ["Total", null, null, null, null, v.stock_value], ["Inventory account", null, null, null, null, v.inventory_account], ["Difference", null, null, null, null, v.difference]] };
+      return { title: "inventory-valuation", rows: [["SKU", "Item", "Unit", "Warehouse", "Quantity", "Average cost", "Value"],
+        ...v.rows.map((r) => [r.sku, r.name, r.unit, r.warehouse, r.quantity, perUnit(r.value, r.quantity), r.value]),
+        ["Total", null, null, null, null, null, v.stock_value], ["Inventory account", null, null, null, null, null, v.inventory_account],
+        ["Difference", null, null, null, null, null, v.difference]] };
     }
     case "customer-statement": case "supplier-statement": {
       // A customer's or supplier's statement for the period, in its standard columns, named in the heading.
