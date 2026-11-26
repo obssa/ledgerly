@@ -23,6 +23,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 final class ExpenseClaimController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly ExpenseClaims $claims, private readonly CurrentCompany $current)
     {
     }
@@ -30,10 +32,11 @@ final class ExpenseClaimController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('expenses.claim');
+        $range = $this->dateRange($request);
         $all = (bool) $this->current->membership()?->can('bills.view');
         $claims = Document::query()->where('type', 'bill')->whereNotNull('claimed_by')
             ->when(! $all, fn ($q) => $q->where('claimed_by', $request->user()->getKey()))
-            ->with('contact:id,name')->orderByDesc('issue_date')->orderByDesc('created_at')->limit(500)
+            ->with('contact:id,name')->when(true, fn ($q) => $this->withinDates($q, 'issue_date', $range))->orderByDesc('issue_date')->orderByDesc('created_at')->limit(500)
             ->get(['id', 'number', 'status', 'contact_id', 'issue_date', 'currency', 'total', 'amount_due', 'claimed_by', 'notes']);
 
         $today = $this->current->today();

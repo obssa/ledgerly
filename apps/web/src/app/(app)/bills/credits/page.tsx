@@ -1,17 +1,23 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getSupplierCredits } from "@/lib/data";
+import { getSupplierCredits, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Supplier credits" };
 
 /** Supplier credits are recorded from the bill they correct (Record a supplier credit on a posted bill). */
-export default async function SupplierCreditsPage() {
-  const credits = await getSupplierCredits();
+export default async function SupplierCreditsPage({ searchParams }: PageProps<"/bills/credits">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const credits = await getSupplierCredits(listQuery(q, period.picked));
 
   return (
     <>
       <PageTitle eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / Supplier credits</>} title="Supplier credits" />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Supplier credits">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -39,6 +45,7 @@ export default async function SupplierCreditsPage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/bills/credits" picked={period.picked} next={credits.next} prev={credits.prev} />
     </>
   );
 }

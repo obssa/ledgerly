@@ -1,17 +1,23 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCreditNotes } from "@/lib/data";
+import { getCreditNotes, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Credit notes" };
 
 /** Credit notes are issued from the invoice they correct (Issue a credit note on a posted invoice). */
-export default async function CreditNotesPage() {
-  const notes = await getCreditNotes();
+export default async function CreditNotesPage({ searchParams }: PageProps<"/credit-notes">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const notes = await getCreditNotes(listQuery(q, period.picked));
 
   return (
     <>
       <PageTitle eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / Credit notes</>} title="Credit notes" />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Credit notes">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -33,6 +39,7 @@ export default async function CreditNotesPage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/credit-notes" picked={period.picked} next={notes.next} prev={notes.prev} />
     </>
   );
 }

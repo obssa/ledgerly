@@ -28,6 +28,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class QuoteController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(
         private readonly CurrentCompany $current,
         private readonly QuoteWorkflow $workflow,
@@ -37,6 +39,7 @@ final class QuoteController extends Controller
     public function index(Request $request, string $kind): JsonResponse
     {
         $this->authorizeCompany('invoices.view');
+        $range = $this->dateRange($request);
         $filters = $request->validate([
             'status' => ['nullable', 'in:draft,sent,accepted,declined,expired,converted,void'],
             'contact_id' => ['nullable', 'uuid'],
@@ -47,6 +50,7 @@ final class QuoteController extends Controller
             ->with('contact:id,name')
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['contact_id'] ?? null, fn ($q, $id) => $q->where('contact_id', $id))
+            ->when(true, fn ($q) => $this->withinDates($q, 'issue_date', $range))   // the period asked for (FiltersByDate)
             ->orderBy('issue_date', 'desc')->orderBy('id')
             ->cursorPaginate(50));
     }

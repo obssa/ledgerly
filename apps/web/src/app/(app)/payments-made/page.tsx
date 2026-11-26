@@ -1,13 +1,18 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getPaymentsMade, getScheduledPayments } from "@/lib/data";
+import { getPaymentsMade, getScheduledPayments, getReportPeriod } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Payments made" };
 
 /** Module 3: what the company paid its suppliers, newest first. */
-export default async function PaymentsMadePage() {
-  const [payments, scheduled] = await Promise.all([getPaymentsMade(), getScheduledPayments("scheduled").catch(() => null)]);
+export default async function PaymentsMadePage({ searchParams }: PageProps<"/payments-made">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const [payments, scheduled] = await Promise.all([getPaymentsMade(listQuery(q, period.picked)), getScheduledPayments("scheduled").catch(() => null)]);
   const due = scheduled?.totals.filter((t) => t.due_count > 0) ?? [];
 
   return (
@@ -19,6 +24,7 @@ export default async function PaymentsMadePage() {
           <Link href="/payments-made/scheduled" className="btn">Open scheduled payments</Link>
         </p>
       )}
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Payments made">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -45,6 +51,7 @@ export default async function PaymentsMadePage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/payments-made" picked={period.picked} next={payments.next} prev={payments.prev} />
     </>
   );
 }

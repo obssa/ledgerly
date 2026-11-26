@@ -1,13 +1,18 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getGoodsReceipts } from "@/lib/data";
+import { getGoodsReceipts, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Goods received" };
 
 /** Module 3: the goods received notes (069), newest first. Each is recorded from its purchase order. */
-export default async function GoodsReceivedPage() {
-  const rows = await getGoodsReceipts();
+export default async function GoodsReceivedPage({ searchParams }: PageProps<"/goods-received">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const rows = await getGoodsReceipts(listQuery(q, period.picked));
   return (
     <>
       <PageTitle
@@ -15,6 +20,7 @@ export default async function GoodsReceivedPage() {
         title="Goods received"
         actions={<Link href="/goods-received/unbilled" className="btn">Received, not billed</Link>}
       />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Goods received notes">
         {rows.length === 0 ? (
           <p className="p-3 text-sm text-muted">No goods received yet. When goods arrive, open their purchase order and record what came: it goes into stock at the order&apos;s price.</p>
@@ -43,6 +49,7 @@ export default async function GoodsReceivedPage() {
           </div>
         )}
       </Card>
+      <ListPager path="/goods-received" picked={period.picked} next={rows.next} prev={rows.prev} />
     </>
   );
 }

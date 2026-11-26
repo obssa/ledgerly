@@ -1,17 +1,23 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getExpenses } from "@/lib/data";
+import { getExpenses, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Expenses" };
 
 /** Module 3: what was paid on the spot (fuel, utilities, small purchases), newest first. */
-export default async function ExpensesPage() {
-  const expenses = await getExpenses();
+export default async function ExpensesPage({ searchParams }: PageProps<"/expenses">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const expenses = await getExpenses(listQuery(q, period.picked));
 
   return (
     <>
       <PageTitle eyebrow="Money out" title="Expenses" actions={<Link href="/expenses/new" className="btn btn-primary">+ Record an expense</Link>} />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Expenses">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -40,6 +46,7 @@ export default async function ExpensesPage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/expenses" picked={period.picked} next={expenses.next} prev={expenses.prev} />
     </>
   );
 }

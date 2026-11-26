@@ -1,7 +1,9 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { Invoice } from "@/lib/api";
-import { getInvoices } from "@/lib/data";
+import { getInvoices, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Invoices" };
@@ -18,8 +20,11 @@ function einvoiceBadge(inv: Invoice) {
   return <Pill tone="warn">Queued</Pill>;
 }
 
-export default async function InvoicesPage() {
-  const invoices = await getInvoices();
+export default async function InvoicesPage({ searchParams }: PageProps<"/invoices">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const invoices = await getInvoices(listQuery(q, period.picked));
 
   return (
     <>
@@ -28,6 +33,7 @@ export default async function InvoicesPage() {
         title="Sales and invoices"
         actions={<Link href="/invoices/new" className="btn btn-primary">+ New invoice</Link>}
       />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Invoices">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -55,6 +61,7 @@ export default async function InvoicesPage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/invoices" picked={period.picked} next={invoices.next} prev={invoices.prev} />
     </>
   );
 }

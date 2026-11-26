@@ -26,16 +26,20 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 final class SupplierCreditController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly AuditLogger $audit)
     {
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('bills.view');
+        $range = $this->dateRange($request);
 
         return response()->json(Document::query()->where('type', 'vendor_credit')
             ->with(['contact:id,name', 'original:id,number,reference'])
+            ->when(true, fn ($q) => $this->withinDates($q, 'issue_date', $range))   // the period asked for (FiltersByDate)
             ->orderByDesc('issue_date')->orderBy('id')
             ->cursorPaginate(50));
     }

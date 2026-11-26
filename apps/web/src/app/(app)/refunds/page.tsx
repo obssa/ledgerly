@@ -1,16 +1,22 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getRefunds } from "@/lib/data";
+import { getRefunds, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Refunds" };
 
 /** Credit given back: to customers (money out) and from suppliers (money in), newest first. */
-export default async function RefundsPage() {
-  const refunds = await getRefunds();
+export default async function RefundsPage({ searchParams }: PageProps<"/refunds">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const refunds = await getRefunds(listQuery(q, period.picked));
   return (
     <>
       <PageTitle eyebrow="Money in and out" title="Refunds" />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Refunds">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -31,6 +37,7 @@ export default async function RefundsPage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/refunds" picked={period.picked} next={refunds.next} prev={refunds.prev} />
     </>
   );
 }

@@ -24,6 +24,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class ExpenseController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly CurrentCompany $current)
     {
     }
@@ -39,11 +41,13 @@ final class ExpenseController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('expenses.view');
+        $range = $this->dateRange($request);
         $q = $request->validate(['contact_id' => ['nullable', 'uuid']]);
 
         return response()->json(Document::query()->where('type', 'expense')
             ->with(['contact:id,name', 'paidFrom:id,code,name'])
             ->when($q['contact_id'] ?? null, fn ($b, $id) => $b->where('contact_id', $id))
+            ->when(true, fn ($q) => $this->withinDates($q, 'issue_date', $range))   // the period asked for (FiltersByDate)
             ->orderByDesc('issue_date')->orderByDesc('created_at')
             ->cursorPaginate(50));
     }

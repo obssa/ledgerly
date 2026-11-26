@@ -27,6 +27,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class BillController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly DuplicateBills $duplicates, private readonly CurrentCompany $current, private readonly ThreeWayMatch $match)
     {
     }
@@ -61,6 +63,7 @@ final class BillController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('bills.view');
+        $range = $this->dateRange($request);
         $filters = $request->validate([
             'status' => ['nullable', 'in:draft,awaiting_approval,posted,part_paid,paid,void'],
             'contact_id' => ['nullable', 'uuid'],
@@ -73,6 +76,7 @@ final class BillController extends Controller
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['contact_id'] ?? null, fn ($q, $id) => $q->where('contact_id', $id))
             ->when($filters['open'] ?? false, fn ($q) => $q->whereIn('status', ['posted', 'part_paid']))
+            ->when(true, fn ($q) => $this->withinDates($q, 'issue_date', $range))   // the period asked for (FiltersByDate)
             // Open bills by due date (the order they are paid in); otherwise newest first.
             ->when($filters['open'] ?? false,
                 fn ($q) => $q->orderByRaw('due_date asc nulls last')->orderBy('issue_date'),

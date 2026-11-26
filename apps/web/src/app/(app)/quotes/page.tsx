@@ -2,6 +2,6 @@ import { QuoteList } from "@/app/(app)/quotes/views";
 
 export const metadata = { title: "Quotes" };
 
-export default function Page() {
-  return <QuoteList kind="quote" />;
+export default async function Page({ searchParams }: PageProps<"/quotes">) {
+  return <QuoteList kind="quote" q={await searchParams} />;
 }
