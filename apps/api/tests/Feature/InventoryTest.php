@@ -64,6 +64,10 @@ final class InventoryTest extends TestCase
 
         $card = $this->getJson("/api/v1/reports/bin-card?item_id={$this->c['stock_item']}&warehouse_id={$this->c['store']}&from=2026-11-01&to=2026-11-30", $this->h)->assertOk();
         $this->assertCount(5, $card->json('moves'));
+        // Each move with its document, that document's customer or supplier, and who made it.
+        foreach (['document_id', 'document_type', 'document_number', 'name', 'created_by', 'created_at'] as $field) {
+            $this->assertArrayHasKey($field, $card->json('moves.0'));
+        }
         $this->assertSame('0.00', end($card->json()['moves'])['balance_value'] ?? $card->json('moves.4.balance_value'));
         $this->assertSame(1, $this->owner()->table('audit_log')->where(['subject_id' => $this->c['stock_item'], 'action' => 'opening_stock'])->count());
     }

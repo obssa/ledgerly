@@ -70,6 +70,11 @@ final class TaxReturnTest extends TestCase
         $this->assertSame(['2000.00', '300.00'], [$sale['taxable'], $sale['tax']]);
         $bill = collect($s->json('purchases.documents'))->firstWhere('id', $this->bill);
         $this->assertSame(['1000.00', '150.00'], [$bill['taxable'], $bill['tax']]);
+        // Each document as a tax register lists it: its own reference, due date, currency and rate.
+        foreach (['reference', 'due_date', 'currency', 'exchange_rate'] as $field) {
+            $this->assertArrayHasKey($field, $bill);
+        }
+        $this->assertSame('ETB', $bill['currency']);
         $vat = collect($s->json('sales.rates'))->firstWhere('code', 'VAT15');
         $this->assertSame('300.00', $vat['tax']);
 
