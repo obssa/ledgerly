@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { byType, KIND_LABELS, naturalBalance } from "@/lib/chart";
 import { getChart } from "@/lib/data";

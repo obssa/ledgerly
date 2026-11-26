@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { redirect } from "next/navigation";
 import { Card, PageTitle } from "@/components/ui";
 import { getExpenseClaims } from "@/lib/data";

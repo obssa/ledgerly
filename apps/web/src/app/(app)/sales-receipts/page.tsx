@@ -1,6 +1,6 @@
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getSalesReceipts, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";

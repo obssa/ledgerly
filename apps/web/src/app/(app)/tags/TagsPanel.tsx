@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, Pill } from "@/components/ui";
 import type { TagKind } from "@/lib/api";
 import { getTransactionTags } from "@/lib/data";

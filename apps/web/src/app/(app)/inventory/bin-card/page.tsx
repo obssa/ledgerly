@@ -1,7 +1,7 @@
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { ColumnCustomizer } from "@/components/ColumnCustomizer";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Card, PageTitle } from "@/components/ui";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle, Segmented } from "@/components/ui";
 import { getBins, getItems, getStock, getWarehouses } from "@/lib/data";
 import { CountForm } from "./CountForm";

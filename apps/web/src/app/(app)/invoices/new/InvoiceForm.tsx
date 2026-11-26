@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { startTransition, useActionState, useMemo, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
 import type { InvoiceDetail } from "@/lib/api";

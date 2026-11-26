@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import type { Account, StatementLine } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { applyBankRules, importStatement, reviewStatementLine } from "./actions";
 
 function Message({ state }: { state: FormState | undefined }) {

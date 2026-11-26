@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { periodQuery, type PickedRange } from "@/lib/periodParams";
 

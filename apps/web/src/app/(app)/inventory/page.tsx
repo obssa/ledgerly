@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getIssueOptions, getReorder, getStock, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";

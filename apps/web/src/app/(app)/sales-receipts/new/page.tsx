@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { PageTitle } from "@/components/ui";
 import { getSalesReceiptOptions } from "@/lib/data";
 import { InvoiceForm } from "../../invoices/new/InvoiceForm";

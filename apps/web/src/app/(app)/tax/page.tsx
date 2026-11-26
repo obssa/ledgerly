@@ -1,6 +1,6 @@
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { CLOSED_RANGE_PRESETS } from "@/lib/periods";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getTaxCentre, getReportPeriod } from "@/lib/data";
 import { formatAmount } from "@/lib/format";

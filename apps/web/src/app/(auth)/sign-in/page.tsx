@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { getDemoOptions } from "@/lib/data";
 import { demoSignIn, signIn } from "../actions";
 import { AuthForm } from "../AuthForm";

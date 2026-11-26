@@ -1,6 +1,6 @@
 import { asOfLabel } from "@/lib/periods";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
 import { getInventoryValuation, getReportAsOf } from "@/lib/data";
