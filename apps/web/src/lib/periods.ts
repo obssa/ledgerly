@@ -122,7 +122,7 @@ function monthEnd(mo: Month, cal: Calendar): string {
 }
 
 /** The same day k months away, in the company's calendar, kept inside the target month (31 Jan → 28 Feb). */
-function shiftDay(iso: string, k: number, cal: Calendar): string {
+export function shiftDay(iso: string, k: number, cal: Calendar): string {
   if (cal === "ethiopian") {
     const e = fromGregorian(iso);
     const day = e.month === 13 ? 30 : e.day;   // a Pagume day counts as the end of Nehase

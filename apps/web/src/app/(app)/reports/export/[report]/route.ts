@@ -41,7 +41,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
       // The ageing's view and periods (lib/ageing.ts checks the ranges).
       view: word("view"), source: word("source"), by: word("by"), pct: q.get("pct") === "1" ? "1" : undefined,
       // The profit and loss as the page had it: its comparison and basis; an open period ("All dates") has none to compare with.
-      compare: q.get("compare") === "year" ? "year" : undefined, basis: q.get("basis") === "cash" ? "cash" : undefined,
+      compare: ["year", "quarter", "month"].includes(q.get("compare") ?? "") ? (q.get("compare") as string) : undefined, basis: q.get("basis") === "cash" ? "cash" : undefined,
       open: period.picked.from && period.picked.to ? undefined : "1",
       // The cash flow method, the forecast's weeks, and a statement's customer or supplier (loaded by the API through the company).
       method: q.get("method") === "direct" ? "direct" : undefined, weeks: /^\d{1,2}$/.test(q.get("weeks") ?? "") ? (q.get("weeks") as string) : undefined,
