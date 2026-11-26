@@ -164,8 +164,8 @@ jobs:
         run: |
           ssh target 'mkdir -p ~/ledgerly/incoming ~/ledgerly/deploy ~/ledgerly-web'
           scp "ledgerly-$SHA.tar.gz" target:ledgerly/incoming/
+          # web-app.js goes live with the release, in release.sh, and goes back with it in rollback.sh.
           scp scripts/deploy/cpanel/*.sh scripts/deploy/cpanel/web-app.js target:ledgerly/deploy/
-          ssh target 'cp ~/ledgerly/deploy/web-app.js ~/ledgerly-web/app.js'
       - name: Migrate, check database roles, switch
         id: switch
         env:

@@ -110,6 +110,14 @@ else
   echo "WARNING: cPanel did not give an address for '$API_HOST'; the web app looks it up in public DNS"
 fi
 
+echo "== The Node.js app's startup file"
+# Installed with the release it belongs to, never before: a deploy that fails earlier leaves the running app alone.
+# The one it replaces is kept for rollback.sh, which puts it back with the previous release.
+if [ -f "$ROOT/deploy/web-app.js" ]; then
+  [ -f "$WEB_APP_ROOT/app.js" ] && cp -p "$WEB_APP_ROOT/app.js" "$ROOT/shared/app.js.previous"
+  cp "$ROOT/deploy/web-app.js" "$WEB_APP_ROOT/app.js"
+fi
+
 echo "== Switch"
 ln -sfn "$REL" "$ROOT/current.next" && mv -Tf "$ROOT/current.next" "$ROOT/current"
 [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$REL" ] && printf '%s\n' "$PREVIOUS" > "$ROOT/shared/previous-release"

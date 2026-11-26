@@ -52,46 +52,57 @@ function pinApiAddress() {
 
 /**
  * When a form's server action ends in a redirect, Next.js fetches the next page from itself, so the browser gets it
- * in the same answer. It fetches from the address it thinks it listens on. Under Passenger ("Setup Node.js App")
- * that address is wrong: Passenger takes over listen() and gives the server a socket of its own, so Next.js records
- * 0.0.0.0:3000, nothing answers there, and every such click costs the visitor a second round trip (and a stack
- * trace in stderr.log: "failed to get redirect response ... ECONNREFUSED 0.0.0.0:3000").
+ * in the same answer. It fetches from the address it thinks it listens on. Under the host's Node.js loader that
+ * address is wrong: the loader (LiteSpeed's lsnode.js on this host, Passenger's node-loader.js on others) takes over
+ * http.Server's listen() and address() and gives the server a socket of its own, so Next.js records 0.0.0.0:3000,
+ * nothing answers there, and every such click costs the visitor a second round trip (and a stack trace in
+ * stderr.log: "failed to get redirect response ... ECONNREFUSED 0.0.0.0:3000").
  *
  * So a second listener on 127.0.0.1 hands its requests to the same server, and Next.js is told to fetch from it.
  * Other accounts on a shared server can reach 127.0.0.1 as well, so it answers only under a path made of random
  * bytes that never leave this process; anything else gets a 404. Behind it is the same app the public reaches.
+ *
+ * The door listens through net.Server's own listen() and address(), which neither loader replaces. Through
+ * http.Server's, the loader would take the door for the app (it installs the FIRST server that listens, and
+ * ignores the rest): on 26 Nov 2026 that answered every visitor with the door's 404. Anything that goes wrong
+ * here leaves the app as it would be without the door.
  */
 function privateDoor() {
   const listen = http.Server.prototype.listen;
   http.Server.prototype.listen = function (...args) {
     http.Server.prototype.listen = listen; // the first server to listen is Next.js's own; leave any later one alone
-    const app = this;
-    const secret = Buffer.from(`/${crypto.randomBytes(24).toString("hex")}`);
-    let origin;
-    const door = http.createServer((req, res) => {
-      const head = Buffer.from(req.url.slice(0, secret.length));
-      const next = req.url.charAt(secret.length);
-      if (head.length !== secret.length || !crypto.timingSafeEqual(head, secret) || (next !== "" && next !== "/" && next !== "?")) {
-        res.statusCode = 404;
-        res.end();
-        return;
-      }
-      req.url = req.url.slice(secret.length) || "/";
-      if (req.url.startsWith("?")) req.url = `/${req.url}`;
-      app.emit("request", req, res);
-    });
-    door.on("error", (e) => console.error(`ledgerly-web: the private listener failed (${e.message}); redirects take two round trips`));
-    const use = () => { if (origin) process.env.__NEXT_PRIVATE_ORIGIN = origin; };
-    // Passenger keeps the real listen() as originalListen. The door must use it, or Passenger would take the door
-    // for the app's server and hand it the public socket.
-    (door.originalListen || listen).call(door, 0, "127.0.0.1", () => {
-      origin = `http://127.0.0.1:${door.address().port}${secret.toString()}`;
-      use();
-    });
-    // Next.js writes its own (wrong) origin when its server starts listening: ours goes in after it.
-    app.once("listening", () => setImmediate(use));
+    try {
+      openDoor(this);
+    } catch (e) {
+      console.error(`ledgerly-web: no private listener (${e.message}); redirects take two round trips`);
+    }
     return listen.apply(this, args);
   };
+}
+
+function openDoor(app) {
+  const secret = Buffer.from(`/${crypto.randomBytes(24).toString("hex")}`);
+  let origin;
+  const door = http.createServer((req, res) => {
+      const head = Buffer.from(req.url.slice(0, secret.length));
+      const next = req.url.charAt(secret.length);
+    if (head.length !== secret.length || !crypto.timingSafeEqual(head, secret) || (next !== "" && next !== "/" && next !== "?")) {
+      res.statusCode = 404;
+      res.end();
+      return;
+    }
+    req.url = req.url.slice(secret.length) || "/";
+    if (req.url.startsWith("?")) req.url = `/${req.url}`;
+    app.emit("request", req, res);
+  });
+  door.on("error", (e) => console.error(`ledgerly-web: the private listener failed (${e.message}); redirects take two round trips`));
+  const use = () => { if (origin) process.env.__NEXT_PRIVATE_ORIGIN = origin; };
+  net.Server.prototype.listen.call(door, 0, "127.0.0.1", () => {
+    origin = `http://127.0.0.1:${net.Server.prototype.address.call(door).port}${secret.toString()}`;
+    use();
+  });
+  // Next.js writes its own (wrong) origin when its server starts listening: ours goes in after it.
+  app.once("listening", () => setImmediate(use));
 }
 
 /**
