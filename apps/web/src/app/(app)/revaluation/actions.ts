@@ -11,7 +11,7 @@ import { getSession } from "@/lib/session";
 export async function postRevaluation(_: FormState | undefined, form: FormData): Promise<FormState> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
   const rates: Record<string, string> = {};
   for (const [key, value] of form.entries()) {
     if (key.startsWith("rate:") && typeof value === "string" && value.trim() !== "") rates[key.slice(5)] = value.trim().replace(/[,\s]/g, "");

@@ -35,7 +35,8 @@ const subscriptionOf = cache((token: string, companyId: string) => ledgerly.subs
 async function withApi<T>(call: (ctx: { token: string; companyId: string }) => Promise<T>): Promise<T> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  // No company chosen (its cookie expired or was cleared): pick one again, never company setup (app/company/resume).
+  if (!companyId) redirect("/company/resume");
   try {
     return await call({ token, companyId });
   } catch (error) {
@@ -44,9 +45,10 @@ async function withApi<T>(call: (ctx: { token: string; companyId: string }) => P
     if (error instanceof ApiError && error.status === 403 && (error.body as { type?: string } | null)?.type === "MfaEnrolmentRequired") {
       redirect("/security");
     }
-    // No usable company: not chosen yet, or not a member (any more).
+    // No usable company: not chosen, or not a member (any more). Another of the person's companies is chosen, or
+    // company setup if they have none (app/company/resume).
     if (error instanceof ApiError && (error.status === 400 || (error.status === 403 && (error.body as { type?: string } | null)?.type === "NotAMember"))) {
-      redirect("/onboarding");
+      redirect("/company/resume");
     }
     // A member whose role does not include this page.
     if (error instanceof ApiError && error.status === 403) redirect("/no-access");
@@ -1704,7 +1706,7 @@ export async function getShellContext(): Promise<ShellContext> {
   const { name, companyId, demo } = await getSession();
   const { data } = await withApi(({ token }) => companiesOf(token));
   const company: Company | undefined = data.find((c) => c.id === companyId);
-  if (!company) redirect("/onboarding");
+  if (!company) redirect("/company/resume");   // the chosen company is not on the person's list any more
   // The demo was started fresh by its owner: everyone in the demo goes on in the new demo company.
   if (demo && company.status === "archived" && data.some((c) => c.status !== "archived")) redirect("/demo-company");
   return {

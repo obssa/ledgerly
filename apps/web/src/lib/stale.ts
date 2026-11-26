@@ -7,7 +7,9 @@
 export function isStaleBuild(error: unknown): boolean {
   const e = error as { name?: string; message?: string } | null;
   const text = `${e?.name ?? ""} ${e?.message ?? ""}`;
-  return /ChunkLoadError|Loading chunk|Failed to load chunk|dynamically imported module|Importing a module script failed|error loading dynamically imported/i.test(text);
+  // A form opened before a release: its Server Action no longer exists in the new build (Next.js names actions by
+  // their build), so submitting it fails until the page is reloaded.
+  return /ChunkLoadError|Loading chunk|Failed to load chunk|dynamically imported module|Importing a module script failed|error loading dynamically imported|Server Action "[^"]*" was not found on the server|Failed to find Server Action/i.test(text);
 }
 
 const KEY = "ledgerly:stale-reload";

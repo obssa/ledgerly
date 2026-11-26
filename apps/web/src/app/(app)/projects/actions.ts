@@ -12,7 +12,7 @@ import { getSession } from "@/lib/session";
 export async function saveProject(_: FormState | undefined, form: FormData): Promise<FormState> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
   const id = text(form, "id") ?? null;
   let saved: string;
   try {
@@ -32,7 +32,7 @@ export async function saveProject(_: FormState | undefined, form: FormData): Pro
 async function context(): Promise<{ token: string; companyId: string }> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
   return { token, companyId };
 }
 

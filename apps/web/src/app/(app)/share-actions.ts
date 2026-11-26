@@ -18,7 +18,7 @@ export interface ShareState extends FormState {
 export async function shareOnWhatsApp(_: ShareState | undefined, form: FormData): Promise<ShareState> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
   const kind = text(form, "kind") === "quote" ? "quote" : "invoice";
   try {
     const s = await ledgerly.shareDocument(kind, text(form, "id") ?? "", { token, companyId });

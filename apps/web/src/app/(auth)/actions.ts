@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { endSession, getSession, heldChallenge, holdChallenge, replaceToken, selectCompany, startSession } from "@/lib/session";
+import { chooseCompany } from "@/lib/companyChoice";
 
 /*
  * Server Functions behind the sign-in, sign-up, sign-out and company-setup forms. They run on the web server,
@@ -14,12 +15,16 @@ import { endSession, getSession, heldChallenge, holdChallenge, replaceToken, sel
  * redirect() works by throwing, so it is always called outside the try blocks.
  */
 
-/** Where to go once signed in: the first company, or company setup when there is none yet. */
-async function afterSignIn(token: string): Promise<string> {
+/**
+ * Signs in with a token the API just issued: asks for the person's companies first, then writes the session in one
+ * step (token, name, company), and says where to go. If the companies can't be read, no cookie is written and the
+ * error reaches the form: the person tries again instead of being left signed in without a company.
+ */
+async function beginSession(token: string, name: string, demo?: string): Promise<string> {
   const { data } = await ledgerly.companies(token);
-  if (data.length === 0) return "/onboarding";
-  await selectCompany(data[0].id);
-  return "/";
+  const choice = chooseCompany(data);
+  await startSession(token, name, demo, choice.companyId);
+  return choice.to;
 }
 
 export async function signIn(_: FormState | undefined, form: FormData): Promise<FormState> {
@@ -31,8 +36,7 @@ export async function signIn(_: FormState | undefined, form: FormData): Promise<
       await holdChallenge(result.challenge);
       next = "/sign-in/code";
     } else {
-      await startSession(result.token, result.user.name);
-      next = await afterSignIn(result.token);
+      next = await beginSession(result.token, result.user.name);
     }
   } catch (error) {
     return formStateFromError(error);
@@ -50,8 +54,7 @@ export async function demoSignIn(form: FormData): Promise<void> {
   let next = "/sign-in?demo=unavailable";
   try {
     const { token, user } = await ledgerly.demoLogin(role);
-    await startSession(token, user.name, role.charAt(0).toUpperCase() + role.slice(1));
-    next = await afterSignIn(token);
+    next = await beginSession(token, user.name, role.charAt(0).toUpperCase() + role.slice(1));
   } catch {
     // Off, not set up, or too many tries: the sign-in page says so.
   }
@@ -68,8 +71,7 @@ export async function verifyCode(_: FormState | undefined, form: FormData): Prom
   let next: string;
   try {
     const { token, user } = await ledgerly.loginWithCode(isAppCode ? { challenge, code: entered } : { challenge, recovery_code: entered });
-    await startSession(token, user.name);
-    next = await afterSignIn(token);
+    next = await beginSession(token, user.name);
   } catch (error) {
     return formStateFromError(error);
   }

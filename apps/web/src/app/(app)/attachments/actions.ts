@@ -10,7 +10,7 @@ import { getSession } from "@/lib/session";
 export async function removeAttachment(_: FormState | undefined, form: FormData): Promise<FormState> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
   try {
     await ledgerly.removeAttachment(text(form, "id") ?? "", { token, companyId });
   } catch (error) {
