@@ -553,6 +553,7 @@ Route::prefix('v1')->group(function () {
 
             Route::get('reports/trial-balance', [LedgerController::class, 'trialBalance']);
             Route::get('reports/general-ledger', [LedgerController::class, 'generalLedger']);
+            Route::get('reports/journal', [LedgerController::class, 'journal']);   // every entry with its lines
             Route::get('reports/balance-sheet', [LedgerController::class, 'balanceSheet']);
             Route::get('reports/bin-card', [LedgerController::class, 'binCard']);
             Route::get('reports/inventory-valuation', [LedgerController::class, 'inventoryValuation']);

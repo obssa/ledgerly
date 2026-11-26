@@ -568,7 +568,9 @@ export interface TimeEntry {
 export type TaxKind = "vat" | "withholding" | "tot";
 
 export interface TaxRateRow { code: string; name: string; rate: string | null; kind: string | null; taxable: string; tax: string }
-export interface TaxDocumentRow { id: string; type: string; number: string | null; date: string; contact: string; tax_id: string | null; taxable: string; tax: string }
+export interface TaxDocumentRow { id: string; type: string; number: string | null; date: string; contact: string; tax_id: string | null; taxable: string; tax: string;
+  /** The supplier's (or customer's) own reference, due date, currency and rate; absent on returns filed before they were kept. */
+  reference?: string | null; due_date?: string | null; currency?: string; exchange_rate?: string }
 
 export interface TaxWorksheet {
   kind: TaxKind;
@@ -739,7 +741,8 @@ export interface StockOnHand {
 /** GET /reports/bin-card. */
 export interface BinCard {
   opening: { quantity: string; value: string };
-  moves: { moved_on: string; kind: string; reference: string | null; qty_in: string; qty_out: string; unit_cost: string; value: string; balance_qty: string; balance_value: string }[];
+  moves: { moved_on: string; kind: string; reference: string | null; qty_in: string; qty_out: string; unit_cost: string; value: string; balance_qty: string; balance_value: string;
+    document_id?: string | null; document_type?: string | null; document_number?: string | null; name?: string | null; created_by?: string | null; created_at?: string }[];
 }
 
 /** Where a supplier is paid: a bank account, a mobile-money wallet, or both. */
@@ -1190,6 +1193,15 @@ export type LedgerLine = { line_id: string; date: string; entry_id: string; entr
   contact: string | null; debit: string; credit: string; balance: string; amount?: string; type?: string; number?: string | null; document_id?: string | null;
   payment_id?: string | null; due_date?: string | null; split?: string | null; foreign_amount?: string | null; currency?: string | null; exchange_rate?: string | null;
   location?: string | null; class?: string | null; project?: string | null; created_by?: string | null; posted_by?: string | null };
+
+/** GET /reports/journal: every entry of a period with its lines (QuickBooks' Journal), each line on its account. */
+export interface JournalReport {
+  from: string | null;
+  to: string | null;
+  currency: string;
+  truncated: boolean;
+  lines: (LedgerLine & { account_id: string; account_code: string; account_name: string })[];
+}
 
 export interface GeneralLedger {
   from: string;
@@ -2156,6 +2168,7 @@ export const ledgerly = {
   reopenYear: (id: string, reason: string, ctx: RequestOptions) => api<{ reversal: { number: number } }>(`fiscal-years/${encodeURIComponent(id)}/reopen`, { ...ctx, method: "POST", body: { reason } }),
   closeChecklist: (periodEnd: string | undefined, ctx: RequestOptions) => api<CloseChecklist>("close-checklist", { ...ctx, query: { period_end: periodEnd } }),
   generalLedger: (q: Record<string, string | undefined>, ctx: RequestOptions) => api<GeneralLedger>("reports/general-ledger", { ...ctx, query: q }),
+  journalReport: (q: { from?: string; to?: string; source?: string }, ctx: RequestOptions) => api<JournalReport>("reports/journal", { ...ctx, query: q }),
   trialBalance: (asOf: string, ctx: RequestOptions) => api<{ data: TrialBalanceRow[] }>("reports/trial-balance", { ...ctx, query: { as_of: asOf } }),
   balanceSheet: (asOf: string, ctx: RequestOptions) => api<BalanceSheet>("reports/balance-sheet", { ...ctx, query: { as_of: asOf } }),
   cashFlow: (q: { from?: string; to?: string }, ctx: RequestOptions) => api<CashFlowStatement>("reports/cash-flow", { ...ctx, query: q }),

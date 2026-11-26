@@ -70,6 +70,24 @@ final class LedgerController extends Controller
             ...$reports->generalLedger($company->getKey(), $company->base_currency, $q['from'], $q['to'], $q['account_id'] ?? null, $dimensions)]);
     }
 
+    /**
+     * The Journal report (Module 6): every entry of a period with its lines, QuickBooks' Journal. All dates when no
+     * dates are given; one kind of entry (manual journals, invoices, payments ...) when asked.
+     */
+    public function journal(Request $request, ReportService $reports): JsonResponse
+    {
+        $this->authorizeCompany('reports.view');
+        $q = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+            'source' => ['nullable', 'string', 'max:40', 'regex:/^[a-z_]+$/'],
+        ]);
+        $company = $this->current->get();
+
+        return response()->json(['from' => $q['from'] ?? null, 'to' => $q['to'] ?? null, 'currency' => $company->base_currency,
+            ...$reports->journal($company->getKey(), $company->base_currency, $q['from'] ?? null, $q['to'] ?? null, $q['source'] ?? null)]);
+    }
+
     /** Balance sheet; `equation.balanced` reports whether Assets = Liabilities + Equity holds. */
     public function balanceSheet(Request $request, ReportService $reports): JsonResponse
     {

@@ -15,6 +15,8 @@ PREVIOUS="$(cat "$ROOT/shared/previous-release" 2>/dev/null || true)"
 FAILED="$(readlink "$ROOT/current" || true)"
 
 ln -sfn "$PREVIOUS" "$ROOT/current.next" && mv -Tf "$ROOT/current.next" "$ROOT/current"
+# The startup file the previous release ran with (release.sh keeps it).
+[ -f "$ROOT/shared/app.js.previous" ] && cp "$ROOT/shared/app.js.previous" "$WEB_APP_ROOT/app.js"
 mkdir -p "$WEB_APP_ROOT/tmp" && touch "$WEB_APP_ROOT/tmp/restart.txt"
 (cd "$ROOT/current/api" && "$PHP" artisan queue:restart --no-interaction) || true
 

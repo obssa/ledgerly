@@ -139,18 +139,24 @@ final class ReportService
              WHERE company_id = ? AND item_id = ? AND warehouse_id = ? AND moved_on < ?
             SQL, [$companyId, $itemId, $warehouseId, $from]);
 
+        // Each move with its document (type and number), that document's customer or supplier, and who made the move.
         $moves = DB::select(<<<'SQL'
-            SELECT moved_on, kind, reference,
-                   greatest(quantity, 0)::numeric(18,2)::text            AS qty_in,
-                   greatest(-quantity, 0)::numeric(18,2)::text           AS qty_out,
-                   round(unit_cost, 2)::text                             AS unit_cost,
-                   (?::numeric + sum(quantity) OVER w)::numeric(18,2)::text            AS balance_qty,
-                   amount::text                                          AS value,
-                   (?::numeric + sum(amount) OVER w)::numeric(20,2)::text AS balance_value
-              FROM stock_moves
-             WHERE company_id = ? AND item_id = ? AND warehouse_id = ? AND moved_on BETWEEN ? AND ?
-            WINDOW w AS (ORDER BY moved_on, seq ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
-             ORDER BY moved_on, seq
+            SELECT m.moved_on, m.kind, m.reference,
+                   greatest(m.quantity, 0)::numeric(18,2)::text            AS qty_in,
+                   greatest(-m.quantity, 0)::numeric(18,2)::text           AS qty_out,
+                   round(m.unit_cost, 2)::text                             AS unit_cost,
+                   (?::numeric + sum(m.quantity) OVER w)::numeric(18,2)::text            AS balance_qty,
+                   m.amount::text                                          AS value,
+                   (?::numeric + sum(m.amount) OVER w)::numeric(20,2)::text AS balance_value,
+                   d.id AS document_id, d.type AS document_type, d.number AS document_number, c.name AS name,
+                   u.name AS created_by, m.created_at::text AS created_at
+              FROM stock_moves m
+              LEFT JOIN documents d ON d.company_id = m.company_id AND d.id = m.document_id
+              LEFT JOIN contacts c ON c.company_id = d.company_id AND c.id = d.contact_id
+              LEFT JOIN users u ON u.id = m.created_by
+             WHERE m.company_id = ? AND m.item_id = ? AND m.warehouse_id = ? AND m.moved_on BETWEEN ? AND ?
+            WINDOW w AS (ORDER BY m.moved_on, m.seq ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+             ORDER BY m.moved_on, m.seq
             SQL, [$opening->quantity, $opening->value, $companyId, $itemId, $warehouseId, $from, $to]);
 
         return ['opening' => (array) $opening, 'moves' => $moves];
@@ -275,35 +281,9 @@ final class ReportService
         };
         $opening = $scoped(DB::table('journal_lines as l'))->where('l.entry_date', '<', $from)->groupBy('l.account_id')
             ->select('l.account_id')->selectRaw('sum(l.debit - l.credit)::numeric(20,2)::text AS balance')->pluck('balance', 'account_id');
-        // Each line with its transaction (the invoice, bill or payment behind the entry), the other side of the entry
-        // ("Split": the one other account, or -Split- for several), and who made and posted it. Fixed SQL: the base
-        // currency is a binding, nothing from the request is SQL (CLAUDE.md rule 1).
-        $lines = $scoped(DB::table('journal_lines as l'))
-            ->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'l.company_id')->on('e.id', '=', 'l.journal_entry_id'))
-            ->leftJoin('documents as d', fn ($j) => $j->on('d.company_id', '=', 'l.company_id')->on('d.id', '=', 'e.source_id')
-                ->whereIn('e.source_type', ['invoice', 'credit_note', 'bill', 'vendor_credit', 'sales_receipt']))
-            ->leftJoin('payments as p', fn ($j) => $j->on('p.company_id', '=', 'l.company_id')->on('p.journal_entry_id', '=', 'e.id'))
-            ->leftJoin('contacts as c', fn ($j) => $j->on('c.company_id', '=', 'l.company_id')->on('c.id', '=', DB::raw('coalesce(l.contact_id, d.contact_id, p.contact_id)')))
-            ->leftJoin('users as cu', 'cu.id', '=', DB::raw('coalesce(d.created_by, e.posted_by)'))
-            ->leftJoin('users as pu', 'pu.id', '=', 'e.posted_by')
-            ->leftJoin('dimensions as loc', fn ($j) => $j->on('loc.company_id', '=', 'l.company_id')->on('loc.id', '=', 'l.location_id'))
-            ->leftJoin('dimensions as cls', fn ($j) => $j->on('cls.company_id', '=', 'l.company_id')->on('cls.id', '=', 'l.class_id'))
-            ->leftJoin('dimensions as prj', fn ($j) => $j->on('prj.company_id', '=', 'l.company_id')->on('prj.id', '=', 'l.project_id'))
+        $lines = $this->withTransactions($scoped(DB::table('journal_lines as l')), $base)
             ->whereBetween('l.entry_date', [$from, $to])
             ->orderBy('l.entry_date')->orderBy('e.number')->orderBy('l.line_no')->limit(self::GL_MAX_LINES + 1)
-            ->select(['l.id as line_id', 'l.account_id', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.status', 'e.memo', 'l.description',
-                'c.name as contact', 'l.debit', 'l.credit', 'd.id as document_id', 'p.id as payment_id', 'd.due_date', 'cu.name as created_by', 'pu.name as posted_by',
-                'loc.name as location', 'cls.name as class', 'prj.name as project'])
-            ->selectRaw("coalesce(d.type, CASE p.direction WHEN 'in' THEN 'payment_received' WHEN 'out' THEN 'payment_made' END, e.source_type) AS type")
-            ->selectRaw('coalesce(d.number, p.reference) AS number')
-            ->selectRaw('CASE WHEN e.currency <> ? THEN l.amount_txn::text END AS foreign_amount', [$base])
-            ->selectRaw('CASE WHEN e.currency <> ? THEN e.currency END AS currency', [$base])
-            ->selectRaw('CASE WHEN e.currency <> ? THEN e.fx_rate::text END AS exchange_rate', [$base])
-            ->selectRaw(<<<'SQL'
-                (SELECT CASE WHEN count(DISTINCT o.account_id) = 1 THEN min(oa.code || ' ' || oa.name) WHEN count(*) > 1 THEN '-Split-' END
-                   FROM journal_lines o JOIN accounts oa ON oa.company_id = o.company_id AND oa.id = o.account_id
-                  WHERE o.company_id = l.company_id AND o.journal_entry_id = l.journal_entry_id AND o.account_id <> l.account_id) AS split
-                SQL)
             ->get();
         $truncated = $lines->count() > self::GL_MAX_LINES;
         $lines = $lines->take(self::GL_MAX_LINES)->groupBy('account_id');
@@ -324,12 +304,7 @@ final class ReportService
                     $debits = $debits->plus($d);
                     $credits = $credits->plus($c);
 
-                    return ['line_id' => $l->line_id, 'date' => $l->date, 'entry_id' => $l->entry_id, 'entry' => (int) $l->entry, 'source_type' => $l->source_type, 'status' => $l->status, 'memo' => $l->memo,
-                        'description' => $l->description, 'contact' => $l->contact, 'debit' => $d->toDecimalString(), 'credit' => $c->toDecimalString(),
-                        'amount' => $d->minus($c)->toDecimalString(), 'balance' => $balance->toDecimalString(),
-                        'type' => $l->type, 'number' => $l->number, 'document_id' => $l->document_id, 'payment_id' => $l->payment_id, 'due_date' => $l->due_date,
-                        'split' => $l->split, 'foreign_amount' => $l->foreign_amount, 'currency' => $l->currency, 'exchange_rate' => $l->exchange_rate,
-                        'location' => $l->location, 'class' => $l->class, 'project' => $l->project, 'created_by' => $l->created_by, 'posted_by' => $l->posted_by];
+                    return [...$this->lineFields($l, $d, $c), 'balance' => $balance->toDecimalString()];
                 })->values()->all();
 
                 return ['account_id' => $a->id, 'code' => $a->code, 'name' => $a->name, 'type' => $a->type, 'opening' => $start->toDecimalString(),
@@ -337,5 +312,80 @@ final class ReportService
             })->values()->all(),
             'truncated' => $truncated,
         ];
+    }
+
+    /**
+     * The Journal report (QuickBooks' Journal): every entry of a period with all its lines, entry by entry in date and
+     * number order, each line with its account and the same fields as the general ledger (transaction type, number,
+     * name, memo, due date, foreign amount, currency, rate, location, class, project, created and posted by). An open
+     * end ("All dates") has no bound; the source is one of the entry kinds, matched as a value.
+     *
+     * @return array{lines: list<array<string, mixed>>, truncated: bool}
+     */
+    public function journal(string $companyId, string $base, ?string $from, ?string $to, ?string $source = null): array
+    {
+        $lines = $this->withTransactions(DB::table('journal_lines as l')->where('l.company_id', $companyId), $base)
+            ->join('accounts as a', fn ($j) => $j->on('a.company_id', '=', 'l.company_id')->on('a.id', '=', 'l.account_id'))
+            ->when($from, fn ($b, $v) => $b->where('l.entry_date', '>=', $v))
+            ->when($to, fn ($b, $v) => $b->where('l.entry_date', '<=', $v))
+            ->when($source, fn ($b, $v) => $b->where('e.source_type', $v))
+            ->addSelect(['a.code as account_code', 'a.name as account_name'])
+            ->orderBy('l.entry_date')->orderBy('e.number')->orderBy('l.line_no')->limit(self::GL_MAX_LINES + 1)
+            ->get();
+        $truncated = $lines->count() > self::GL_MAX_LINES;
+
+        return [
+            'lines' => $lines->take(self::GL_MAX_LINES)->map(function ($l) use ($base) {
+                $d = Money::of((string) $l->debit, $base);
+                $c = Money::of((string) $l->credit, $base);
+
+                return [...$this->lineFields($l, $d, $c), 'account_id' => $l->account_id, 'account_code' => $l->account_code, 'account_name' => $l->account_name];
+            })->values()->all(),
+            'truncated' => $truncated,
+        ];
+    }
+
+    /**
+     * A ledger line with its transaction: the invoice, bill or payment behind the entry, the other side of the entry
+     * ("Split": the one other account, or -Split- for several), and who made and posted it. Fixed SQL: the base
+     * currency is a binding, nothing from the request is SQL (CLAUDE.md rule 1).
+     */
+    private function withTransactions(\Illuminate\Database\Query\Builder $q, string $base): \Illuminate\Database\Query\Builder
+    {
+        return $q
+            ->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'l.company_id')->on('e.id', '=', 'l.journal_entry_id'))
+            ->leftJoin('documents as d', fn ($j) => $j->on('d.company_id', '=', 'l.company_id')->on('d.id', '=', 'e.source_id')
+                ->whereIn('e.source_type', ['invoice', 'credit_note', 'bill', 'vendor_credit', 'sales_receipt']))
+            ->leftJoin('payments as p', fn ($j) => $j->on('p.company_id', '=', 'l.company_id')->on('p.journal_entry_id', '=', 'e.id'))
+            ->leftJoin('contacts as c', fn ($j) => $j->on('c.company_id', '=', 'l.company_id')->on('c.id', '=', DB::raw('coalesce(l.contact_id, d.contact_id, p.contact_id)')))
+            ->leftJoin('users as cu', 'cu.id', '=', DB::raw('coalesce(d.created_by, e.posted_by)'))
+            ->leftJoin('users as pu', 'pu.id', '=', 'e.posted_by')
+            ->leftJoin('dimensions as loc', fn ($j) => $j->on('loc.company_id', '=', 'l.company_id')->on('loc.id', '=', 'l.location_id'))
+            ->leftJoin('dimensions as cls', fn ($j) => $j->on('cls.company_id', '=', 'l.company_id')->on('cls.id', '=', 'l.class_id'))
+            ->leftJoin('dimensions as prj', fn ($j) => $j->on('prj.company_id', '=', 'l.company_id')->on('prj.id', '=', 'l.project_id'))
+            ->select(['l.id as line_id', 'l.account_id', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.status', 'e.memo', 'l.description',
+                'c.name as contact', 'l.debit', 'l.credit', 'd.id as document_id', 'p.id as payment_id', 'd.due_date', 'cu.name as created_by', 'pu.name as posted_by',
+                'loc.name as location', 'cls.name as class', 'prj.name as project'])
+            ->selectRaw("coalesce(d.type, CASE p.direction WHEN 'in' THEN 'payment_received' WHEN 'out' THEN 'payment_made' END, e.source_type) AS type")
+            ->selectRaw('coalesce(d.number, p.reference) AS number')
+            ->selectRaw('CASE WHEN e.currency <> ? THEN l.amount_txn::text END AS foreign_amount', [$base])
+            ->selectRaw('CASE WHEN e.currency <> ? THEN e.currency END AS currency', [$base])
+            ->selectRaw('CASE WHEN e.currency <> ? THEN e.fx_rate::text END AS exchange_rate', [$base])
+            ->selectRaw(<<<'SQL'
+                (SELECT CASE WHEN count(DISTINCT o.account_id) = 1 THEN min(oa.code || ' ' || oa.name) WHEN count(*) > 1 THEN '-Split-' END
+                   FROM journal_lines o JOIN accounts oa ON oa.company_id = o.company_id AND oa.id = o.account_id
+                  WHERE o.company_id = l.company_id AND o.journal_entry_id = l.journal_entry_id AND o.account_id <> l.account_id) AS split
+                SQL);
+    }
+
+    /** @return array<string, mixed> a line's fields, as the general ledger and the journal show them */
+    private function lineFields(object $l, Money $d, Money $c): array
+    {
+        return ['line_id' => $l->line_id, 'date' => $l->date, 'entry_id' => $l->entry_id, 'entry' => (int) $l->entry, 'source_type' => $l->source_type, 'status' => $l->status, 'memo' => $l->memo,
+            'description' => $l->description, 'contact' => $l->contact, 'debit' => $d->toDecimalString(), 'credit' => $c->toDecimalString(),
+            'amount' => $d->minus($c)->toDecimalString(),
+            'type' => $l->type, 'number' => $l->number, 'document_id' => $l->document_id, 'payment_id' => $l->payment_id, 'due_date' => $l->due_date,
+            'split' => $l->split, 'foreign_amount' => $l->foreign_amount, 'currency' => $l->currency, 'exchange_rate' => $l->exchange_rate,
+            'location' => $l->location, 'class' => $l->class, 'project' => $l->project, 'created_by' => $l->created_by, 'posted_by' => $l->posted_by];
     }
 }

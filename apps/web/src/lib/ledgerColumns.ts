@@ -1,5 +1,6 @@
 import type { ColumnDef } from "./columns";
-import type { LedgerLine, PartyStatementLine } from "./api";
+import { parse, toString } from "./decimal";
+import type { BinCard, JournalReport, LedgerLine, PartyStatementLine } from "./api";
 
 /**
  * The general ledger's and the customer and supplier statements' columns (Customize, Columns), with QuickBooks'
@@ -99,3 +100,57 @@ export function statementRow(l: PartyStatementLine, i: number, payable: boolean)
 }
 
 const negate = (v: string) => (v.startsWith("-") ? v.slice(1) : v === "0.00" ? v : `-${v}`);
+
+/** The Journal report: every entry with its lines; QuickBooks shows Date, Transaction type, No., Name, Memo, Account, Debit, Credit. */
+export type JournalRow = GlRow & { account: string };
+export type JournalColumn = Exclude<GlColumn, "balance" | "split"> | "account";
+export const JOURNAL_COLUMNS: ColumnDef<JournalColumn>[] = [
+  ...GL_COLUMNS.filter((c): c is ColumnDef<Exclude<GlColumn, "balance" | "split">> => c.key !== "balance" && c.key !== "split").slice(0, 6),
+  { key: "account", label: "Account", group: "Transaction", kind: "text" },
+  ...GL_COLUMNS.filter((c): c is ColumnDef<Exclude<GlColumn, "balance" | "split">> => c.key !== "balance" && c.key !== "split").slice(6),
+];
+export const JOURNAL_DEFAULTS: JournalColumn[] = ["date", "type", "number", "name", "memo", "account", "debit", "credit", "foreign_amount", "currency"];
+export const JOURNAL_FOREIGN: JournalColumn[] = ["foreign_amount", "currency", "exchange_rate"];
+
+export function journalRow(l: JournalReport["lines"][number]): JournalRow {
+  return { ...glRow(l), account: `${l.account_code} ${l.account_name}` };
+}
+
+/** The entries of the journal, each with its lines in order and its totals (debits equal credits). */
+export function journalEntries(lines: JournalReport["lines"]): { entryId: string; rows: JournalRow[]; debits: string; credits: string }[] {
+  const out = new Map<string, JournalRow[]>();
+  for (const l of lines) out.set(l.entry_id, [...(out.get(l.entry_id) ?? []), journalRow(l)]);
+  const sum = (rows: JournalRow[], k: "debit" | "credit") => toString(rows.reduce((t, r) => t + parse(r[k]), 0n));
+  return [...out.entries()].map(([entryId, rows]) => ({ entryId, rows, debits: sum(rows, "debit"), credits: sum(rows, "credit") }));
+}
+
+/** The bin card: each stock move with its document, customer or supplier, and who made it. */
+export type BinRow = {
+  id: string; document_id: string | null; date: string; kind: string; reference: string | null; document: string | null; name: string | null;
+  qty_in: string; qty_out: string; unit_cost: string; value: string; balance_qty: string; balance_value: string; created_by: string | null;
+};
+export type BinColumn = Exclude<keyof BinRow, "id" | "document_id">;
+export const BIN_COLUMNS: ColumnDef<BinColumn>[] = [
+  { key: "date", label: "Date", group: "Move", kind: "date" },
+  { key: "kind", label: "What", group: "Move", kind: "text" },
+  { key: "reference", label: "Reference", group: "Move", kind: "text" },
+  { key: "document", label: "Document", group: "Move", kind: "text" },
+  { key: "name", label: "Customer or supplier", group: "Move", kind: "text" },
+  { key: "qty_in", label: "In", group: "Quantity", kind: "count" },
+  { key: "qty_out", label: "Out", group: "Quantity", kind: "count" },
+  { key: "balance_qty", label: "Balance", group: "Quantity", kind: "count" },
+  { key: "unit_cost", label: "Unit cost", group: "Value", kind: "money" },
+  { key: "value", label: "Value moved", group: "Value", kind: "money" },
+  { key: "balance_value", label: "Value", group: "Value", kind: "money" },
+  { key: "created_by", label: "Created by", group: "People", kind: "text" },
+];
+export const BIN_DEFAULTS: BinColumn[] = ["date", "kind", "reference", "name", "qty_in", "qty_out", "unit_cost", "balance_qty", "balance_value"];
+
+const DOC_WORD: Record<string, string> = { invoice: "Invoice", credit_note: "Credit note", bill: "Bill", vendor_credit: "Supplier credit", sales_receipt: "Cash sale",
+  delivery_note: "Delivery note", goods_receipt: "Goods received" };
+
+export function binRow(m: BinCard["moves"][number], i: number): BinRow {
+  const doc = m.document_number ? `${DOC_WORD[m.document_type ?? ""] ?? ""} ${m.document_number}`.trim() : null;
+  return { id: `${m.moved_on}-${i}`, document_id: m.document_id ?? null, date: m.moved_on, kind: m.kind, reference: m.reference, document: doc, name: m.name ?? null,
+    qty_in: m.qty_in, qty_out: m.qty_out, unit_cost: m.unit_cost, value: m.value, balance_qty: m.balance_qty, balance_value: m.balance_value, created_by: m.created_by ?? null };
+}
