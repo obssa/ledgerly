@@ -60,6 +60,8 @@ as_owner() { DB_OWNER_USERNAME="$OWNER_USERNAME" DB_OWNER_PASSWORD="$OWNER_PASSW
 echo "== Migrate as the owner (before any config cache, so the password is never cached)"
 as_owner ledgerly:create-schema
 as_owner migrate --database=owner --force
+# Fresh planner statistics after the migrations (autovacuum leaves small tables unanalyzed). Never stops a release.
+as_owner ledgerly:analyze || echo "WARNING: VACUUM (ANALYZE) did not run; the release goes on"
 
 # Demo sign-in (config/demo.php): set from the repository variable DEMO_LOGINS, then the demo company and its shared
 # accounts are added if missing. A failed demo setup does not stop the release: the books matter, the demo does not.
