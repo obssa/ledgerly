@@ -8,7 +8,8 @@ import { chooseColumns, rightAligned, withoutUnusedForeign } from "@/lib/columns
 import { getCustomerStatement, getReportPeriod, getSupplierStatement } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { STATEMENT_DEFAULTS, STATEMENT_FOREIGN, statementColumns, statementRow, transactionHref, type StatementColumn, type StatementRow } from "@/lib/ledgerColumns";
-import { periodQuery } from "@/lib/periodParams";
+import { exportPeriod, periodQuery } from "@/lib/periodParams";
+import { ExportLink } from "@/app/(app)/reports/ReportsNav";
 import { rangeLabel } from "@/lib/periods";
 import { typeLabel } from "@/lib/transactionColumns";
 
@@ -54,7 +55,8 @@ export async function StatementView({ party, id, q }: { party: "customer" | "sup
   return (
     <>
       <PageTitle eyebrow={<><Link href={base} className="hover:underline">{who.name}</Link> / Statement</>}
-        title={<>Statement · <span className="num">{data.from}</span> to <span className="num">{data.to}</span></>} />
+        title={<>Statement · <span className="num">{data.from}</span> to <span className="num">{data.to}</span></>}
+        actions={<ExportLink report={payable ? "supplier-statement" : "customer-statement"} params={{ ...exportPeriod(period.picked), contact_id: id }} />} />
       <DateRangeFilter picked={period.picked} keep={{ cols: custom ? cols.join(",") : undefined }} fields={[]} />
       <ColumnCustomizer defs={defs} cols={cols} keep={keep} moveHref={(next) => href({ cols: next.join(",") })} resetHref={href({})} />
       <Card className="max-w-[1100px]" label="Statement">

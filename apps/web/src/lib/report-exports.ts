@@ -3,7 +3,8 @@ import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, total
 import { ledgerly } from "./api";
 import { DISPLAY_BY, columnsRequest, percentOf, pickDisplayBy } from "./pnlColumns";
 import type { Calendar } from "./periods";
-import { periodLabel, previousPeriod, samePeriodLastYear } from "./reports";
+import { periodLabel, previousPeriod, samePeriodLastYear, yearEarlier } from "./reports";
+import { STATEMENT_DEFAULTS, statementColumns, statementRow } from "./ledgerColumns";
 import { AGE_COLUMNS, AGE_DEFAULTS, AGE_FOREIGN, DEFAULT_BUCKETS, ageRows, bucketLabel, groupAgeRows, pickPeriods, type AgeColumn, type AgeRow } from "./ageing";
 import { chooseColumns, withoutUnusedForeign } from "./columns";
 import { GL_COLUMNS, GL_DEFAULTS, GL_FOREIGN, JOURNAL_COLUMNS, JOURNAL_DEFAULTS, JOURNAL_FOREIGN, glRow, journalEntries, type GlColumn } from "./ledgerColumns";
@@ -17,12 +18,14 @@ import type { Cell } from "./csv";
 type Ctx = { token: string; companyId: string };
 type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
   rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
-  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string; by?: string; pct?: string; calendar?: Calendar; compare?: string; basis?: string; open?: string };
-export type Export = { title: string; rows: Cell[][] };
+  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string; by?: string; pct?: string; calendar?: Calendar; compare?: string; basis?: string; open?: string; method?: string; weeks?: string; contact_id?: string };
+/** A report's rows; a heading or period line when the report names them itself (a statement's customer, a forecast's weeks). */
+export type Export = { title: string; rows: Cell[][]; heading?: string; period?: string };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
   "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing", "custom",
-  "transaction-list", "invoice-list", "open-invoices", "bill-list", "unpaid-bills", "payments-received", "payments-made", "journal"] as const;
+  "transaction-list", "invoice-list", "open-invoices", "bill-list", "unpaid-bills", "payments-received", "payments-made", "journal",
+  "cash-forecast", "inventory-valuation", "customer-statement", "supplier-statement"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 type Ageing = Awaited<ReturnType<typeof ledgerly.arAgeing>>;
@@ -95,12 +98,19 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: "profit-and-loss", rows };
     }
     case "balance-sheet": {
-      const bs = await ledgerly.balanceSheet(p.as_of ?? p.to ?? "", ctx);
-      const rows: Cell[][] = [["Section", "Code", "Account", "Amount"]];
-      for (const [section, list] of [["Assets", bs.sections.assets], ["Liabilities", bs.sections.liabilities], ["Equity", bs.sections.equity]] as const) {
-        for (const r of list) rows.push([section, r.code, r.name, r.amount]);
+      // Against the same date a year earlier when the page compared (compare=year), every account in either year.
+      const asOf = p.as_of ?? p.to ?? "";
+      const [bs, prior] = await Promise.all([ledgerly.balanceSheet(asOf, ctx), p.compare === "year" ? ledgerly.balanceSheet(yearEarlier(asOf), ctx) : Promise.resolve(null)]);
+      const rows: Cell[][] = [["Section", "Code", "Account", asOf, ...(prior ? [yearEarlier(asOf)] : [])]];
+      for (const [section, key] of [["Assets", "assets"], ["Liabilities", "liabilities"], ["Equity", "equity"]] as const) {
+        const now = new Map(bs.sections[key].map((r) => [r.code, r]));
+        const then = new Map((prior?.sections[key] ?? []).map((r) => [r.code, r]));
+        for (const code of [...new Set([...now.keys(), ...then.keys()])].sort()) {
+          rows.push([section, code, (now.get(code) ?? then.get(code))!.name, now.get(code)?.amount ?? null, ...(prior ? [then.get(code)?.amount ?? null] : [])]);
+        }
       }
-      rows.push(["Equity", null, "Profit not yet closed to retained earnings", bs.equation.profit_to_date], ["Check", null, "Difference", bs.equation.difference]);
+      rows.push(["Equity", null, "Profit not yet closed to retained earnings", bs.equation.profit_to_date, ...(prior ? [prior.equation.profit_to_date] : [])],
+        ["Check", null, "Difference", bs.equation.difference, ...(prior ? [prior.equation.difference] : [])]);
       return { title: "balance-sheet", rows };
     }
     case "trial-balance": {
@@ -138,6 +148,19 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: "journal", rows };
     }
     case "cash-flow": {
+      if (p.method === "direct") {
+        // The direct method: what the cash accounts received and paid, by what it was for, and each line's accounts.
+        const d = await ledgerly.directCashFlow({ from: p.from, to: p.to }, ctx);
+        const rows: Cell[][] = [["Line", "Code", "Account", "Amount"]];
+        for (const l of d.lines) {
+          rows.push([l.label, null, null, l.amount]);
+          for (const a of l.accounts) rows.push([null, a.code, a.name, a.amount]);
+        }
+        rows.push(["Cash from operating activities", null, null, d.totals.operating], ["Cash from investing activities", null, null, d.totals.investing],
+          ["Cash from financing activities", null, null, d.totals.financing], ["Net change", null, null, d.net_change],
+          ["Cash at the start", null, null, d.opening_cash], ["Cash at the end", null, null, d.closing_cash]);
+        return { title: "cash-flow-direct", rows };
+      }
       const cf = await ledgerly.cashFlow({ from: p.from, to: p.to }, ctx);
       const rows: Cell[][] = [["Section", "Code", "Line", "Amount"], ["Operating", null, "Net profit for the period", cf.net_profit]];
       for (const [section, key] of [["Operating", "operating"], ["Investing", "investing"], ["Financing", "financing"]] as const) {
@@ -205,6 +228,36 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
           x.closing_qty, x.closing_value]),
         ["Total", null, null, null, r.totals.opening_value, null, r.totals.in_value, null, r.totals.out_value, null, null, r.totals.closing_value]] };
     }
+    case "cash-forecast": {
+      // Week by week from today: what comes in and goes out, and the cash at the end of each week.
+      const weeks = [4, 8, 13, 26].includes(Number(p.weeks)) ? Number(p.weeks) : 13;
+      const f = await ledgerly.cashForecast(weeks, ctx);
+      const rows: Cell[][] = [["Week", "From", "To", "Customers owe", "Due to suppliers", "Coming in", "Going out", "Net", "Cash at the end"]];
+      for (const w of f.data) rows.push([w.week, w.from, w.to, w.receivables, w.payables, w.in, w.out, w.net, w.closing]);
+      rows.push(["Overdue", null, null, f.overdue.receivables, f.overdue.payables, null, null, null, null], ["Cash now", null, null, null, null, null, null, null, f.opening],
+        ["Cash at the end", null, null, null, null, null, null, null, f.closing]);
+      return { title: "cash-forecast", rows, period: `The next ${weeks} weeks, from ${f.as_of}` };
+    }
+    case "inventory-valuation": {
+      const v = await ledgerly.inventoryValuation(p.as_of, ctx);
+      return { title: "inventory-valuation", rows: [["SKU", "Item", "Unit", "Warehouse", "Quantity", "Value"],
+        ...v.rows.map((r) => [r.sku, r.name, r.unit, r.warehouse, r.quantity, r.value]),
+        ["Total", null, null, null, null, v.stock_value], ["Inventory account", null, null, null, null, v.inventory_account], ["Difference", null, null, null, null, v.difference]] };
+    }
+    case "customer-statement": case "supplier-statement": {
+      // A customer's or supplier's statement for the period, in its standard columns, named in the heading.
+      const payable = report === "supplier-statement";
+      if (!p.contact_id) throw new Error("A statement needs its customer or supplier.");
+      const s = payable ? await ledgerly.supplierStatement(p.contact_id, { from: p.from, to: p.to }, ctx) : await ledgerly.customerStatement(p.contact_id, { from: p.from, to: p.to }, ctx);
+      const who = "supplier" in s ? s.supplier : s.customer;
+      const defs = statementColumns(payable);
+      const cols = STATEMENT_DEFAULTS.filter((c) => !["foreign_amount", "currency"].includes(c) || s.lines.some((l) => l.currency));
+      const rows: Cell[][] = [cols.map((c) => defs.find((d) => d.key === c)!.label)];
+      rows.push(cols.map((c, i) => (c === "balance" ? s.opening : i === 0 ? `Balance brought forward at ${s.from}` : null)));
+      s.lines.forEach((l, i) => { const r = statementRow(l, i, payable); rows.push(cols.map((c) => (c === "type" ? typeLabel(r.type) : r[c] === "" ? null : r[c]))); });
+      rows.push(cols.map((c, i) => (c === "balance" ? s.closing : i === 0 ? `${payable ? "We owe" : "Owes"} at ${s.to}` : null)));
+      return { title: report, rows, heading: `${payable ? "Supplier" : "Customer"} statement: ${who.name}` };
+    }
     case "stock-ageing": {
       const r = await ledgerly.stockAgeing({ as_of: p.as_of, warehouse_id: p.warehouse_id }, ctx);
       return { title: "stock-ageing", rows: [["SKU", "Item", "Unit", "Quantity", "Value", "Last sold", "Last received", "Days since sale", "Band"],
@@ -224,7 +277,7 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
 const GROUP_WORDS: Record<string, string> = { contact: "", item: "item", month: "month", salesperson: "salesperson", location: "location", class: "class", project: "project" };
 
 /** What a report is called in its header and file name ("Sales by customer", "Profit by location"). */
-export function reportTitle(report: ExportableReport, o: { group?: string; kind?: string; view?: string; by?: string } = {}): string {
+export function reportTitle(report: ExportableReport, o: { group?: string; kind?: string; view?: string; by?: string; method?: string } = {}): string {
   switch (report) {
     case "profit-and-loss": {
       const by = pickDisplayBy(o.by);
@@ -234,7 +287,7 @@ export function reportTitle(report: ExportableReport, o: { group?: string; kind?
     case "trial-balance": return "Trial balance";
     case "general-ledger": return "General ledger";
     case "journal": return "Journal";
-    case "cash-flow": return "Cash flow statement";
+    case "cash-flow": return o.method === "direct" ? "Cash flow statement (direct method)" : "Cash flow statement";
     case "changes-in-equity": return "Statement of changes in equity";
     case "profit-by-dimension": return `Profit by ${GROUP_WORDS[o.kind ?? "location"] || "location"}`;
     case "sales": return `Sales by ${o.group && o.group !== "contact" ? GROUP_WORDS[o.group] ?? o.group : "customer"}`;
@@ -244,6 +297,10 @@ export function reportTitle(report: ExportableReport, o: { group?: string; kind?
     case "audit-log": return "Audit log";
     case "stock-movement": return "Stock movement";
     case "stock-ageing": return "Stock ageing";
+    case "cash-forecast": return "Cash forecast";
+    case "inventory-valuation": return "Inventory valuation";
+    case "customer-statement": return "Customer statement";
+    case "supplier-statement": return "Supplier statement";
     case "custom": return "Custom report";
     case "transaction-list": case "invoice-list": case "open-invoices": case "bill-list": case "unpaid-bills": case "payments-received": case "payments-made":
       return TX_REPORTS[report].title;

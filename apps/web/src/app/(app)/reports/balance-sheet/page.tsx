@@ -43,7 +43,7 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Balance sheet" actions={<ExportLink report="balance-sheet" params={{ as_of: asOf }} />} />
+      <PageTitle eyebrow="Reports / Financial statements" title="Balance sheet" actions={<ExportLink report="balance-sheet" params={{ as_of: asOf, ...(lastYear ? { compare: "year" } : {}) }} />} />
       <AsOfFilter picked={at.picked} keep={q} />
       <Segmented label="Compare with" size="sm" items={[
         { key: "one", href: `/reports/balance-sheet?as_of=${asOf}`, label: "This date only", active: !lastYear },

@@ -19,7 +19,7 @@ final class ReportExportController extends Controller
     public const REPORTS = ['profit-and-loss', 'balance-sheet', 'trial-balance', 'general-ledger', 'cash-flow', 'changes-in-equity',
         'profit-by-dimension', 'sales', 'purchases', 'ar-ageing', 'ap-ageing', 'audit-log', 'stock-movement', 'stock-ageing', 'custom',
         'transaction-list', 'invoice-list', 'open-invoices', 'bill-list', 'unpaid-bills', 'payments-received', 'payments-made',
-        'journal'];
+        'journal', 'cash-forecast', 'inventory-valuation', 'customer-statement', 'supplier-statement'];
 
     public function __construct(private readonly CurrentCompany $current, private readonly AuditLogger $audit)
     {
@@ -36,7 +36,7 @@ final class ReportExportController extends Controller
             'as_of' => ['nullable', 'date_format:Y-m-d'],
             // The page's choices, recorded as they were: its filters, and a report's Customize choices (columns in order,
             // sort, status; the ageing's view and periods). A column list is the longest.
-            'options' => ['nullable', 'array:kind,group,account_id,action,user_id,warehouse_id,rows,columns,measure,account_type,project_id,location_id,class_id,cols,sort,dir,status,view,interval,periods,source,by,pct,compare,basis,open'],
+            'options' => ['nullable', 'array:kind,group,account_id,action,user_id,warehouse_id,rows,columns,measure,account_type,project_id,location_id,class_id,cols,sort,dir,status,view,interval,periods,source,by,pct,compare,basis,open,method,weeks,contact_id'],
             'options.*' => ['nullable', 'string', 'max:400'],
             'rows' => ['required', 'integer', 'min:0', 'max:1000000'],
         ]);
