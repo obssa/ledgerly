@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui";
 import type { TaxDocumentRow, TaxRateRow, TaxWithholdingRegister, TaxWorksheet } from "@/lib/api";
 import { formatAmount } from "@/lib/format";
+import { parse, toString } from "@/lib/decimal";
 
 /* A tax worksheet, live or as it was filed: the figures, rate by rate, document by document, and what no document explains. */
 
@@ -26,19 +27,36 @@ function Rates({ rows, caption }: { rows: TaxRateRow[]; caption: string }) {
   );
 }
 
-function Documents({ rows, caption }: { rows: TaxDocumentRow[]; caption: string }) {
+/**
+ * A side's documents, as a tax register lists them: date, document, the customer's or supplier's own reference (the
+ * invoice number input VAT is claimed on), name and TIN, due date, taxable, tax and gross; the currency and rate only
+ * when a document is in another currency (amounts are in the company's currency at the document's own rate).
+ */
+function Documents({ rows, caption, base }: { rows: TaxDocumentRow[]; caption: string; base: string }) {
+  const refs = rows.some((d) => d.reference);
+  const due = rows.some((d) => d.due_date);
+  const foreign = rows.some((d) => d.currency && d.currency !== base);
+  const span = 7 + (refs ? 1 : 0) + (due ? 1 : 0) + (foreign ? 2 : 0);
   return (
     <table className="tbl">
       <caption className="px-3 pt-2 text-left text-[14px] font-bold">{caption}</caption>
-      <thead><tr><th scope="col">Date</th><th scope="col">Document</th><th scope="col">Customer or supplier</th><th scope="col">TIN</th><th scope="col" className="!text-right">Taxable</th><th scope="col" className="!text-right">Tax</th></tr></thead>
+      <thead><tr>
+        <th scope="col">Date</th><th scope="col">Document</th>{refs && <th scope="col">Reference</th>}<th scope="col">Customer or supplier</th><th scope="col">TIN</th>
+        {due && <th scope="col">Due date</th>}{foreign && <><th scope="col">Currency</th><th scope="col" className="!text-right">Rate</th></>}
+        <th scope="col" className="!text-right">Taxable</th><th scope="col" className="!text-right">Tax</th><th scope="col" className="!text-right">Gross</th>
+      </tr></thead>
       <tbody>
-        {rows.length === 0 && <tr><td colSpan={6} className="text-muted">None in the period.</td></tr>}
+        {rows.length === 0 && <tr><td colSpan={span} className="text-muted">None in the period.</td></tr>}
         {rows.map((d) => (
           <tr key={d.id}>
             <td className="num">{d.date}</td>
             <td><Link href={`/${DOC_PATH[d.type] ?? "invoices"}/${encodeURIComponent(d.id)}`} className="hover:underline">{DOC_LABEL[d.type] ?? d.type} {d.number ?? ""}</Link></td>
+            {refs && <td>{d.reference ?? ""}</td>}
             <td>{d.contact}</td><td className="num">{d.tax_id ?? "—"}</td>
+            {due && <td className="num">{d.due_date ?? ""}</td>}
+            {foreign && <><td>{d.currency !== base ? d.currency : ""}</td><td className="num text-right">{d.currency !== base ? d.exchange_rate : ""}</td></>}
             <td className="num text-right">{formatAmount(d.taxable)}</td><td className="num text-right">{formatAmount(d.tax)}</td>
+            <td className="num text-right">{formatAmount(toString(parse(d.taxable) + parse(d.tax)))}</td>
           </tr>
         ))}
       </tbody>
@@ -95,14 +113,14 @@ export function Worksheet({ sheet }: { sheet: TaxWorksheet }) {
           <Card className="mb-4 !p-2" label="By rate">
             <div className="grid gap-4 overflow-x-auto md:grid-cols-2"><Rates rows={sheet.sales.rates} caption="Sales" /><Rates rows={sheet.purchases.rates} caption="Purchases" /></div>
           </Card>
-          <Card className="mb-4 !p-2" label="Sales documents"><div className="overflow-x-auto"><Documents rows={sheet.sales.documents} caption="Sales documents" /></div></Card>
-          <Card className="mb-4 !p-2" label="Purchase documents"><div className="overflow-x-auto"><Documents rows={sheet.purchases.documents} caption="Purchase documents" /></div></Card>
+          <Card className="mb-4 !p-2" label="Sales documents"><div className="overflow-x-auto"><Documents base={sheet.currency} rows={sheet.sales.documents} caption="Sales documents" /></div></Card>
+          <Card className="mb-4 !p-2" label="Purchase documents"><div className="overflow-x-auto"><Documents base={sheet.currency} rows={sheet.purchases.documents} caption="Purchase documents" /></div></Card>
         </>
       )}
       {tot && sheet.sales && (
         <>
           <Card className="mb-4 !p-2" label="By rate"><div className="overflow-x-auto"><Rates rows={sheet.sales.rates.filter((r) => r.kind === "tot" || r.tax !== "0.00")} caption="Sales at a turnover tax rate" /></div></Card>
-          <Card className="mb-4 !p-2" label="Sales documents"><div className="overflow-x-auto"><Documents rows={sheet.sales.documents.filter((d) => d.tax !== "0.00")} caption="Sales documents with turnover tax" /></div></Card>
+          <Card className="mb-4 !p-2" label="Sales documents"><div className="overflow-x-auto"><Documents base={sheet.currency} rows={sheet.sales.documents.filter((d) => d.tax !== "0.00")} caption="Sales documents with turnover tax" /></div></Card>
         </>
       )}
       {!vat && !tot && sheet.withheld && <Register register={sheet.withheld} caption="Payments to suppliers with tax withheld" path="payments-made" who="Supplier" />}

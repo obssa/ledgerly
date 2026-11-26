@@ -204,8 +204,9 @@ final class TaxReturns
             ->selectRaw("sum(CASE WHEN {$taxCounts} THEN ({$sign}) * round(dl.line_tax * d.fx_rate, 2) ELSE 0 END)::numeric(20,2)::text AS tax")
             ->get();
         $documents = (clone $lines)->join('contacts as c', 'c.id', '=', 'd.contact_id')
-            ->groupBy('d.id', 'd.type', 'd.number', 'd.issue_date', 'c.name', 'c.tax_id', 'd.journal_entry_id')->orderBy('d.issue_date')->orderBy('d.number')
-            ->select('d.id', 'd.type', 'd.number', 'd.issue_date', 'c.name as contact', 'c.tax_id', 'd.journal_entry_id')
+            ->groupBy('d.id', 'd.type', 'd.number', 'd.reference', 'd.issue_date', 'd.due_date', 'd.currency', 'd.fx_rate', 'c.name', 'c.tax_id', 'd.journal_entry_id')
+            ->orderBy('d.issue_date')->orderBy('d.number')
+            ->select('d.id', 'd.type', 'd.number', 'd.reference', 'd.issue_date', 'd.due_date', 'd.currency', 'd.fx_rate', 'c.name as contact', 'c.tax_id', 'd.journal_entry_id')
             ->selectRaw("sum(({$sign}) * round(dl.line_subtotal * d.fx_rate, 2))::numeric(20,2)::text AS taxable")
             ->selectRaw("sum(CASE WHEN {$taxCounts} THEN ({$sign}) * round(dl.line_tax * d.fx_rate, 2) ELSE 0 END)::numeric(20,2)::text AS tax")
             ->limit(2000)->get();
@@ -214,7 +215,10 @@ final class TaxReturns
         return [
             'rates' => $rates->map(fn ($r) => ['code' => $r->code ?? 'NONE', 'name' => $r->name ?? 'No tax rate', 'rate' => $r->rate === null ? null : (string) $r->rate,
                 'kind' => $r->kind, 'taxable' => $r->taxable, 'tax' => $r->tax])->values()->all(),
-            'documents' => $documents->map(fn ($d) => ['id' => $d->id, 'type' => $d->type, 'number' => $d->number, 'date' => $d->issue_date, 'contact' => $d->contact,
+            // Each document with its supplier's reference (the invoice number input VAT is claimed on), due date and
+            // currency and rate (the amounts are in the company's currency at the document's own rate).
+            'documents' => $documents->map(fn ($d) => ['id' => $d->id, 'type' => $d->type, 'number' => $d->number, 'reference' => $d->reference, 'date' => $d->issue_date,
+                'due_date' => $d->due_date, 'currency' => $d->currency, 'exchange_rate' => (string) $d->fx_rate, 'contact' => $d->contact,
                 'tax_id' => $d->tax_id, 'taxable' => $d->taxable, 'tax' => $d->tax])->values()->all(),
             'taxable' => $sum($rates, 'taxable'), 'tax' => $sum($rates, 'tax'),
             'entries' => $documents->pluck('journal_entry_id')->filter()->values()->all(),

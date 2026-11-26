@@ -3,7 +3,7 @@ import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, total
 import { ledgerly } from "./api";
 import { AGE_COLUMNS, AGE_DEFAULTS, AGE_FOREIGN, DEFAULT_BUCKETS, ageRows, bucketLabel, groupAgeRows, pickPeriods, type AgeColumn, type AgeRow } from "./ageing";
 import { chooseColumns, withoutUnusedForeign } from "./columns";
-import { GL_COLUMNS, GL_DEFAULTS, GL_FOREIGN, glRow, type GlColumn } from "./ledgerColumns";
+import { GL_COLUMNS, GL_DEFAULTS, GL_FOREIGN, JOURNAL_COLUMNS, JOURNAL_DEFAULTS, JOURNAL_FOREIGN, glRow, journalEntries, type GlColumn } from "./ledgerColumns";
 import type { Cell } from "./csv";
 
 /*
@@ -14,12 +14,12 @@ import type { Cell } from "./csv";
 type Ctx = { token: string; companyId: string };
 type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
   rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
-  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string };
+  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
   "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing", "custom",
-  "transaction-list", "invoice-list", "open-invoices", "bill-list", "unpaid-bills", "payments-received", "payments-made"] as const;
+  "transaction-list", "invoice-list", "open-invoices", "bill-list", "unpaid-bills", "payments-received", "payments-made", "journal"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 type Ageing = Awaited<ReturnType<typeof ledgerly.arAgeing>>;
@@ -96,6 +96,18 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
         rows.push([a.code, a.name, ...cols.map((c, i) => (c === "balance" ? a.closing : c === "debit" ? a.debits : c === "credit" ? a.credits : i === 0 ? `Balance at ${gl.to}` : null))]);
       }
       return { title: "general-ledger", rows };
+    }
+    case "journal": {
+      // Every entry with its lines, in the columns chosen on screen, each entry followed by its totals.
+      const j = await ledgerly.journalReport({ from: p.from, to: p.to, ...(p.source ? { source: p.source } : {}) }, ctx);
+      const q = { cols: p.cols };
+      const cols = withoutUnusedForeign(chooseColumns(q, JOURNAL_COLUMNS, JOURNAL_DEFAULTS), j.lines.map((l) => ({ currency: l.currency ?? null })), q, JOURNAL_FOREIGN);
+      const rows: Cell[][] = [cols.map((c) => JOURNAL_COLUMNS.find((d) => d.key === c)!.label)];
+      for (const e of journalEntries(j.lines)) {
+        for (const r of e.rows) rows.push(cols.map((c) => (r[c] === "" ? null : c === "type" && r[c] ? typeLabel(r[c]!) : r[c])));
+        rows.push(cols.map((c) => (c === "debit" ? e.debits : c === "credit" ? e.credits : null)));
+      }
+      return { title: "journal", rows };
     }
     case "cash-flow": {
       const cf = await ledgerly.cashFlow({ from: p.from, to: p.to }, ctx);
@@ -190,6 +202,7 @@ export function reportTitle(report: ExportableReport, o: { group?: string; kind?
     case "balance-sheet": return "Balance sheet";
     case "trial-balance": return "Trial balance";
     case "general-ledger": return "General ledger";
+    case "journal": return "Journal";
     case "cash-flow": return "Cash flow statement";
     case "changes-in-equity": return "Statement of changes in equity";
     case "profit-by-dimension": return `Profit by ${GROUP_WORDS[o.kind ?? "location"] || "location"}`;

@@ -6,7 +6,7 @@ import { PrintButton } from "./PrintButton";
 const CYCLE: { stage: string; reports: [string, string][] }[] = [
   { stage: "Financial statements", reports: [["Profit and loss", "/reports"], ["Balance sheet", "/reports/balance-sheet"], ["Cash flow statement", "/reports/cash-flow"],
     ["Changes in equity", "/reports/changes-in-equity"], ["Statements and notes (to print)", "/reports/notes-pack"], ["Cash forecast (13 weeks)", "/reports/cash-forecast"]] },
-  { stage: "Ledger and trial balance", reports: [["Trial balance", "/reports/trial-balance"], ["General ledger", "/reports/general-ledger"], ["Journal report", "/journal"],
+  { stage: "Ledger and trial balance", reports: [["Trial balance", "/reports/trial-balance"], ["General ledger", "/reports/general-ledger"], ["Journal report", "/reports/journal"], ["Journal entries", "/journal"],
     ["Audit adjustments", "/close"]] },
   { stage: "Transactions", reports: [["Transaction list by date", "/reports/transaction-list"], ["Invoice list", "/reports/invoice-list"], ["Open invoices", "/reports/open-invoices"],
     ["Payments received", "/reports/payments-received"], ["Bill list", "/reports/bill-list"], ["Unpaid bills", "/reports/unpaid-bills"], ["Payments made", "/reports/payments-made"]] },
