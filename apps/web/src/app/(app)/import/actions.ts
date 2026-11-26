@@ -15,7 +15,7 @@ export type ImportState = FormState & { result?: ImportResult };
 export async function runImport(_: ImportState | undefined, form: FormData): Promise<ImportState> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
   // An Excel workbook is read here (Module 6); a CSV file or pasted lines as before.
   const file = (await spreadsheetFrom(form)) ?? (await statementFrom(form));
   if ("error" in file) {

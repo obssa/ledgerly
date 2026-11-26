@@ -11,7 +11,7 @@ import { getSession } from "@/lib/session";
 export async function saveOpeningBalances(_: FormState | undefined, form: FormData): Promise<FormState> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
 
   let difference = "0.00";
   try {
@@ -36,7 +36,7 @@ export async function saveOpeningBalances(_: FormState | undefined, form: FormDa
 export async function enterOpeningDocument(_: FormState | undefined, form: FormData): Promise<FormState> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
   const type = form.get("type") === "bill" ? "bill" : "invoice";
   const amount = (text(form, "amount") ?? "").replace(/[\s,]/g, "");
   let number: string;

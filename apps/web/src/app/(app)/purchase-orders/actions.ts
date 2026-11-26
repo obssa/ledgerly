@@ -16,7 +16,7 @@ import { getSession } from "@/lib/session";
 async function context(): Promise<{ token: string; companyId: string }> {
   const { token, companyId } = await getSession();
   if (!token) redirect("/sign-in");
-  if (!companyId) redirect("/onboarding");
+  if (!companyId) redirect("/company/resume");
   return { token, companyId };
 }
 
