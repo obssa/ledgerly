@@ -1,6 +1,9 @@
 import "server-only";
 import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, totals, typeLabel, type TxColumn, type TxRow } from "./transactionColumns";
 import { ledgerly } from "./api";
+import { AGE_COLUMNS, AGE_DEFAULTS, AGE_FOREIGN, DEFAULT_BUCKETS, ageRows, bucketLabel, groupAgeRows, pickPeriods, type AgeColumn, type AgeRow } from "./ageing";
+import { chooseColumns, withoutUnusedForeign } from "./columns";
+import { GL_COLUMNS, GL_DEFAULTS, GL_FOREIGN, glRow, type GlColumn } from "./ledgerColumns";
 import type { Cell } from "./csv";
 
 /*
@@ -11,7 +14,7 @@ import type { Cell } from "./csv";
 type Ctx = { token: string; companyId: string };
 type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
   rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
-  cols?: string; sort?: string; dir?: string; status?: string };
+  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
@@ -19,12 +22,37 @@ export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", 
   "transaction-list", "invoice-list", "open-invoices", "bill-list", "unpaid-bills", "payments-received", "payments-made"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
-const ageing = (title: string, r: Awaited<ReturnType<typeof ledgerly.arAgeing>>): Export => ({
-  title,
-  rows: [["Name", "Current", "1-30 days", "31-60 days", "61-90 days", "Over 90 days", "Credits", "Total"],
-    ...r.rows.map((x) => [x.name, x.current, x.days_1_30, x.days_31_60, x.days_61_90, x.over_90, x.credits, x.total]),
-    ["Total", r.totals.current, r.totals.days_1_30, r.totals.days_31_60, r.totals.days_61_90, r.totals.over_90, r.totals.credits, r.totals.total]],
-});
+type Ageing = Awaited<ReturnType<typeof ledgerly.arAgeing>>;
+
+/** The ageing summary: one line per party, a column per ageing period (as many as were asked for). */
+const ageing = (title: string, r: Ageing): Export => {
+  const buckets = r.buckets ?? DEFAULT_BUCKETS;
+  return {
+    title,
+    rows: [["Name", ...buckets.map(bucketLabel), "Credits", "Total"],
+      ...r.rows.map((x) => [x.name, ...buckets.map((b) => x[b] ?? null), x.credits, x.total]),
+      ["Total", ...buckets.map((b) => r.totals[b] ?? null), r.totals.credits, r.totals.total]],
+  };
+};
+
+/** The ageing detail as on screen: the columns chosen, in groups (ageing period or party), each with its subtotal. */
+const ageingDetail = (title: string, r: Ageing, p: Params, credits: string): Export => {
+  const list = ageRows(r);
+  const q = { cols: p.cols };
+  const cols = withoutUnusedForeign(chooseColumns(q, AGE_COLUMNS, AGE_DEFAULTS), list, q, AGE_FOREIGN);
+  const value = (row: AgeRow, c: AgeColumn): Cell => (c === "age" ? bucketLabel(row.age) : c === "type" && row.type === "credit" ? credits : row[c] === "" ? null : row[c] ?? null);
+  const rows: Cell[][] = [cols.map((c) => AGE_COLUMNS.find((d) => d.key === c)!.label)];
+  const open = cols.indexOf("open_balance");
+  const line = (label: string, amount: string | null) => cols.map((c, i) => (i === 0 ? label : i === open ? amount : null));
+  for (const g of groupAgeRows(r, list, p.group === "name" ? "name" : "age", credits)) {
+    rows.push(line(g.label, null));
+    for (const row of g.rows) rows.push(row.type === "credit" ? line(row.name, row.open_balance) : cols.map((c) => value(row, c)));
+    if (g.credits) rows.push(line(credits, g.credits));
+    if (g.total !== null) rows.push(line(`Total ${g.label}`, g.total));
+  }
+  rows.push(line("Total", r.totals.total ?? null));
+  return { title, rows };
+};
 
 /** The rows of a report for the period or date given (each report's own default otherwise). */
 export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx): Promise<Export> {
@@ -53,11 +81,19 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
     }
     case "general-ledger": {
       // The same lines as on screen: the location, class and project filters too.
+      // And the columns chosen on screen (Customize), after the account each line is on.
       const gl = await ledgerly.generalLedger({ from: p.from, to: p.to, account_id: p.account_id, location_id: p.location_id, class_id: p.class_id, project_id: p.project_id }, ctx);
-      const rows: Cell[][] = [["Account code", "Account", "Date", "Entry", "Description", "Contact", "Debit", "Credit", "Balance"]];
+      const q = { cols: p.cols };
+      const cols = withoutUnusedForeign(chooseColumns(q, GL_COLUMNS, GL_DEFAULTS), gl.accounts.flatMap((a) => a.lines).map((l) => ({ currency: l.currency ?? null })), q, GL_FOREIGN);
+      const value = (v: string | null, c: GlColumn): Cell => (v === "" ? null : c === "type" && v ? typeLabel(v) : v);
+      const rows: Cell[][] = [["Account code", "Account", ...cols.map((c) => GL_COLUMNS.find((d) => d.key === c)!.label)]];
       for (const a of gl.accounts) {
-        rows.push([a.code, a.name, gl.from, null, "Brought forward", null, null, null, a.opening]);
-        for (const l of a.lines) rows.push([a.code, a.name, l.date, l.entry, l.description ?? l.memo ?? l.source_type, l.contact, l.debit, l.credit, l.balance]);
+        rows.push([a.code, a.name, ...cols.map((c, i) => (c === "balance" ? a.opening : i === 0 ? `Brought forward at ${gl.from}` : null))]);
+        for (const l of a.lines) {
+          const r = glRow(l);
+          rows.push([a.code, a.name, ...cols.map((c) => value(r[c], c))]);
+        }
+        rows.push([a.code, a.name, ...cols.map((c, i) => (c === "balance" ? a.closing : c === "debit" ? a.debits : c === "credit" ? a.credits : i === 0 ? `Balance at ${gl.to}` : null))]);
       }
       return { title: "general-ledger", rows };
     }
@@ -135,17 +171,20 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
         ...r.rows.map((x) => [x.item.sku, x.item.name, x.item.unit, x.quantity, x.value, x.last_sold_on, x.last_received_on, x.days_since_sale, x.band]),
         ["Total", null, null, null, r.total_value, null, null, null, null]] };
     }
-    case "ar-ageing":
-      return ageing("ar-ageing", await ledgerly.arAgeing(p.as_of, ctx));
-    case "ap-ageing":
-      return ageing("ap-ageing", await ledgerly.apAgeing(p.as_of, ctx));
+    case "ar-ageing": case "ap-ageing": {
+      // The periods asked for (days per period, how many); the detail when the page showed it.
+      const periods = pickPeriods({ interval: p.interval, periods: p.periods });
+      const r = report === "ar-ageing" ? await ledgerly.arAgeing(p.as_of, ctx, periods) : await ledgerly.apAgeing(p.as_of, ctx, periods);
+      if (p.view === "detail") return ageingDetail(report, r, p, report === "ap-ageing" ? "Advances and credits not used" : "Credit not used");
+      return ageing(report, r);
+    }
   }
 }
 
 const GROUP_WORDS: Record<string, string> = { contact: "", item: "item", month: "month", salesperson: "salesperson", location: "location", class: "class", project: "project" };
 
 /** What a report is called in its header and file name ("Sales by customer", "Profit by location"). */
-export function reportTitle(report: ExportableReport, o: { group?: string; kind?: string } = {}): string {
+export function reportTitle(report: ExportableReport, o: { group?: string; kind?: string; view?: string } = {}): string {
   switch (report) {
     case "profit-and-loss": return "Profit and loss";
     case "balance-sheet": return "Balance sheet";
@@ -156,8 +195,8 @@ export function reportTitle(report: ExportableReport, o: { group?: string; kind?
     case "profit-by-dimension": return `Profit by ${GROUP_WORDS[o.kind ?? "location"] || "location"}`;
     case "sales": return `Sales by ${o.group && o.group !== "contact" ? GROUP_WORDS[o.group] ?? o.group : "customer"}`;
     case "purchases": return `Purchases by ${o.group && o.group !== "contact" ? GROUP_WORDS[o.group] ?? o.group : "supplier"}`;
-    case "ar-ageing": return "Accounts receivable ageing summary";
-    case "ap-ageing": return "Accounts payable ageing summary";
+    case "ar-ageing": return `Accounts receivable ageing ${o.view === "detail" ? "detail" : "summary"}`;
+    case "ap-ageing": return `Accounts payable ageing ${o.view === "detail" ? "detail" : "summary"}`;
     case "audit-log": return "Audit log";
     case "stock-movement": return "Stock movement";
     case "stock-ageing": return "Stock ageing";

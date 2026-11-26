@@ -39,6 +39,28 @@ final class GeneralLedgerTest extends TestCase
         $this->assertNotNull($account['lines'][0]['entry_id']);
     }
 
+    public function test_each_line_carries_quickbooks_fields_its_transaction_and_the_other_side(): void
+    {
+        $ar = $this->owner()->table('accounts')->where(['company_id' => $this->c['company'], 'system_key' => 'accounts_receivable'])->value('id');
+        $lines = $this->getJson("/api/v1/reports/general-ledger?from=2026-11-01&to=2026-11-30&account_id={$ar}", $this->h)->assertOk()->json('accounts.0.lines');
+        $invoice = collect($lines)->firstWhere('type', 'invoice');
+        $this->assertNotNull($invoice, 'the invoice is on the receivable account');
+        $this->assertSame('INV-2027-0001', $invoice['number']);
+        $this->assertSame('Abyssinia Coffee customer', $invoice['contact']);
+        $this->assertSame('-Split-', $invoice['split'], 'the invoice credits income and tax: more than one other account');
+        $this->assertSame($invoice['debit'], $invoice['amount'], 'the amount is the debit less the credit');
+        $this->assertNull($invoice['currency'], 'a line in the base currency has no foreign fields');
+        $this->assertNull($invoice['foreign_amount']);
+        $this->assertNotNull($invoice['created_by']);
+        $this->assertNotNull($invoice['document_id']);
+        $payment = collect($lines)->firstWhere('type', 'payment_received');
+        $this->assertNotNull($payment['payment_id']);
+        $this->assertNotSame('-Split-', $payment['split'], 'a payment has one other side: the bank');
+        foreach (['due_date', 'exchange_rate', 'location', 'class', 'project', 'posted_by'] as $field) {
+            $this->assertArrayHasKey($field, $invoice);
+        }
+    }
+
     public function test_every_account_balances_to_nothing_and_agrees_with_the_trial_balance(): void
     {
         $gl = collect($this->getJson('/api/v1/reports/general-ledger?from=2026-11-01&to=2026-12-31', $this->h)->assertOk()->json('accounts'));

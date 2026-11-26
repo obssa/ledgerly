@@ -33,8 +33,10 @@ final class ReportExportController extends Controller
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d'],
             'as_of' => ['nullable', 'date_format:Y-m-d'],
-            'options' => ['nullable', 'array:kind,group,account_id,action,user_id,warehouse_id,rows,columns,measure,account_type,project_id,location_id,class_id'],
-            'options.*' => ['nullable', 'string', 'max:60'],
+            // The page's choices, recorded as they were: its filters, and a report's Customize choices (columns in order,
+            // sort, status; the ageing's view and periods). A column list is the longest.
+            'options' => ['nullable', 'array:kind,group,account_id,action,user_id,warehouse_id,rows,columns,measure,account_type,project_id,location_id,class_id,cols,sort,dir,status,view,interval,periods'],
+            'options.*' => ['nullable', 'string', 'max:400'],
             'rows' => ['required', 'integer', 'min:0', 'max:1000000'],
         ]);
         $this->audit->record($this->current->id(), 'report_exported', 'company', $this->current->id(), null, $data, userId: $request->user()->getKey());

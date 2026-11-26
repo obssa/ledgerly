@@ -28,7 +28,10 @@ final class SavedReports
 
     /** The options each report takes, and the values allowed (a list, or 'uuid'). */
     public const OPTIONS = [
-        'general-ledger' => ['account_id' => 'uuid'],
+        'general-ledger' => ['account_id' => 'uuid', 'location_id' => 'uuid', 'class_id' => 'uuid', 'project_id' => 'uuid',
+            'cols' => ['columns' => ReportService::LEDGER_COLUMNS]],
+        // The ageing: summary or detail, QuickBooks' periods (days per period, how many), the detail's columns and grouping.
+        'ar-ageing' => self::AGEING_OPTIONS, 'ap-ageing' => self::AGEING_OPTIONS,
         'profit-by-dimension' => ['kind' => ['location', 'class', 'project']],
         'sales' => ['group' => ['contact', 'item', 'month', 'salesperson']],
         'purchases' => ['group' => ['contact', 'item', 'month']],
@@ -43,7 +46,10 @@ final class SavedReports
         'bill-list' => self::TX_OPTIONS + ['status' => ['open', 'overdue', 'paid', 'draft', 'void']],
     ];
 
-    private const TX_OPTIONS = ['cols' => 'columns', 'sort' => TransactionReport::COLUMNS, 'dir' => ['asc', 'desc'],
+    private const AGEING_OPTIONS = ['view' => ['summary', 'detail'], 'interval' => ['between' => [1, 365]], 'periods' => ['between' => [2, 12]],
+        'cols' => ['columns' => ReceivablesReport::DETAIL_COLUMNS], 'group' => ['age', 'name']];
+
+    private const TX_OPTIONS = ['cols' => ['columns' => TransactionReport::COLUMNS], 'sort' => TransactionReport::COLUMNS, 'dir' => ['asc', 'desc'],
         'group' => ['none', 'name', 'type', 'month', 'status']];
 
     /**

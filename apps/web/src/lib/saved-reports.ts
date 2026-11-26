@@ -34,7 +34,7 @@ export const SCHEDULES: [string, string][] = [["none", "Not sent"], ["weekly", "
 
 /** The report options a saved report keeps (each report takes some of them; the API checks which). */
 export const OPTION_KEYS = ["group", "kind", "account_id", "warehouse_id", "rows", "columns", "measure", "account_type", "project_id", "location_id", "class_id",
-  "cols", "sort", "dir", "status"] as const;
+  "cols", "sort", "dir", "status", "view", "interval", "periods"] as const;
 
 /** The report page for a saved report, for the dates its period covers today, with its options. */
 export function savedReportUrl(r: { report: string; period?: string; covers: { from?: string | null; to?: string | null; as_of?: string | null }; options: Record<string, string> }): string {

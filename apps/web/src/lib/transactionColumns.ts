@@ -1,4 +1,6 @@
 import { parse, toString } from "./decimal";
+import { chooseColumns, type ColumnDef } from "./columns";
+export { moveColumn } from "./columns";
 
 /**
  * The transaction reports' columns, as QuickBooks offers them under Customize, Columns: every row has every field
@@ -14,8 +16,7 @@ export type TxRow = {
 };
 export type TxColumn = keyof TxRow;
 
-type Kind = "date" | "text" | "money" | "count" | "rate";
-export const COLUMNS: { key: TxColumn; label: string; group: string; kind: Kind }[] = [
+export const COLUMNS: ColumnDef<TxColumn>[] = [
   { key: "date", label: "Date", group: "Transaction", kind: "date" },
   { key: "type", label: "Transaction type", group: "Transaction", kind: "text" },
   { key: "number", label: "No.", group: "Transaction", kind: "text" },
@@ -42,6 +43,7 @@ export const COLUMNS: { key: TxColumn; label: string; group: string; kind: Kind 
   { key: "posted_by", label: "Posted by", group: "People and time", kind: "text" },
 ];
 const KEYS = new Set<string>(COLUMNS.map((c) => c.key));
+export const FOREIGN: readonly TxColumn[] = ["foreign_amount", "foreign_open_balance", "currency", "exchange_rate"];
 export const column = (key: TxColumn) => COLUMNS.find((c) => c.key === key)!;
 export const isMoney = (key: TxColumn) => column(key).kind === "money";
 
@@ -79,27 +81,10 @@ const STATUS_LABELS: Record<string, string> = { awaiting_approval: "Awaiting app
 export const statusLabel = (s: string | null) => (s ? STATUS_LABELS[s] ?? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ") : "");
 
 type Query = Record<string, string | string[] | undefined>;
-const list = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v ? v.split(",") : []);
 
-/**
- * The columns shown, from the URL. `cols` keeps its order; a column ticked in Customize (sent as `col`, in catalogue
- * order) is added at the end, an unticked one removed; unknown keys are dropped. No columns at all: the defaults.
- */
+/** The columns shown, from the URL (lib/columns.ts); no choice: the report's defaults. */
 export function pickColumns(q: Query, defaults: readonly TxColumn[]): TxColumn[] {
-  const order = list(q.cols).filter((k): k is TxColumn => KEYS.has(k));
-  const ticked = q.customize === "1" ? list(q.col).filter((k): k is TxColumn => KEYS.has(k)) : null;
-  let cols = order.length > 0 ? order : [...defaults];
-  if (ticked) cols = [...cols.filter((c) => ticked.includes(c)), ...ticked.filter((c) => !cols.includes(c))];
-  return cols.length > 0 ? [...new Set(cols)] : [...defaults];
-}
-
-/** One column moved left (-1) or right (+1). */
-export function moveColumn(cols: TxColumn[], key: TxColumn, by: -1 | 1): TxColumn[] {
-  const i = cols.indexOf(key), j = i + by;
-  if (i < 0 || j < 0 || j >= cols.length) return cols;
-  const next = [...cols];
-  [next[i], next[j]] = [next[j], next[i]];
-  return next;
+  return chooseColumns(q, COLUMNS, defaults);
 }
 
 export function pickSort(q: Query, cols: TxColumn[]): { sort: TxColumn; dir: "asc" | "desc" } {
