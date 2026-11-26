@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\DB;
 
 final class InvoiceController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly CreditCheck $credit, private readonly CurrentCompany $current)
     {
     }
@@ -63,6 +65,7 @@ final class InvoiceController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('invoices.view');
+        $range = $this->dateRange($request);
         $filters = $request->validate([
             'status' => ['nullable', 'in:draft,awaiting_approval,posted,part_paid,paid,void'],
             'contact_id' => ['nullable', 'uuid'],
@@ -76,6 +79,7 @@ final class InvoiceController extends Controller
             ->when($filters['contact_id'] ?? null, fn ($q, $id) => $q->where('contact_id', $id))
             ->when($filters['open'] ?? false, fn ($q) => $q->whereIn('status', ['posted', 'part_paid']))
             ->when($request->boolean('overdue'), fn ($q) => $q->where('amount_due', '>', 0)->whereDate('due_date', '<', now()))
+            ->when(true, fn ($q) => $this->withinDates($q, 'issue_date', $range))   // the period asked for (FiltersByDate)
             // Open invoices oldest first (the order a payment settles them in); otherwise newest first.
             ->orderBy('issue_date', ($filters['open'] ?? false) ? 'asc' : 'desc')->orderBy('id')
             ->cursorPaginate(50);

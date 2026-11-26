@@ -1,12 +1,17 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getDeliveryNotes } from "@/lib/data";
+import { getDeliveryNotes, getReportPeriod } from "@/lib/data";
 
 export const metadata = { title: "Delivery notes" };
 
 /** Module 2: the delivery notes (071), newest first. Each is recorded from its sales order. */
-export default async function DeliveryNotesPage() {
-  const rows = await getDeliveryNotes();
+export default async function DeliveryNotesPage({ searchParams }: PageProps<"/delivery-notes">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const rows = await getDeliveryNotes(listQuery(q, period.picked));
   return (
     <>
       <PageTitle
@@ -14,6 +19,7 @@ export default async function DeliveryNotesPage() {
         title="Delivery notes"
         actions={<Link href="/delivery-notes/uninvoiced" className="btn">Delivered, not invoiced</Link>}
       />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Delivery notes">
         {rows.length === 0 ? (
           <p className="p-3 text-sm text-muted">No delivery notes yet. When goods leave for a customer, open their sales order and record what went: it leaves stock at its cost.</p>
@@ -41,6 +47,7 @@ export default async function DeliveryNotesPage() {
           </div>
         )}
       </Card>
+      <ListPager path="/delivery-notes" picked={period.picked} next={rows.next} prev={rows.prev} />
     </>
   );
 }

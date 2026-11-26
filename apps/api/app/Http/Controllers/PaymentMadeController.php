@@ -31,6 +31,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 final class PaymentMadeController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly CurrentCompany $current, private readonly WithholdingAdvice $advice)
     {
     }
@@ -38,11 +40,13 @@ final class PaymentMadeController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('payments.view');
+        $range = $this->dateRange($request);
         $q = $request->validate(['contact_id' => ['nullable', 'uuid']]);
 
         return response()->json(Payment::query()->where(['direction' => 'out', 'kind' => 'payment'])
             ->when($q['contact_id'] ?? null, fn ($b, $id) => $b->where('contact_id', $id))
             ->with('contact:id,name')->withCount('allocations')
+            ->when(true, fn ($q) => $this->withinDates($q, 'payment_date', $range))   // the period asked for (FiltersByDate)
             ->orderByDesc('payment_date')->orderByDesc('created_at')
             ->cursorPaginate(50));
     }

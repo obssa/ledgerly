@@ -20,6 +20,8 @@ use Illuminate\Validation\Rule;
  */
 final class PurchaseRequisitionController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly PurchaseRequisitions $requisitions, private readonly CurrentCompany $current)
     {
     }
@@ -27,9 +29,11 @@ final class PurchaseRequisitionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('bills.request');
+        $range = $this->dateRange($request);
         $all = $this->seesAll();
         $rows = DB::table('purchase_requisitions as r')->join('users as u', 'u.id', '=', 'r.requested_by')
             ->when(! $all, fn ($q) => $q->where('r.requested_by', $request->user()->getKey()))
+            ->when(true, fn ($q) => $this->withinDates($q, 'r.created_at', $range, timestamp: true))   // the period asked for (FiltersByDate)
             ->orderByRaw("CASE r.status WHEN 'requested' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END")->orderByDesc('r.created_at')->limit(500)
             ->get(['r.id', 'r.status', 'r.reason', 'r.needed_by', 'r.created_at', 'r.purchase_order_id', 'u.name as requested_by_name', 'r.requested_by', 'r.lines'])
             ->map(fn ($r) => [...(array) $r, 'lines' => count(json_decode((string) $r->lines, true) ?? [])]);

@@ -1147,6 +1147,10 @@ export interface PaymentReceived {
 }
 
 /** GET /reports/ar-ageing: open invoices by days overdue; each total is the customer's receivable balance. */
+/** A list's period and page (lib/lists.ts), and where the pages around it start (the API's cursor pagination). */
+export type ListQuery = { from?: string; to?: string; cursor?: string };
+export type ListCursor = { next_cursor?: string | null; prev_cursor?: string | null };
+
 /** The ageing periods as query fields (only when not QuickBooks' standard 30 days, four periods). */
 const ageingQuery = (p: { interval?: number; periods?: number }) =>
   ({ ...(p.interval && p.interval !== 30 ? { interval: String(p.interval) } : {}), ...(p.periods && p.periods !== 4 ? { periods: String(p.periods) } : {}) });
@@ -1843,9 +1847,9 @@ export const ledgerly = {
     api<{ data: Invoice[] }>("invoices", { ...ctx, query: { contact_id: contactId, open: "1" } }),
   openBills: (contactId: string, ctx: RequestOptions) =>
     api<{ data: Bill[] }>("bills", { ...ctx, query: { contact_id: contactId, open: "1" } }),
-  paymentsMade: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-made", ctx),
+  paymentsMade: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: PaymentReceived[] } & ListCursor>("payments-made", { ...ctx, query }),
   /** Module 3: one payment per supplier for the bills given, all or none. */
-  requisitions: (ctx: RequestOptions) => api<RequisitionList>("purchase-requisitions", ctx),
+  requisitions: (ctx: RequestOptions, query: ListQuery = {}) => api<RequisitionList>("purchase-requisitions", { ...ctx, query }),
   requisition: (id: string, ctx: RequestOptions) => api<PurchaseRequisition>(`purchase-requisitions/${encodeURIComponent(id)}`, ctx),
   createRequisition: (body: Record<string, unknown>, ctx: RequestOptions) => api<PurchaseRequisition>("purchase-requisitions", { ...ctx, method: "POST", body }),
   decideRequisition: (id: string, decision: "approve" | "reject", note: string | null, ctx: RequestOptions) =>
@@ -1853,7 +1857,7 @@ export const ledgerly = {
   withdrawRequisition: (id: string, ctx: RequestOptions) => api<PurchaseRequisition>(`purchase-requisitions/${encodeURIComponent(id)}/withdraw`, { ...ctx, method: "POST", body: {} }),
   orderRequisition: (id: string, body: { contact_id: string; account_id: string; prices: (string | null)[] }, ctx: RequestOptions) =>
     api<PurchaseRequisition>(`purchase-requisitions/${encodeURIComponent(id)}/order`, { ...ctx, method: "POST", body }),
-  expenseClaims: (ctx: RequestOptions) => api<ExpenseClaimList>("expense-claims", ctx),
+  expenseClaims: (ctx: RequestOptions, query: ListQuery = {}) => api<ExpenseClaimList>("expense-claims", { ...ctx, query }),
   expenseClaim: (id: string, ctx: RequestOptions) => api<ExpenseClaim>(`expense-claims/${encodeURIComponent(id)}`, ctx),
   createExpenseClaim: (body: Record<string, unknown>, ctx: RequestOptions) => api<ExpenseClaim>("expense-claims", { ...ctx, method: "POST", body }),
   submitExpenseClaim: (id: string, ctx: RequestOptions) => api<ExpenseClaim>(`expense-claims/${encodeURIComponent(id)}/submit`, { ...ctx, method: "POST", body: {} }),
@@ -1875,14 +1879,14 @@ export const ledgerly = {
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/allocate`, { ...ctx, method: "POST", body }),
   allocatePaymentMade: (id: string, body: { allocations: { bill_id: string; amount: string }[] }, ctx: RequestOptions) =>
     api<PaymentReceived>(`payments-made/${encodeURIComponent(id)}/allocate`, { ...ctx, method: "POST", body }),
-  refunds: (ctx: RequestOptions) => api<{ data: (PaymentReceived & { direction: "in" | "out" })[] }>("refunds", ctx),
+  refunds: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: (PaymentReceived & { direction: "in" | "out" })[] } & ListCursor>("refunds", { ...ctx, query }),
   refund: (id: string, ctx: RequestOptions) =>
     api<PaymentReceived & { direction: "in" | "out"; refunds_payment_id: string | null; can: { reverse: boolean } }>(`refunds/${encodeURIComponent(id)}`, ctx),
   recordRefund: (side: "customer" | "supplier", body: Record<string, unknown>, ctx: RequestOptions) =>
     api<PaymentReceived>(`refunds/${side}`, { ...ctx, method: "POST", body }),
   reverseRefund: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<PaymentReceived>(`refunds/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
-  paymentsReceived: (ctx: RequestOptions) => api<{ data: PaymentReceived[] }>("payments-received", ctx),
+  paymentsReceived: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: PaymentReceived[] } & ListCursor>("payments-received", { ...ctx, query }),
   paymentReceived: (id: string, ctx: RequestOptions) =>
     api<PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean; refund: boolean } }>(`payments-received/${encodeURIComponent(id)}`, ctx),
   receivePayment: (body: Record<string, unknown>, ctx: RequestOptions) => api<PaymentReceived>("payments-received", { ...ctx, method: "POST", body }),
@@ -1907,9 +1911,9 @@ export const ledgerly = {
   createSupplier: (body: Record<string, unknown>, ctx: RequestOptions) => api<Supplier>("suppliers", { ...ctx, method: "POST", body }),
   updateSupplier: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<Supplier>(`suppliers/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
-  bills: (ctx: RequestOptions) => api<{ data: Bill[] }>("bills", ctx),
-  supplierCredits: (ctx: RequestOptions) =>
-    api<{ data: (Bill & { original?: { id: string; number: string | null } | null })[] }>("supplier-credits", ctx),
+  bills: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: Bill[] } & ListCursor>("bills", { ...ctx, query }),
+  supplierCredits: (ctx: RequestOptions, query: ListQuery = {}) =>
+    api<{ data: (Bill & { original?: { id: string; number: string | null } | null })[] } & ListCursor>("supplier-credits", { ...ctx, query }),
   createSupplierCredit: (billId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<BillDetail>(`bills/${encodeURIComponent(billId)}/credits`, { ...ctx, method: "POST", body }),
   applySupplierCredit: (creditId: string, body: { bill_id: string; amount: string }, ctx: RequestOptions) =>
@@ -1926,17 +1930,17 @@ export const ledgerly = {
     api<BillDetail>(`bills/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
   deliverSalesOrder: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<DeliveryNote>(`sales-orders/${encodeURIComponent(id)}/deliver`, { ...ctx, method: "POST", body }),
-  deliveryNotes: (ctx: RequestOptions) => api<{ data: DeliveryNoteSummary[] }>("delivery-notes", ctx),
+  deliveryNotes: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: DeliveryNoteSummary[] } & ListCursor>("delivery-notes", { ...ctx, query }),
   deliveryNote: (id: string, ctx: RequestOptions) => api<DeliveryNote>(`delivery-notes/${encodeURIComponent(id)}`, ctx),
   voidDeliveryNote: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<DeliveryNote>(`delivery-notes/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body }),
   uninvoicedGoods: (ctx: RequestOptions) => api<UninvoicedGoods>("delivery-notes/uninvoiced", ctx),
-  salesReceipts: (ctx: RequestOptions) => api<{ data: SalesReceipt[] }>("sales-receipts", ctx),
+  salesReceipts: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: SalesReceipt[] } & ListCursor>("sales-receipts", { ...ctx, query }),
   salesReceipt: (id: string, ctx: RequestOptions) => api<SalesReceipt>(`sales-receipts/${encodeURIComponent(id)}`, ctx),
   createSalesReceipt: (body: Record<string, unknown>, ctx: RequestOptions) => api<SalesReceipt>("sales-receipts", { ...ctx, method: "POST", body }),
   voidSalesReceipt: (id: string, reason: string, ctx: RequestOptions) =>
     api<SalesReceipt>(`sales-receipts/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body: { reason } }),
-  expenses: (ctx: RequestOptions) => api<{ data: Expense[] }>("expenses", ctx),
+  expenses: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: Expense[] } & ListCursor>("expenses", { ...ctx, query }),
   expense: (id: string, ctx: RequestOptions) => api<Expense>(`expenses/${encodeURIComponent(id)}`, ctx),
   createExpense: (body: Record<string, unknown>, ctx: RequestOptions) => api<Expense>("expenses", { ...ctx, method: "POST", body }),
   voidExpense: (id: string, reason: string, ctx: RequestOptions) =>
@@ -2033,7 +2037,7 @@ export const ledgerly = {
   reviewStatementLine: (id: string, step: "match" | "categorise" | "split" | "exclude" | "undo", body: Record<string, unknown>, ctx: RequestOptions) =>
     api<StatementLine>(`statement-lines/${encodeURIComponent(id)}/${step}`, { ...ctx, method: "POST", body }),
   depositReceipts: (body: Record<string, unknown>, ctx: RequestOptions) => api<{ number: number }>("banking/deposits", { ...ctx, method: "POST", body }),
-  invoices: (ctx: RequestOptions) => api<{ data: Invoice[] }>("invoices", ctx),
+  invoices: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: Invoice[] } & ListCursor>("invoices", { ...ctx, query }),
   invoice: (id: string, ctx: RequestOptions) => api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}`, ctx),
   createInvoice: (body: Record<string, unknown>, ctx: RequestOptions) => api<InvoiceDetail>("invoices", { ...ctx, method: "POST", body }),
   leases: (ctx: RequestOptions) => api<LeaseRegister>("leases", ctx),
@@ -2076,7 +2080,7 @@ export const ledgerly = {
   landedCosts: (billId: string, ctx: RequestOptions) => api<LandedCosts>(`bills/${encodeURIComponent(billId)}/landed-costs`, ctx),
   applyLandedCost: (billId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ amount: string; inventory: string; cost_of_sales: string }>(`bills/${encodeURIComponent(billId)}/landed-costs`, { ...ctx, method: "POST", body }),
-  quotes: (kind: QuoteKind, ctx: RequestOptions) => api<{ data: QuoteSummary[] }>(quotePath(kind), ctx),
+  quotes: (kind: QuoteKind, ctx: RequestOptions, query: ListQuery = {}) => api<{ data: QuoteSummary[] } & ListCursor>(quotePath(kind), { ...ctx, query }),
   quote: (kind: QuoteKind, id: string, ctx: RequestOptions) => api<QuoteDetail>(`${quotePath(kind)}/${encodeURIComponent(id)}`, ctx),
   createQuote: (kind: QuoteKind, body: Record<string, unknown>, ctx: RequestOptions) => api<QuoteDetail>(quotePath(kind), { ...ctx, method: "POST", body }),
   updateQuote: (kind: QuoteKind, id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
@@ -2090,7 +2094,7 @@ export const ledgerly = {
     api<{ id: string; type: "invoice" | "sales_order"; number: string | null; status: string }>(`${quotePath(kind)}/${encodeURIComponent(id)}/convert`,
       { ...ctx, method: "POST", body: { to, ...(number ? { number } : {}), ...(lines ? { lines } : {}) } }),
   backOrders: (ctx: RequestOptions) => api<BackOrders>("sales-orders/back-orders", ctx),
-  purchaseOrders: (ctx: RequestOptions) => api<{ data: PurchaseOrderSummary[] }>("purchase-orders", ctx),
+  purchaseOrders: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: PurchaseOrderSummary[] } & ListCursor>("purchase-orders", { ...ctx, query }),
   purchaseOrder: (id: string, ctx: RequestOptions) => api<PurchaseOrderDetail>(`purchase-orders/${encodeURIComponent(id)}`, ctx),
   createPurchaseOrder: (body: Record<string, unknown>, ctx: RequestOptions) => api<PurchaseOrderDetail>("purchase-orders", { ...ctx, method: "POST", body }),
   updatePurchaseOrder: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
@@ -2103,7 +2107,7 @@ export const ledgerly = {
   openPurchaseOrders: (ctx: RequestOptions) => api<BackOrders>("purchase-orders/open", ctx),
   receivePurchaseOrder: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<GoodsReceipt>(`purchase-orders/${encodeURIComponent(id)}/receive`, { ...ctx, method: "POST", body }),
-  goodsReceipts: (ctx: RequestOptions) => api<{ data: GoodsReceiptSummary[] }>("goods-receipts", ctx),
+  goodsReceipts: (ctx: RequestOptions, query: ListQuery = {}) => api<{ data: GoodsReceiptSummary[] } & ListCursor>("goods-receipts", { ...ctx, query }),
   goodsReceipt: (id: string, ctx: RequestOptions) => api<GoodsReceipt>(`goods-receipts/${encodeURIComponent(id)}`, ctx),
   voidGoodsReceipt: (id: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<GoodsReceipt>(`goods-receipts/${encodeURIComponent(id)}/void`, { ...ctx, method: "POST", body }),
@@ -2118,8 +2122,8 @@ export const ledgerly = {
     api<{ id: string }>(`sales-receipts/${encodeURIComponent(receiptId)}/credit-notes`, { ...ctx, method: "POST", body }),
   createCreditNote: (invoiceId: string, body: Record<string, unknown>, ctx: RequestOptions) =>
     api<{ id: string }>(`invoices/${encodeURIComponent(invoiceId)}/credit-notes`, { ...ctx, method: "POST", body }),
-  creditNotes: (ctx: RequestOptions) =>
-    api<{ data: (Invoice & { original?: { id: string; number: string | null } | null })[] }>("credit-notes", ctx),
+  creditNotes: (ctx: RequestOptions, query: ListQuery = {}) =>
+    api<{ data: (Invoice & { original?: { id: string; number: string | null } | null })[] } & ListCursor>("credit-notes", { ...ctx, query }),
   holdRetention: (id: string, body: { amount?: string; percent?: string; held_on: string }, ctx: RequestOptions) =>
     api<InvoiceDetail>(`invoices/${encodeURIComponent(id)}/retention`, { ...ctx, method: "POST", body }),
   batchInvoice: (id: string, body: { contact_ids: string[]; issue_date: string; post: boolean }, ctx: RequestOptions) =>

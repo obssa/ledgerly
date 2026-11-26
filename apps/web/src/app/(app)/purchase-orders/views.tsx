@@ -1,8 +1,10 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { PurchaseOrderStatus } from "@/lib/api";
-import { getBillOptions, getCompanyToday, getPurchaseOrder, getPurchaseOrders } from "@/lib/data";
+import { getBillOptions, getCompanyToday, getPurchaseOrder, getPurchaseOrders, getReportPeriod } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { InvoiceForm } from "../invoices/new/InvoiceForm";
 import { PurchaseOrderActions } from "./PurchaseOrderActions";
@@ -22,14 +24,16 @@ const eyebrow = (last?: string) => (
   <><Link href="/bills" className="hover:underline">Bills and purchases</Link> / {last ? <><Link href="/purchase-orders" className="hover:underline">Purchase orders</Link> / {last}</> : "Purchase orders"}</>
 );
 
-export async function PurchaseOrderList() {
-  const rows = await getPurchaseOrders();
+export async function PurchaseOrderList({ q = {} }: { q?: Record<string, string | string[] | undefined> } = {}) {
+  const period = await getReportPeriod(q, "all");
+  const rows = await getPurchaseOrders(listQuery(q, period.picked));
   return (
     <>
       <PageTitle eyebrow={eyebrow()} title="Purchase orders" actions={<>
         <Link href="/purchase-orders/open" className="btn">Still to come</Link>
         <Link href="/purchase-orders/new" className="btn btn-primary">+ New purchase order</Link>
       </>} />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Purchase orders">
         {rows.length === 0 ? (
           <p className="p-3 text-sm text-muted">No purchase orders yet. An order posts nothing; issue it to the supplier, then bill it as their invoices come in.</p>
@@ -58,6 +62,7 @@ export async function PurchaseOrderList() {
           </div>
         )}
       </Card>
+      <ListPager path="/purchase-orders" picked={period.picked} next={rows.next} prev={rows.prev} />
     </>
   );
 }

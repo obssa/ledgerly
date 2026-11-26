@@ -4,6 +4,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type JournalReport, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { paged, type ListQuery, type Paged } from "./lists";
 import type { TransactionReportData, BankPaymentFile, Bin, LeaseDetail, LeaseRegister, Tag, TagKind, TagReport, TransactionTags, DonorReport, IndustryTemplates, DirectCashFlow, FinancialNotes, ItemAssembly, ExpenseClaim, ExpenseClaimList, PurchaseRequisition, RequisitionList, InvoiceWriteOffs, LateInterestPreview, PriceList, PriceListDetail, ScheduledPayments, ScheduledPaymentDetail } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
@@ -486,10 +487,10 @@ export async function getExpenseOptions(): Promise<InvoiceOptions> {
 }
 
 /** The delivery notes, newest first (071). */
-export async function getDeliveryNotes(): Promise<DeliveryNoteSummary[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getDeliveryNotes(q: ListQuery = {}): Promise<Paged<DeliveryNoteSummary>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.deliveryNotes(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.deliveryNotes(ctx, q)));
 }
 
 /** One delivery note, or null when it is not one of this company's (071). */
@@ -524,10 +525,10 @@ export async function getSalesReceiptOptions(): Promise<InvoiceOptions> {
   };
 }
 
-export async function getSalesReceipts(): Promise<SalesReceipt[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getSalesReceipts(q: ListQuery = {}): Promise<Paged<SalesReceipt>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.salesReceipts(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.salesReceipts(ctx, q)));
 }
 
 /** One cash sale, or null when it is not one of this company's (070). */
@@ -542,10 +543,10 @@ export async function getSalesReceipt(id: string): Promise<SalesReceipt | null> 
   }
 }
 
-export async function getExpenses(): Promise<Expense[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getExpenses(q: ListQuery = {}): Promise<Paged<Expense>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.expenses(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.expenses(ctx, q)));
 }
 
 export async function getExpense(id: string): Promise<Expense | null> {
@@ -746,12 +747,12 @@ export async function getItemAssembly(id: string): Promise<ItemAssembly | null> 
 }
 
 /** 084: the member's own requisitions (everyone's for those who decide or order); null for a role that cannot ask. */
-export async function getRequisitions(): Promise<RequisitionList | null> {
+export async function getRequisitions(q: ListQuery = {}): Promise<RequisitionList | null> {
   await connection();
   if (isDemoMode()) return null;
   return withApi(async (ctx) => {
     try {
-      return await ledgerly.requisitions(ctx);
+      return await ledgerly.requisitions(ctx, q);
     } catch (error) {
       if (error instanceof ApiError && error.status === 403) return null;
       throw error;
@@ -774,12 +775,12 @@ export async function getRequisition(id: string): Promise<PurchaseRequisition | 
 }
 
 /** 083: the member's own expense claims (everyone's for someone who sees bills); null for a role that cannot claim. */
-export async function getExpenseClaims(): Promise<ExpenseClaimList | null> {
+export async function getExpenseClaims(q: ListQuery = {}): Promise<ExpenseClaimList | null> {
   await connection();
   if (isDemoMode()) return null;
   return withApi(async (ctx) => {
     try {
-      return await ledgerly.expenseClaims(ctx);
+      return await ledgerly.expenseClaims(ctx, q);
     } catch (error) {
       if (error instanceof ApiError && error.status === 403) return null;
       throw error;
@@ -909,10 +910,10 @@ export async function getCostAccounts(): Promise<{ id: string; code: string; nam
   return data.filter((a) => a.is_active && (a.type === "expense" || a.type === "asset")).map((a) => ({ id: a.id, code: a.code, name: a.name }));
 }
 
-export async function getSupplierCredits() {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getSupplierCredits(q: ListQuery = {}) {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.supplierCredits(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.supplierCredits(ctx, q)));
 }
 
 /** A supplier's open bills in one currency, by due date: what a supplier credit can be applied to. */
@@ -922,10 +923,10 @@ export async function getOpenBills(contactId: string, currency: string): Promise
   return (await withApi((ctx) => ledgerly.openBills(contactId, ctx))).data.filter((b) => b.currency === currency);
 }
 
-export async function getBills(): Promise<Bill[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getBills(q: ListQuery = {}): Promise<Paged<Bill>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.bills(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.bills(ctx, q)));
 }
 
 /** One bill, or null when it is not one of this company's. */
@@ -1178,10 +1179,10 @@ export async function getMoneyAccounts(currency: string): Promise<{ id: string; 
     .map((a) => ({ id: a.id, code: a.code, name: a.name }));
 }
 
-export async function getRefunds() {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getRefunds(q: ListQuery = {}) {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.refunds(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.refunds(ctx, q)));
 }
 
 export async function getRefund(id: string) {
@@ -1195,10 +1196,10 @@ export async function getRefund(id: string) {
   }
 }
 
-export async function getPaymentsMade(): Promise<PaymentReceived[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getPaymentsMade(q: ListQuery = {}): Promise<Paged<PaymentReceived>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.paymentsMade(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.paymentsMade(ctx, q)));
 }
 
 /** Module 3: scheduled supplier payments (103), those still to pay first. */
@@ -1257,10 +1258,10 @@ export async function getSupplierStatement(id: string, q: { from?: string; to?: 
   }
 }
 
-export async function getCreditNotes(): Promise<(Invoice & { original?: { id: string; number: string | null } | null })[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getCreditNotes(q: ListQuery = {}): Promise<Paged<(Invoice & { original?: { id: string; number: string | null } | null })>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.creditNotes(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.creditNotes(ctx, q)));
 }
 
 /** A customer's open invoices in one currency, oldest first: where a credit note's leftover credit can go. */
@@ -1270,10 +1271,10 @@ export async function getOpenInvoices(contactId: string, currency: string): Prom
   return (await withApi((ctx) => ledgerly.openInvoices(contactId, ctx))).data.filter((i) => i.currency === currency);
 }
 
-export async function getPaymentsReceived(): Promise<PaymentReceived[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getPaymentsReceived(q: ListQuery = {}): Promise<Paged<PaymentReceived>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.paymentsReceived(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.paymentsReceived(ctx, q)));
 }
 
 export async function getPaymentReceived(id: string): Promise<(PaymentReceived & { unallocated: string; can: { allocate: boolean; reverse: boolean; refund: boolean } }) | null> {
@@ -1317,16 +1318,15 @@ export async function getCustomerStatement(id: string, q: { from?: string; to?: 
 }
 
 /** Quotes or sales orders, newest first; none in the demo without an API. */
-export async function getQuotes(kind: QuoteKind): Promise<QuoteSummary[]> {
+export async function getQuotes(kind: QuoteKind, q: ListQuery = {}): Promise<Paged<QuoteSummary>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.quotes(kind, ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.quotes(kind, ctx, q)));
 }
 
-export async function getPurchaseOrders(): Promise<PurchaseOrderSummary[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getPurchaseOrders(q: ListQuery = {}): Promise<Paged<PurchaseOrderSummary>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.purchaseOrders(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.purchaseOrders(ctx, q)));
 }
 
 /** One purchase order, or null when it is not one of this company's (068). */
@@ -1342,10 +1342,10 @@ export async function getPurchaseOrder(id: string): Promise<PurchaseOrderDetail 
 }
 
 /** The goods received notes, newest first (069). */
-export async function getGoodsReceipts(): Promise<GoodsReceiptSummary[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getGoodsReceipts(q: ListQuery = {}): Promise<Paged<GoodsReceiptSummary>> {
   await connection();
-  if (isDemoMode()) return [];
-  return (await withApi((ctx) => ledgerly.goodsReceipts(ctx))).data;
+  return paged(isDemoMode() ? { data: [] } : await withApi((ctx) => ledgerly.goodsReceipts(ctx, q)));
 }
 
 /** One goods received note, or null when it is not one of this company's (069). */
@@ -1392,10 +1392,10 @@ export async function getQuote(kind: QuoteKind, id: string): Promise<QuoteDetail
   }
 }
 
-export async function getInvoices(): Promise<Invoice[]> {
+/** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
+export async function getInvoices(q: ListQuery = {}): Promise<Paged<Invoice>> {
   await connection();
-  if (isDemoMode()) return demoInvoices;
-  return (await withApi((ctx) => ledgerly.invoices(ctx))).data;
+  return paged(isDemoMode() ? { data: demoInvoices } : await withApi((ctx) => ledgerly.invoices(ctx, q)));
 }
 
 /** The general ledger for a period (one account, or all; optionally one location, class or project). null in the demo. */

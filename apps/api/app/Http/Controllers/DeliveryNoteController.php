@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class DeliveryNoteController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly Delivering $delivering, private readonly CurrentCompany $current)
     {
     }
@@ -26,6 +28,7 @@ final class DeliveryNoteController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('invoices.view');
+        $range = $this->dateRange($request);
         $filters = $request->validate([
             'status' => ['nullable', 'in:posted,void'],
             'sales_order_id' => ['nullable', 'uuid'],
@@ -39,6 +42,7 @@ final class DeliveryNoteController extends Controller
             ->when($filters['sales_order_id'] ?? null, fn ($q, $id) => $q->where('d.sales_order_id', $id))
             ->select(['d.id', 'd.number', 'd.delivered_on', 'd.reference', 'd.status', 'd.sales_order_id', 'o.number as order_number',
                 'c.name as customer', 'w.name as warehouse'])
+            ->when(true, fn ($q) => $this->withinDates($q, 'd.delivered_on', $range))   // the period asked for (FiltersByDate)
             ->orderByDesc('d.delivered_on')->orderByDesc('d.number')
             ->cursorPaginate(50));
     }

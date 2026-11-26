@@ -25,6 +25,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class SalesReceiptController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly CurrentCompany $current)
     {
     }
@@ -42,11 +44,13 @@ final class SalesReceiptController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('invoices.view');
+        $range = $this->dateRange($request);
         $q = $request->validate(['contact_id' => ['nullable', 'uuid']]);
 
         return response()->json(Document::query()->where('type', 'sales_receipt')
             ->with(['contact:id,name', 'paidFrom:id,code,name'])
             ->when($q['contact_id'] ?? null, fn ($b, $id) => $b->where('contact_id', $id))
+            ->when(true, fn ($q) => $this->withinDates($q, 'issue_date', $range))   // the period asked for (FiltersByDate)
             ->orderByDesc('issue_date')->orderByDesc('created_at')
             ->cursorPaginate(50));
     }

@@ -1,16 +1,22 @@
+import { ListPager, ListPeriod } from "@/components/ListPeriod";
+import { listQuery } from "@/lib/lists";
 import Link from "next/link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getPaymentsReceived } from "@/lib/data";
+import { getPaymentsReceived, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Payments received" };
 
-export default async function PaymentsPage() {
-  const payments = await getPaymentsReceived();
+export default async function PaymentsPage({ searchParams }: PageProps<"/payments">) {
+  const q = await searchParams;
+  // All dates unless a period is chosen: nothing disappears from the list.
+  const period = await getReportPeriod(q, "all");
+  const payments = await getPaymentsReceived(listQuery(q, period.picked));
 
   return (
     <>
       <PageTitle eyebrow="Money in" title="Payments received" actions={<Link href="/payments/new" className="btn btn-primary">+ Receive a payment</Link>} />
+      <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Payments received">
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -33,6 +39,7 @@ export default async function PaymentsPage() {
           </table>
         </div>
       </Card>
+      <ListPager path="/payments" picked={period.picked} next={payments.next} prev={payments.prev} />
     </>
   );
 }

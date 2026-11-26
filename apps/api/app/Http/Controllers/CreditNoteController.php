@@ -25,6 +25,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 final class CreditNoteController extends Controller
 {
+    use Concerns\FiltersByDate;
+
     public function __construct(private readonly AuditLogger $audit)
     {
     }
@@ -32,9 +34,11 @@ final class CreditNoteController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeCompany('invoices.view');
+        $range = $this->dateRange($request);
 
         return response()->json(Document::query()->where('type', 'credit_note')
             ->with(['contact:id,name', 'original:id,number'])
+            ->when(true, fn ($q) => $this->withinDates($q, 'issue_date', $range))   // the period asked for (FiltersByDate)
             ->orderByDesc('issue_date')->orderBy('id')
             ->cursorPaginate(50));
     }
