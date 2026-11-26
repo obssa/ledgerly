@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { connection } from "next/server";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { Bill } from "@/lib/api";

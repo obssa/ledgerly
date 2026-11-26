@@ -1,5 +1,5 @@
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { asOfLabel } from "@/lib/periods";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";

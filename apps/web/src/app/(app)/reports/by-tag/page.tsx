@@ -1,6 +1,6 @@
 import { rangeLabel } from "@/lib/periods";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getTagReport } from "@/lib/data";
 import { formatAmount } from "@/lib/format";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { QuoteDetail, QuoteKind, QuoteStatus } from "@/lib/api";

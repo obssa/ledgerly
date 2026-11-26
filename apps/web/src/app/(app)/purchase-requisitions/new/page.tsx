@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { NewRequisition } from "../RequisitionForms";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useActionState } from "react";
 import { formatAmount } from "@/lib/format";
 import { orderLowStock } from "../products/actions";

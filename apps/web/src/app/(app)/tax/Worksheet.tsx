@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card } from "@/components/ui";
 import type { TaxDocumentRow, TaxRateRow, TaxWithholdingRegister, TaxWorksheet } from "@/lib/api";
 import { formatAmount } from "@/lib/format";

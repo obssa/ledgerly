@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 
 export function Card({ children, className = "", label }: { children: ReactNode; className?: string; label?: string }) {
   return (

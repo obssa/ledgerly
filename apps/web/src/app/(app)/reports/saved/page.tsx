@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getSavedReports } from "@/lib/data";
 import { isDate } from "@/lib/reports";

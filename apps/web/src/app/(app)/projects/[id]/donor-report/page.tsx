@@ -1,5 +1,5 @@
 import { DateRangeFilter } from "@/components/DateRangeFilter";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getDonorReport, getReportPeriod } from "@/lib/data";

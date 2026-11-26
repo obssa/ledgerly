@@ -2,7 +2,7 @@ import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { exportPeriod } from "@/lib/periodParams";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { rangeLabel } from "@/lib/periods";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getReportPeriod, getStockMovement, getWarehouses } from "@/lib/data";
 import { formatAmount } from "@/lib/format";

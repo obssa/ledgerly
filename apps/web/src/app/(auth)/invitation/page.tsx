@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ApiError, ledgerly } from "@/lib/api";
 import { acceptInvitation } from "../actions";
 import { AuthForm } from "../AuthForm";

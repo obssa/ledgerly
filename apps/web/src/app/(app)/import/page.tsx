@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle, Segmented } from "@/components/ui";
 import { IMPORT_KINDS, importKind, importRequires } from "@/lib/imports";
 import { MIGRATION_SOURCES, migrationSource, type MigrationSource } from "@/lib/migration";

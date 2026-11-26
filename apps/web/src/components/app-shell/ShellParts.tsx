@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { signOut, switchCompany } from "@/app/(auth)/actions";
 import { getShellContext } from "@/lib/data";
 import { Icon } from "./Icon";

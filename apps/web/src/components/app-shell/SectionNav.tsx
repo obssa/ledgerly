@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { CREATE, activeHref, locate } from "@/lib/navigation";
 import { Icon } from "./Icon";

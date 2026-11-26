@@ -1,7 +1,7 @@
 import { rangeLabel } from "@/lib/periods";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { exportPeriod } from "@/lib/periodParams";
 import { Card, PageTitle } from "@/components/ui";
 import { getChart, getDimensions, getGeneralLedger, getReportPeriod } from "@/lib/data";

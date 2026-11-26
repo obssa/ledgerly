@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SAVEABLE } from "@/lib/saved-reports";
 import { PrintButton } from "./PrintButton";
 

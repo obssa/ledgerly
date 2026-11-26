@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle } from "@/components/ui";
 import { getBankRules } from "@/lib/data";

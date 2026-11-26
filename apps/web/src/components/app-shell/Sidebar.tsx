@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ADMIN, SECTIONS, activeHref, firstPage, locate, type NavSection } from "@/lib/navigation";
 import { Icon } from "./Icon";

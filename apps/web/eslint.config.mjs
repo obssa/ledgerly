@@ -21,6 +21,15 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // Links prefetch on intent, not on sight (src/components/Link.tsx): import Link from there.
+    ignores: ["src/components/Link.tsx"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        paths: [{ name: "next/link", message: "Import Link from \"@/components/Link\": it prefetches on hover, not for every link on screen (the host can't serve that many at once)." }],
+      }],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

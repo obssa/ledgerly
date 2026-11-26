@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card } from "@/components/ui";
 import { actionLabel, changesOf, type DocumentHistory } from "@/lib/history";
 

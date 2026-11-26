@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
 import { ColumnCustomizer } from "@/components/ColumnCustomizer";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { verifyCode } from "../../actions";
 import { AuthForm } from "../../AuthForm";
 

@@ -1,5 +1,5 @@
 import { DateRangeFilter } from "@/components/DateRangeFilter";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getGeneralLedger, getJournalOptions, getReportPeriod } from "@/lib/data";
 import { journalAccounts } from "@/lib/journal";

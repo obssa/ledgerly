@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { AccountTabs } from "../AccountTabs";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";

@@ -1,6 +1,6 @@
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { CLOSED_RANGE_PRESETS } from "@/lib/periods";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import type { ReviewFlag } from "@/lib/api";
 import { getReviewQueue, getReportPeriod } from "@/lib/data";

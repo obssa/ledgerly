@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
 import type { LateInterestPreview } from "@/lib/api";

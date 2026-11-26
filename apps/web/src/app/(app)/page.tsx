@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { connection } from "next/server";
 import { Card, PageTitle, Pill, Stat } from "@/components/ui";
 import { AgeingBar, BalanceLine, PairedColumns, type ColumnPoint } from "@/components/charts";
