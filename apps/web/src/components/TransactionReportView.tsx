@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Card, PageTitle } from "@/components/ui";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { ColumnCustomizer } from "@/components/ColumnCustomizer";
+import { withoutUnusedForeign } from "@/lib/columns";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { ExportLink, ReportsNav } from "@/app/(app)/reports/ReportsNav";
 import { getReportPeriod, getTransactionReport } from "@/lib/data";
@@ -8,7 +10,7 @@ import { formatAmount } from "@/lib/format";
 import { exportPeriod, periodQuery } from "@/lib/periodParams";
 import { rangeLabel, type RangePreset } from "@/lib/periods";
 import {
-  COLUMNS, GROUPS, TX_REPORTS, column, customQuery, groupRows, isMoney, moveColumn, pickColumns, pickGroup, pickSort, sortRows, statusLabel,
+  COLUMNS, FOREIGN, GROUPS, TX_REPORTS, column, customQuery, groupRows, isMoney, pickColumns, pickGroup, pickSort, sortRows, statusLabel,
   totals, typeLabel, type TxColumn, type TxReport, type TxRow,
 } from "@/lib/transactionColumns";
 
@@ -40,11 +42,11 @@ function cell(key: TxColumn, r: TxRow): string {
 export async function TransactionReportView({ report, q }: { report: TxReport; q: Query }) {
   const def = TX_REPORTS[report];
   const period = await getReportPeriod(q, def.fallback as RangePreset);
-  const cols = pickColumns(q, def.columns);
-  const sort = pickSort(q, cols);
-  const group = pickGroup(q, def.group);
   const status = def.statuses && typeof q.status === "string" && STATUSES.some(([s]) => s === q.status) ? q.status : "";
   const data = await getTransactionReport({ report: def.api, from: period.picked.from ?? undefined, to: period.picked.to ?? undefined, ...(status ? { status } : {}) });
+  const cols = withoutUnusedForeign(pickColumns(q, def.columns), data?.rows ?? [], q, FOREIGN);
+  const sort = pickSort(q, cols);
+  const group = pickGroup(q, def.group);
   const rows = data ? sortRows(data.rows, sort.sort, sort.dir) : [];
   const groups = groupRows(rows, group);
   const chosen = customQuery(cols, sort, group, { status: status || undefined });
@@ -62,50 +64,16 @@ export async function TransactionReportView({ report, q }: { report: TxReport; q
         )}
       </DateRangeFilter>
 
-      <details className="mb-4 rounded-[14px] border border-line bg-surface p-4 print:hidden">
-        <summary className="cursor-pointer text-sm font-bold">Customize: columns, sort and grouping</summary>
-        <form className="mt-3">
-          {Object.entries(periodQuery(period.picked)).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-          {status && <input type="hidden" name="status" value={status} />}
-          <input type="hidden" name="cols" value={cols.join(",")} />
-          <input type="hidden" name="customize" value="1" />
-          <fieldset className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-x-6 gap-y-3">
-            <legend className="mb-2 text-[13px] font-semibold text-muted">Columns (ticked ones show; the order is below)</legend>
-            {[...new Set(COLUMNS.map((c) => c.group))].map((g) => (
-              <div key={g}>
-                <div className="mb-1 text-[12px] font-bold text-muted">{g}</div>
-                {COLUMNS.filter((c) => c.group === g).map((c) => (
-                  <label key={c.key} className="flex items-center gap-2 py-0.5 text-sm">
-                    <input type="checkbox" name="col" value={c.key} defaultChecked={cols.includes(c.key)} /> {c.label}
-                  </label>
-                ))}
-              </div>
-            ))}
-          </fieldset>
-          <div className="mt-4 flex flex-wrap items-end gap-2.5">
-            <div><label className="field-label" htmlFor="sort">Sort by</label>
-              <select className="field" id="sort" name="sort" defaultValue={sort.sort}>{COLUMNS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select></div>
-            <div><label className="field-label" htmlFor="dir">Order</label>
-              <select className="field" id="dir" name="dir" defaultValue={sort.dir}><option value="asc">Ascending</option><option value="desc">Descending</option></select></div>
-            <div><label className="field-label" htmlFor="group">Group by</label>
-              <select className="field" id="group" name="group" defaultValue={group}>{GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-            <button type="submit" className="btn btn-primary">Apply</button>
-            <Link href={`/reports/${report}?${new URLSearchParams(periodQuery(period.picked))}`} className="btn">Back to the standard columns</Link>
-          </div>
-        </form>
-        <div className="mt-4">
-          <div className="mb-1 text-[13px] font-semibold text-muted">Column order</div>
-          <ol className="flex flex-wrap gap-2">
-            {cols.map((c, i) => (
-              <li key={c} className="flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[13px]">
-                {i > 0 && <Link aria-label={`Move ${column(c).label} left`} href={here({ cols: moveColumn(cols, c, -1).join(",") })} className="px-1 font-bold text-brand">‹</Link>}
-                {column(c).label}
-                {i < cols.length - 1 && <Link aria-label={`Move ${column(c).label} right`} href={here({ cols: moveColumn(cols, c, 1).join(",") })} className="px-1 font-bold text-brand">›</Link>}
-              </li>
-            ))}
-          </ol>
-        </div>
-      </details>
+      <ColumnCustomizer defs={COLUMNS} cols={cols} keep={{ ...periodQuery(period.picked), status: status || undefined }}
+        moveHref={(next) => here({ cols: next.join(",") })} resetHref={`/reports/${report}?${new URLSearchParams(periodQuery(period.picked))}`}
+        summary="Customize: columns, sort and grouping">
+        <div><label className="field-label" htmlFor="sort">Sort by</label>
+          <select className="field" id="sort" name="sort" defaultValue={sort.sort}>{COLUMNS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select></div>
+        <div><label className="field-label" htmlFor="dir">Order</label>
+          <select className="field" id="dir" name="dir" defaultValue={sort.dir}><option value="asc">Ascending</option><option value="desc">Descending</option></select></div>
+        <div><label className="field-label" htmlFor="group">Group by</label>
+          <select className="field" id="group" name="group" defaultValue={group}>{GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+      </ColumnCustomizer>
 
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current={`/reports/${report}`} />

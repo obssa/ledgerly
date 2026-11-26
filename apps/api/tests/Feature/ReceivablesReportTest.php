@@ -57,6 +57,27 @@ final class ReceivablesReportTest extends TestCase
         $this->assertTrue($documents->every(fn ($d) => $d['number'] !== null && $d['days_late'] >= 0 && isset($d['issue_date'], $d['amount_due'])));
     }
 
+    public function test_the_ageing_takes_quickbooks_periods_and_the_detail_has_every_field(): void
+    {
+        // Six periods of 15 days: Current, 1-15, 16-30, 31-45, 46-60, 61-75, Over 75. The invoice is 28 days late.
+        $ageing = $this->getJson('/api/v1/reports/ar-ageing?as_of=2026-11-30&interval=15&periods=6', $this->h)->assertOk()
+            ->assertJsonPath('interval', 15)->assertJsonPath('periods', 6)
+            ->assertJsonPath('buckets', ['current', 'days_1_15', 'days_16_30', 'days_31_45', 'days_46_60', 'days_61_75', 'over_75'])
+            ->assertJsonPath('rows.0.days_16_30', '1000.00')->assertJsonPath('totals.days_16_30', '1000.00')->assertJsonPath('totals.total', '1000.00');
+        $doc = $ageing->json('documents.0');
+        $this->assertSame(['days_16_30', 'invoice', '1050.00', '1000.00'], [$doc['bucket'], $doc['type'], $doc['base_total'], $doc['amount']]);
+        $this->assertNotNull($doc['created_by'], 'who made the invoice');
+        $this->assertArrayHasKey('posted_by', $doc);
+        $this->assertArrayHasKey('exchange_rate', $doc);
+        // The standard periods by default, and only whole numbers in range.
+        $this->getJson('/api/v1/reports/ar-ageing?as_of=2026-11-30', $this->h)->assertJsonPath('buckets', ['current', 'days_1_30', 'days_31_60', 'days_61_90', 'over_90']);
+        $this->getJson('/api/v1/reports/ar-ageing?interval=0', $this->h)->assertUnprocessable()->assertJsonValidationErrors('interval');
+        $this->getJson('/api/v1/reports/ar-ageing?periods=13', $this->h)->assertUnprocessable()->assertJsonValidationErrors('periods');
+        $this->getJson('/api/v1/reports/ap-ageing?interval=1%3B', $this->h)->assertUnprocessable();
+        // At a date before the invoice was issued, it was not owed yet.
+        $this->getJson('/api/v1/reports/ar-ageing?as_of=2026-11-01', $this->h)->assertOk()->assertJsonCount(0, 'documents')->assertJsonPath('totals.total', '0.00');
+    }
+
     public function test_the_statement_lists_every_movement_with_a_running_balance(): void
     {
         $this->getJson("/api/v1/customers/{$this->c['contact']}/statement?from=2026-11-01&to=2026-11-30", $this->h)->assertOk()
@@ -67,7 +88,14 @@ final class ReceivablesReportTest extends TestCase
             ->assertJsonPath('lines.1.source_type', 'payment')
             ->assertJsonPath('lines.1.credit', '50.00')
             ->assertJsonPath('lines.1.balance', '1000.00')
-            ->assertJsonPath('closing', '1000.00');
+            ->assertJsonPath('closing', '1000.00')
+            // Each line's transaction: its type, what is still open on it, no foreign fields in the company's currency.
+            ->assertJsonPath('lines.0.type', 'invoice')->assertJsonPath('lines.0.open_balance', '1000.00')
+            ->assertJsonPath('lines.0.foreign_amount', null)->assertJsonPath('lines.0.currency', null)
+            ->assertJsonPath('lines.1.type', 'payment_received');
+        $line = $this->getJson("/api/v1/customers/{$this->c['contact']}/statement?from=2026-11-01&to=2026-11-30", $this->h)->json('lines.0');
+        $this->assertNotNull($line['created_by']);
+        $this->assertNotNull($line['entry_id']);
 
         // A later period starts from what was owed.
         $this->getJson("/api/v1/customers/{$this->c['contact']}/statement?from=2026-12-01&to=2026-12-31", $this->h)

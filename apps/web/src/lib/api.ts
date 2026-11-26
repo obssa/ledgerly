@@ -1144,18 +1144,32 @@ export interface PaymentReceived {
 }
 
 /** GET /reports/ar-ageing: open invoices by days overdue; each total is the customer's receivable balance. */
+/** The ageing periods as query fields (only when not QuickBooks' standard 30 days, four periods). */
+const ageingQuery = (p: { interval?: number; periods?: number }) =>
+  ({ ...(p.interval && p.interval !== 30 ? { interval: String(p.interval) } : {}), ...(p.periods && p.periods !== 4 ? { periods: String(p.periods) } : {}) });
+
 export interface ArAgeing {
   as_of: string;
   /** The company's currency, which every amount is in. */
   currency?: string;
-  rows: ({ contact_id: string; name: string } & Record<"current" | "days_1_30" | "days_31_60" | "days_61_90" | "over_90" | "credits" | "total", string>)[];
-  totals: Record<"current" | "days_1_30" | "days_31_60" | "days_61_90" | "over_90" | "credits" | "total", string>;
+  /** The ageing periods (days per period, how many) and their keys in order: current, days_1_30, … over_90. */
+  interval?: number;
+  periods?: number;
+  buckets?: string[];
+  rows: ({ contact_id: string; name: string; credits: string; total: string } & Record<string, string>)[];
+  totals: Record<string, string>;
   /** The detail: every open invoice (or bill), oldest due first; `amount` is what is still due in the company's currency. */
   documents?: { id: string; contact_id: string; number: string | null; reference: string | null; issue_date: string; due_date: string | null;
-    days_late: number; bucket: string; currency: string; total: string; amount_due: string; amount: string }[];
+    days_late: number; bucket: string; currency: string; total: string; amount_due: string; amount: string;
+    type?: string; memo?: string | null; base_total?: string; exchange_rate?: string; created_by?: string | null; posted_by?: string | null; location?: string | null }[];
 }
 
 /** GET /customers/{id}/statement: the receivable account's lines for the customer, with a running balance. */
+/** A statement line: the ledger line with its transaction (type, number, due date, open balance, foreign amount, who made it). */
+export type PartyStatementLine = { date: string; entry_id?: string; entry: number; source_type: string; memo: string | null; reference: string | null; document_id: string | null;
+  payment_id?: string | null; debit: string; credit: string; balance: string; type?: string; due_date?: string | null; open_balance?: string | null;
+  foreign_amount?: string | null; currency?: string | null; exchange_rate?: string | null; created_by?: string | null; posted_by?: string | null };
+
 export interface CustomerStatement {
   customer: { id: string; name: string; tax_id: string | null; address?: Address };
   currency: string;
@@ -1163,17 +1177,23 @@ export interface CustomerStatement {
   to: string;
   opening: string;
   closing: string;
-  lines: { date: string; entry: number; source_type: string; memo: string | null; reference: string | null; document_id: string | null; debit: string; credit: string; balance: string }[];
+  lines: PartyStatementLine[];
 }
 
 /** Module 6: the general ledger for a period, account by account (amounts are debit minus credit, base currency). */
+/** A general ledger line, with its transaction and the other side of the entry (`split`). */
+export type LedgerLine = { line_id: string; date: string; entry_id: string; entry: number; source_type: string; status: string; memo: string | null; description: string | null;
+  contact: string | null; debit: string; credit: string; balance: string; amount?: string; type?: string; number?: string | null; document_id?: string | null;
+  payment_id?: string | null; due_date?: string | null; split?: string | null; foreign_amount?: string | null; currency?: string | null; exchange_rate?: string | null;
+  location?: string | null; class?: string | null; project?: string | null; created_by?: string | null; posted_by?: string | null };
+
 export interface GeneralLedger {
   from: string;
   to: string;
   currency: string;
   truncated: boolean;
   accounts: { account_id: string; code: string; name: string; type: string; opening: string; debits: string; credits: string; closing: string;
-    lines: { line_id: string; date: string; entry_id: string; entry: number; source_type: string; status: string; memo: string | null; description: string | null; contact: string | null; debit: string; credit: string; balance: string }[] }[];
+    lines: LedgerLine[] }[];
 }
 
 export interface TrialBalanceRow {
@@ -1835,7 +1855,8 @@ export const ledgerly = {
   reversePaymentMade: (id: string, body: { date: string; reason: string }, ctx: RequestOptions) =>
     api<PaymentReceived>(`payments-made/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   withholdingAdvice: (supplierId: string, ctx: RequestOptions) => api<WithholdingAdvice>(`payments-made/withholding/${encodeURIComponent(supplierId)}`, ctx),
-  apAgeing: (asOf: string | undefined, ctx: RequestOptions) => api<ArAgeing>("reports/ap-ageing", { ...ctx, query: { as_of: asOf } }),
+  apAgeing: (asOf: string | undefined, ctx: RequestOptions, periods: { interval?: number; periods?: number } = {}) =>
+    api<ArAgeing>("reports/ap-ageing", { ...ctx, query: { as_of: asOf, ...ageingQuery(periods) } }),
   supplierStatement: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) =>
     api<Omit<CustomerStatement, "customer"> & { supplier: CustomerStatement["customer"] }>(`suppliers/${encodeURIComponent(id)}/statement`, { ...ctx, query: q }),
   allocatePayment: (id: string, body: { allocations: { invoice_id: string; amount: string }[] }, ctx: RequestOptions) =>
@@ -1864,7 +1885,8 @@ export const ledgerly = {
     api<PaymentReceived>(`payments-received/${encodeURIComponent(id)}/reverse`, { ...ctx, method: "POST", body }),
   transactionReport: (q: { report: string; from?: string; to?: string; contact_id?: string; status?: string; created_by?: string }, ctx: RequestOptions) =>
     api<TransactionReportData>("reports/transactions", { ...ctx, query: q }),
-  arAgeing: (asOf: string | undefined, ctx: RequestOptions) => api<ArAgeing>("reports/ar-ageing", { ...ctx, query: { as_of: asOf } }),
+  arAgeing: (asOf: string | undefined, ctx: RequestOptions, periods: { interval?: number; periods?: number } = {}) =>
+    api<ArAgeing>("reports/ar-ageing", { ...ctx, query: { as_of: asOf, ...ageingQuery(periods) } }),
   customerStatement: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) =>
     api<CustomerStatement>(`customers/${encodeURIComponent(id)}/statement`, { ...ctx, query: q }),
   suppliers: (q: { search?: string; include_archived?: string }, ctx: RequestOptions) =>

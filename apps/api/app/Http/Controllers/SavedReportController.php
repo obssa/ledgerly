@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Domain\Audit\AuditLogger;
 use App\Domain\Inventory\Models\Warehouse;
 use App\Domain\Ledger\Models\Account;
+use App\Domain\Ledger\Models\Dimension;
 use App\Domain\Reports\SavedReports;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Http\JsonResponse;
@@ -121,10 +122,17 @@ final class SavedReportController extends Controller
                 continue;
             }
             $ok = match (true) {
-                $allowed === 'columns' => is_string($value) && $value !== ''
-                    && array_diff(explode(',', $value), \App\Domain\Reports\TransactionReport::COLUMNS) === [],
+                // A column list: each one a field of that report, in the order chosen.
+                is_array($allowed) && isset($allowed['columns']) => is_string($value) && $value !== ''
+                    && array_diff(explode(',', $value), $allowed['columns']) === [],
+                // A whole number in a range (the ageing's days per period and number of periods).
+                is_array($allowed) && isset($allowed['between']) => is_string($value) && ctype_digit($value)
+                    && (int) $value >= $allowed['between'][0] && (int) $value <= $allowed['between'][1],
                 $allowed !== 'uuid' => in_array($value, $allowed, true),
                 $key === 'account_id' => \Illuminate\Support\Str::isUuid($value) && Account::query()->whereKey($value)->exists(),
+                // A location, class or project: one of this company's, of that kind.
+                in_array($key, Dimension::COLUMNS, true) => \Illuminate\Support\Str::isUuid($value)
+                    && Dimension::query()->where(['id' => $value, 'kind' => array_search($key, Dimension::COLUMNS, true)])->exists(),
                 default => \Illuminate\Support\Str::isUuid($value) && Warehouse::query()->whereKey($value)->exists(),
             };
             if (! $ok) {

@@ -250,6 +250,10 @@ final class ReportService
     /** Lines a general ledger report shows at most; past this the report says so and asks for a shorter period. */
     public const GL_MAX_LINES = 5000;
 
+    /** The fields of each general ledger line (Customize, Columns); also the list a saved report may keep. */
+    public const LEDGER_COLUMNS = ['date', 'type', 'number', 'entry', 'name', 'memo', 'split', 'due_date', 'debit', 'credit', 'amount', 'balance',
+        'foreign_amount', 'currency', 'exchange_rate', 'location', 'class', 'project', 'created_by', 'posted_by'];
+
     /**
      * The general ledger for a period: for each account (or the one asked for), the balance brought forward, every
      * posted line with its entry, memo, contact and a running balance, and the balance at the end. Optionally only the
@@ -271,12 +275,36 @@ final class ReportService
         };
         $opening = $scoped(DB::table('journal_lines as l'))->where('l.entry_date', '<', $from)->groupBy('l.account_id')
             ->select('l.account_id')->selectRaw('sum(l.debit - l.credit)::numeric(20,2)::text AS balance')->pluck('balance', 'account_id');
+        // Each line with its transaction (the invoice, bill or payment behind the entry), the other side of the entry
+        // ("Split": the one other account, or -Split- for several), and who made and posted it. Fixed SQL: the base
+        // currency is a binding, nothing from the request is SQL (CLAUDE.md rule 1).
         $lines = $scoped(DB::table('journal_lines as l'))
             ->join('journal_entries as e', fn ($j) => $j->on('e.company_id', '=', 'l.company_id')->on('e.id', '=', 'l.journal_entry_id'))
-            ->leftJoin('contacts as c', 'c.id', '=', 'l.contact_id')
+            ->leftJoin('documents as d', fn ($j) => $j->on('d.company_id', '=', 'l.company_id')->on('d.id', '=', 'e.source_id')
+                ->whereIn('e.source_type', ['invoice', 'credit_note', 'bill', 'vendor_credit', 'sales_receipt']))
+            ->leftJoin('payments as p', fn ($j) => $j->on('p.company_id', '=', 'l.company_id')->on('p.journal_entry_id', '=', 'e.id'))
+            ->leftJoin('contacts as c', fn ($j) => $j->on('c.company_id', '=', 'l.company_id')->on('c.id', '=', DB::raw('coalesce(l.contact_id, d.contact_id, p.contact_id)')))
+            ->leftJoin('users as cu', 'cu.id', '=', DB::raw('coalesce(d.created_by, e.posted_by)'))
+            ->leftJoin('users as pu', 'pu.id', '=', 'e.posted_by')
+            ->leftJoin('dimensions as loc', fn ($j) => $j->on('loc.company_id', '=', 'l.company_id')->on('loc.id', '=', 'l.location_id'))
+            ->leftJoin('dimensions as cls', fn ($j) => $j->on('cls.company_id', '=', 'l.company_id')->on('cls.id', '=', 'l.class_id'))
+            ->leftJoin('dimensions as prj', fn ($j) => $j->on('prj.company_id', '=', 'l.company_id')->on('prj.id', '=', 'l.project_id'))
             ->whereBetween('l.entry_date', [$from, $to])
             ->orderBy('l.entry_date')->orderBy('e.number')->orderBy('l.line_no')->limit(self::GL_MAX_LINES + 1)
-            ->get(['l.id as line_id', 'l.account_id', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.status', 'e.memo', 'l.description', 'c.name as contact', 'l.debit', 'l.credit']);
+            ->select(['l.id as line_id', 'l.account_id', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.status', 'e.memo', 'l.description',
+                'c.name as contact', 'l.debit', 'l.credit', 'd.id as document_id', 'p.id as payment_id', 'd.due_date', 'cu.name as created_by', 'pu.name as posted_by',
+                'loc.name as location', 'cls.name as class', 'prj.name as project'])
+            ->selectRaw("coalesce(d.type, CASE p.direction WHEN 'in' THEN 'payment_received' WHEN 'out' THEN 'payment_made' END, e.source_type) AS type")
+            ->selectRaw('coalesce(d.number, p.reference) AS number')
+            ->selectRaw('CASE WHEN e.currency <> ? THEN l.amount_txn::text END AS foreign_amount', [$base])
+            ->selectRaw('CASE WHEN e.currency <> ? THEN e.currency END AS currency', [$base])
+            ->selectRaw('CASE WHEN e.currency <> ? THEN e.fx_rate::text END AS exchange_rate', [$base])
+            ->selectRaw(<<<'SQL'
+                (SELECT CASE WHEN count(DISTINCT o.account_id) = 1 THEN min(oa.code || ' ' || oa.name) WHEN count(*) > 1 THEN '-Split-' END
+                   FROM journal_lines o JOIN accounts oa ON oa.company_id = o.company_id AND oa.id = o.account_id
+                  WHERE o.company_id = l.company_id AND o.journal_entry_id = l.journal_entry_id AND o.account_id <> l.account_id) AS split
+                SQL)
+            ->get();
         $truncated = $lines->count() > self::GL_MAX_LINES;
         $lines = $lines->take(self::GL_MAX_LINES)->groupBy('account_id');
 
@@ -298,7 +326,10 @@ final class ReportService
 
                     return ['line_id' => $l->line_id, 'date' => $l->date, 'entry_id' => $l->entry_id, 'entry' => (int) $l->entry, 'source_type' => $l->source_type, 'status' => $l->status, 'memo' => $l->memo,
                         'description' => $l->description, 'contact' => $l->contact, 'debit' => $d->toDecimalString(), 'credit' => $c->toDecimalString(),
-                        'balance' => $balance->toDecimalString()];
+                        'amount' => $d->minus($c)->toDecimalString(), 'balance' => $balance->toDecimalString(),
+                        'type' => $l->type, 'number' => $l->number, 'document_id' => $l->document_id, 'payment_id' => $l->payment_id, 'due_date' => $l->due_date,
+                        'split' => $l->split, 'foreign_amount' => $l->foreign_amount, 'currency' => $l->currency, 'exchange_rate' => $l->exchange_rate,
+                        'location' => $l->location, 'class' => $l->class, 'project' => $l->project, 'created_by' => $l->created_by, 'posted_by' => $l->posted_by];
                 })->values()->all();
 
                 return ['account_id' => $a->id, 'code' => $a->code, 'name' => $a->name, 'type' => $a->type, 'opening' => $start->toDecimalString(),

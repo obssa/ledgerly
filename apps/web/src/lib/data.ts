@@ -1228,10 +1228,10 @@ export async function getPaymentMade(id: string) {
   }
 }
 
-export async function getApAgeing(asOf?: string): Promise<ArAgeing | null> {
+export async function getApAgeing(asOf?: string, periods: { interval?: number; periods?: number } = {}): Promise<ArAgeing | null> {
   await connection();
   if (isDemoMode()) return null;
-  return withApi((ctx) => ledgerly.apAgeing(asOf, ctx));
+  return withApi((ctx) => ledgerly.apAgeing(asOf, ctx, periods));
 }
 
 export async function getSupplierStatement(id: string, q: { from?: string; to?: string }) {
@@ -1287,10 +1287,10 @@ export async function getDemoOptions(): Promise<DemoOptions | null> {
   }
 }
 
-export async function getArAgeing(asOf?: string): Promise<ArAgeing | null> {
+export async function getArAgeing(asOf?: string, periods: { interval?: number; periods?: number } = {}): Promise<ArAgeing | null> {
   await connection();
   if (isDemoMode()) return null;
-  return withApi((ctx) => ledgerly.arAgeing(asOf, ctx));
+  return withApi((ctx) => ledgerly.arAgeing(asOf, ctx, periods));
 }
 
 export async function getCustomerStatement(id: string, q: { from?: string; to?: string }): Promise<CustomerStatement | null> {

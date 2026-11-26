@@ -84,20 +84,37 @@ final class LedgerController extends Controller
     public function arAgeing(Request $request, ReceivablesReport $receivables): JsonResponse
     {
         $this->authorizeCompany('reports.view');
-        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? app(CurrentCompany::class)->today();
+        [$asOf, $interval, $periods] = $this->ageingOptions($request);
         $company = $this->current->get();
 
-        return response()->json($receivables->ageing($company->getKey(), Account::system('accounts_receivable')->getKey(), $company->base_currency, $asOf));
+        return response()->json($receivables->ageing($company->getKey(), Account::system('accounts_receivable')->getKey(), $company->base_currency, $asOf, 'invoice', $interval, $periods));
     }
 
     /** AP ageing: open bills by days overdue; each total is what the company owes that supplier on accounts payable. */
     public function apAgeing(Request $request, ReceivablesReport $report): JsonResponse
     {
         $this->authorizeCompany('reports.view');
-        $asOf = $request->validate(['as_of' => ['nullable', 'date_format:Y-m-d']])['as_of'] ?? app(CurrentCompany::class)->today();
+        [$asOf, $interval, $periods] = $this->ageingOptions($request);
         $company = $this->current->get();
 
-        return response()->json($report->ageing($company->getKey(), Account::system('accounts_payable')->getKey(), $company->base_currency, $asOf, 'bill'));
+        return response()->json($report->ageing($company->getKey(), Account::system('accounts_payable')->getKey(), $company->base_currency, $asOf, 'bill', $interval, $periods));
+    }
+
+    /**
+     * The ageing's date and periods, as QuickBooks offers them: days per ageing period (1 to 365, 30 by default) and
+     * number of periods (2 to 12, 4 by default).
+     *
+     * @return array{0: string, 1: int, 2: int}
+     */
+    private function ageingOptions(Request $request): array
+    {
+        $q = $request->validate([
+            'as_of' => ['nullable', 'date_format:Y-m-d'],
+            'interval' => ['nullable', 'integer', 'between:1,365'],
+            'periods' => ['nullable', 'integer', 'between:2,12'],
+        ]);
+
+        return [$q['as_of'] ?? $this->current->today(), (int) ($q['interval'] ?? 30), (int) ($q['periods'] ?? 4)];
     }
 
     /**

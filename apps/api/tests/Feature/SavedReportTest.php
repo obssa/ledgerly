@@ -107,6 +107,18 @@ final class SavedReportTest extends TestCase
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'stock-ageing', 'options' => ['warehouse_id' => $other['store']]]), $this->h)->assertUnprocessable();
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'sales', 'options' => ['group' => 'DROP TABLE']]), $this->h)->assertUnprocessable();
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'payroll']), $this->h)->assertUnprocessable()->assertJsonValidationErrors('report');
+        // The detail reports keep their Customize choices: columns from their own list, the ageing's periods in range.
+        $ageing = $this->postJson('/api/v1/saved-reports', $body(['report' => 'ar-ageing', 'options' => ['view' => 'detail', 'interval' => '15', 'periods' => '6', 'group' => 'name',
+            'cols' => 'date,number,name,age,open_balance']]), $this->h)->assertCreated();
+        // The same options, in whatever order the database keeps them.
+        $this->assertEquals(['view' => 'detail', 'interval' => '15', 'periods' => '6', 'cols' => 'date,number,name,age,open_balance', 'group' => 'name'], $ageing->json('options'));
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'ar-ageing', 'options' => ['interval' => '0']]), $this->h)->assertUnprocessable()->assertJsonValidationErrors('options.interval');
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'ap-ageing', 'options' => ['periods' => '4; DROP']]), $this->h)->assertUnprocessable();
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'general-ledger', 'options' => ['account_id' => $this->c['rent'], 'cols' => 'date,type,split,balance']]), $this->h)->assertCreated();
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'general-ledger', 'options' => ['account_id' => $this->c['rent'], 'cols' => 'date,password']]), $this->h)
+            ->assertUnprocessable()->assertJsonValidationErrors('options.cols');
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'general-ledger', 'options' => ['account_id' => $this->c['rent'], 'location_id' => $other['rent']]]), $this->h)
+            ->assertUnprocessable()->assertJsonValidationErrors('options.location_id');
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'cash-flow', 'period' => 'custom', 'to' => '2026-10-31']), $this->h)->assertUnprocessable()->assertJsonValidationErrors('from');
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'cash-flow', 'period' => 'custom', 'from' => '2026-11-30', 'to' => '2026-10-31']), $this->h)->assertUnprocessable();
 

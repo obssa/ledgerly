@@ -34,6 +34,11 @@ final class ReportExportTest extends TestCase
         $this->assertSame('pdf', json_decode((string) $this->owner()->table('audit_log')->where(['company_id' => $c['company'], 'action' => 'report_exported'])
             ->orderByDesc('id')->value('after'), true)['format']);
         $this->postJson('/api/v1/reports/exports', ['report' => 'sales', 'format' => 'csv', 'rows' => 1, 'options' => ['sql' => 'x']], $h)->assertUnprocessable();
+        // A report's Customize choices are recorded with it: the columns in order, the sort, the ageing's periods.
+        $this->postJson('/api/v1/reports/exports', ['report' => 'open-invoices', 'format' => 'csv', 'rows' => 3,
+            'options' => ['cols' => 'date,number,name,due_date,amount,open_balance,foreign_amount,foreign_open_balance,currency', 'sort' => 'date', 'dir' => 'asc', 'group' => 'name']], $h)->assertCreated();
+        $this->postJson('/api/v1/reports/exports', ['report' => 'ar-ageing', 'format' => 'xlsx', 'as_of' => '2026-11-17', 'rows' => 5,
+            'options' => ['view' => 'detail', 'interval' => '15', 'periods' => '6', 'group' => 'age']], $h)->assertCreated();
 
         // A role without reports cannot record one either.
         $sales = $this->createUser('Sales', 'sales@example.test');
