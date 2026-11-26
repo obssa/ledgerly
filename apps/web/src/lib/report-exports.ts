@@ -3,6 +3,7 @@ import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, total
 import { ledgerly } from "./api";
 import { DISPLAY_BY, columnsRequest, percentOf, pickDisplayBy } from "./pnlColumns";
 import type { Calendar } from "./periods";
+import { periodLabel, previousPeriod, samePeriodLastYear } from "./reports";
 import { AGE_COLUMNS, AGE_DEFAULTS, AGE_FOREIGN, DEFAULT_BUCKETS, ageRows, bucketLabel, groupAgeRows, pickPeriods, type AgeColumn, type AgeRow } from "./ageing";
 import { chooseColumns, withoutUnusedForeign } from "./columns";
 import { GL_COLUMNS, GL_DEFAULTS, GL_FOREIGN, JOURNAL_COLUMNS, JOURNAL_DEFAULTS, JOURNAL_FOREIGN, glRow, journalEntries, type GlColumn } from "./ledgerColumns";
@@ -16,7 +17,7 @@ import type { Cell } from "./csv";
 type Ctx = { token: string; companyId: string };
 type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
   rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
-  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string; by?: string; pct?: string; calendar?: Calendar };
+  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string; by?: string; pct?: string; calendar?: Calendar; compare?: string; basis?: string; open?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
@@ -79,14 +80,18 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
           return { title: "profit-and-loss", rows };
         }
       }
-      const pl = await ledgerly.profitAndLoss({ from: p.from ?? "", to: p.to ?? "" }, ctx);
+      // As on screen: against the period before or the same period last year (a closed period only), on the
+      // accrual or cash basis.
+      const before = p.from && p.to && p.open !== "1" ? (p.compare === "year" ? samePeriodLastYear(p.from, p.to) : previousPeriod(p.from, p.to)) : null;
+      const pl = await ledgerly.profitAndLoss({ from: p.from ?? "", to: p.to ?? "", ...(before ? { compare_from: before.from, compare_to: before.to } : {}),
+        ...(p.basis === "cash" ? { basis: "cash" as const } : {}) }, ctx);
       const share = (v: string): Cell[] => (pct ? [percentOf(v, pl.totals.income.current)] : []);
-      const rows: Cell[][] = [["Section", "Code", "Account", "Amount", ...(pct ? ["% of income"] : [])]];
+      const amounts = (v: { current: string; previous: string | null }): Cell[] => [v.current, ...(before ? [v.previous] : []), ...share(v.current)];
+      const rows: Cell[][] = [["Section", "Code", "Account", "This period", ...(before ? [periodLabel(before.from, before.to)] : []), ...(pct ? ["% of income"] : [])]];
       for (const [section, list] of [["Income", pl.sections.income], ["Cost of goods sold", pl.sections.cost_of_sales], ["Expenses", pl.sections.expenses]] as const) {
-        for (const r of list) rows.push([section, r.code, r.name, r.current, ...share(r.current)]);
+        for (const r of list) rows.push([section, r.code, r.name, ...amounts(r)]);
       }
-      rows.push(["Gross profit", null, null, pl.totals.gross_profit.current, ...share(pl.totals.gross_profit.current)],
-        ["Net profit", null, null, pl.totals.net_profit.current, ...share(pl.totals.net_profit.current)]);
+      rows.push(["Gross profit", null, null, ...amounts(pl.totals.gross_profit)], ["Net profit", null, null, ...amounts(pl.totals.net_profit)]);
       return { title: "profit-and-loss", rows };
     }
     case "balance-sheet": {
