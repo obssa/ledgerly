@@ -563,6 +563,7 @@ Route::prefix('v1')->group(function () {
             Route::get('reports/transactions', [\App\Http\Controllers\TransactionReportController::class, 'index']);   // invoice, bill, payment and transaction lists
             Route::get('reports/ap-ageing', [LedgerController::class, 'apAgeing']);
             Route::get('reports/profit-and-loss', [LedgerController::class, 'profitAndLoss']);
+            Route::get('reports/profit-and-loss/columns', [LedgerController::class, 'profitAndLossColumns']);   // Display columns by
             Route::get('reports/cash-flow', [FinancialStatementController::class, 'cashFlow']);
             Route::get('reports/cash-forecast', [FinancialStatementController::class, 'cashForecast']);
             Route::get('reports/kpis', [FinancialStatementController::class, 'kpis']);

@@ -270,3 +270,29 @@ export const asOfLabel = (iso: string, cal: Calendar) => `As of ${formatDay(iso,
 
 /** Presets with both ends: for reports that need a start and an end (ratios over a number of days). */
 export const CLOSED_RANGE_PRESETS: readonly RangePreset[] = RANGE_PRESETS.map((p) => p.key).filter((k) => k !== "all" && !k.startsWith("since_"));
+
+// ---- Columns of a period (QuickBooks' "Display columns by") ---------------------------------------------------------
+
+export type SplitUnit = "month" | "quarter" | "year";
+
+/**
+ * A period cut into months, quarters or years of the company's calendar, each named as a column header ("Nov 2026",
+ * "Q4 2026", "2026"; "Hidar 2019" for an Ethiopian-calendar company), the first and last clipped to the period. At
+ * most `max` columns; null when there would be more.
+ */
+export function splitRange(range: { from: string; to: string }, unit: SplitUnit, cal: Calendar, max = 60): { label: string; from: string; to: string }[] | null {
+  const out: { label: string; from: string; to: string }[] = [];
+  const step = unit === "month" ? 1 : unit === "quarter" ? 3 : 12;
+  const first = monthOf(range.from, cal);
+  let mo: Month = unit === "month" ? first : unit === "quarter" ? quarterFirst(first) : { y: first.y, m: 1 };
+  while (monthStart(mo, cal) <= range.to) {
+    if (out.length >= max) return null;
+    const start = monthStart(mo, cal), end = monthEnd(shiftMonth(mo, step - 1), cal);
+    const months = cal === "ethiopian" ? ETHIOPIAN_MONTHS : GREGORIAN_MONTHS;
+    const label = unit === "month" ? `${months[mo.m - 1].slice(0, cal === "ethiopian" ? undefined : 3)} ${mo.y}`
+      : unit === "quarter" ? `Q${Math.floor((mo.m - 1) / 3) + 1} ${mo.y}` : String(mo.y);
+    out.push({ label, from: start < range.from ? range.from : start, to: end > range.to ? range.to : end });
+    mo = shiftMonth(mo, step);
+  }
+  return out;
+}

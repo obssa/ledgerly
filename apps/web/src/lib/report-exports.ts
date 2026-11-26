@@ -1,6 +1,9 @@
 import "server-only";
 import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, totals, typeLabel, type TxColumn, type TxRow } from "./transactionColumns";
 import { ledgerly } from "./api";
+import { DISPLAY_BY, columnsRequest, percentOf, pickDisplayBy } from "./pnlColumns";
+import type { Calendar } from "./periods";
+import { periodLabel, previousPeriod, samePeriodLastYear } from "./reports";
 import { AGE_COLUMNS, AGE_DEFAULTS, AGE_FOREIGN, DEFAULT_BUCKETS, ageRows, bucketLabel, groupAgeRows, pickPeriods, type AgeColumn, type AgeRow } from "./ageing";
 import { chooseColumns, withoutUnusedForeign } from "./columns";
 import { GL_COLUMNS, GL_DEFAULTS, GL_FOREIGN, JOURNAL_COLUMNS, JOURNAL_DEFAULTS, JOURNAL_FOREIGN, glRow, journalEntries, type GlColumn } from "./ledgerColumns";
@@ -14,7 +17,7 @@ import type { Cell } from "./csv";
 type Ctx = { token: string; companyId: string };
 type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
   rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
-  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string };
+  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string; by?: string; pct?: string; calendar?: Calendar; compare?: string; basis?: string; open?: string };
 export type Export = { title: string; rows: Cell[][] };
 
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
@@ -58,12 +61,37 @@ const ageingDetail = (title: string, r: Ageing, p: Params, credits: string): Exp
 export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx): Promise<Export> {
   switch (report) {
     case "profit-and-loss": {
-      const pl = await ledgerly.profitAndLoss({ from: p.from ?? "", to: p.to ?? "" }, ctx);
-      const rows: Cell[][] = [["Section", "Code", "Account", "Amount"]];
-      for (const [section, list] of [["Income", pl.sections.income], ["Cost of goods sold", pl.sections.cost_of_sales], ["Expenses", pl.sections.expenses]] as const) {
-        for (const r of list) rows.push([section, r.code, r.name, r.current]);
+      const by = pickDisplayBy(p.by);
+      const pct = p.pct === "1";
+      if (by !== "total") {
+        // Display columns by, as on screen: a column per period or per customer or tag, a Total, and % of income.
+        const split = columnsRequest(by, { from: p.from ?? "", to: p.to ?? "" }, p.calendar ?? "gregorian");
+        if (split) {
+          const c = await ledgerly.profitAndLossColumns({ from: p.from ?? "", to: p.to ?? "", by: split.by, ...(split.starts ? { starts: split.starts } : {}) }, ctx);
+          const income = c.totals.income.total;
+          const line = (l: { values: string[]; total: string }): Cell[] => [...l.values, l.total, ...(pct ? [percentOf(l.total, income)] : [])];
+          const rows: Cell[][] = [["Section", "Code", "Account", ...c.columns.map((col, i) => split.labels?.[i] ?? col.label), "Total", ...(pct ? ["% of income"] : [])]];
+          for (const [section, list, total] of [["Income", c.sections.income, c.totals.income], ["Cost of goods sold", c.sections.cost_of_sales, c.totals.cost_of_sales],
+            ["Expenses", c.sections.expenses, c.totals.expenses]] as const) {
+            for (const r of list) rows.push([section, r.code, r.name, ...line(r)]);
+            rows.push([`Total ${section.toLowerCase()}`, null, null, ...line(total)]);
+          }
+          rows.push(["Gross profit", null, null, ...line(c.totals.gross_profit)], ["Net profit", null, null, ...line(c.totals.net_profit)]);
+          return { title: "profit-and-loss", rows };
+        }
       }
-      rows.push(["Gross profit", null, null, pl.totals.gross_profit.current], ["Net profit", null, null, pl.totals.net_profit.current]);
+      // As on screen: against the period before or the same period last year (a closed period only), on the
+      // accrual or cash basis.
+      const before = p.from && p.to && p.open !== "1" ? (p.compare === "year" ? samePeriodLastYear(p.from, p.to) : previousPeriod(p.from, p.to)) : null;
+      const pl = await ledgerly.profitAndLoss({ from: p.from ?? "", to: p.to ?? "", ...(before ? { compare_from: before.from, compare_to: before.to } : {}),
+        ...(p.basis === "cash" ? { basis: "cash" as const } : {}) }, ctx);
+      const share = (v: string): Cell[] => (pct ? [percentOf(v, pl.totals.income.current)] : []);
+      const amounts = (v: { current: string; previous: string | null }): Cell[] => [v.current, ...(before ? [v.previous] : []), ...share(v.current)];
+      const rows: Cell[][] = [["Section", "Code", "Account", "This period", ...(before ? [periodLabel(before.from, before.to)] : []), ...(pct ? ["% of income"] : [])]];
+      for (const [section, list] of [["Income", pl.sections.income], ["Cost of goods sold", pl.sections.cost_of_sales], ["Expenses", pl.sections.expenses]] as const) {
+        for (const r of list) rows.push([section, r.code, r.name, ...amounts(r)]);
+      }
+      rows.push(["Gross profit", null, null, ...amounts(pl.totals.gross_profit)], ["Net profit", null, null, ...amounts(pl.totals.net_profit)]);
       return { title: "profit-and-loss", rows };
     }
     case "balance-sheet": {
@@ -196,9 +224,12 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
 const GROUP_WORDS: Record<string, string> = { contact: "", item: "item", month: "month", salesperson: "salesperson", location: "location", class: "class", project: "project" };
 
 /** What a report is called in its header and file name ("Sales by customer", "Profit by location"). */
-export function reportTitle(report: ExportableReport, o: { group?: string; kind?: string; view?: string } = {}): string {
+export function reportTitle(report: ExportableReport, o: { group?: string; kind?: string; view?: string; by?: string } = {}): string {
   switch (report) {
-    case "profit-and-loss": return "Profit and loss";
+    case "profit-and-loss": {
+      const by = pickDisplayBy(o.by);
+      return by === "total" ? "Profit and loss" : `Profit and loss by ${DISPLAY_BY.find(([k]) => k === by)![1].toLowerCase()}`;
+    }
     case "balance-sheet": return "Balance sheet";
     case "trial-balance": return "Trial balance";
     case "general-ledger": return "General ledger";
