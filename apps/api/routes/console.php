@@ -391,6 +391,18 @@ Artisan::command('ledgerly:create-schema {--database=owner}', function () {
 })->purpose('Create the schema the Evenbooks tables live in (DB_SCHEMA)');
 
 /*
+| Run by the deploy after migrating, as the owner (only a table's owner may vacuum or analyze it): VACUUM (ANALYZE)
+| over every Evenbooks table. Autovacuum skips small tables until 50 rows have changed, so most had never been
+| analyzed (173 of them on 26 Nov 2026) and the planner guessed their sizes. Plain VACUUM never locks out reads or
+| writes. A fixed statement, nothing from input; run outside a transaction, as VACUUM requires.
+*/
+Artisan::command('ledgerly:analyze {--database=owner}', function () {
+    $started = microtime(true);
+    DB::connection($this->option('database'))->unprepared('VACUUM (ANALYZE)');
+    $this->info(sprintf('Vacuumed and analyzed in %.1f s.', microtime(true) - $started));
+})->purpose('VACUUM (ANALYZE) every table the owner login owns: fresh statistics for the query planner');
+
+/*
 | Run by the deploy after migrating, on the application's own connection: refuses to go live if the login the
 | API runs as could bypass row-level security or change the database (App\Support\DatabaseRoleCheck).
 */

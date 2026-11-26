@@ -123,6 +123,12 @@ Ethiopia), which serves the script files from its cache; pages and API calls go 
 | LiteSpeed serves a few requests to the Node.js app at once and starts another Node.js process for the rest; one takes about 20 s to start here, and goes away when idle | of 6 requests at once, 4 took 1.9 s and 2 took 24 s. Next.js prefetched every link on screen, 14-16 requests per page in the same second, so clicks queued behind them | links prefetch on hover, touch or focus only (`src/components/Link.tsx`; ESLint refuses `next/link` elsewhere) |
 | The server is shared and busy (load 40–53 on 32 cores; the old server ran at about 21) | everything waits for CPU; the API's health check takes 60–550 ms | nothing in code: ask the host for a quieter server, or move to a VPS |
 
+The database is not where the time goes (measured 26 Nov 2026): 23 MB, the largest table 515 rows, 580 indexes (every
+one led by `company_id`, as row-level security filters by it), a query on an open connection 1-2 ms, opening a
+connection 12-35 ms. The same CPU benchmark took 551 ms on the server and 214 ms on an ordinary PC. Each deploy runs
+`VACUUM (ANALYZE)` as the owner (`ledgerly:analyze`), since autovacuum leaves small tables unanalyzed. No connection
+pooler exists on this host; PHP's persistent connections would save about 15 ms per API call and are not used.
+
 LiteSpeed already replaces Cloudflare's address with the visitor's own (a request through Cloudflare is logged under
 the visitor's address), so sign-in limits and the audit log need no Cloudflare setting (`LEDGERLY_BEHIND_CLOUDFLARE`
 stays `false`).
