@@ -74,6 +74,7 @@ final class SupplierCreditController extends Controller
             'restock' => ['sometimes', 'boolean'],   // the goods went back to the supplier (059)
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')->whereIn('kind', ['vat', 'tot'])],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
+            ...\App\Http\Requests\Concerns\DocumentFieldRules::rules(),   // 111: class, location, custom fields, service date
         ], ['notes.required' => 'Say why: goods returned, a price corrected.']);
 
         $credit = $save->handle([...$data, 'prices_include_tax' => (bool) $bill->prices_include_tax, 'tax_mode' => $bill->tax_mode], null, $request->user()->getKey(), $bill);

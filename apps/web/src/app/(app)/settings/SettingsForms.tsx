@@ -6,13 +6,13 @@ import { Dt } from "@/components/Dt";
 
 import { useActionState, useId, useState, type ReactNode } from "react";
 import { FiscalStartFields } from "@/components/FiscalStartFields";
-import type { CompanySettings, Currencies, Dimension, Numbering, PaymentTerm } from "@/lib/api";
+import type { CompanySettings, Currencies, Dimension, FormContent, Numbering, PaymentTerm } from "@/lib/api";
 import { describeTerm } from "@/lib/terms";
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
-import { DATE_FORMAT_CHOICES, VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN, TEMPLATE_SHOWN, INTEREST_SHOWN } from "@/lib/settings";
-import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, addPaymentTerm, savePaymentTerm, setCurrency, setPeriodLock, toggleDimension } from "./actions";
+import { FORM_FIELDS, DATE_FORMAT_CHOICES, VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN, TEMPLATE_SHOWN, INTEREST_SHOWN } from "@/lib/settings";
+import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, addPaymentTerm, savePaymentTerm, saveFormContent, setCurrency, setPeriodLock, toggleDimension } from "./actions";
 
 type Settings = CompanySettings & { demo: boolean };
 
@@ -380,6 +380,72 @@ const DOC_TYPES: Record<string, string> = {
   invoice: "Invoices", credit_note: "Credit notes", sales_receipt: "Cash sales", quote: "Quotes", sales_order: "Sales orders",
   bill: "Bills (our number)", vendor_credit: "Supplier credits", purchase_order: "Purchase orders", expense: "Expenses",
 };
+
+/**
+ * QuickBooks' Customize (111): which fields the invoice and bill forms show, for sales and for purchases; how classes and
+ * locations are tracked (off, one for the whole document, or one per line); and up to three custom fields.
+ */
+export function FormContentPanel({ settings }: { settings: Settings }) {
+  const [state, action, pending] = useActionState(saveFormContent, undefined);
+  const manage = settings.can.manage && !settings.demo;
+  const c: FormContent = settings.form_content ?? {
+    sales: {} as FormContent["sales"], purchases: {} as FormContent["purchases"], track_classes: "off", track_locations: "off", custom_fields: [],
+  };
+  return (
+    <form action={action} className="mt-3" noValidate>
+      <input type="hidden" name="version" value={settings.version} />
+      <Message state={state} />
+      <fieldset disabled={!manage}>
+        <legend className="sr-only">Form content</legend>
+        <div className="overflow-x-auto">
+          <table className="tbl">
+            <thead><tr><th scope="col">Field</th><th scope="col" className="!text-center">Sales forms</th><th scope="col" className="!text-center">Purchase forms</th></tr></thead>
+            <tbody>
+              {FORM_FIELDS.map((f) => (
+                <tr key={f.key}>
+                  <td>{f.label}</td>
+                  {(["sales", "purchases"] as const).map((side) => (
+                    <td key={side} className="text-center">
+                      {f[side]
+                        ? <input type="checkbox" name={`${side}.${f.key}`} defaultChecked={Boolean(c[side]?.[f.key])} aria-label={`${f.label}, ${side === "sales" ? "sales" : "purchase"} forms`} className="size-4" />
+                        : <span className="text-muted" aria-hidden="true">—</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-2.5">
+          <Select name="track_classes" label="Track classes" defaultValue={c.track_classes}>
+            <option value="off">Off</option>
+            <option value="transaction">One to each transaction</option>
+            <option value="line">One to each line</option>
+          </Select>
+          <Select name="track_locations" label="Track locations" defaultValue={c.track_locations}>
+            <option value="off">Off</option>
+            <option value="transaction">One to each transaction</option>
+            <option value="line">One to each line</option>
+          </Select>
+        </div>
+        <h3 className="mt-5 text-[15px] font-bold">Custom fields</h3>
+        <p className="mt-1 text-[13px] text-muted">Up to three, such as a PO number or crop year. Leave a name empty to remove it.</p>
+        {[0, 1, 2].map((i) => {
+          const f = c.custom_fields[i];
+          return (
+            <div key={i} className="mt-2 flex flex-wrap items-end gap-3">
+              <div className="min-w-[200px] flex-1"><TextField name={`custom.${i}.name`} label={`Field ${i + 1} name`} defaultValue={f?.name ?? ""} /></div>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name={`custom.${i}.sales`} defaultChecked={f?.sales ?? true} className="size-4" />Sales</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name={`custom.${i}.purchases`} defaultChecked={f?.purchases ?? false} className="size-4" />Purchases</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name={`custom.${i}.print`} defaultChecked={f?.print ?? true} className="size-4" />Print on the document</label>
+            </div>
+          );
+        })}
+      </fieldset>
+      {manage && <button type="submit" className="btn mt-4" disabled={pending}>{pending ? "Saving…" : "Save form content"}</button>}
+    </form>
+  );
+}
 
 /**
  * QuickBooks' Terms list (109): each term sets the due date of the invoices and bills on it, from their date in the

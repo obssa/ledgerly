@@ -245,12 +245,15 @@ final class QuoteWorkflow
                 'notes' => $source->notes,
                 'warehouse_id' => $source->warehouse_id,
                 'salesperson_id' => $source->salesperson_id,
+                'class_id' => $source->class_id,   // 111
+                'location_id' => $source->location_id,
+                'custom_fields' => $source->custom_fields,
                 'reference' => null,
                 'lines' => $lines->map(fn ($l) => [
                     'description' => (string) $l->description,
                     'quantity' => (string) ($quantities[(string) $l->getKey()] ?? $l->quantity), 'unit_price' => (string) $l->unit_price,
                     'discount_rate' => (string) $l->discount_rate, 'account_id' => (string) $l->account_id, 'tax_rate_id' => $l->tax_rate_id,
-                    'item_id' => $l->item_id, 'project_id' => $l->project_id,
+                    'item_id' => $l->item_id, 'project_id' => $l->project_id, 'class_id' => $l->class_id, 'location_id' => $l->location_id, 'service_date' => $l->service_date?->format('Y-m-d'),
                     'unit_id' => $l->unit_id,   // 072: in the order line's unit
                 ])->values()->all(),
             ];

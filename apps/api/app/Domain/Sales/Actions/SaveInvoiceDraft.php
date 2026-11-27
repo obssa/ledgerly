@@ -262,6 +262,10 @@ final class SaveInvoiceDraft
         $currency = $data['currency'];
         // 110: QuickBooks' Amounts are. Out of scope of tax: no rate and no tax on any line, whatever was sent.
         $mode = self::taxMode($data);
+        // 111: classes and locations as the company tracks them (off, one per transaction, one per line), and its custom fields.
+        $form = \App\Domain\Sales\FormContent::of($this->company->get());
+        $perLine = fn (string $k) => $form[$k] === 'line';
+        $perDocument = fn (string $k) => $form[$k] === 'transaction';
         $inclusive = $mode === 'inclusive';
         $outOfScope = $mode === 'out_of_scope';
         $rates = DB::table('tax_rates')
@@ -297,6 +301,9 @@ final class SaveInvoiceDraft
                 'unit_id' => $line['unit_id'] ?? null,   // 072: another unit of the item; quantity and price are in it
                 'batch_number' => isset($line['batch_number']) && trim((string) $line['batch_number']) !== '' ? trim((string) $line['batch_number']) : null,   // 074
                 'batch_expires_on' => isset($line['batch_number']) && trim((string) $line['batch_number']) !== '' ? ($line['batch_expires_on'] ?? null) : null,
+                'service_date' => $line['service_date'] ?? null,   // 111: QuickBooks' Service date
+                'class_id' => $perLine('track_classes') ? ($line['class_id'] ?? null) : null,
+                'location_id' => $perLine('track_locations') ? ($line['location_id'] ?? null) : null,
                 'line_subtotal' => $result->subtotal->toDecimalString(),
                 'line_tax' => $result->tax->toDecimalString(),
             ];
@@ -326,6 +333,11 @@ final class SaveInvoiceDraft
                 'payment_method' => $data['payment_method'] ?? null,
                 'warehouse_id' => $data['warehouse_id'] ?? null,   // where stock lines leave from or arrive in (025)
                 'salesperson_id' => $data['salesperson_id'] ?? null,   // sales documents only (044)
+                'class_id' => $perDocument('track_classes') ? ($data['class_id'] ?? null) : null,
+                'location_id' => $perDocument('track_locations') ? ($data['location_id'] ?? null) : null,
+                // Only the custom fields the company has, each a short text; empty ones are not kept.
+                'custom_fields' => array_filter(array_intersect_key(array_map(fn ($v) => $v === null ? '' : trim((string) $v), (array) ($data['custom_fields'] ?? [])),
+                    array_flip(array_column($form['custom_fields'], 'name'))), fn (string $v) => $v !== ''),
             ],
             'lines' => $lineRows,
             'totals' => [

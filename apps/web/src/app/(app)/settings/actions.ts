@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
 import { getSession, selectCompany } from "@/lib/session";
-import { settingsBody } from "@/lib/settings";
+import { formContentBody, settingsBody } from "@/lib/settings";
 
 /*
  * Server Functions behind the company settings screen. The API decides who may change what (company.manage,
@@ -36,6 +36,18 @@ export async function saveCompanySettings(_: FormState | undefined, form: FormDa
   }
   refresh(); // shows the saved values and the new version
   return { notice: "Company settings saved." };
+}
+
+/** QuickBooks' Customize (111): sales and purchase form content, class and location tracking, custom fields. */
+export async function saveFormContent(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    await ledgerly.saveCompanySettings({ version: text(form, "version") ?? "", form_content: formContentBody(form) }, ctx);
+  } catch (error) {
+    return refusal(error);
+  }
+  refresh();
+  return { notice: "Saved. New invoices and bills show these fields." };
 }
 
 export async function setCurrency(_: FormState | undefined, form: FormData): Promise<FormState> {

@@ -47,6 +47,9 @@ final class InvoicePdf
         $address = implode(', ', array_filter([$company->address_line1 ?? null, $company->address_line2 ?? null, $company->city ?? null]));
         $contactLine = implode(' · ', array_filter([$company->phone ?? null, $company->email ?? null]));
         $clearance = $invoice->einvoiceSubmissions->firstWhere('status', 'cleared')?->clearance_number;
+        // 111: the custom fields set to print, each with its value.
+        $printed = implode('', array_map(fn (array $f) => '<div>' . $e($f['name']) . ' ' . $e((string) $invoice->custom_fields[$f['name']]) . '</div>',
+            array_filter(\App\Domain\Sales\FormContent::of($company)['custom_fields'], fn (array $f) => $f['print'] && ($invoice->custom_fields[$f['name']] ?? '') !== '')));
         // 109: the term it is on, printed beside the due date as QuickBooks does (a term turned off still reads).
         $termName = $invoice->payment_terms_id ? \App\Domain\Sales\Models\PaymentTerm::query()->whereKey($invoice->payment_terms_id)->value('name') : null;
         $original = $invoice->original_document_id ? DB::table('documents')->where(['company_id' => $company->getKey(), 'id' => $invoice->original_document_id])->value('number') : null;
@@ -58,7 +61,8 @@ final class InvoicePdf
 
         $rows = '';
         foreach ($invoice->lines as $l) {
-            $rows .= '<tr><td>' . $e($l->description) . '</td><td class="n">' . $e(rtrim(rtrim((string) $l->quantity, '0'), '.')) . '</td><td class="n">'
+            // 111: the service date under the description, as QuickBooks prints it.
+            $rows .= '<tr><td>' . $e($l->description) . ($l->service_date ? '<div class="muted">Service date ' . $e((string) \App\Support\DateFormat::format($l->service_date, $company)) . '</div>' : '') . '</td><td class="n">' . $e(rtrim(rtrim((string) $l->quantity, '0'), '.')) . '</td><td class="n">'
                 . $money($l->unit_price) . '</td><td class="n">' . $money($l->line_tax) . '</td><td class="n">' . $money($l->line_subtotal) . '</td></tr>';
         }
         $due = $invoice->type === 'invoice' && in_array($invoice->status, ['posted', 'part_paid', 'paid'], true)
@@ -82,6 +86,7 @@ final class InvoicePdf
             . '<div>Invoice date ' . $e((string) \App\Support\DateFormat::format($invoice->issue_date, $company)) . '</div>'
             // 109: the term it is on, as QuickBooks prints it beside the due date.
             . ($termName !== null ? '<div>Terms ' . $e($termName) . '</div>' : '')
+            . $printed
             . ($invoice->due_date ? '<div>Due date ' . $e((string) \App\Support\DateFormat::format($invoice->due_date, $company)) . '</div>' : '')
             . ($original ? '<div>Corrects invoice ' . $e($original) . '</div>' : '')
             . '</td></tr></table>'

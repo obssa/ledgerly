@@ -1,3 +1,4 @@
+import type { FormField } from "./api";
 /**
  * Turns the company settings form into the body of PUT /company. Only fields that are on the form are sent: a field
  * that is locked (disabled once anything is posted) is not submitted, so it is left as it is. An emptied optional
@@ -67,4 +68,35 @@ export function settingsBody(form: FormData): Record<string, unknown> {
   if (form.has(REMINDERS_SHOWN)) body.reminders = { enabled: form.get("reminders.enabled") === "on", days: reminderDays(value("reminders.days")) };
 
   return body;
+}
+
+/** The form fields Customize turns on or off (111), in QuickBooks' words. */
+export const FORM_FIELDS: { key: FormField; label: string; sales: boolean; purchases: boolean }[] = [
+  { key: "service_date", label: "Service date on each line", sales: true, purchases: true },
+  { key: "sku", label: "SKU on each line", sales: true, purchases: true },
+  { key: "shipping", label: "Shipping (ship to, ship via, date, tracking no.)", sales: true, purchases: false },
+  { key: "email_cc_bcc", label: "Cc and Bcc on emails", sales: true, purchases: false },
+  { key: "message_on_statement", label: "Message on statement", sales: true, purchases: false },
+  { key: "discount", label: "Discount", sales: true, purchases: false },
+  { key: "deposit", label: "Deposit", sales: true, purchases: false },
+  { key: "tags", label: "Tags", sales: true, purchases: true },
+  { key: "attachments", label: "Attachments", sales: true, purchases: true },
+];
+
+/** Customize from the form: each field for sales and purchases, tracking, and up to three custom fields (empty names dropped). */
+export function formContentBody(form: FormData): Record<string, unknown> {
+  const on = (name: string) => form.get(name) === "on";
+  const pick = (v: FormDataEntryValue | null, allowed: string[]) => (typeof v === "string" && allowed.includes(v) ? v : "off");
+  const side = (prefix: "sales" | "purchases") =>
+    Object.fromEntries(FORM_FIELDS.filter((f) => f[prefix]).map((f) => [f.key, on(`${prefix}.${f.key}`)]));
+  const custom = [0, 1, 2].map((i) => ({
+    name: String(form.get(`custom.${i}.name`) ?? "").trim(),
+    sales: on(`custom.${i}.sales`), purchases: on(`custom.${i}.purchases`), print: on(`custom.${i}.print`),
+  })).filter((f) => f.name !== "");
+  return {
+    sales: side("sales"), purchases: side("purchases"),
+    track_classes: pick(form.get("track_classes"), ["off", "transaction", "line"]),
+    track_locations: pick(form.get("track_locations"), ["off", "transaction", "line"]),
+    custom_fields: custom,
+  };
 }

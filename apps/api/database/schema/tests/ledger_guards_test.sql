@@ -5910,6 +5910,40 @@ BEGIN
   RAISE NOTICE 'PASS T135 a document out of scope of tax carries no tax';
 END $$;
 
+-- T136: a document's class, and a line's class and location, are the company's own dimensions of the right kind (111).
+-- Company A as f1: location d41, class d42 (T41); company B's location d43. Rolled back.
+DO $$
+DECLARE doc uuid;
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due, class_id, location_id)
+      VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 100, 100, 0,
+              '00000000-0000-0000-0000-000000000d42', '00000000-0000-0000-0000-000000000d41') RETURNING id INTO doc;
+    BEGIN
+      UPDATE documents SET class_id = '00000000-0000-0000-0000-000000000d41' WHERE id = doc;
+      RAISE EXCEPTION 'FAIL T136a: a location was taken as a document''s class';
+    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, service_date, class_id, location_id)
+      VALUES (app_company_id(), doc, 1, 'Roasting, October', 1, 100, '00000000-0000-0000-0000-000000000a40', 100, '2027-10-31',
+              '00000000-0000-0000-0000-000000000d42', '00000000-0000-0000-0000-000000000d41');
+    BEGIN
+      INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, location_id)
+        VALUES (app_company_id(), doc, 2, 'Planted', 1, 100, '00000000-0000-0000-0000-000000000a40', 100, '00000000-0000-0000-0000-000000000d43');
+      RAISE EXCEPTION 'FAIL T136b: a line took another company''s location';
+    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, class_id)
+        VALUES (app_company_id(), doc, 3, 'Planted', 1, 100, '00000000-0000-0000-0000-000000000a40', 100, '00000000-0000-0000-0000-000000000d41');
+      RAISE EXCEPTION 'FAIL T136c: a line took a location as its class';
+    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+    RAISE EXCEPTION 'T136 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T136 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T136 a document''s and a line''s class and location are the company''s own';
+END $$;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

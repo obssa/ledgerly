@@ -62,6 +62,8 @@ export interface CompanySettings {
   tax_reminders?: boolean;
   /** 110: the default Amounts are of new documents. */
   amounts_are?: TaxMode;
+  /** 111: QuickBooks' Customize. */
+  form_content?: FormContent;
   /** Interest on late payment (079): an annual rate and the income account it goes to. */
   late_interest?: { rate: string | null; account_id: string | null };
   /** How invoices look on paper and as PDF files. */
@@ -123,6 +125,16 @@ export interface OpeningDocument {
   amount_due: string;
   status: string;
 }
+
+/** QuickBooks' Customize (111): what the sales and purchase forms show, how classes and locations are tracked, custom fields. */
+export interface FormContent {
+  sales: Record<FormField, boolean>;
+  purchases: Record<FormField, boolean>;
+  track_classes: "off" | "transaction" | "line";
+  track_locations: "off" | "transaction" | "line";
+  custom_fields: { name: string; sales: boolean; purchases: boolean; print: boolean }[];
+}
+export type FormField = "service_date" | "sku" | "shipping" | "email_cc_bcc" | "message_on_statement" | "discount" | "deposit" | "tags" | "attachments";
 
 /** QuickBooks' Amounts are (110): exclusive of tax, inclusive of tax, or out of scope of tax. */
 export type TaxMode = "exclusive" | "inclusive" | "out_of_scope";
@@ -826,6 +838,10 @@ export interface InvoiceLine {
   item_id?: string | null;
   /** The project the line is tagged with (job costing), if any. */
   project_id?: string | null;
+  /** 111: its service date, and its class and location when tracked per line. */
+  service_date?: string | null;
+  class_id?: string | null;
+  location_id?: string | null;
   /** On an invoice made from a sales order: the order line it delivers (067). */
   source_line_id?: string | null;
   /** 072: another unit of the item the line is in (its quantity and price are in it), kept as it was then. */
@@ -863,6 +879,10 @@ export interface Invoice {
   payment_terms?: { id: string; name: string } | null;
   /** 110: Amounts are; out of scope of tax carries no tax at all. */
   tax_mode?: TaxMode;
+  /** 111: its class and location when tracked per transaction, and its custom fields. */
+  class_id?: string | null;
+  location_id?: string | null;
+  custom_fields?: Record<string, string>;
   currency: string;
   subtotal: string;
   tax_total: string;

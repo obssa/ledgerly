@@ -1,4 +1,5 @@
 import { Dt } from "@/components/Dt";
+import { DocumentFields } from "@/components/DocumentFields";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -101,6 +102,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
               <div><span className="text-muted">{creditNote ? "Credit note date" : "Invoice date"}</span> <span className="num"><Dt v={invoice.issue_date} /></span></div>
               {!creditNote && invoice.payment_terms && <div><span className="text-muted">Terms</span> {invoice.payment_terms.name}</div>}
               {invoice.tax_mode && invoice.tax_mode !== "exclusive" && <div><span className="text-muted">Amounts are</span> {invoice.tax_mode === "inclusive" ? "Inclusive of tax" : "Out of scope of tax"}</div>}
+              <DocumentFields doc={invoice} />
               {!creditNote && <div><span className="text-muted">Due date</span> <span className="num"><Dt v={invoice.due_date} /></span></div>}
               {invoice.salesperson && <div><span className="text-muted">Salesperson</span> {invoice.salesperson.name}</div>}
               {Number(invoice.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{invoice.fx_rate}</span></div>}

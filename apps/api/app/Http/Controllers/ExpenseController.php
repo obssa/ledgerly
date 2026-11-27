@@ -84,6 +84,7 @@ final class ExpenseController extends Controller
                 ->where(fn (Builder $w) => $w->where('type', 'expense')->orWhere(fn (Builder $a) => $a->where('type', 'asset')->whereIn('subtype', ['fixed_asset', 'prepayment']))))],
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')->whereIn('kind', ['vat', 'tot'])],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
+            ...\App\Http\Requests\Concerns\DocumentFieldRules::rules(),   // 111: class, location, custom fields, service date
         ], ['lines.*.account_id.exists' => 'Choose an expense account, or a fixed asset or prepayment account.']);
 
         // Loaded through the company-scoped model (CLAUDE.md rule 4); the account's currency is the expense's.

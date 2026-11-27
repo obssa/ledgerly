@@ -21,7 +21,7 @@ class Document extends Model
     protected $fillable = [
         'type', 'number', 'contact_id', 'issue_date', 'due_date', 'currency', 'fx_rate', 'prices_include_tax',
         'language', 'notes', 'location_id', 'custom_fields', 'created_by', 'original_document_id', 'reference',
-        'paid_from_account_id', 'payment_method', 'warehouse_id', 'salesperson_id', 'payment_terms_id', 'out_of_scope',
+        'paid_from_account_id', 'payment_method', 'warehouse_id', 'salesperson_id', 'payment_terms_id', 'out_of_scope', 'class_id',
     ];
 
     /** 110: read back as QuickBooks' Amounts are. */
