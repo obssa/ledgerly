@@ -48,7 +48,7 @@ export function CompareFilter({ slots, diff, asOf = false, open }: { slots: Slot
         })}
         <div>
           <label className="field-label" htmlFor="diff">Change columns (against the first comparison)</label>
-          <select className="field" id="diff" name="diff" defaultValue={diff}>{DIFFS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <select className="field !w-auto" id="diff" name="diff" defaultValue={diff}>{DIFFS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         </div>
       </div>
     </details>
