@@ -75,6 +75,29 @@ final class PaymentReceivedTest extends TestCase
         $this->assertSame(['0.00', '547.67'], [(string) $fx->debit, (string) $fx->credit]);   // 14,000.00 - 13,452.33
     }
 
+    public function test_a_dollar_invoice_paid_into_the_birr_bank_books_what_the_bank_received_and_the_gain(): void
+    {
+        // 100 USD invoiced at 134.523333 (13,452.33 receivable). The customer sends 100 USD; the birr bank credits 14,000.00
+        // for it, less a 2 USD fee at the bank's rate of 140 (280.00): the bank gets 13,720.00, the gain is 547.67.
+        $usd = $this->postedInvoice('100', 'USD');
+        $this->pay(['currency' => 'USD', 'amount' => '100', 'allocations' => [['invoice_id' => $usd, 'amount' => '100']]])
+            ->assertUnprocessable()->assertJsonValidationErrors('account_amount');
+        $payment = $this->pay(['currency' => 'USD', 'amount' => '100', 'fee' => '2', 'account_amount' => '14000', 'allocations' => [['invoice_id' => $usd, 'amount' => '100']]])
+            ->assertCreated()->assertJsonPath('account_amount', '14000.00')->assertJsonPath('fx_rate', '140.000000');
+        $lines = $this->owner()->table('journal_lines')->where('journal_entry_id', $payment->json('journal_entry_id'))->get()->keyBy('account_id');
+        $this->assertSame(['13720.00', '98.00'], [(string) $lines[$this->c['bank']]->debit, (string) $lines[$this->c['bank']]->amount_txn]);
+        $this->assertSame('280.00', (string) $lines[$this->accountId('bank_charges')]->debit);
+        $this->assertSame('13452.33', (string) $lines[$this->accountId('accounts_receivable')]->credit);
+        $this->assertSame('547.67', (string) $lines[$this->accountId('fx_gain_loss')]->credit);
+        $this->getJson("/api/v1/invoices/{$usd}", $this->h)->assertJsonPath('status', 'paid');
+        $this->getJson('/api/v1/reports/exchange-gains/realized?from=2026-11-01&to=2026-11-30', $this->h)->assertOk()->assertJsonPath('total', '547.67');
+
+        // Never a third currency: a dollar payment into a euro account is refused.
+        $eur = (string) \Illuminate\Support\Str::uuid();
+        $this->owner()->table('accounts')->insert(['id' => $eur, 'company_id' => $this->c['company'], 'code' => '1016', 'name' => 'Bank EUR', 'type' => 'asset', 'subtype' => 'bank', 'currency' => 'EUR']);
+        $this->pay(['currency' => 'USD', 'account_id' => $eur, 'amount' => '1', 'account_amount' => '1'])->assertUnprocessable()->assertJsonValidationErrors('account_id');
+    }
+
     public function test_what_a_payment_may_not_do(): void
     {
         $draft = $this->c['draft'];

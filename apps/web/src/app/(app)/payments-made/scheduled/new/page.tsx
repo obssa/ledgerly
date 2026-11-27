@@ -1,3 +1,4 @@
+import { paymentAccounts } from "@/lib/payments";
 import { Card, PageTitle } from "@/components/ui";
 import { getPayOptions } from "@/lib/data";
 import { todayIn } from "@/lib/dates";
@@ -31,7 +32,7 @@ export default async function SchedulePaymentPage({ searchParams }: PageProps<"/
       {chosen && (
         <ScheduleForm key={chosen.id} supplier={chosen} currency={currency} today={todayIn()} demo={options.demo}
           bills={options.bills.filter((b) => b.currency === currency).map((b) => ({ id: b.id, number: b.number, reference: b.reference, due_date: b.due_date, amount_due: b.amount_due, currency: b.currency }))}
-          accounts={options.accounts.filter((a) => (a.currency ?? options.baseCurrency) === currency)} />
+          accounts={paymentAccounts(options.accounts, currency, options.baseCurrency)} />
       )}
     </>
   );

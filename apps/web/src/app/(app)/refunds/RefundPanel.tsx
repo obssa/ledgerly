@@ -1,7 +1,7 @@
 "use client";
 import { DateInput } from "@/components/DateInput";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Card } from "@/components/ui";
 import { formatAmount } from "@/lib/format";
 import { recordRefund } from "./actions";
@@ -17,9 +17,13 @@ const METHODS: Record<string, string> = {
  */
 export function RefundPanel({ side, contactId, currency, left, creditId, paymentId, accounts }: {
   side: "customer" | "supplier"; contactId: string; currency: string; left: string; creditId?: string; paymentId?: string;
-  accounts: { id: string; code: string; name: string }[];
+  accounts: { id: string; code: string; name: string; currency?: string; base?: string }[];
 }) {
   const [state, action, pending] = useActionState(recordRefund, undefined);
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  // A birr account for a dollar refund (QuickBooks): what it moved, in birr; each side at its own rate.
+  const cross = Boolean(account?.currency && account.currency !== currency);
   const today = todayIn();
   const out = side === "customer";
   return (
@@ -28,7 +32,7 @@ export function RefundPanel({ side, contactId, currency, left, creditId, payment
       <p className="mt-1.5 text-[13px] text-muted">{out ? "Money goes back to the customer" : "The supplier pays the money back"}: at most <span className="num">{formatAmount(left)}</span>.</p>
       {state?.error && <p role="alert" className="mt-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
       {accounts.length === 0 ? (
-        <p className="mt-2 text-[13px] text-muted">No bank, cash or mobile-money account in {currency}.</p>
+        <p className="mt-2 text-[13px] text-muted">No bank, cash or mobile-money account in {currency} or the company&apos;s currency.</p>
       ) : (
         <form action={action} className="mt-3 flex flex-col gap-3" noValidate>
           <input type="hidden" name="side" value={side} />
@@ -42,10 +46,17 @@ export function RefundPanel({ side, contactId, currency, left, creditId, payment
           </div>
           <div>
             <label className="field-label" htmlFor="refund_account">{out ? "Paid from" : "Received into"}</label>
-            <select className="field" id="refund_account" name="account_id">
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+            <select className="field" id="refund_account" name="account_id" value={account?.id ?? ""} onChange={(e) => setAccountId(e.target.value)}>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}{a.currency && a.currency !== currency ? ` (${a.currency})` : ""}</option>)}
             </select>
           </div>
+          {cross && (
+            <div>
+              <label className="field-label" htmlFor="refund_account_amount">Amount {out ? "paid" : "received"} in {account?.currency}</label>
+              <input className={`field num ${state?.fields?.account_amount ? "!border-bad" : ""}`} id="refund_account_amount" name="account_amount" inputMode="decimal" />
+              <p className="mt-1.5 text-[13px] text-muted">What {account?.name} moved for the {currency} refund; the difference from the credit&apos;s rate is an exchange gain or loss.</p>
+            </div>
+          )}
           <div>
             <label className="field-label" htmlFor="refund_method">Method</label>
             <select className="field" id="refund_method" name="method" defaultValue="bank_transfer">

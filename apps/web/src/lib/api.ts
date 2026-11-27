@@ -941,7 +941,7 @@ export interface InvoiceDetail extends Invoice {
 export interface ScheduledPayment {
   id: string;
   contact: { id: string; name: string };
-  account: { id: string; code: string; name: string };
+  account: { id: string; code: string; name: string; currency?: string | null };
   pay_on: string;
   method: string;
   reference: string | null;

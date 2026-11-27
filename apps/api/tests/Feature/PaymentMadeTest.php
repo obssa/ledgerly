@@ -81,6 +81,21 @@ final class PaymentMadeTest extends TestCase
         $this->postJson("/api/v1/payments-made/{$id}/reverse", ['date' => '2026-11-13', 'reason' => 'Again'], $this->h)->assertUnprocessable();
     }
 
+    public function test_a_dollar_bill_paid_from_the_birr_bank_books_what_the_bank_paid_and_the_loss(): void
+    {
+        // A 50 USD bill at 150 (7,500.00 payable), paid from the birr bank for 7,750.00 birr (rate 155): a loss of 250.00.
+        $bill = $this->postJson('/api/v1/bills', ['contact_id' => $this->supplier, 'issue_date' => '2026-11-09', 'currency' => 'USD', 'fx_rate' => '150', 'reference' => 'US-7',
+            'lines' => [['description' => 'Freight', 'quantity' => '1', 'unit_price' => '50', 'account_id' => $this->account('6200')]]], $this->h)->assertCreated()->json('id');
+        $this->postJson("/api/v1/bills/{$bill}/approve", [], $this->h)->assertOk();
+        $payment = $this->postJson('/api/v1/payments-made', $this->payment(['currency' => 'USD', 'amount' => '50', 'fee' => null, 'withholding' => null, 'withholding_certificate' => null,
+            'account_amount' => '7750', 'allocations' => [['bill_id' => $bill, 'amount' => '50']]]), $this->h)->assertCreated()->assertJsonPath('fx_rate', '155.000000');
+        $lines = $this->owner()->table('journal_lines')->where('journal_entry_id', $payment->json('journal_entry_id'))->get();
+        $this->assertSame('7750.00', (string) $lines->firstWhere('account_id', $this->c['bank'])->credit);
+        $fx = $this->owner()->table('accounts')->where(['company_id' => $this->c['company'], 'system_key' => 'fx_gain_loss'])->value('id');
+        $this->assertSame('250.00', (string) $lines->firstWhere('account_id', $fx)->debit);
+        $this->getJson("/api/v1/bills/{$bill}", $this->h)->assertJsonPath('status', 'paid');
+    }
+
     public function test_payment_rules(): void
     {
         $this->postJson('/api/v1/payments-made', $this->payment(['withholding_certificate' => null]), $this->h)->assertUnprocessable()->assertJsonValidationErrors('withholding_certificate');

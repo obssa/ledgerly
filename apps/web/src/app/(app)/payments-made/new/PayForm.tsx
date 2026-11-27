@@ -7,7 +7,7 @@ import { startTransition, useActionState, useState, type FormEvent } from "react
 import { Card } from "@/components/ui";
 import type { PayOptions } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
-import { allocateOldestFirst, paymentTotals, settleProblem, suggestedWithholding, withholdingBasis } from "@/lib/payments";
+import { allocateOldestFirst, bankRate, paymentAccounts, paymentCurrencies, paymentTotals, settleProblem, suggestedWithholding, withholdingBasis } from "@/lib/payments";
 import { payBills } from "../actions";
 import { todayIn } from "@/lib/dates";
 
@@ -23,12 +23,20 @@ const METHODS: Record<string, string> = {
 export function PayForm({ options }: { options: PayOptions & { supplier: NonNullable<PayOptions["supplier"]> } }) {
   const [state, action, pending] = useActionState(payBills, undefined);
   const today = todayIn();
-  const currency = options.supplier.currency && options.currencies.includes(options.supplier.currency) ? options.supplier.currency : options.baseCurrency;
+  // The supplier's currency, or that of their open bills (a supplier with no currency of their own may still owe in dollars).
+  const choices = paymentCurrencies(options.supplier.currency, options.bills, options.baseCurrency, options.currencies);
+  const [currency, setCurrency] = useState(choices[0] ?? options.baseCurrency);
   const bills = options.bills.filter((b) => b.currency === currency);
-  const accounts = options.accounts.filter((a) => (a.currency ?? options.baseCurrency) === currency);
   const advice = options.advice;
 
   const [amount, setAmount] = useState("");
+  // An account in the payment's currency, or in the company's (QuickBooks): through a birr account, what it moved is entered.
+  const accounts = paymentAccounts(options.accounts, currency, options.baseCurrency);
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  const cross = currency !== options.baseCurrency && (account?.currency ?? options.baseCurrency) === options.baseCurrency;
+  const [moved, setMoved] = useState("");
+  const rate = cross ? bankRate(moved, amount) : null;
   const [withholding, setWithholding] = useState("");
   const [method, setMethod] = useState("bank_transfer");
   const [alloc, setAlloc] = useState<string[]>(bills.map(() => ""));
@@ -69,6 +77,14 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
       {(problem ?? state?.error) && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{problem ?? state?.error}</p>}
       <input type="hidden" name="contact_id" value={options.supplier.id} />
       <input type="hidden" name="currency" value={currency} />
+      {choices.length > 1 && (
+        <div className="max-w-[240px]">
+          <label className="field-label" htmlFor="currency_choice">Currency</label>
+          <select className="field" id="currency_choice" value={currency} onChange={(e) => { setCurrency(e.target.value); setAccountId(""); setMoved(""); setAlloc(options.bills.filter((b) => b.currency === e.target.value).map(() => "")); }}>
+            {choices.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
 
       <Card className="!p-2" label="Bills to pay">
         {bills.length === 0 ? (
@@ -139,13 +155,15 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
           </div>
           <div>
             <label className="field-label" htmlFor="account_id">Paid from</label>
-            <select className={`field ${bad("account_id") ? "!border-bad" : ""}`} id="account_id" name="account_id">
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+            <select className={`field ${bad("account_id") ? "!border-bad" : ""}`} id="account_id" name="account_id" value={account?.id ?? ""} onChange={(e) => setAccountId(e.target.value)}>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}{(a.currency ?? options.baseCurrency) !== currency ? ` (${a.currency ?? options.baseCurrency})` : ""}</option>)}
             </select>
           </div>
           {method === "cheque" && <Field name="cheque_number" label="Cheque number" hint="From the cheque book; each number once per account" invalid={bad("cheque_number")} />}
           <Field name="reference" label={method === "cheque" ? "Reference" : "Reference (transfer number)"} />
-          {currency !== options.baseCurrency && <Field name="fx_rate" label={`Rate (${options.baseCurrency} for 1 ${currency})`} hint="Empty: the company's rate for the date" invalid={bad("fx_rate")} />}
+          {cross && <Field name="account_amount" label={`Amount paid in ${options.baseCurrency}`} value={moved} onChange={setMoved} invalid={bad("account_amount")}
+            hint={rate ? `The bank's rate: ${rate} ${options.baseCurrency} for 1 ${currency}; each bill is settled at its own rate, the difference an exchange gain or loss` : `What ${account?.name ?? "the account"} paid for the ${currency} payment`} />}
+          {currency !== options.baseCurrency && !cross && <Field name="fx_rate" label={`Rate (${options.baseCurrency} for 1 ${currency})`} hint="Empty: the company's rate for the date" invalid={bad("fx_rate")} />}
         </div>
         {advice?.applies && <p className="mt-3 text-[13px] text-muted">{advice.note} Goods above {formatAmount(advice.goods_above ?? "0")}, services above {formatAmount(advice.services_above ?? "0")}.</p>}
         {overCash && <p role="status" className="mt-3 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">Cash above {formatAmount(advice!.cash_limit!)} must go through a bank or an authorised electronic channel.</p>}
@@ -154,7 +172,7 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
       {!options.demo && (
         <div><button type="submit" className="btn btn-primary min-w-[200px] justify-center" disabled={pending || accounts.length === 0}>{pending ? "Recording…" : "Record payment"}</button></div>
       )}
-      {accounts.length === 0 && <p className="text-sm text-muted">No bank, cash or mobile-money account in {currency}.</p>}
+      {accounts.length === 0 && <p className="text-sm text-muted">No bank, cash or mobile-money account in {currency} or {options.baseCurrency}.</p>}
     </form>
   );
 }

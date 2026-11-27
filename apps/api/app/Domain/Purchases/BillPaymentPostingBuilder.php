@@ -45,6 +45,7 @@ final class BillPaymentPostingBuilder
         array $allocations,
         ?string $memo = null,
         string $settledLabel = 'Bill paid',
+        ?Money $accountAmount = null,
     ): JournalDraft {
         $currency = $amount->currency;
         if ($amount->isZero() || $amount->isNegative()) {
@@ -75,7 +76,9 @@ final class BillPaymentPostingBuilder
         }
 
         $out = $amount->plus($fee);
-        $draft->add(JournalLineDraft::credit($bankAccountId, $base($out, $paymentRate), $out, 'Payment made', $supplierId));
+        // Through an account in the company's currency (107): exactly what it paid, plus the fee at the bank's rate.
+        $bank = $accountAmount !== null ? $accountAmount->plus($base($fee, $paymentRate)) : $base($out, $paymentRate);
+        $draft->add(JournalLineDraft::credit($bankAccountId, $bank, $out, 'Payment made', $supplierId));
         if (! $withholding->isZero()) {
             $draft->add(JournalLineDraft::credit($withholdingAccountId, $base($withholding, $paymentRate), $withholding, 'Tax withheld from the supplier', $supplierId));
         }

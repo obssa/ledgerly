@@ -68,7 +68,7 @@ export async function confirmScheduledPayment(_: FormState | undefined, form: Fo
   let payment: string;
   try {
     payment = (await ledgerly.confirmScheduledPayment(id(form), {
-      payment_date: text(form, "payment_date") ?? null, reference: text(form, "reference") ?? null, fx_rate: amount(form, "fx_rate"),
+      payment_date: text(form, "payment_date") ?? null, reference: text(form, "reference") ?? null, fx_rate: amount(form, "fx_rate"), account_amount: amount(form, "account_amount"),
       fee: amount(form, "fee"), withholding: amount(form, "withholding"), withholding_certificate: text(form, "withholding_certificate") ?? null,
       cheque_number: text(form, "cheque_number") ?? null,
     }, ctx)).payment_id;

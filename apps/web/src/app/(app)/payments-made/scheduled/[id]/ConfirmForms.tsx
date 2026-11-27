@@ -13,8 +13,8 @@ import { cancelScheduledPayment, confirmScheduledPayment } from "../actions";
  * out earlier), any tax withheld with its receipt number, a bank fee and a cheque number are entered now. What leaves
  * the account is the planned amount less the tax withheld.
  */
-export function ConfirmForm({ id, planned, currency, baseCurrency, method, today, bills, advice }: {
-  id: string; planned: string; currency: string; baseCurrency: string; method: string; today: string;
+export function ConfirmForm({ id, planned, currency, baseCurrency, method, today, bills, advice, throughBase = false }: {
+  id: string; planned: string; currency: string; baseCurrency: string; method: string; today: string; throughBase?: boolean;
   bills: { amount: string; subtotal: string; total: string }[]; advice: WithholdingAdvice | null;
 }) {
   const [state, action, pending] = useActionState(confirmScheduledPayment, undefined);
@@ -69,7 +69,14 @@ export function ConfirmForm({ id, planned, currency, baseCurrency, method, today
             <label className="field-label" htmlFor="reference">Reference (transfer number)</label>
             <input className="field" id="reference" name="reference" maxLength={100} placeholder="Empty: the plan's reference" />
           </div>
-          {currency !== baseCurrency && (
+          {throughBase && (
+            <div>
+              <label className="field-label" htmlFor="account_amount">Amount paid in {baseCurrency}</label>
+              <input className={`field num ${bad("account_amount") ? "!border-bad" : ""}`} id="account_amount" name="account_amount" inputMode="decimal" />
+              <p className="mt-1.5 text-[13px] text-muted">What the {baseCurrency} account paid for the {currency} payment: each bill at its own rate, the difference an exchange gain or loss.</p>
+            </div>
+          )}
+          {currency !== baseCurrency && !throughBase && (
             <div>
               <label className="field-label" htmlFor="fx_rate">Rate ({baseCurrency} for 1 {currency})</label>
               <input className={`field num ${bad("fx_rate") ? "!border-bad" : ""}`} id="fx_rate" name="fx_rate" inputMode="decimal" placeholder="The company's rate" />

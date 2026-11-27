@@ -85,6 +85,8 @@ final class ScheduledPaymentController extends Controller
             'payment_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:' . $this->current->today()],
             'reference' => ['nullable', 'string', 'max:100'],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            // Through an account in the company's currency: what it moved, in that currency (107).
+            'account_amount' => ['nullable', 'decimal:0,2', 'gt:0'],
             'fee' => ['nullable', 'decimal:0,2', 'min:0'],
             'withholding' => ['nullable', 'decimal:0,2', 'min:0'],
             'withholding_certificate' => ['nullable', 'string', 'max:60', 'required_unless:withholding,null,0,0.0,0.00'],

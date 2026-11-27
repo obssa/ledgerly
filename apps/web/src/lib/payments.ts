@@ -23,7 +23,7 @@ export function paymentBody(form: FormData, settles: "invoice" | "bill" = "invoi
   };
   for (const name of ["reference", "withholding_certificate"]) if (value(name) !== "") body[name] = value(name);
   if (body.method === "cheque" && value("cheque_number") !== "") body.cheque_number = value("cheque_number");
-  for (const name of ["fee", "withholding", "fx_rate"]) if (!blank(clean(form.get(name)))) body[name] = clean(form.get(name));
+  for (const name of ["fee", "withholding", "fx_rate", "account_amount"]) if (!blank(clean(form.get(name)))) body[name] = clean(form.get(name));
 
   const allocations: Record<string, string>[] = [];
   for (const [key, v] of form.entries()) {
@@ -33,6 +33,29 @@ export function paymentBody(form: FormData, settles: "invoice" | "bill" = "invoi
   }
   if (allocations.length > 0) body.allocations = allocations;
   return body;
+}
+
+/**
+ * The money accounts a payment in `currency` may go through, as QuickBooks allows: one in that currency, or one in the
+ * company's (a dollar invoice paid into a birr account); those in the payment's own currency first.
+ */
+export function paymentAccounts<T extends { currency: string | null }>(accounts: T[], currency: string, base: string): T[] {
+  const held = (a: T) => a.currency ?? base;
+  return accounts.filter((a) => held(a) === currency || held(a) === base).sort((a, b) => Number(held(b) === currency) - Number(held(a) === currency));
+}
+
+/** The currencies a contact may be paid in: their own, any of their open documents', and the company's. */
+export function paymentCurrencies(own: string | null | undefined, documents: readonly { currency: string }[], base: string, enabled: readonly string[]): string[] {
+  const list = [own && (own === base || enabled.includes(own)) ? own : null, ...documents.map((d) => d.currency), base].filter((c): c is string => Boolean(c));
+  return [...new Set(list)];
+}
+
+/** The rate the bank gave: what the account moved, in the company's currency, for each unit of the payment's (6 decimals). */
+export function bankRate(moved: string, amount: string): string | null {
+  const m = safe(moved), a = safe(amount);
+  if (m <= 0n || a <= 0n) return null;
+  const micro = (m * 1_000_000n * 2n + a) / (2n * a);   // half-up, both in hundredths
+  return `${micro / 1_000_000n}.${String(micro % 1_000_000n).padStart(6, "0")}`;
 }
 
 /**

@@ -125,7 +125,7 @@ final class ScheduledPayments
             $body = [
                 'contact_id' => $plan->contact_id, 'account_id' => $plan->account_id, 'payment_date' => $data['payment_date'],
                 'method' => $plan->method, 'reference' => ($data['reference'] ?? null) ?: $plan->reference, 'currency' => $plan->currency,
-                'fx_rate' => $data['fx_rate'] ?? null, 'amount' => $cash->toDecimalString(), 'fee' => $data['fee'] ?? null,
+                'fx_rate' => $data['fx_rate'] ?? null, 'account_amount' => $data['account_amount'] ?? null, 'amount' => $cash->toDecimalString(), 'fee' => $data['fee'] ?? null,
                 'withholding' => $withholding->toDecimalString(), 'withholding_certificate' => $data['withholding_certificate'] ?? null,
                 'cheque_number' => $data['cheque_number'] ?? null,
                 'allocations' => $lines->map(fn ($l) => ['bill_id' => $l->document_id, 'amount' => (string) $l->amount])->all(),
@@ -213,7 +213,7 @@ final class ScheduledPayments
         return DB::table('scheduled_payments as s')->join('contacts as k', 'k.id', '=', 's.contact_id')->join('accounts as a', 'a.id', '=', 's.account_id')
             ->leftJoin('users as u', 'u.id', '=', 's.created_by')
             ->where('s.company_id', $this->current->id())
-            ->select(['s.id', 's.contact_id', 'k.name as contact_name', 's.account_id', 'a.code as account_code', 'a.name as account_name', 's.pay_on',
+            ->select(['s.id', 's.contact_id', 'k.name as contact_name', 's.account_id', 'a.code as account_code', 'a.name as account_name', 'a.currency as account_currency', 's.pay_on',
                 's.method', 's.reference', 's.note', 's.currency', 's.status', 's.payment_id', 's.closed_on', 's.reminded_on', 's.created_at',
                 'u.name as created_by_name']);
     }
@@ -225,7 +225,8 @@ final class ScheduledPayments
 
         return [
             'id' => $r->id, 'contact' => ['id' => $r->contact_id, 'name' => $r->contact_name],
-            'account' => ['id' => $r->account_id, 'code' => $r->account_code, 'name' => $r->account_name],
+            // The account's own currency (null: the company's), so confirming through a birr account asks what it paid.
+            'account' => ['id' => $r->account_id, 'code' => $r->account_code, 'name' => $r->account_name, 'currency' => $r->account_currency],
             'pay_on' => $payOn, 'method' => $r->method, 'reference' => $r->reference, 'note' => $r->note, 'currency' => $r->currency,
             'amount' => $sum?->amount ?? '0.00', 'bill_count' => (int) ($sum?->bills ?? 0), 'status' => $r->status, 'payment_id' => $r->payment_id,
             'closed_on' => $r->closed_on === null ? null : substr((string) $r->closed_on, 0, 10),
@@ -253,8 +254,9 @@ final class ScheduledPayments
         $company = $this->current->get();
         $account = Account::query()->where('is_active', true)->whereIn('subtype', self::MONEY)->find($accountId)
             ?? throw ValidationException::withMessages(['account_id' => ['Choose a bank, cash or mobile-money account of this company.']]);
-        if (($account->currency ?? $company->base_currency) !== $currency) {
-            throw ValidationException::withMessages(['account_id' => ["{$account->name} is kept in " . ($account->currency ?? $company->base_currency) . ", not {$currency}."]]);
+        $held = $account->currency ?? $company->base_currency;
+        if ($held !== $currency && $held !== $company->base_currency) {
+            throw ValidationException::withMessages(['account_id' => ["{$account->name} is kept in {$held}: a {$currency} payment goes out of an account in {$currency} or in {$company->base_currency}."]]);
         }
     }
 

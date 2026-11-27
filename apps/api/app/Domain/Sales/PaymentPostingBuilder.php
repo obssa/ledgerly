@@ -45,6 +45,7 @@ final class PaymentPostingBuilder
         array $allocations,
         ?string $memo = null,
         string $settledLabel = 'Invoice settled',
+        ?Money $accountAmount = null,
     ): JournalDraft {
         $currency = $amount->currency;
         if ($amount->isZero() || $amount->isNegative()) {
@@ -68,7 +69,9 @@ final class PaymentPostingBuilder
 
         $received = $amount->minus($fee);
         if (! $received->isZero()) {
-            $draft->add(JournalLineDraft::debit($bankAccountId, $base($received, $paymentRate), $received, 'Payment received', $customerId));
+            // Through an account in the company's currency (107): exactly what it received, less the fee at the bank's rate.
+            $bank = $accountAmount !== null ? $accountAmount->minus($base($fee, $paymentRate)) : $base($received, $paymentRate);
+            $draft->add(JournalLineDraft::debit($bankAccountId, $bank, $received, 'Payment received', $customerId));
         }
         if (! $fee->isZero()) {
             $draft->add(JournalLineDraft::debit($feeAccountId, $base($fee, $paymentRate), $fee, 'Bank fee on payment'));

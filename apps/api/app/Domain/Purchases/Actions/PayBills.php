@@ -8,6 +8,7 @@ use App\Domain\Audit\AuditLogger;
 use App\Domain\Ledger\ExchangeRates;
 use App\Domain\Ledger\Models\Account;
 use App\Domain\Ledger\Money;
+use App\Domain\Ledger\PaymentAccount;
 use App\Domain\Ledger\PostingService;
 use App\Domain\Purchases\BillPaymentPostingBuilder;
 use App\Domain\Sales\Models\Contact;
@@ -56,13 +57,13 @@ final class PayBills
             if ($account === null || ! in_array($account->subtype, self::PAYING_SUBTYPES, true)) {
                 throw ValidationException::withMessages(['account_id' => ['Choose a bank, cash or mobile-money account of this company.']]);
             }
-            if (($account->currency ?? $company->base_currency) !== $currency) {
-                throw ValidationException::withMessages(['account_id' => ["{$account->name} is kept in " . ($account->currency ?? $company->base_currency) . ", not {$currency}."]]);
-            }
-            $rate = $this->rates->forDocument($company, $currency, $data['payment_date'], $data['fx_rate'] ?? null);
+            // An account in the payment's currency, or in the company's with what it moved (107, QuickBooks).
+            $moved = PaymentAccount::amountMoved($account, $company, $currency, $data['account_amount'] ?? null);
+            $amount = Money::of($data['amount'], $currency);
+            // Through a birr account the bank's own rate is the payment's: what it paid over the amount.
+            $rate = $moved !== null ? PaymentAccount::rate($moved, $amount) : $this->rates->forDocument($company, $currency, $data['payment_date'], $data['fx_rate'] ?? null);
 
             $allocations = $this->allocations($data['allocations'] ?? [], $supplier, $currency);
-            $amount = Money::of($data['amount'], $currency);
             $fee = Money::of($data['fee'] ?? '0', $currency);
             $withholding = Money::of($data['withholding'] ?? '0', $currency);
             if (! $withholding->isZero() && $supplier->withholding_exempt) {
@@ -79,6 +80,7 @@ final class PayBills
                 'account_id' => $account->getKey(), 'payment_date' => $data['payment_date'], 'method' => $data['method'],
                 'reference' => $data['reference'] ?? null, 'currency' => $currency, 'fx_rate' => $rate,
                 'amount' => $amount->toDecimalString(), 'fee' => $fee->toDecimalString(), 'withholding' => $withholding->toDecimalString(),
+                'account_amount' => $moved?->toDecimalString(),
                 'withholding_certificate' => $withholding->isZero() ? null : ($data['withholding_certificate'] ?? null),
                 'cheque_number' => ($data['method'] ?? null) === 'cheque' ? ($data['cheque_number'] ?? null) : null,
             ]);
@@ -91,7 +93,7 @@ final class PayBills
                 feeAccountId: Account::system('bank_charges')->getKey(),
                 withholdingAccountId: Account::system('withholding_payable')->getKey(),
                 fxAccountId: Account::system('fx_gain_loss')->getKey(),
-                amount: $amount, fee: $fee, withholding: $withholding,
+                amount: $amount, fee: $fee, withholding: $withholding, accountAmount: $moved,
                 allocations: array_map(fn (array $a) => ['amount' => $a['amount'], 'bill_rate' => $a['rate']], $allocations),
                 memo: 'Payment to ' . $supplier->name . (empty($data['reference']) ? '' : " ({$data['reference']})"),
             ), $userId);
@@ -106,6 +108,7 @@ final class PayBills
 
             $this->audit->record($company->getKey(), 'payment_made', 'payment', $paymentId, null, [
                 'supplier' => $supplier->name, 'amount' => $amount->toDecimalString(), 'currency' => $currency,
+                ...($moved !== null ? ['account_amount' => $moved->toDecimalString(), 'rate' => $rate] : []),
                 'withholding' => $withholding->toDecimalString(), 'withholding_certificate' => $data['withholding_certificate'] ?? null,
                 'fee' => $fee->toDecimalString(), 'journal_entry' => $entry->number,
                 'allocations' => array_map(fn (array $a) => ['bill' => $a['bill']->number, 'amount' => $a['amount']->toDecimalString()], $allocations),
