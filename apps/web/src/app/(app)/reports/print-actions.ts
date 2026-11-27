@@ -8,7 +8,7 @@ import { getSession } from "@/lib/session";
 
 /* Module 10: records a report printed or saved as PDF in the audit log (who, when, which report and period, how many rows). */
 
-const POINT_IN_TIME = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing"];
+const POINT_IN_TIME = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing", "unrealized-gains"];
 
 export async function recordPrint(report: string, params: Record<string, string | undefined>, rows: number): Promise<void> {
   if (!(EXPORTABLE as readonly string[]).includes(report)) return;

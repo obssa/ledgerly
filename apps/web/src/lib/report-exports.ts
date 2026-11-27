@@ -31,7 +31,7 @@ export type Export = { title: string; rows: Cell[][]; heading?: string; period?:
 export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", "general-ledger", "cash-flow", "changes-in-equity",
   "profit-by-dimension", "sales", "purchases", "ar-ageing", "ap-ageing", "audit-log", "stock-movement", "stock-ageing", "custom",
   "transaction-list", "invoice-list", "open-invoices", "bill-list", "unpaid-bills", "payments-received", "payments-made", "journal",
-  "cash-forecast", "inventory-valuation", "customer-statement", "supplier-statement"] as const;
+  "cash-forecast", "inventory-valuation", "customer-statement", "supplier-statement", "realized-gains", "unrealized-gains"] as const;
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 type Ageing = Awaited<ReturnType<typeof ledgerly.arAgeing>>;
@@ -312,6 +312,19 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
         ...r.rows.map((x) => [x.item.sku, x.item.name, x.item.unit, x.quantity, x.value, x.last_sold_on, x.last_received_on, x.days_since_sale, x.band]),
         ["Total", null, null, null, r.total_value, null, null, null, null]] };
     }
+    case "realized-gains": {
+      const r = await ledgerly.realizedGains({ from: p.from ?? "", to: p.to ?? "" }, ctx);
+      return { title: "realized-gains", rows: [["Date", "Transaction type", "No.", "Name", "Currency", "Foreign amount", "Exchange rate", `Gain or loss (${r.currency})`],
+        ...r.lines.map((l) => [l.date, l.payment_id ? (l.direction === "in" ? "Payment received" : "Payment made") : typeLabel(l.document_type ?? l.source_type),
+          l.document_number ?? l.reference ?? `#${l.entry}`, l.name, l.currency, l.foreign_amount, l.exchange_rate, l.gain]),
+        ["Total", null, null, null, null, null, null, r.total]] };
+    }
+    case "unrealized-gains": {
+      const r = await ledgerly.unrealizedGains(p.as_of ?? p.to ?? "", ctx);
+      return { title: "unrealized-gains", rows: [["Item", "Reference", "Name", "Currency", "Foreign open balance", `In the books (${r.currency})`, "Rate", `At the rate (${r.currency})`, "Unrealized gain or loss"],
+        ...r.lines.map((l) => [l.kind, l.label, l.name, l.currency, l.amount, l.booked, l.rate, l.restated, l.difference]),
+        ["Net", null, null, null, null, null, null, null, r.net]] };
+    }
     case "ar-ageing": case "ap-ageing": {
       // The periods asked for (days per period, how many); the detail when the page showed it.
       const periods = pickPeriods({ interval: p.interval, periods: p.periods });
@@ -340,6 +353,8 @@ export function reportTitle(report: ExportableReport, o: { group?: string; kind?
     case "trial-balance": return "Trial balance";
     case "general-ledger": return "General ledger";
     case "journal": return "Journal";
+    case "realized-gains": return "Realized gains and losses";
+    case "unrealized-gains": return "Unrealized gains and losses";
     case "cash-flow": return o.method === "direct" ? "Cash flow statement (direct method)" : "Cash flow statement";
     case "changes-in-equity": return "Statement of changes in equity";
     case "profit-by-dimension": return `Profit by ${GROUP_WORDS[o.kind ?? "location"] || "location"}`;

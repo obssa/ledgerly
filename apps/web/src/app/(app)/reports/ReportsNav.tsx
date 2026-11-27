@@ -14,6 +14,8 @@ const CYCLE: { stage: string; reports: [string, string][] }[] = [
     ["Purchases analysis", "/reports/purchases"], ["AP ageing summary", "/reports/ap-ageing"], ["AP ageing detail", "/reports/ap-ageing?view=detail"], ["Supplier statements", "/suppliers"]] },
   { stage: "Inventory and assets", reports: [["Inventory valuation", "/reports/inventory-valuation"], ["Stock movement", "/reports/stock-movement"],
     ["Stock ageing (slow-moving)", "/reports/stock-ageing"], ["Bin cards", "/inventory"], ["Fixed asset register", "/fixed-assets"]] },
+  { stage: "Foreign currency", reports: [["Realized gains and losses", "/reports/exchange-gains"], ["Unrealized gains and losses", "/reports/exchange-gains/unrealized"],
+    ["Revalue foreign balances", "/revaluation"]] },
   { stage: "Tax", reports: [["VAT return worksheet", "/tax"], ["Withholding register", "/tax?kind=withholding"]] },
   { stage: "Audit", reports: [["Changes: who changed what", "/reports/changes"], ["Audit log", "/audit"]] },
   { stage: "Saved", reports: [["Saved and scheduled reports", "/reports/saved"]] },

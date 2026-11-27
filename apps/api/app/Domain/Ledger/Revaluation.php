@@ -13,8 +13,9 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Month-end revaluation of foreign-currency balances (IAS 21: monetary items at the closing rate). At a date, each
- * foreign-currency bank or wallet balance and each open foreign-currency invoice, credit note, bill and supplier credit
- * is valued at that day's rate; the difference from its value in the books is an unrealised exchange gain or loss. The
+ * foreign-currency bank or wallet balance, each open foreign-currency invoice, credit note, bill and supplier credit, and
+ * each foreign payment not yet applied (a customer's credit on receivables, an advance to a supplier on payables) is
+ * valued at that day's rate; the difference from its value in the books is an unrealised exchange gain or loss. The
  * entry is reversed the next day, so documents keep their own rates and every month starts again from them (034).
  *
  * What a document owed on the date: its amount due now, plus what payments dated after the date and credits applied
@@ -28,10 +29,13 @@ final class Revaluation
     }
 
     /**
+     * As a report (the Unrealized gains and losses report): every open foreign item, a difference of nothing too, and a
+     * currency with no rate in the week listed with no rate instead of refused.
+     *
      * @param array<string, string> $given closing rates entered for the run (base per unit), by currency
-     * @return array{as_of: string, rates: array<string, string>, lines: list<array<string, mixed>>, net: string}
+     * @return array{as_of: string, rates: array<string, ?string>, lines: list<array<string, mixed>>, net: string}
      */
-    public function preview(Company $company, string $asOf, array $given = []): array
+    public function preview(Company $company, string $asOf, array $given = [], bool $report = false): array
     {
         $base = $company->base_currency;
         $id = $company->getKey();
@@ -65,11 +69,38 @@ final class Revaluation
                 'currency' => $d->currency, 'amount' => $due->toDecimalString(), 'booked' => $due->convertTo($base, (string) $d->fx_rate)->toDecimalString(), 'sign' => $sign];
         }
 
+        // A foreign payment not yet applied to invoices or bills, nor refunded by the date: a customer's credit is held on
+        // receivables (as a credit note is), an advance to a supplier on payables (as a supplier credit is), at the
+        // payment's own rate. Its applications count from its own date, as the documents' do (takenOffAfter).
+        $payments = DB::table('payments')->where(['company_id' => $id, 'status' => 'posted', 'kind' => 'payment'])->whereNotNull('contact_id')
+            ->where('currency', '<>', $base)->where('payment_date', '<=', $asOf)->orderBy('payment_date')
+            ->get(['id', 'direction', 'reference', 'contact_id', 'currency', 'fx_rate', 'amount', 'withholding']);
+        $applied = $payments->isEmpty() ? collect() : DB::table('payment_allocations')->where('company_id', $id)->whereIn('payment_id', $payments->pluck('id')->all())
+            ->groupBy('payment_id')->select('payment_id')->selectRaw('sum(amount)::text AS n')->pluck('n', 'payment_id');
+        $refunded = $payments->isEmpty() ? collect() : DB::table('payments')->where(['company_id' => $id, 'status' => 'posted'])->where('payment_date', '<=', $asOf)
+            ->whereIn('refunds_payment_id', $payments->pluck('id')->all())->groupBy('refunds_payment_id')
+            ->select('refunds_payment_id')->selectRaw('sum(amount)::text AS n')->pluck('n', 'refunds_payment_id');
+        foreach ($payments as $p) {
+            $left = Money::of((string) $p->amount, $p->currency)->plus(Money::of((string) $p->withholding, $p->currency))
+                ->minus(Money::of((string) ($applied[$p->id] ?? '0'), $p->currency))->minus(Money::of((string) ($refunded[$p->id] ?? '0'), $p->currency));
+            if ($left->isZero() || $left->isNegative()) {
+                continue;
+            }
+            $in = $p->direction === 'in';
+            $items[] = ['kind' => $in ? 'customer_credit' : 'supplier_advance', 'account_id' => $in ? $receivable : $payable, 'contact_id' => $p->contact_id,
+                'label' => ($in ? 'Payment received ' : 'Payment made ') . ($p->reference ?? ''), 'document_id' => null, 'payment_id' => $p->id,
+                'currency' => $p->currency, 'amount' => $left->toDecimalString(), 'booked' => $left->convertTo($base, (string) $p->fx_rate)->toDecimalString(), 'sign' => $in ? -1 : 1];
+        }
+
         $rates = [];
         foreach (array_unique(array_column($items, 'currency')) as $currency) {
             $found = isset($given[$currency]) ? null : $this->rates->on($id, $currency, $asOf);
             $rate = $given[$currency] ?? ($found['rate'] ?? null);
             if ($rate === null || $rate === '') {
+                if ($report) {
+                    $rates[$currency] = null;   // listed, not guessed
+                    continue;
+                }
                 throw ValidationException::withMessages(["rates.{$currency}" => ["Enter the {$currency} rate for {$asOf}: there is none in the week before it."]]);
             }
             $rates[$currency] = (string) $rate;
@@ -78,11 +109,15 @@ final class Revaluation
         $net = Money::zero($base);
         $lines = [];
         foreach ($items as $item) {
+            if ($rates[$item['currency']] === null) {
+                $lines[] = [...array_diff_key($item, ['sign' => 1]), 'rate' => null, 'restated' => null, 'difference' => null];
+                continue;
+            }
             $restated = Money::of($item['amount'], $item['currency'])->convertTo($base, $rates[$item['currency']]);
             $booked = Money::of($item['booked'], $base);
             // In the ledger's terms (debit minus credit): receivables and bank balances as they are, payables turned.
             $difference = $item['kind'] === 'account' ? $restated->minus($booked) : ($item['sign'] > 0 ? $restated->minus($booked) : $booked->minus($restated));
-            if ($difference->isZero()) {
+            if ($difference->isZero() && ! $report) {
                 continue;
             }
             $net = $net->plus($difference);
