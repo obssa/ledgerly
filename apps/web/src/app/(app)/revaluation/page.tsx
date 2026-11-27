@@ -12,7 +12,8 @@ export const metadata = { title: "Currency revaluation" };
 
 /** A date from the form: as stored, or typed the company's way (it works without JavaScript). */
 const date = (v: unknown, prefs: DatePrefs) => (typeof v === "string" ? parseDate(v, prefs) ?? undefined : undefined);
-const KIND: Record<string, string> = { account: "Bank or wallet", invoice: "Invoice", credit_note: "Credit note", bill: "Bill", vendor_credit: "Supplier credit" };
+const KIND: Record<string, string> = { account: "Bank or wallet", invoice: "Invoice", credit_note: "Credit note", bill: "Bill", vendor_credit: "Supplier credit",
+  customer_credit: "Customer credit not yet applied", supplier_advance: "Advance to a supplier not yet applied" };
 
 function Amount({ value }: { value: string }) {
   const b = drCr(value);

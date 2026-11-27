@@ -397,6 +397,8 @@ final class PermissionMatrixTest extends TestCase
         'GET api/v1/reports/trial-balance' => 'reports.view',
         'GET api/v1/reports/general-ledger' => 'reports.view',
         'GET api/v1/reports/journal' => 'reports.view',
+        'GET api/v1/reports/exchange-gains/realized' => 'reports.view',
+        'GET api/v1/reports/exchange-gains/unrealized' => 'reports.view',
         'GET api/v1/reports/profit-and-loss/columns' => 'reports.view',
         'GET api/v1/reports/balance-sheet' => 'reports.view',
         'GET api/v1/reports/bin-card' => 'reports.view',

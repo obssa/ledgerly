@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
   try {
     // The period as the page had it: a preset ("All dates", "Last month") or dates (lib/periodParams.ts).
     const period = await getReportPeriod(Object.fromEntries(q.entries()));
-    const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing", "inventory-valuation", "cash-forecast"].includes(report);
+    const pointInTime = ["balance-sheet", "trial-balance", "ar-ageing", "ap-ageing", "stock-ageing", "inventory-valuation", "cash-forecast", "unrealized-gains"].includes(report);
     const asOf = isDate(q.get("as_of")) ? (q.get("as_of") as string) : (period.picked.to ?? period.ctx.today);
     const options = { kind: word("kind"), group: word("group"), account_id: id, action: word("action"), user_id: uuid("user_id"), warehouse_id: uuid("warehouse_id"),
       rows: word("rows"), columns: word("columns"), measure: word("measure"), account_type: word("account_type"),

@@ -2184,6 +2184,8 @@ export const ledgerly = {
     api<unknown>(`credit-notes/${encodeURIComponent(creditNoteId)}/apply`, { ...ctx, method: "POST", body }),
   taxRates: (ctx: RequestOptions) => api<{ data: TaxRate[] }>("tax-rates", ctx),
   revaluations: (ctx: RequestOptions) => api<{ data: RevaluationRun[]; can: { revalue: boolean } }>("revaluations", ctx),
+  realizedGains: (q: { from: string; to: string }, ctx: RequestOptions) => api<RealizedGains>("reports/exchange-gains/realized", { ...ctx, query: q }),
+  unrealizedGains: (asOf: string, ctx: RequestOptions) => api<UnrealizedGains>("reports/exchange-gains/unrealized", { ...ctx, query: { as_of: asOf } }),
   revaluationPreview: (asOf: string, rates: Record<string, string>, ctx: RequestOptions) =>
     api<RevaluationPreview>("revaluations/preview", { ...ctx, query: { as_of: asOf, ...Object.fromEntries(Object.entries(rates).map(([k, v]) => [`rates[${k}]`, v])) } }),
   postRevaluation: (body: { as_of: string; rates: Record<string, string> }, ctx: RequestOptions) => api<RevaluationRun>("revaluations", { ...ctx, method: "POST", body }),
@@ -2226,3 +2228,18 @@ export const ledgerly = {
   profitAndLoss: (q: { from: string; to: string; compare_from?: string; compare_to?: string; basis?: "accrual" | "cash" }, ctx: RequestOptions) =>
     api<ProfitAndLoss>("reports/profit-and-loss", { ...ctx, query: q }),
 };
+
+/** GET /reports/exchange-gains/realized: exchange differences booked when foreign money moved (revaluations left out). */
+export interface RealizedGains {
+  from: string; to: string; currency: string; total: string;
+  lines: { date: string; entry_id: string; entry: number; source_type: string; memo: string | null; description: string | null; name: string | null;
+    payment_id: string | null; direction: "in" | "out" | null; reference: string | null; document_id: string | null; document_type: string | null; document_number: string | null;
+    currency: string | null; foreign_amount: string | null; exchange_rate: string | null; gain: string }[];
+}
+
+/** GET /reports/exchange-gains/unrealized: every open foreign item at a date, its value in the books and at the day's rate. */
+export interface UnrealizedGains {
+  as_of: string; currency: string; net: string; rates: Record<string, string | null>; missing_rates: string[];
+  lines: { kind: string; label: string; name: string | null; document_id: string | null; payment_id?: string | null; account_id: string; currency: string;
+    amount: string; booked: string; rate: string | null; restated: string | null; difference: string | null }[];
+}
