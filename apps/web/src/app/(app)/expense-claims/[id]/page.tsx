@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle } from "@/components/ui";
@@ -16,7 +17,7 @@ export default async function ExpenseClaimPage({ params, searchParams }: PagePro
   if (!claim) notFound();
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/expense-claims" className="hover:underline">Expense claims</Link> / {claim.contact.name}</>} title={<>Expense claim of <span className="num">{claim.issue_date}</span></>} />
+      <PageTitle eyebrow={<><Link href="/expense-claims" className="hover:underline">Expense claims</Link> / {claim.contact.name}</>} title={<>Expense claim of <span className="num"><Dt v={claim.issue_date} /></span></>} />
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_560px]" label="Receipts">
           {claim.notes && <p className="mb-3 text-sm">{claim.notes}</p>}

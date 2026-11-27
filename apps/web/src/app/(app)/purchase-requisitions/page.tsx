@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -30,7 +31,7 @@ export default async function RequisitionsPage({ searchParams }: PageProps<"/pur
             <tbody>
               {list.data.map((r) => (
                 <tr key={r.id}>
-                  <td className="num"><Link href={`/purchase-requisitions/${encodeURIComponent(r.id)}`} className="font-semibold hover:underline">{r.created_at.slice(0, 10)}</Link></td>
+                  <td className="num"><Link href={`/purchase-requisitions/${encodeURIComponent(r.id)}`} className="font-semibold hover:underline"><Dt v={r.created_at} /></Link></td>
                   <td>{r.requested_by_name}</td>
                   <td>{r.reason} <span className="text-[12px] text-muted">({r.lines} line{r.lines === 1 ? "" : "s"})</span></td>
                   <td className="num">{r.needed_by ?? "—"}</td>

@@ -68,6 +68,15 @@ export function OnboardingForm({ organisation = null }: { organisation?: string 
         <Field id="website" label="Website" type="url" invalid={bad("website")} />
         <FiscalStartFields calendars={["gregorian", "ethiopian"]} defaultCalendar="gregorian" defaultMonth={7} ethiopianLabel="Ethiopian (tax year from Hamle)" />
         <div>
+          <label className="field-label" htmlFor="date_format">Date format</label>
+          <select className="field" id="date_format" name="date_format" defaultValue="DD/MM/YYYY">
+            <option value="DD/MM/YYYY">DD/MM/YYYY (27/11/2026)</option>
+            <option value="MM/DD/YYYY">MM/DD/YYYY (11/27/2026)</option>
+            <option value="YYYY-MM-DD">YYYY-MM-DD (2026-11-27)</option>
+          </select>
+          <p className="mt-1.5 text-[13px] text-muted">How every date is written. You can change it later in Settings.</p>
+        </div>
+        <div>
           <label className="field-label" htmlFor="conversion_date">Last bank statement date</label>
           <input className="field" id="conversion_date" name="conversion_date" type="date" />
           <p className="mt-1.5 text-[13px] text-muted">Opening balances are entered as at this date.</p>

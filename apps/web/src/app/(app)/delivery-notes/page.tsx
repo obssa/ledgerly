@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -33,7 +34,7 @@ export default async function DeliveryNotesPage({ searchParams }: PageProps<"/de
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td className="num">{r.delivered_on}</td>
+                    <td className="num"><Dt v={r.delivered_on} /></td>
                     <td className="num font-semibold"><Link href={`/delivery-notes/${encodeURIComponent(r.id)}`} className="hover:underline">{r.number}</Link></td>
                     <td>{r.customer}</td>
                     <td className="num"><Link href={`/sales-orders/${encodeURIComponent(r.sales_order_id)}`} className="hover:underline">{r.order_number ?? "—"}</Link></td>

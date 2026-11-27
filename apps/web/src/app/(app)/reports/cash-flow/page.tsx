@@ -30,7 +30,7 @@ export default async function CashFlowPage({ searchParams }: PageProps<"/reports
         {!cf ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Cash flow statement">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <ReportHeader title="Cash flow statement (indirect method)" period={rangeLabel(period.picked, period.ctx.calendar)} />
+              <ReportHeader title="Cash flow statement (indirect method)" period={rangeLabel(period.picked, period.ctx)} />
               {cf.balanced ? <Pill tone="good">Agrees with the cash accounts</Pill> : <Pill tone="bad">Does not agree with the cash accounts</Pill>}
             </div>
             <div className="overflow-x-auto">
@@ -83,7 +83,7 @@ async function DirectPage({ period, params, link }: { period: Awaited<ReturnType
         {!cf ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Cash flow statement, direct method">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <ReportHeader title="Cash flow statement (direct method)" period={rangeLabel(period.picked, period.ctx.calendar)} />
+              <ReportHeader title="Cash flow statement (direct method)" period={rangeLabel(period.picked, period.ctx)} />
               {cf.balanced ? <Pill tone="good">Agrees with the cash accounts</Pill> : <Pill tone="bad">Does not agree with the cash accounts</Pill>}
             </div>
             <div className="overflow-x-auto">

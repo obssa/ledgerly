@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getTaxDepreciation } from "@/lib/data";
@@ -27,7 +28,7 @@ export default async function TaxDepreciationPage({ searchParams }: PageProps<"/
           <form className="mb-4 flex flex-wrap items-end gap-2.5" action="/fixed-assets/tax">
             <div><label className="field-label" htmlFor="year_end">Year ending</label><input className="field" id="year_end" name="year_end" type="date" defaultValue={year.to} /></div>
             <button type="submit" className="btn">Show</button>
-            <p className="text-[13px] text-muted">From <span className="num">{year.from}</span> to <span className="num">{year.to}</span>. Each asset by its tax rule, or its book rule when it has none.</p>
+            <p className="text-[13px] text-muted">From <span className="num"><Dt v={year.from} /></span> to <span className="num"><Dt v={year.to} /></span>. Each asset by its tax rule, or its book rule when it has none.</p>
           </form>
           <Card className="!p-2" label="Tax depreciation schedule">
             {year.rows.length === 0 ? <p className="p-3 text-sm text-muted">No assets in this year.</p> : (
@@ -47,7 +48,7 @@ export default async function TaxDepreciationPage({ searchParams }: PageProps<"/
                       <tr key={r.id}>
                         <td>
                           <Link href={`/fixed-assets/${encodeURIComponent(r.id)}`} className="font-semibold hover:underline"><span className="num">{r.code}</span> {r.name}</Link>
-                          {r.disposed_on && <span className="block text-[12px] text-muted">Disposed of on <span className="num">{r.disposed_on}</span></span>}
+                          {r.disposed_on && <span className="block text-[12px] text-muted">Disposed of on <span className="num"><Dt v={r.disposed_on} /></span></span>}
                         </td>
                         <td className="text-[13px]">
                           {RULE[r.tax_rule.method] ?? r.tax_rule.method}

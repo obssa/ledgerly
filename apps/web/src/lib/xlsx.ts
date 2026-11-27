@@ -10,6 +10,16 @@ import type { Cell } from "./csv";
  */
 
 const NUMBER = /^-?\d+(\.\d+)?$/;
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Excel's own date formats for the company's (Settings, Date format). */
+const EXCEL_DATE: Record<string, string> = { "DD/MM/YYYY": "dd/mm/yyyy", "MM/DD/YYYY": "mm/dd/yyyy", "YYYY-MM-DD": "yyyy-mm-dd" };
+
+/** Days since 30 December 1899: what Excel stores a date as. */
+export function excelSerial(iso: string): number {
+  const [, y, m, d] = ISO_DAY.exec(iso)!.map(Number);
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86_400_000);
+}
 
 const escapeXml = (text: string) =>
   text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string)
@@ -31,6 +41,7 @@ export function columnName(index: number): string {
 function cellXml(value: Cell, ref: string, text: boolean, bold: boolean): string {
   if (value === null || value === undefined || value === "") return "";
   const s = String(value);
+  if (!text && ISO_DAY.test(s)) return `<c r="${ref}" s="3"><v>${excelSerial(s)}</v></c>`;
   if (!text && (typeof value === "number" || NUMBER.test(s))) {
     const style = s.includes(".") ? ' s="2"' : "";
     return `<c r="${ref}"${style}><v>${s}</v></c>`;
@@ -51,11 +62,11 @@ export function sheetXml(rows: Cell[][], headingRow = 0): string {
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="${headingRow + 1}" topLeftCell="A${headingRow + 2}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${cols}</cols><sheetData>${body}</sheetData></worksheet>`;
 }
 
-const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+const styles = (dateFormat: string) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="${EXCEL_DATE[dateFormat] ?? "dd/mm/yyyy"}"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 
 /** The workbook's files, by name. The sheet name is cut to Excel's 31 characters and cleared of the ones it refuses. */
-export function workbookFiles(sheetName: string, rows: Cell[][], headingRow = 0): Record<string, string> {
+export function workbookFiles(sheetName: string, rows: Cell[][], headingRow = 0, dateFormat = "DD/MM/YYYY"): Record<string, string> {
   const name = escapeXml((sheetName.replace(/[\\/?*[\]:]/g, " ").trim() || "Report").slice(0, 31));
   return {
     "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -66,7 +77,7 @@ export function workbookFiles(sheetName: string, rows: Cell[][], headingRow = 0)
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${name}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
     "xl/_rels/workbook.xml.rels": `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
-    "xl/styles.xml": STYLES,
+    "xl/styles.xml": styles(dateFormat),
     "xl/worksheets/sheet1.xml": sheetXml(rows, headingRow),
   };
 }
@@ -119,6 +130,6 @@ export function zip(files: Record<string, string>): Uint8Array {
   return new Uint8Array(Buffer.concat([...parts, directory, end]));
 }
 
-export function toXlsx(sheetName: string, rows: Cell[][], headingRow = 0): Uint8Array {
-  return zip(workbookFiles(sheetName, rows, headingRow));
+export function toXlsx(sheetName: string, rows: Cell[][], headingRow = 0, dateFormat = "DD/MM/YYYY"): Uint8Array {
+  return zip(workbookFiles(sheetName, rows, headingRow, dateFormat));
 }

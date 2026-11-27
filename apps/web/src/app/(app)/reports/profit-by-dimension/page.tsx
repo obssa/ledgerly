@@ -30,7 +30,7 @@ export default async function ProfitByDimensionPage({ searchParams }: PageProps<
         <ReportsNav current="/reports/profit-by-dimension" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Profit by dimension">
-            <div className="px-3 pt-3"><ReportHeader title={`Profit by ${label.toLowerCase()}`} period={rangeLabel(period.picked, period.ctx.calendar)} /></div>
+            <div className="px-3 pt-3"><ReportHeader title={`Profit by ${label.toLowerCase()}`} period={rangeLabel(period.picked, period.ctx)} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">{label}</th><th scope="col" className="!text-right">Income</th><th scope="col" className="!text-right">Cost of sales</th>

@@ -32,6 +32,7 @@ export const demoCompanySettings: CompanySettings = {
   timezone: "Africa/Addis_Ababa",
   accounting_basis: "accrual",
   calendar: "gregorian",
+  date_format: "DD/MM/YYYY",
   fiscal_year_start_month: 7,
   conversion_date: "2026-07-07",
   books_closed_until: "2026-09-30",

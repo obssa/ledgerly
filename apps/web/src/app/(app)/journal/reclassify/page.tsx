@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
@@ -35,7 +36,7 @@ export default async function ReclassifyPage({ searchParams }: PageProps<"/journ
           {gl?.truncated && <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">Only the first lines of a long period are shown: choose a shorter period.</p>}
           {filters.account_id && (
             <Card label="Lines to move">
-              <h2 className="mb-3 text-[15px] font-bold">{account ? <><span className="num">{account.code}</span> {account.name}</> : "Lines"}, {filters.from} to {filters.to}</h2>
+              <h2 className="mb-3 text-[15px] font-bold">{account ? <><span className="num">{account.code}</span> {account.name}</> : "Lines"}, <Dt v={filters.from} /> to <Dt v={filters.to} /></h2>
               <ReclassifyForm fromAccountId={filters.account_id} accounts={accounts}
                 lines={(account?.lines ?? []).map((l) => ({ ...l, movable: l.status === "posted" && l.source_type !== "reversal" }))} />
             </Card>

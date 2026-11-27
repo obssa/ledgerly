@@ -27,7 +27,7 @@ final class SetUpCompany
     /**
      * @param array{organisation_id?: string, legal_name: string, trading_name?: ?string, country_code: string,
      *              industry?: ?string, tin?: ?string, vat_registered?: bool, vat_number?: ?string,
-     *              calendar?: string, fiscal_year_start_month?: int, base_currency?: string, timezone?: string,
+     *              calendar?: string, date_format?: ?string, fiscal_year_start_month?: int, base_currency?: string, timezone?: string,
      *              phone?: ?string, email?: ?string, website?: ?string, conversion_date?: ?string, legal_form?: ?string,
      *              address_line1?: ?string, address_line2?: ?string, city?: ?string, region?: ?string, postal_code?: ?string} $data
      */
@@ -76,6 +76,10 @@ final class SetUpCompany
                 'region' => $data['region'] ?? null,
                 'postal_code' => $data['postal_code'] ?? null,
             ]);
+            // How dates are written (Settings, Date format): day first unless chosen otherwise.
+            if (! empty($data['date_format'])) {
+                $company->settings = ['date_format' => (string) $data['date_format']];
+            }
             $company->id = $companyId;
             $company->save();
 

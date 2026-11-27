@@ -1,5 +1,7 @@
 "use server";
 
+import { companyDate } from "@/lib/data";
+
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
@@ -114,7 +116,7 @@ export async function importStatement(_: FormState | undefined, form: FormData):
   }
   refresh();
   const skipped = result.skipped > 0 ? `; ${result.skipped} already imported, skipped` : "";
-  return { notice: `Imported ${result.imported} line${result.imported === 1 ? "" : "s"} from ${result.from} to ${result.to}${skipped}.` };
+  return { notice: `Imported ${result.imported} line${result.imported === 1 ? "" : "s"} from ${await companyDate(result.from)} to ${await companyDate(result.to)}${skipped}.` };
 }
 
 const STEPS = { match: "Matched.", categorise: "Categorised and posted.", split: "Split and posted in one entry.", exclude: "Excluded.", undo: "Back to review." } as const;
@@ -218,7 +220,7 @@ export async function saveReconciliation(_: FormState | undefined, form: FormDat
     if (text(form, "intent") === "finish") {
       const done = await ledgerly.completeReconciliation(id, ctx);
       refresh();
-      return { notice: `Reconciled to ${done.statement_date}. The account is locked through that date.` };
+      return { notice: `Reconciled to ${await companyDate(done.statement_date)}. The account is locked through that date.` };
     }
   } catch (error) {
     refresh();

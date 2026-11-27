@@ -1,5 +1,7 @@
 "use server";
 
+import { companyDate } from "@/lib/data";
+
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
@@ -42,7 +44,7 @@ export async function settleTaxReturn(_: FormState | undefined, form: FormData):
   try {
     const done = await ledgerly.settleTaxReturn(text(form, "id") ?? "", { date: text(form, "date") ?? "", bank_account_id: text(form, "bank_account_id") ?? null }, ctx);
     refresh();
-    return { notice: `Settled on ${done.settled_on}${done.settlement ? ` (entry #${done.settlement.number})` : ""}.` };
+    return { notice: `Settled on ${await companyDate(done.settled_on)}${done.settlement ? ` (entry #${done.settlement.number})` : ""}.` };
   } catch (error) {
     return refusal(error);
   }

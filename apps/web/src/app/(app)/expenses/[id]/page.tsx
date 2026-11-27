@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -26,7 +27,7 @@ export default async function ExpensePage({ params, searchParams }: PageProps<"/
         <Card className="min-w-0 flex-[2_1_560px]" label="Expense">
           <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 text-sm">
             <div><dt className="text-muted">Paid to</dt><dd><Link href={`/suppliers/${encodeURIComponent(expense.contact.id)}`} className="font-bold hover:underline">{expense.contact.name}</Link></dd></div>
-            <div><dt className="text-muted">Date</dt><dd className="num">{expense.issue_date}</dd></div>
+            <div><dt className="text-muted">Date</dt><dd className="num"><Dt v={expense.issue_date} /></dd></div>
             <div><dt className="text-muted">Receipt</dt><dd className="num">{expense.reference ?? "—"}</dd></div>
             <div><dt className="text-muted">Paid from</dt><dd>{expense.paid_from ? `${expense.paid_from.code} ${expense.paid_from.name}` : "—"}</dd></div>
             <div><dt className="text-muted">Paid by</dt><dd>{expense.payment_method.replace("_", " ")}</dd></div>

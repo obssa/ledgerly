@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -34,7 +35,7 @@ export default async function GoodsReceivedPage({ searchParams }: PageProps<"/go
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td className="num">{r.received_on}</td>
+                    <td className="num"><Dt v={r.received_on} /></td>
                     <td className="num font-semibold"><Link href={`/goods-received/${encodeURIComponent(r.id)}`} className="hover:underline">{r.number}</Link></td>
                     <td>{r.supplier}</td>
                     <td className="num"><Link href={`/purchase-orders/${encodeURIComponent(r.purchase_order_id)}`} className="hover:underline">{r.order_number ?? "—"}</Link></td>

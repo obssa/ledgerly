@@ -1,3 +1,6 @@
+import { DatePrefsProvider } from "@/components/DatePrefs";
+import { pickDateFormat } from "@/lib/dates";
+import { Dt } from "@/components/Dt";
 import { Suspense } from "react";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formatAmount, formatMoney } from "@/lib/format";
@@ -33,9 +36,11 @@ async function Invoice({ searchParams }: Pick<PageProps<"/invoice">, "searchPara
     throw error;
   }
   const i = view.invoice;
+  // The company's date format and calendar (Settings), as the customer should read its dates.
+  const prefs = { calendar: view.company.calendar ?? "gregorian", dateFormat: pickDateFormat(view.company.date_format) } as const;
 
   return (
-    <>
+    <DatePrefsProvider prefs={prefs}>
       {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI from the API, the company's own logo */}
       {view.company.logo && <img src={view.company.logo} alt="" className="mb-2 max-h-[56px] max-w-[200px] object-contain" />}
       <p className="text-[13px] text-muted">An invoice from</p>
@@ -44,8 +49,8 @@ async function Invoice({ searchParams }: Pick<PageProps<"/invoice">, "searchPara
       <dl className="mt-3 grid grid-cols-2 gap-1 text-[13px]">
         <dt className="text-muted">Invoice no.</dt><dd className="num text-right font-semibold">{i.number}</dd>
         <dt className="text-muted">Bill to</dt><dd className="text-right">{view.customer}</dd>
-        <dt className="text-muted">Invoice date</dt><dd className="num text-right">{i.issue_date}</dd>
-        {i.due_date && <><dt className="text-muted">Due date</dt><dd className="num text-right">{i.due_date}</dd></>}
+        <dt className="text-muted">Invoice date</dt><dd className="num text-right"><Dt v={i.issue_date} /></dd>
+        {i.due_date && <><dt className="text-muted">Due date</dt><dd className="num text-right"><Dt v={i.due_date} /></dd></>}
       </dl>
       <ul className="mt-3 divide-y divide-line border-y border-line text-[13px]">
         {i.lines.map((l, n) => (
@@ -68,8 +73,8 @@ async function Invoice({ searchParams }: Pick<PageProps<"/invoice">, "searchPara
       <a className="btn btn-primary mt-4 w-full justify-center" href={`/invoice/pdf?token=${token}`}>Download the PDF</a>
       <p className="mt-3 text-[12px] text-muted">
         To pay, or with a question, contact {view.company.name}{view.company.phone ? ` on ${view.company.phone}` : ""}{view.company.email ? ` or at ${view.company.email}` : ""}.
-        This link works until {view.expires_at.slice(0, 10)}.
+        This link works until <Dt v={view.expires_at} />.
       </p>
-    </>
+    </DatePrefsProvider>
   );
 }

@@ -74,6 +74,7 @@ final class CompanyController extends Controller
             'website' => ['nullable', 'url', 'max:200'],
             'calendar' => ['nullable', Rule::in(['gregorian', 'ethiopian'])],
             'timezone' => ['nullable', 'timezone'],
+            'date_format' => ['nullable', Rule::in(\App\Support\DateFormat::FORMATS)],
             'fiscal_year_start_month' => ['required', 'integer', 'between:1,12'],
             // Last bank statement date before switching to Evenbooks: opening balances are entered as at this date.
             // The company's time zone is not set yet: no later than today anywhere (UTC+14).

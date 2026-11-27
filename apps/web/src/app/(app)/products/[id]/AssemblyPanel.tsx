@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { useActionState, useState } from "react";
 import type { ItemAssembly } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
@@ -77,7 +79,7 @@ export function AssemblyPanel({ itemId, itemName, assembly, choices, warehouses 
         <ul className="mt-4 text-[13px]">
           {assembly.builds.map((b) => (
             <li key={b.id} className="flex justify-between gap-2 border-t border-line py-1.5">
-              <span><span className="num">{b.built_on}</span> · {Number(b.quantity)} in {b.warehouse}{b.reference ? ` · ${b.reference}` : ""}</span>
+              <span><span className="num"><Dt v={b.built_on} /></span> · {Number(b.quantity)} in {b.warehouse}{b.reference ? ` · ${b.reference}` : ""}</span>
               <span className="num">{b.value ? formatAmount(b.value) : ""}</span>
             </li>
           ))}

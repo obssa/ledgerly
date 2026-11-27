@@ -28,7 +28,7 @@ export default async function TrialBalancePage({ searchParams }: PageProps<"/rep
       <AsOfFilter picked={at.picked} keep={q} />
       {!rows ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <Card className="!p-2" label="Trial balance">
-          <div className="px-3 pt-3"><ReportHeader title="Trial balance" period={asOfLabel(asOf, at.ctx.calendar)} /></div>
+          <div className="px-3 pt-3"><ReportHeader title="Trial balance" period={asOfLabel(asOf, at.ctx)} /></div>
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead><tr><th scope="col">Code</th><th scope="col">Account</th><th scope="col" className="!text-right">Debit</th><th scope="col" className="!text-right">Credit</th></tr></thead>

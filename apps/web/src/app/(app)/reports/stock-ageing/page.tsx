@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import Link from "@/components/Link";
 import { asOfLabel } from "@/lib/periods";
@@ -42,7 +43,7 @@ export default async function StockAgeingPage({ searchParams }: PageProps<"/repo
               ))}
             </div>
             <Card className="!p-2" label="Stock on hand by days since it last sold">
-              <div className="px-3 pt-3"><ReportHeader title="Stock ageing" period={asOfLabel(r.as_of, at.ctx.calendar)} filters={[r.warehouse?.name ?? "All warehouses", "Values at cost"]} /></div>
+              <div className="px-3 pt-3"><ReportHeader title="Stock ageing" period={asOfLabel(r.as_of, at.ctx)} filters={[r.warehouse?.name ?? "All warehouses", "Values at cost"]} /></div>
               <div className="overflow-x-auto">
                 <table className="tbl">
                   <thead><tr><th scope="col">Item</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Value</th>
@@ -57,8 +58,8 @@ export default async function StockAgeingPage({ searchParams }: PageProps<"/repo
                             {x.item.sku && <span className="block text-[11px] text-muted">{x.item.sku}</span>}</td>
                           <td className="num text-right">{formatAmount(x.quantity)} {x.item.unit}</td>
                           <td className="num text-right font-semibold">{formatAmount(x.value)}</td>
-                          <td className="num">{x.last_sold_on ?? "—"}</td>
-                          <td className="num">{x.last_received_on ?? "—"}</td>
+                          <td className="num"><Dt v={x.last_sold_on} /></td>
+                          <td className="num"><Dt v={x.last_received_on} /></td>
                           <td className="num text-right">{x.days_since_sale ?? "—"}</td>
                           <td>{band?.note ? <Pill tone={band.note === "dead stock" ? "bad" : "warn"}>{band.note}</Pill> : <span className="text-[13px] text-muted">{band?.label ?? x.band}</span>}</td>
                         </tr>

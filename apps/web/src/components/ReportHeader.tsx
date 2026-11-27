@@ -30,7 +30,7 @@ export async function ReportHeader({ title, period, filters }: { title: string; 
 /** The foot of every report: the basis it is kept on, its currency, and when and by whom it was prepared. */
 export async function ReportFooter({ basis, currency }: { basis?: "accrual" | "cash" | null; currency?: string | null }) {
   const [settings, session] = await Promise.all([getCompanySettings().catch(() => null), getSession()]);
-  const prepared = preparedLabel(new Date(), settings?.timezone || "Africa/Addis_Ababa", settings?.calendar ?? "gregorian", session.name);
+  const prepared = preparedLabel(new Date(), settings?.timezone || "Africa/Addis_Ababa", { calendar: settings?.calendar ?? "gregorian", dateFormat: settings?.date_format }, session.name);
   const line = footerLine({
     company: "", title: "", period: "", prepared,
     basis: basis === null ? null : basis ?? settings?.accounting_basis ?? "accrual",

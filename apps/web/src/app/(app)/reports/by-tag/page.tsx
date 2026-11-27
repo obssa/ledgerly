@@ -26,7 +26,7 @@ export default async function ProfitByTagPage({ searchParams }: PageProps<"/repo
           {!r ? <p className="text-[14px] text-muted">Not available in the demo or for your role.</p> : r.data.length === 0 ? (
             <Card label="Profit by tag"><p className="text-sm text-muted">No tags yet. Add them under Tags, then put them on invoices, bills, expenses and journal entries.</p></Card>
           ) : (<>
-            <ReportHeader title="Profit by tag" period={rangeLabel(period.picked, period.ctx.calendar)} />
+            <ReportHeader title="Profit by tag" period={rangeLabel(period.picked, period.ctx)} />
             {r.data.map((t) => (
             <Card key={t.id} className="mb-4 !p-2" label={t.name}>
               <div className="flex flex-wrap items-baseline justify-between gap-2 px-3 pt-2">

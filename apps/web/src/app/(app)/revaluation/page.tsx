@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getRevaluationPreview, getRevaluations } from "@/lib/data";
@@ -47,7 +48,7 @@ export default async function RevaluationPage({ searchParams }: PageProps<"/reva
               </form>
               {preview?.error && <p role="alert" className="mt-3 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{preview.error}</p>}
               {preview?.preview && (
-                preview.preview.lines.length === 0 ? <p className="mt-3 text-[14px] text-muted">Nothing to revalue at {preview.preview.as_of}.</p> : (
+                preview.preview.lines.length === 0 ? <p className="mt-3 text-[14px] text-muted">Nothing to revalue at <Dt v={preview.preview.as_of} />.</p> : (
                   <>
                     <div className="mt-4 overflow-x-auto">
                       <table className="tbl">
@@ -81,10 +82,10 @@ export default async function RevaluationPage({ searchParams }: PageProps<"/reva
                   {runs.data.length === 0 && <tr><td colSpan={6} className="text-muted">No revaluation yet.</td></tr>}
                   {runs.data.map((r) => (
                     <tr key={r.id}>
-                      <td className="num">{r.as_of}</td>
+                      <td className="num"><Dt v={r.as_of} /></td>
                       <td className="num text-[13px]">{Object.entries(r.rates).map(([c, v]) => `${c} ${v}`).join(", ")}</td>
                       <td className="num"><Link href={`/journal/${encodeURIComponent(r.entry.id)}`} className="hover:underline">#{r.entry.number}</Link></td>
-                      <td className="num"><Link href={`/journal/${encodeURIComponent(r.reversal.id)}`} className="hover:underline">#{r.reversal.number}</Link> on {r.reversal.date}</td>
+                      <td className="num"><Link href={`/journal/${encodeURIComponent(r.reversal.id)}`} className="hover:underline">#{r.reversal.number}</Link> on <Dt v={r.reversal.date} /></td>
                       <td>{r.by ?? "—"}</td>
                       <td className="num text-right">{r.net.startsWith("-") ? `loss ${formatAmount(r.net.slice(1))}` : `gain ${formatAmount(r.net)}`}</td>
                     </tr>

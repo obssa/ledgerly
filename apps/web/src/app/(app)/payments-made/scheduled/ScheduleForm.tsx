@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
 import { formatAmount } from "@/lib/format";
@@ -69,7 +71,7 @@ export function ScheduleForm({ supplier, currency, bills, accounts, today, initi
                       onChange={(e) => { setTicked((t) => t.map((v, j) => (j === i ? e.target.checked : v))); setProblem(null); }} /></td>
                     <td className="num font-semibold">{b.number ?? "—"}</td>
                     <td className="num">{b.reference ?? "—"}</td>
-                    <td className={`num ${b.due_date !== null && b.due_date < today ? "font-semibold text-bad" : ""}`}>{b.due_date ?? "—"}</td>
+                    <td className={`num ${b.due_date !== null && b.due_date < today ? "font-semibold text-bad" : ""}`}><Dt v={b.due_date} /></td>
                     <td className="num text-right">{formatAmount(b.amount_due)}</td>
                     <td className="text-right">
                       <input aria-label={`Amount for ${b.number ?? "bill"}`} inputMode="decimal" className="field num ml-auto w-[130px] text-right disabled:opacity-50"

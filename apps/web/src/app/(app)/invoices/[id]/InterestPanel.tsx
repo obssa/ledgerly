@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import Link from "@/components/Link";
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
@@ -25,7 +27,7 @@ export function InterestPanel({ invoiceId, interest }: { invoiceId: string; inte
           {interest.charged.map((c) => (
             <li key={c.id}>
               <Link href={`/invoices/${encodeURIComponent(c.id)}`} className="font-semibold underline">{c.number ?? "Draft"}</Link>{" "}
-              <span className="num">{formatAmount(c.total)}</span> for <span className="num">{c.from}</span> to <span className="num">{c.through}</span>
+              <span className="num">{formatAmount(c.total)}</span> for <span className="num"><Dt v={c.from} /></span> to <span className="num"><Dt v={c.through} /></span>
               {c.status === "void" ? " (void)" : c.status === "draft" ? " (draft)" : ""}
             </li>
           ))}
@@ -34,7 +36,7 @@ export function InterestPanel({ invoiceId, interest }: { invoiceId: string; inte
       {canCharge && (
         <>
           <p className="mt-2 text-[13px] text-muted">
-            {interest.days} days from <span className="num">{interest.from}</span> at {interest.rate}% a year on <span className="num">{formatAmount(interest.owed)}</span> owed:{" "}
+            {interest.days} days from <span className="num"><Dt v={interest.from} /></span> at {interest.rate}% a year on <span className="num">{formatAmount(interest.owed)}</span> owed:{" "}
             <span className="num font-semibold text-ink">{formatAmount(interest.amount)} {interest.currency}</span>.
           </p>
           <form action={charge} className="mt-3 flex flex-wrap items-end gap-2">

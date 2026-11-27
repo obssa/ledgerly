@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { useActionState, useState } from "react";
 import type { Reconciliation } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
@@ -88,7 +90,7 @@ export function ReconcileWorkspace({ r }: { r: Reconciliation }) {
               return (
                 <tr key={id}>
                   <td><input type="checkbox" name="cleared" value={id} id={`c-${id}`} checked={Boolean(ticked[id])} onChange={(e) => setTicked({ ...ticked, [id]: e.target.checked })} /></td>
-                  <td className="num"><label htmlFor={`c-${id}`}>{l.date}</label></td>
+                  <td className="num"><label htmlFor={`c-${id}`}><Dt v={l.date} /></label></td>
                   <td className="num">#{l.entry}</td>
                   <td>{l.memo ?? l.source_type}{l.on_statement && <span className="ml-2 text-[12px] font-semibold text-brand">on the statement</span>}</td>
                   <td>{l.contact ?? "—"}</td>

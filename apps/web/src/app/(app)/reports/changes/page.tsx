@@ -1,9 +1,10 @@
+import { Dt } from "@/components/Dt";
 import { rangeLabel } from "@/lib/periods";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getAuditLog, getCompanySettings, getReportPeriod } from "@/lib/data";
+import { getAuditLog, getReportPeriod } from "@/lib/data";
 import { actionLabel, changesOf } from "@/lib/history";
 import { ReportsNav } from "../ReportsNav";
 
@@ -22,9 +23,8 @@ export default async function ChangesReport({ searchParams }: PageProps<"/report
   const period = await getReportPeriod(q, "all");
   const filters = { from: period.picked.from ?? undefined, to: period.picked.to ?? undefined, user_id: typeof q.user_id === "string" && /^[0-9a-f-]{36}$/.test(q.user_id) ? q.user_id : undefined,
     before_id: typeof q.before_id === "string" && /^\d{1,18}$/.test(q.before_id) ? q.before_id : undefined };
-  const [log, settings] = await Promise.all([getAuditLog({ ...filters, group: "document_changes" }), getCompanySettings()]);
-  const zone = settings.timezone || "Africa/Addis_Ababa";
-  const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: zone });
+  const log = await getAuditLog({ ...filters, group: "document_changes" });
+  const when = (iso: string) => <Dt v={iso} time />;
   const more = (id: number) => `/reports/changes?${new URLSearchParams(Object.entries({ ...filters, before_id: String(id) }).filter(([, v]) => v) as [string, string][]).toString()}`;
 
   return (
@@ -43,7 +43,7 @@ export default async function ChangesReport({ searchParams }: PageProps<"/report
                   </select></div>
               </DateRangeFilter>
               <Card className="!p-2" label="Changes">
-                <div className="px-3 pt-3"><ReportHeader title="Changes: who changed what" period={rangeLabel(period.picked, period.ctx.calendar)} /></div>
+                <div className="px-3 pt-3"><ReportHeader title="Changes: who changed what" period={rangeLabel(period.picked, period.ctx)} /></div>
                 <div className="overflow-x-auto">
                   <table className="tbl">
                     <thead><tr><th scope="col">When</th><th scope="col">Document</th><th scope="col">What happened</th><th scope="col">By</th><th scope="col">What changed</th><th scope="col">Reason</th></tr></thead>

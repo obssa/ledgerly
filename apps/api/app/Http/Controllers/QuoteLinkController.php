@@ -42,6 +42,7 @@ final class QuoteLinkController extends Controller
 
             return response()->json([
                 'company' => ['name' => (string) ($company->trading_name ?: $company->legal_name), 'tin' => $company->tin, 'email' => $company->email, 'phone' => $company->phone,
+                    'date_format' => \App\Support\DateFormat::of($company), 'calendar' => (string) $company->calendar,
                     'logo' => app(\App\Domain\Tenancy\CompanyLogo::class)->dataUri((string) $company->getKey())],   // 100
                 'customer' => $quote->contact?->name,
                 'quote' => [

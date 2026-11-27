@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getStockBatches } from "@/lib/data";
@@ -34,7 +35,7 @@ export default async function BatchesPage({ searchParams }: PageProps<"/inventor
                   <tr key={`${r.batch_id}-${r.warehouse_id}`}>
                     <td><Link href={`/products/${encodeURIComponent(r.item_id)}`} className="hover:underline">{r.item_name}</Link></td>
                     <td className="num font-semibold">{r.number}</td>
-                    <td className="num">{r.expires_on ?? "—"} {r.expired && <Pill tone="bad">Expired</Pill>}</td>
+                    <td className="num"><Dt v={r.expires_on} /> {r.expired && <Pill tone="bad">Expired</Pill>}</td>
                     <td>{r.warehouse}</td>
                     <td className="num text-right">{r.quantity} {r.unit}</td>
                   </tr>

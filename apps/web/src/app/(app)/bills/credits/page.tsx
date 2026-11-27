@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -31,7 +32,7 @@ export default async function SupplierCreditsPage({ searchParams }: PageProps<"/
                 const s = creditStatus(c);
                 return (
                   <tr key={c.id}>
-                    <td className="num">{c.issue_date}</td>
+                    <td className="num"><Dt v={c.issue_date} /></td>
                     <td className="num font-semibold"><Link href={`/bills/${encodeURIComponent(c.id)}`} className="hover:underline">{c.number ?? <span className="text-muted">Draft</span>}</Link></td>
                     <td>{c.contact.name}</td>
                     <td className="num">{c.reference ?? "—"}</td>

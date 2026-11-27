@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
 import type { InvoiceWriteOff } from "@/lib/api";
@@ -29,8 +31,8 @@ export function BadDebtPanel({ invoiceId, writeOffs, canManage, owed, issueDate 
         <ul className="mt-2 flex flex-col gap-1 text-[13px]">
           {writeOffs.map((w) => (
             <li key={w.id}>
-              <span className="num font-semibold">{formatAmount(w.amount)}</span> written off on <span className="num">{w.written_off_on}</span>: {w.reason}
-              {w.reversed_on && <>; reversed on <span className="num">{w.reversed_on}</span></>}
+              <span className="num font-semibold">{formatAmount(w.amount)}</span> written off on <span className="num"><Dt v={w.written_off_on} /></span>: {w.reason}
+              {w.reversed_on && <>; reversed on <span className="num"><Dt v={w.reversed_on} /></span></>}
             </li>
           ))}
         </ul>

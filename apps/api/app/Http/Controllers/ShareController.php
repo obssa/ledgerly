@@ -38,7 +38,7 @@ final class ShareController extends Controller
         $url = rtrim((string) config('security.frontend_url'), '/') . '/invoice?token=' . $token;
         $money = number_format((float) ($invoice->status === 'paid' ? $invoice->total : $invoice->amount_due), 2);
         $text = "{$this->company()}: invoice {$invoice->number}, " . ($invoice->status === 'paid' ? "{$invoice->currency} {$money}, paid. Thank you."
-            : "{$invoice->currency} {$money} due" . ($invoice->due_date ? ' by ' . $invoice->due_date->format('j M Y') : '') . '.') . " See it and download the PDF: {$url}";
+            : "{$invoice->currency} {$money} due" . ($invoice->due_date ? ' by ' . \App\Support\DateFormat::format($invoice->due_date, $this->current->get()) : '') . '.') . " See it and download the PDF: {$url}";
 
         return $this->shared($request, $invoice, 'invoice_shared', $url, $text, $expires->toIso8601String());
     }
@@ -60,7 +60,7 @@ final class ShareController extends Controller
         DB::select('SELECT quote_link_issue(?, ?, ?)', [$quote->getKey(), hash('sha256', $token), $expires->toIso8601String()]);   // replaces its unanswered links (065)
         $url = rtrim((string) config('security.frontend_url'), '/') . '/quote?token=' . $token;
         $text = "{$this->company()}: quote {$quote->number}, {$quote->currency} " . number_format((float) $quote->total, 2)
-            . ($quote->due_date ? ', valid until ' . $quote->due_date->format('j M Y') : '') . ". See it and accept or decline it online: {$url}";
+            . ($quote->due_date ? ', valid until ' . \App\Support\DateFormat::format($quote->due_date, $company) : '') . ". See it and accept or decline it online: {$url}";
 
         return $this->shared($request, $quote, 'quote_shared', $url, $text, $expires->toIso8601String());
     }

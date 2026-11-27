@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { AccountTabs } from "../AccountTabs";
 import { notFound } from "next/navigation";
@@ -49,7 +50,7 @@ export default async function StatementPage({ params, searchParams }: PageProps<
                 const amount = signed(l.amount);
                 return (
                   <tr key={l.id} className="align-top">
-                    <td className="num">{l.date}</td>
+                    <td className="num"><Dt v={l.date} /></td>
                     <td>
                       <div className="font-semibold">{l.description}</div>
                       {l.reference && <div className="num text-[13px] text-muted">{l.reference}</div>}

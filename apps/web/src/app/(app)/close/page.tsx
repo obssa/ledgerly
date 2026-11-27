@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCloseChecklist, getYearEnd } from "@/lib/data";
@@ -54,7 +55,7 @@ export default async function ClosePage({ searchParams }: PageProps<"/close">) {
               <ul className="grid gap-1.5 text-[14px]">
                 {yearEnd.years.map((y) => (
                   <li key={y.id} className="flex flex-wrap items-center gap-2">
-                    <span className="num">{y.starts_on} to {y.ends_on}</span>
+                    <span className="num"><Dt v={y.starts_on} /> to <Dt v={y.ends_on} /></span>
                     <Pill tone={y.status === "closed" ? "good" : y.status === "reopened" ? "warn" : "neutral"}>{y.status === "closed" ? "Closed" : y.status === "reopened" ? "Reopened" : "Open"}</Pill>
                     {y.closed_by && y.status === "closed" && <span className="text-[13px] text-muted">by {y.closed_by}</span>}
                     {y.adjustments_closed_at && <Pill tone="good">Audit signed off</Pill>}
@@ -68,14 +69,14 @@ export default async function ClosePage({ searchParams }: PageProps<"/close">) {
               </ul>
               {yearEnd.closing && (
                 <div className="mt-4 border-t border-line pt-4">
-                  <h3 className="mb-2 text-[14px] font-bold">Close the year to <span className="num">{yearEnd.closing.year.ends_on}</span></h3>
+                  <h3 className="mb-2 text-[14px] font-bold">Close the year to <span className="num"><Dt v={yearEnd.closing.year.ends_on} /></span></h3>
                   <p className="mb-2 text-[14px]">{yearEnd.closing.net_profit.startsWith("-") ? "Loss" : "Profit"} of the year: <span className="num font-semibold">{formatAmount(yearEnd.closing.net_profit.replace("-", ""))}</span>, from {yearEnd.closing.lines.length} income and expense account{yearEnd.closing.lines.length === 1 ? "" : "s"}.</p>
                   <CloseYear id={yearEnd.closing.year.id} endsOn={yearEnd.closing.year.ends_on} netProfit={yearEnd.closing.net_profit} />
                 </div>
               )}
               {yearEnd.years.filter((y) => y.can_reopen).map((y) => (
                 <div key={y.id} className="mt-4 border-t border-line pt-4">
-                  <h3 className="mb-2 text-[14px] font-bold">Reopen the year to <span className="num">{y.ends_on}</span></h3>
+                  <h3 className="mb-2 text-[14px] font-bold">Reopen the year to <span className="num"><Dt v={y.ends_on} /></span></h3>
                   <ReopenYear id={y.id} />
                 </div>
               ))}

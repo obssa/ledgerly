@@ -1,3 +1,7 @@
+import { fromGregorian, toGregorian } from "@/lib/ethiopian";
+import { formatDate, type DatePrefs } from "@/lib/dates";
+import { shiftDay, splitRange, type Calendar } from "@/lib/periods";
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { connection } from "next/server";
 import { Card, PageTitle, Pill, Stat } from "@/components/ui";
@@ -27,17 +31,15 @@ async function optional<T>(load: () => Promise<T>): Promise<T | null> {
   }
 }
 
-const iso = (d: Date) => d.toISOString().slice(0, 10);
 const monthName = (d: Date, long = false) => d.toLocaleDateString("en-GB", { month: long ? "long" : "short", timeZone: "UTC" });
 
-/** The last six months, this one to today. */
-function lastMonths(today: string, count = 6): { label: string; from: string; to: string }[] {
-  const t = new Date(`${today}T00:00:00Z`);
-  return Array.from({ length: count }, (_, k) => {
-    const start = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - (count - 1 - k), 1));
-    const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
-    return { label: monthName(start), from: iso(start), to: iso(end < t ? end : t) };
-  });
+/** The last six months of the company's calendar (Gregorian or Ethiopian), this one to today. */
+function lastMonths(today: string, calendar: Calendar, count = 6): { label: string; from: string; to: string }[] {
+  const back = shiftDay(today, -(count - 1), calendar);
+  const e = fromGregorian(back);
+  const first = calendar === "ethiopian" ? toGregorian(e.year, Math.min(e.month, 12), 1) : `${back.slice(0, 8)}01`;
+  const months = splitRange({ from: first, to: today }, "month", calendar) ?? [];
+  return months.slice(-count).map((m) => ({ ...m, label: m.label.split(" ")[0] }));
 }
 
 const sum = (...values: string[]) => toString(values.reduce((acc, v) => acc + parse(v), 0n));
@@ -56,12 +58,15 @@ export default async function OverviewPage() {
   ]);
   firstRound?.catch(() => {}); // awaited below; a failure is reported there, not as an unhandled rejection
   // Today, written in the calendar chosen in Settings (Gregorian or Ethiopian), never both.
-  const [invoices, { today: todayIso, calendar }] = await Promise.all([
+  const [invoices, { today: todayIso, calendar, dateFormat, timezone }] = await Promise.all([
     getInvoices(),
-    demo ? { today: "2026-11-02", calendar: "gregorian" as const } : getCompanyDay(),
+    demo ? { today: "2026-11-02", calendar: "gregorian" as const, dateFormat: "DD/MM/YYYY" as const, timezone: "Africa/Addis_Ababa" } : getCompanyDay(),
   ]);
   const today = new Date(`${todayIso}T00:00:00Z`);
-  const hour = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Africa/Addis_Ababa" }));
+  // The greeting by the hour where the company is (Settings, Time zone).
+  const hourIn = (zone: string) => Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: zone }).format(new Date()));
+  let hour: number;
+  try { hour = hourIn(timezone || "Africa/Addis_Ababa"); } catch { hour = hourIn("Africa/Addis_Ababa"); }
   const firstName = demo ? "Hana" : ((await getSession()).name ?? "").split(" ")[0];
 
   const overdue = invoices
@@ -69,7 +74,7 @@ export default async function OverviewPage() {
     .sort((a, b) => daysOverdue(b.due_date, today) - daysOverdue(a.due_date, today))
     .slice(0, 6);
 
-  const months = lastMonths(todayIso);
+  const months = lastMonths(todayIso, calendar);
   const [[kpis, forecast, ar, ap, banks], pnl] = firstRound
     ? await Promise.all([firstRound, Promise.all(months.map((m) => optional(() => getProfitAndLoss({ from: m.from, to: m.to }))))])
     : [[null, null, null, null, null], null];
@@ -86,7 +91,7 @@ export default async function OverviewPage() {
   return (
     <>
       <PageTitle
-        eyebrow={formatLongDate(today, calendar)}
+        eyebrow={formatLongDate(today, { calendar, dateFormat })}
         title={firstName ? `${greeting(hour)}, ${firstName}` : greeting(hour)}
         description="Where the business stands today: cash, who owes whom, and what the next weeks look like."
         actions={
@@ -110,7 +115,7 @@ export default async function OverviewPage() {
               <Empty text="Profit and loss appears here for roles that can see reports." />
             )}
           </Card>
-          <Attention k={kpis} forecast={forecast} overdueCount={kpis?.receivable.overdue_count ?? overdue.length} />
+          <Attention k={kpis} forecast={forecast} overdueCount={kpis?.receivable.overdue_count ?? overdue.length} prefs={{ calendar, dateFormat }} />
         </div>
       )}
 
@@ -160,7 +165,7 @@ export default async function OverviewPage() {
                     <tr key={inv.id}>
                       <td className="!pl-5 font-semibold"><Link href={`/invoices/${inv.id}`} className="text-ink no-underline hover:underline">{inv.contact.name}</Link></td>
                       <td className="num">{inv.number ?? <span className="text-muted">Draft</span>}</td>
-                      <td className="num text-muted">{inv.due_date}</td>
+                      <td className="num text-muted"><Dt v={inv.due_date} /></td>
                       <td><Pill tone={days > 30 ? "bad" : "warn"}>{days} days</Pill></td>
                       <td className="num !pr-5 text-right font-semibold">{formatMoney(inv.amount_due, inv.currency)}</td>
                     </tr>
@@ -231,11 +236,11 @@ function KeyFigures({ k }: { k: Kpis }) {
 }
 
 /** What needs doing, from the figures already loaded: no extra calls. */
-function Attention({ k, forecast, overdueCount }: { k: Kpis | null; forecast: CashForecast | null; overdueCount: number }) {
+function Attention({ k, forecast, overdueCount, prefs }: { k: Kpis | null; forecast: CashForecast | null; overdueCount: number; prefs: DatePrefs }) {
   const items: { tone: "bad" | "warn" | "good"; title: string; note: string; href: string }[] = [];
   const cur = k?.currency ?? "ETB";
   if (forecast?.goes_below_zero && forecast.lowest) {
-    items.push({ tone: "bad", title: "Cash runs short", note: `Lowest ${formatMoney(forecast.lowest.closing, cur)} in the week of ${forecast.lowest.from}`, href: "/reports/cash-forecast" });
+    items.push({ tone: "bad", title: "Cash runs short", note: `Lowest ${formatMoney(forecast.lowest.closing, cur)} in the week of ${formatDate(forecast.lowest.from, prefs)}`, href: "/reports/cash-forecast" });
   }
   if (overdueCount > 0) items.push({ tone: "bad", title: `${overdueCount} invoice${overdueCount === 1 ? "" : "s"} overdue`, note: k ? `${formatMoney(k.receivable.overdue, cur)} to chase` : "Send reminders or statements", href: "/reports/ar-ageing" });
   if (k && k.payable.due_this_week_count > 0) items.push({ tone: "warn", title: `${k.payable.due_this_week_count} bill${k.payable.due_this_week_count === 1 ? "" : "s"} due this week`, note: `${formatMoney(k.payable.due_this_week, cur)} to pay`, href: "/payments-made/batch" });

@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCompanySettings, getCurrencies, getDimensions, getNumbering, getSubscription } from "@/lib/data";
 import { subscriptionStatus } from "@/lib/subscription";
@@ -80,7 +81,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <h2 className="text-[19px] font-bold">Fiscal year</h2>
             {year ? (
               <p className="mt-1.5 text-sm">
-                <span className="num">{year.starts_on}</span> to <span className="num">{year.ends_on}</span>{" "}
+                <span className="num"><Dt v={year.starts_on} /></span> to <span className="num"><Dt v={year.ends_on} /></span>{" "}
                 <Pill tone={year.status === "open" ? "good" : "neutral"}>{year.status}</Pill>
               </p>
             ) : (
@@ -97,7 +98,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               <dl className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 text-sm">
                 <div><dt className="text-muted">Plan</dt><dd className="font-semibold">{subscription.plan_name}</dd></div>
                 <div><dt className="text-muted">Status</dt><dd><Pill tone={subscription.read_only ? "bad" : subscription.status === "active" ? "good" : "warn"}>{subscriptionStatus(subscription)}</Pill></dd></div>
-                {subscription.until && <div><dt className="text-muted">{subscription.status === "trial" ? "Trial ends" : "Paid until"}</dt><dd className="num">{subscription.until}</dd></div>}
+                {subscription.until && <div><dt className="text-muted">{subscription.status === "trial" ? "Trial ends" : "Paid until"}</dt><dd className="num"><Dt v={subscription.until} /></dd></div>}
               </dl>
               {subscription.instructions && (
                 <div className="mt-4 rounded-lg border border-line p-3 text-[13px]">

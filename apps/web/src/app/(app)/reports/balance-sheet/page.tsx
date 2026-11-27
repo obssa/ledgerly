@@ -66,7 +66,7 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
         {!bs ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Balance sheet">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <ReportHeader title="Balance sheet" period={asOfLabel(asOf, at.ctx.calendar)} filters={[before ? `Compared with ${asOfLabel(before, at.ctx.calendar).replace(/^As of /, "")}` : null]} />
+              <ReportHeader title="Balance sheet" period={asOfLabel(asOf, at.ctx)} filters={[before ? `Compared with ${asOfLabel(before, at.ctx).replace(/^As of /, "")}` : null]} />
               {bs.equation.balanced ? <Pill tone="good">Assets = Liabilities + Equity</Pill> : <Pill tone="bad">Out by {formatAmount(bs.equation.difference, cur)}</Pill>}
             </div>
             <div className="overflow-x-auto">

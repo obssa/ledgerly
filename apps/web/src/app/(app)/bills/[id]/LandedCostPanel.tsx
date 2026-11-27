@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import Link from "@/components/Link";
 import { useActionState } from "react";
 import type { LandedCosts } from "@/lib/api";
@@ -23,7 +25,7 @@ export function LandedCostPanel({ billId, landed, base }: { billId: string; land
           {landed.received.map((r) => (
             <li key={r.id}>
               <span className="num font-semibold">{formatMoney(r.amount, base)}</span> added from{" "}
-              <Link href={`/bills/${encodeURIComponent(r.cost_bill_id)}`} className="num font-semibold hover:underline">{r.cost_bill_number}</Link> on <span className="num">{r.applied_on}</span>
+              <Link href={`/bills/${encodeURIComponent(r.cost_bill_id)}`} className="num font-semibold hover:underline">{r.cost_bill_number}</Link> on <span className="num"><Dt v={r.applied_on} /></span>
             </li>
           ))}
         </ul>
@@ -52,7 +54,7 @@ export function LandedCostPanel({ billId, landed, base }: { billId: string; land
             <label className="field-label" htmlFor="goods_bill_id">The goods of</label>
             <select className="field" id="goods_bill_id" name="goods_bill_id">
               {landed.candidates.map((b) => (
-                <option key={b.id} value={b.id}>{b.number}{b.reference ? ` (${b.reference})` : ""} · {b.supplier} · {b.issue_date}</option>
+                <option key={b.id} value={b.id}>{b.number}{b.reference ? ` (${b.reference})` : ""} · {b.supplier} · <Dt v={b.issue_date} /></option>
               ))}
             </select>
           </div>

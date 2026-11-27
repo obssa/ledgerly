@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { AccountTabs } from "../AccountTabs";
 import { notFound } from "next/navigation";
@@ -48,7 +49,7 @@ export default async function ReconcilePage({ params }: PageProps<"/banking/[id]
               {list.data.length === 0 && <tr><td colSpan={5} className="text-muted">No reconciliations yet.</td></tr>}
               {list.data.map((r) => (
                 <tr key={r.id}>
-                  <td className="num font-semibold"><Link href={href(r.id)} className="hover:underline">{r.statement_date}</Link></td>
+                  <td className="num font-semibold"><Link href={href(r.id)} className="hover:underline"><Dt v={r.statement_date} /></Link></td>
                   <td><Pill tone={STATUS[r.status][1]}>{STATUS[r.status][0]}</Pill></td>
                   <td className="num text-right">{formatAmount(r.opening_balance)}</td>
                   <td className="num text-right">{formatAmount(r.ending_balance)}</td>

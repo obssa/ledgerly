@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { AccountTabs } from "../AccountTabs";
 import { notFound } from "next/navigation";
@@ -50,9 +51,9 @@ export default async function ChequesPage({ params, searchParams }: PageProps<"/
               {register.data.map((c) => (
                 <tr key={c.id}>
                   <td className="num font-semibold"><Link href={detail(c)} className="hover:underline">{c.number ?? "—"}</Link></td>
-                  <td className="num">{c.date}</td>
+                  <td className="num"><Dt v={c.date} /></td>
                   <td>{c.contact ?? "—"}</td>
-                  <td><Pill tone={STATUS[c.status][1]}>{STATUS[c.status][0]}</Pill>{c.bounced_on && <span className="num ml-2 text-[13px] text-muted">{c.bounced_on}</span>}</td>
+                  <td><Pill tone={STATUS[c.status][1]}>{STATUS[c.status][0]}</Pill>{c.bounced_on && <span className="num ml-2 text-[13px] text-muted"><Dt v={c.bounced_on} /></span>}</td>
                   <td className="num text-right">{formatAmount(c.amount)}</td>
                 </tr>
               ))}

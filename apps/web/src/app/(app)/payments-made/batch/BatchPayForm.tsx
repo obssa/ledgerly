@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { useActionState, useMemo, useState } from "react";
 import type { Bill } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
@@ -64,7 +66,7 @@ export function BatchPayForm({ bills, accounts, currency }: { bills: Bill[]; acc
                 <tr key={b.id} className="border-t border-line">
                   <td className="py-1.5"><input type="checkbox" name={`bill.${b.id}`} aria-label={`Pay ${b.number ?? "bill"}`} checked={ticked.has(b.id)} onChange={() => toggle(b.id)} /></td>
                   <td className="py-1.5">{b.number}{b.reference && <span className="ml-1 text-[12px] text-muted">{b.reference}</span>}</td>
-                  <td className="num py-1.5">{b.due_date ?? "—"}</td>
+                  <td className="num py-1.5"><Dt v={b.due_date} /></td>
                   <td className="num py-1.5 text-right">{formatAmount(b.amount_due)}</td>
                   <td className="py-1.5 text-right">
                     <label className="sr-only" htmlFor={`amount-${b.id}`}>Amount to pay on {b.number}</label>

@@ -1,8 +1,10 @@
+import { Dt } from "@/components/Dt";
+import type { ReactNode } from "react";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { ColumnCustomizer } from "@/components/ColumnCustomizer";
-import { withoutUnusedForeign } from "@/lib/columns";
+import { isDateKey, isMomentKey, withoutUnusedForeign } from "@/lib/columns";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { ExportLink, ReportsNav } from "@/app/(app)/reports/ReportsNav";
 import { getReportPeriod, getTransactionReport } from "@/lib/data";
@@ -24,12 +26,12 @@ function href(report: TxReport, r: TxRow): string | null {
   return path[r.type] ? `/${path[r.type]}/${encodeURIComponent(r.id)}` : null;
 }
 
-function cell(key: TxColumn, r: TxRow): string {
+function cell(key: TxColumn, r: TxRow): ReactNode {
   const v = r[key];
   if (v === null || v === "") return "";
+  if (isDateKey(key) || isMomentKey(key)) return <Dt v={String(v)} time={isMomentKey(key)} />;
   if (key === "type") return typeLabel(String(v));
   if (key === "status") return statusLabel(String(v));
-  if (key === "created_at") return String(v).slice(0, 16).replace("T", " ");
   if (isMoney(key)) return formatAmount(String(v));
   return String(v);
 }
@@ -81,7 +83,7 @@ export async function TransactionReportView({ report, q }: { report: TxReport; q
           {!data ? <p className="p-3 text-[14px] text-muted">Not available in the demo or for your role.</p> : (
             <>
               <div className="px-3 pt-3">
-                <ReportHeader title={def.title} period={rangeLabel(period.picked, period.ctx.calendar)}
+                <ReportHeader title={def.title} period={rangeLabel(period.picked, period.ctx)}
                   filters={[status ? `Status: ${STATUSES.find(([s]) => s === status)?.[1]}` : null, group !== "none" ? `Grouped by ${GROUPS.find(([g]) => g === group)?.[1].toLowerCase()}` : null]} />
               </div>
               {data.truncated && <p role="status" className="mx-3 mb-3 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">The first 5,000 transactions are shown: choose a shorter period.</p>}

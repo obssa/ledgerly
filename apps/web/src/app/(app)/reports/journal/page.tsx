@@ -1,3 +1,5 @@
+import { isDateKey, isMomentKey } from "@/lib/columns";
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { ColumnCustomizer } from "@/components/ColumnCustomizer";
@@ -24,6 +26,7 @@ const def = (c: JournalColumn) => JOURNAL_COLUMNS.find((d) => d.key === c)!;
 function cell(c: JournalColumn, r: JournalRow) {
   const v = r[c];
   if (v === null || v === "") return "";
+  if (isDateKey(c) || isMomentKey(c)) return <Dt v={String(v)} time={isMomentKey(c)} />;
   if (MONEY.has(c)) return v === "0.00" && (c === "debit" || c === "credit") ? "" : formatAmount(v);
   if (c === "type") return typeLabel(v);
   if (c === "entry") return <Link href={`/journal/${encodeURIComponent(r.entry_id)}`} className="hover:underline">{v}</Link>;
@@ -71,7 +74,7 @@ export default async function JournalReportPage({ searchParams }: PageProps<"/re
           {!report ? <p className="p-3 text-[14px] text-muted">Not available in the demo, or the period ends before it starts.</p> : (
             <>
               <div className="px-3 pt-3">
-                <ReportHeader title="Journal" period={rangeLabel(period.picked, period.ctx.calendar)} filters={[source ? SOURCES.find(([s]) => s === source)?.[1] : null]} />
+                <ReportHeader title="Journal" period={rangeLabel(period.picked, period.ctx)} filters={[source ? SOURCES.find(([s]) => s === source)?.[1] : null]} />
               </div>
               {report.truncated && <p role="status" className="mx-3 mb-3 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">Only the first 5,000 lines are shown: choose a shorter period or one kind of entry.</p>}
               <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Journal">

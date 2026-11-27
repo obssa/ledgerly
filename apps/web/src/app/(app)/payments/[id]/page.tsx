@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -28,11 +29,11 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_520px]" label="Payment">
           <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 text-sm">
-            <div><dt className="text-muted">Date</dt><dd className="num">{payment.payment_date}</dd></div>
+            <div><dt className="text-muted">Date</dt><dd className="num"><Dt v={payment.payment_date} /></dd></div>
             <div><dt className="text-muted">Method</dt><dd>{payment.method.replace("_", " ")}</dd></div>
             <div><dt className="text-muted">Reference</dt><dd className="num">{payment.reference ?? "—"}</dd></div>
             {payment.cheque_number && <div><dt className="text-muted">Cheque</dt><dd className="num">{payment.cheque_number}</dd></div>}
-            {payment.bounced_on && <div><dt className="text-muted">Bounced on</dt><dd className="num">{payment.bounced_on}</dd></div>}
+            {payment.bounced_on && <div><dt className="text-muted">Bounced on</dt><dd className="num"><Dt v={payment.bounced_on} /></dd></div>}
             <div><dt className="text-muted">Tax withheld</dt><dd className="num">{formatAmount(payment.withholding)}</dd></div>
             <div><dt className="text-muted">Bank fee</dt><dd className="num">{formatAmount(payment.fee)}</dd></div>
             {Number(payment.fx_rate) !== 1 && <div><dt className="text-muted">Rate</dt><dd className="num">{payment.fx_rate}</dd></div>}

@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -30,7 +31,7 @@ export default async function DeliveryNotePage({ params }: PageProps<"/delivery-
               <div className="text-[13px]">Waybill or their order <span className="num font-semibold">{n.reference ?? "—"}</span></div>
             </div>
             <div className="text-right">
-              <div><span className="text-muted">Delivered</span> <span className="num">{n.delivered_on}</span></div>
+              <div><span className="text-muted">Delivered</span> <span className="num"><Dt v={n.delivered_on} /></span></div>
               <div><span className="text-muted">From</span> {n.warehouse}</div>
             </div>
           </div>

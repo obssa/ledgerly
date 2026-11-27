@@ -3,15 +3,17 @@ import { connection } from "next/server";
 import { Sidebar } from "@/components/app-shell/Sidebar";
 import { Topbar } from "@/components/app-shell/Topbar";
 import PageLoading from "@/components/PageLoading";
+import { DatePrefsBoundary } from "@/components/DatePrefsBoundary";
 import { CompanyBadge, PrintedCompany, UserMenu } from "@/components/app-shell/ShellParts";
 import { isDemoMode } from "@/lib/api";
 import { getSession } from "@/lib/session";
-import { getSubscription } from "@/lib/data";
+import { getDateFormatter, getSubscription } from "@/lib/data";
 import { subscriptionNotice } from "@/lib/subscription";
 
 /** The subscription's notice: read-only books, an overdue payment, a trial ending soon (src/lib/subscription.ts). */
 async function SubscriptionBanner() {
-  const notice = subscriptionNotice(await getSubscription());
+  const [subscription, dates] = await Promise.all([getSubscription(), getDateFormatter()]);
+  const notice = subscriptionNotice(subscription, (iso) => dates.date(iso));
   if (!notice) return null;
   return (
     <p role="status" className={`mb-4 rounded-lg px-3 py-2 text-[13px] font-semibold ${notice.tone === "bad" ? "bg-bad-tint text-bad" : "bg-warn-tint text-warn"}`}>
@@ -76,7 +78,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
             <PrintedCompany />
           </Suspense>
           {/* Pages read the session and call the API per request (src/lib/data.ts). */}
-          <Suspense fallback={<PageLoading />}>{children}</Suspense>
+          <Suspense fallback={<PageLoading />}><DatePrefsBoundary>{children}</DatePrefsBoundary></Suspense>
         </main>
       </div>
     </div>

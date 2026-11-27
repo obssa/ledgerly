@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { useActionState, useState } from "react";
 import type { Account, StatementLine } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
@@ -123,7 +125,7 @@ export function ReviewLine({ line, accounts, canReview, foreign }: {
         {line.entry && (
           <p className="text-[13px]">
             {line.status === "categorised" ? "Posted as" : "Matched to"} entry <span className="num font-semibold">#{line.entry.number}</span>
-            {" "}({SOURCE[line.entry.source_type] ?? line.entry.source_type}, <span className="num">{line.entry.date}</span>){line.entry.memo ? `: ${line.entry.memo}` : ""}
+            {" "}({SOURCE[line.entry.source_type] ?? line.entry.source_type}, <span className="num"><Dt v={line.entry.date} /></span>){line.entry.memo ? `: ${line.entry.memo}` : ""}
           </p>
         )}
         {line.note && <p className="text-[13px] text-muted">{line.status === "excluded" ? "Excluded: " : ""}{line.note}</p>}
@@ -164,7 +166,7 @@ export function ReviewLine({ line, accounts, canReview, foreign }: {
           {hidden("match")}
           {(line.suggestions ?? []).map((s) => (
             <button key={s.journal_line_id} type="submit" name="journal_line_id" value={s.journal_line_id} className="btn justify-start text-left" disabled={pending}>
-              Match to <span className="num">#{s.entry}</span> · {SOURCE[s.source_type] ?? s.source_type} · <span className="num">{s.date}</span>
+              Match to <span className="num">#{s.entry}</span> · {SOURCE[s.source_type] ?? s.source_type} · <span className="num"><Dt v={s.date} /></span>
               {s.contact ? ` · ${s.contact}` : ""}{s.days_apart > 0 ? ` (${s.days_apart} day${s.days_apart === 1 ? "" : "s"} apart)` : ""}
             </button>
           ))}

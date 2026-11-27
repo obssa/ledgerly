@@ -27,6 +27,8 @@ final class InvoiceLinkController extends Controller
     {
         return $this->withInvoice($request, fn (Company $company, Document $invoice, object $link) => response()->json([
             'company' => ['name' => (string) ($company->trading_name ?: $company->legal_name), 'tin' => $company->tin, 'email' => $company->email, 'phone' => $company->phone,
+                // How the company writes dates, so the customer reads them the same way (Settings, Date format).
+                'date_format' => \App\Support\DateFormat::of($company), 'calendar' => (string) $company->calendar,
                 'logo' => app(\App\Domain\Tenancy\CompanyLogo::class)->dataUri((string) $company->getKey()),
                 'payment_details' => CompanySettingsController::template($company->settings['invoice_template'] ?? [])['payment_details'] ?? null],
             'customer' => $invoice->contact?->name,

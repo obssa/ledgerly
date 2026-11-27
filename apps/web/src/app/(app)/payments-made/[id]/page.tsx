@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -33,7 +34,7 @@ export default async function PaymentMadePage({ params, searchParams }: PageProp
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_520px]" label="Payment">
           <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 text-sm">
-            <div><dt className="text-muted">Date</dt><dd className="num">{payment.payment_date}</dd></div>
+            <div><dt className="text-muted">Date</dt><dd className="num"><Dt v={payment.payment_date} /></dd></div>
             <div><dt className="text-muted">Method</dt><dd>{payment.method.replace("_", " ")}</dd></div>
             <div><dt className="text-muted">Reference</dt><dd className="num">{payment.reference ?? "—"}</dd></div>
             {payment.cheque_number && (

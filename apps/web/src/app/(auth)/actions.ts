@@ -204,7 +204,7 @@ export async function changePassword(_: FormState | undefined, form: FormData): 
   }
 }
 
-const OPTIONAL = ["organisation_id", "trading_name", "base_currency", "tin", "phone", "email", "website", "calendar", "conversion_date", "industry"] as const;
+const OPTIONAL = ["organisation_id", "trading_name", "base_currency", "tin", "phone", "email", "website", "calendar", "date_format", "conversion_date", "industry"] as const;
 
 /** Company switcher: works in another company without signing out. Only a company of the person's own list. */
 export async function switchCompany(form: FormData): Promise<void> {

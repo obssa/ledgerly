@@ -1,5 +1,7 @@
 "use server";
 
+import { companyDate } from "@/lib/data";
+
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
@@ -28,7 +30,7 @@ export async function saveReport(_: FormState | undefined, form: FormData): Prom
   try {
     const saved = await ledgerly.saveReport(id, savedReportBody(form), ctx);
     refresh();
-    return { notice: saved.schedule === "none" ? `Saved ${saved.name}.` : `Saved ${saved.name}. It is sent to you next on ${saved.next_send_on}.` };
+    return { notice: saved.schedule === "none" ? `Saved ${saved.name}.` : `Saved ${saved.name}. It is sent to you next on ${await companyDate(saved.next_send_on)}.` };
   } catch (error) {
     return refusal(error);
   }

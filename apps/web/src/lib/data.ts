@@ -8,7 +8,7 @@ import { paged, type ListQuery, type Paged } from "./lists";
 import type { TransactionReportData, BankPaymentFile, Bin, LeaseDetail, LeaseRegister, Tag, TagKind, TagReport, TransactionTags, DonorReport, IndustryTemplates, DirectCashFlow, FinancialNotes, ItemAssembly, ExpenseClaim, ExpenseClaimList, PurchaseRequisition, RequisitionList, InvoiceWriteOffs, LateInterestPreview, PriceList, PriceListDetail, ScheduledPayments, ScheduledPaymentDetail } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
-import { todayIn } from "@/lib/dates";
+import { DEFAULT_DATE_PREFS, formatDate, formatDateTime, pickDateFormat, todayIn, type DatePrefs } from "@/lib/dates";
 import type { AsOfPreset, PeriodContext, RangePreset } from "./periods";
 import { apiDates, pickAsOf, pickRange, type PickedAsOf, type PickedRange } from "./periodParams";
 import { sortSessions, type SignedInSession } from "./sessions";
@@ -1500,15 +1500,15 @@ export async function getTrialBalance(asOf: string): Promise<TrialBalanceRow[] |
  */
 export async function getPeriodContext(): Promise<PeriodContext> {
   await connection();
-  if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar, fiscalStartMonth: demoCompanySettings.fiscal_year_start_month, fiscalYears: demoCompanySettings.fiscal_years };
+  if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar, fiscalStartMonth: demoCompanySettings.fiscal_year_start_month, fiscalYears: demoCompanySettings.fiscal_years, dateFormat: pickDateFormat(demoCompanySettings.date_format) };
   try {
     const s = await withApi((ctx) => settingsOf(ctx.token, ctx.companyId));
-    return { today: todayIn(s.timezone), calendar: s.calendar, fiscalStartMonth: s.fiscal_year_start_month, fiscalYears: s.fiscal_years };
+    return { today: todayIn(s.timezone), calendar: s.calendar, fiscalStartMonth: s.fiscal_year_start_month, fiscalYears: s.fiscal_years, dateFormat: pickDateFormat(s.date_format) };
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
     const years = await withApi((ctx) => fiscalYearsOf(ctx.token, ctx.companyId)).catch(() => ({ data: [] as FiscalYear[] }));
     const first = years.data[0]?.starts_on;
-    return { today: todayIn(), calendar: "gregorian", fiscalStartMonth: first ? Number(first.slice(5, 7)) : 1, fiscalYears: years.data };
+    return { today: todayIn(), calendar: "gregorian", fiscalStartMonth: first ? Number(first.slice(5, 7)) : 1, fiscalYears: years.data, dateFormat: DEFAULT_DATE_PREFS.dateFormat };
   }
 }
 
@@ -1676,18 +1676,38 @@ export async function getCompanyToday(): Promise<string> {
   return (await getCompanyDay()).today;
 }
 
-/** Today in the company's time zone and the calendar its dates are shown in, from one settings request. */
-export async function getCompanyDay(): Promise<{ today: string; calendar: CompanySettings["calendar"] }> {
+/** Today in the company's time zone, the calendar its dates are shown in and how it writes them, from one settings request. */
+export async function getCompanyDay(): Promise<{ today: string; calendar: CompanySettings["calendar"]; dateFormat: DatePrefs["dateFormat"]; timezone: string }> {
   await connection();
-  if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar };
+  if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar, dateFormat: pickDateFormat(demoCompanySettings.date_format), timezone: demoCompanySettings.timezone };
   try {
     const settings = await withApi((ctx) => settingsOf(ctx.token, ctx.companyId));
-    return { today: todayIn(settings.timezone), calendar: settings.calendar };
+    return { today: todayIn(settings.timezone), calendar: settings.calendar, dateFormat: pickDateFormat(settings.date_format), timezone: settings.timezone };
   } catch (error) {
-    // A role without company.view still gets a date (Gregorian, the default); redirects pass through.
-    if (error instanceof ApiError) return { today: todayIn(), calendar: "gregorian" };
+    // A role without company.view still gets a date (Gregorian, DD/MM/YYYY, the defaults); redirects pass through.
+    if (error instanceof ApiError) return { today: todayIn(), calendar: "gregorian", dateFormat: DEFAULT_DATE_PREFS.dateFormat, timezone: "" };
     throw error;
   }
+}
+
+/** How the company writes dates: its calendar and date format (Settings). */
+export async function getDatePrefs(): Promise<DatePrefs & { timezone: string }> {
+  const { calendar, dateFormat, timezone } = await getCompanyDay();
+  return { calendar, dateFormat, timezone };
+}
+
+/** One date the company's way, for a notice after saving ("Reconciled to 27/11/2026"). */
+export async function companyDate(iso: string | null | undefined): Promise<string> {
+  return (await getDateFormatter()).date(iso);
+}
+
+/**
+ * A page's date writers, in the company's format: `date("2026-11-27")` → "27/11/2026"; `at(timestamp)` → the date
+ * and time in the company's time zone.
+ */
+export async function getDateFormatter(): Promise<{ date: (iso: string | null | undefined, empty?: string) => string; at: (ts: string | null | undefined) => string; prefs: DatePrefs }> {
+  const p = await getDatePrefs();
+  return { date: (iso, empty) => formatDate(iso, p, empty), at: (ts) => formatDateTime(ts, p, p.timezone), prefs: p };
 }
 
 export async function getShellContext(): Promise<ShellContext> {

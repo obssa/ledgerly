@@ -3,6 +3,7 @@ import { TX_REPORTS, column, pickColumns, pickSort, sortRows, statusLabel, total
 import { ledgerly } from "./api";
 import { DISPLAY_BY, columnsRequest, percentOf, pickDisplayBy } from "./pnlColumns";
 import type { Calendar } from "./periods";
+import { formatDate, pickDateFormat } from "./dates";
 import { periodLabel, previousPeriod, samePeriodLastYear } from "./reports";
 import { shiftDay } from "./periods";
 import { perUnit, percentChange } from "./decimal";
@@ -20,7 +21,7 @@ import type { Cell } from "./csv";
 type Ctx = { token: string; companyId: string };
 type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
   rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
-  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string; by?: string; pct?: string; calendar?: Calendar; compare?: string; basis?: string; open?: string; method?: string; weeks?: string; contact_id?: string };
+  cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string; by?: string; pct?: string; calendar?: Calendar; dateFormat?: string; compare?: string; basis?: string; open?: string; method?: string; weeks?: string; contact_id?: string };
 /** A report's rows; a heading or period line when the report names them itself (a statement's customer, a forecast's weeks). */
 export type Export = { title: string; rows: Cell[][]; heading?: string; period?: string };
 
@@ -31,6 +32,9 @@ export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", 
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 type Ageing = Awaited<ReturnType<typeof ledgerly.arAgeing>>;
+
+/** A date inside a line of text, written the company's way. */
+const day = (p: Params, iso: string) => formatDate(iso, { calendar: p.calendar ?? "gregorian", dateFormat: pickDateFormat(p.dateFormat) });
 
 /** The ageing summary: one line per party, a column per ageing period (as many as were asked for). */
 const ageing = (title: string, r: Ageing): Export => {
@@ -134,12 +138,12 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       const value = (v: string | null, c: GlColumn): Cell => (v === "" ? null : c === "type" && v ? typeLabel(v) : v);
       const rows: Cell[][] = [["Account code", "Account", ...cols.map((c) => GL_COLUMNS.find((d) => d.key === c)!.label)]];
       for (const a of gl.accounts) {
-        rows.push([a.code, a.name, ...cols.map((c, i) => (c === "balance" ? a.opening : i === 0 ? `Brought forward at ${gl.from}` : null))]);
+        rows.push([a.code, a.name, ...cols.map((c, i) => (c === "balance" ? a.opening : i === 0 ? `Brought forward at ${day(p, gl.from)}` : null))]);
         for (const l of a.lines) {
           const r = glRow(l);
           rows.push([a.code, a.name, ...cols.map((c) => value(r[c], c))]);
         }
-        rows.push([a.code, a.name, ...cols.map((c, i) => (c === "balance" ? a.closing : c === "debit" ? a.debits : c === "credit" ? a.credits : i === 0 ? `Balance at ${gl.to}` : null))]);
+        rows.push([a.code, a.name, ...cols.map((c, i) => (c === "balance" ? a.closing : c === "debit" ? a.debits : c === "credit" ? a.credits : i === 0 ? `Balance at ${day(p, gl.to)}` : null))]);
       }
       return { title: "general-ledger", rows };
     }
@@ -244,7 +248,7 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       for (const w of f.data) rows.push([w.week, w.from, w.to, w.receivables, w.payables, w.in, w.out, w.net, w.closing]);
       rows.push(["Overdue", null, null, f.overdue.receivables, f.overdue.payables, null, null, null, null], ["Cash now", null, null, null, null, null, null, null, f.opening],
         ["Cash at the end", null, null, null, null, null, null, null, f.closing]);
-      return { title: "cash-forecast", rows, period: `The next ${weeks} weeks, from ${f.as_of}` };
+      return { title: "cash-forecast", rows, period: `The next ${weeks} weeks, from ${day(p, f.as_of)}` };
     }
     case "inventory-valuation": {
       const v = await ledgerly.inventoryValuation(p.as_of, ctx);
@@ -262,9 +266,9 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       const defs = statementColumns(payable);
       const cols = STATEMENT_DEFAULTS.filter((c) => !["foreign_amount", "currency"].includes(c) || s.lines.some((l) => l.currency));
       const rows: Cell[][] = [cols.map((c) => defs.find((d) => d.key === c)!.label)];
-      rows.push(cols.map((c, i) => (c === "balance" ? s.opening : i === 0 ? `Balance brought forward at ${s.from}` : null)));
+      rows.push(cols.map((c, i) => (c === "balance" ? s.opening : i === 0 ? `Balance brought forward at ${day(p, s.from)}` : null)));
       s.lines.forEach((l, i) => { const r = statementRow(l, i, payable); rows.push(cols.map((c) => (c === "type" ? typeLabel(r.type) : r[c] === "" ? null : r[c]))); });
-      rows.push(cols.map((c, i) => (c === "balance" ? s.closing : i === 0 ? `${payable ? "We owe" : "Owes"} at ${s.to}` : null)));
+      rows.push(cols.map((c, i) => (c === "balance" ? s.closing : i === 0 ? `${payable ? "We owe" : "Owes"} at ${day(p, s.to)}` : null)));
       return { title: report, rows, heading: `${payable ? "Supplier" : "Customer"} statement: ${who.name}` };
     }
     case "stock-ageing": {

@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -25,7 +26,7 @@ export default async function RefundsPage({ searchParams }: PageProps<"/refunds"
               {refunds.length === 0 && <tr><td colSpan={6} className="text-muted">No refunds yet. Refund a credit note, a supplier credit or an overpayment from its page.</td></tr>}
               {refunds.map((r) => (
                 <tr key={r.id}>
-                  <td className="num"><Link href={`/refunds/${encodeURIComponent(r.id)}`} className="hover:underline">{r.payment_date}</Link></td>
+                  <td className="num"><Link href={`/refunds/${encodeURIComponent(r.id)}`} className="hover:underline"><Dt v={r.payment_date} /></Link></td>
                   <td>{r.contact?.name}{r.status === "reversed" && <> <Pill tone="bad">Reversed</Pill></>}</td>
                   <td>{r.direction === "out" ? "Customer refund" : "Supplier refund"}</td>
                   <td className="num">{r.allocations?.[0]?.document?.number ?? "Unapplied payment"}</td>
