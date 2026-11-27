@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import type { QuoteDetail } from "@/lib/api";
@@ -49,7 +50,7 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
           <div className="mt-2 grid grid-cols-2 gap-2">
             <div>
               <label className="field-label" htmlFor="delivered-on">Delivered on</label>
-              <input className="field num" id="delivered-on" name="delivered_on" type="date" defaultValue={todayIn()} max={todayIn()} required />
+              <DateInput className="field num" id="delivered-on" name="delivered_on" defaultValue={todayIn()} max={todayIn()} required />
             </div>
             <div>
               <label className="field-label" htmlFor="delivered-ref">Waybill or their order</label>
@@ -149,7 +150,7 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
         <form action={action} className="rounded-xl border border-line p-3">
           {hidden("extend")}
           <label className="field-label" htmlFor="valid_until">Offer it again until</label>
-          <input className="field" id="valid_until" name="valid_until" type="date" min={todayIn()} />
+          <DateInput className="field" id="valid_until" name="valid_until" min={todayIn()} />
           <button type="submit" className="btn mt-2" disabled={pending}>Extend</button>
         </form>
       )}

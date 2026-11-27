@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import Link from "@/components/Link";
 import { startTransition, useActionState, useMemo, useState, type FormEvent } from "react";
@@ -258,7 +259,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             {options.manualNumbers && !revision && !correcting && <Field name="number" label={words.numberLabel} defaultValue={draft?.number ?? ""} invalid={bad("number")} />}
             <div>
               <label className="field-label" htmlFor="issue_date">Issue date</label>
-              <input className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+              <DateInput className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" value={issueDate} onValue={(v) => setIssueDate(v)} />
             </div>
             {!onTheSpot && (
               <Field key={`${customerId}-${issueDate}`} name="due_date" label={kind === "quote" ? "Valid until" : kind === "sales_order" ? "Deliver by" : purchase ? "Expected by" : "Due date"} type="date"
@@ -331,7 +332,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                           // 074: a tracked item comes in with its batch, and its expiry when it has one.
                           <div className="mt-1 flex gap-1">
                             <input aria-label="Batch" className="field !w-[110px] text-[13px]" placeholder="Batch" value={l.batchNumber ?? ""} onChange={(e) => update(l.key, { batchNumber: e.target.value })} />
-                            <input aria-label="Expires on" type="date" className="field !w-[150px] text-[13px]" value={l.batchExpires ?? ""} onChange={(e) => update(l.key, { batchExpires: e.target.value })} />
+                            <DateInput aria-label="Expires on" className="field !w-[150px] text-[13px]" value={l.batchExpires ?? ""} onValue={(v) => update(l.key, { batchExpires: v })} />
                           </div>
                         )}
                       </td>
@@ -494,8 +495,9 @@ function Field({ name, label, type = "text", defaultValue = "", invalid, hint }:
   return (
     <div>
       <label className="field-label" htmlFor={name}>{label}</label>
-      <input className={`field ${invalid ? "!border-bad" : ""}`} id={name} name={name} type={type} defaultValue={defaultValue} aria-invalid={invalid || undefined}
-        aria-describedby={hint ? `${name}-hint` : undefined} />
+      {type === "date" ? <DateInput className={`field ${invalid ? "!border-bad" : ""}`} id={name} name={name} defaultValue={defaultValue} aria-invalid={invalid || undefined} aria-describedby={hint ? `${name}-hint` : undefined} /> : (
+        <input className={`field ${invalid ? "!border-bad" : ""}`} id={name} name={name} type={type} defaultValue={defaultValue} aria-invalid={invalid || undefined}
+        aria-describedby={hint ? `${name}-hint` : undefined} />)}
       {hint && <p id={`${name}-hint`} className="mt-1.5 text-[13px] text-muted">{hint}</p>}
     </div>
   );

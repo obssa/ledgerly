@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useState } from "react";
 import { PERIODS, SAVEABLE, SCHEDULES } from "@/lib/saved-reports";
@@ -38,11 +39,11 @@ export function SavedReportForm({ initial }: { initial: Initial }) {
         </div>
         {period === "custom" && !atADate && (
           <div><label className="field-label" htmlFor="from">From</label>
-            <input className={`field ${bad("from") ? "!border-bad" : ""}`} id="from" name="from" type="date" defaultValue={initial.from} /></div>
+            <DateInput className={`field ${bad("from") ? "!border-bad" : ""}`} id="from" name="from" defaultValue={initial.from} /></div>
         )}
         {period === "custom" && (
           <div><label className="field-label" htmlFor="to">{atADate ? "As at" : "To"}</label>
-            <input className={`field ${bad("to") ? "!border-bad" : ""}`} id="to" name="to" type="date" defaultValue={initial.to} /></div>
+            <DateInput className={`field ${bad("to") ? "!border-bad" : ""}`} id="to" name="to" defaultValue={initial.to} /></div>
         )}
         <div>
           <label className="field-label" htmlFor="schedule">Email it to me</label>

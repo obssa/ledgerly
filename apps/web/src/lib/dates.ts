@@ -24,6 +24,10 @@ export type DateCalendar = "gregorian" | "ethiopian";
 export interface DatePrefs { calendar: DateCalendar; dateFormat: DateFormat }
 export const DEFAULT_DATE_PREFS: DatePrefs = { calendar: "gregorian", dateFormat: DEFAULT_DATE_FORMAT };
 
+/** The names a date field (DateInput) adds to its form: what was typed, and how the company writes dates ("DD/MM/YYYY|gregorian"). */
+export const TYPED = "__typed";
+export const DATE_PREFS_FIELD = "__date_prefs";
+
 /** A stored or sent format, or the default when it is missing or unknown. */
 export function pickDateFormat(value: unknown): DateFormat {
   return (DATE_FORMATS as readonly unknown[]).includes(value) ? (value as DateFormat) : DEFAULT_DATE_FORMAT;

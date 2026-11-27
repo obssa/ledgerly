@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import type { PurchaseOrderDetail } from "@/lib/api";
@@ -41,7 +42,7 @@ export function PurchaseOrderActions({ doc, today }: { doc: PurchaseOrderDetail;
           <div className="mt-2 grid grid-cols-2 gap-2">
             <div>
               <label className="field-label" htmlFor="received-on">Arrived on</label>
-              <input className="field num" id="received-on" name="received_on" type="date" defaultValue={today} max={today} required />
+              <DateInput className="field num" id="received-on" name="received_on" defaultValue={today} max={today} required />
             </div>
             <div>
               <label className="field-label" htmlFor="received-ref">Their delivery note</label>
@@ -56,7 +57,7 @@ export function PurchaseOrderActions({ doc, today }: { doc: PurchaseOrderDetail;
                 <input className="field num !w-[96px] text-right" id={`receive-${l.id}`} name={`receive_${l.id}`} defaultValue={doc.arriving[l.id ?? ""]}
                   inputMode="decimal" pattern="\d+(\.\d{1,2})?" aria-describedby="receive-help" />
                 <input className="field !w-[96px] text-[13px]" aria-label={`Batch of ${l.description}`} name={`batch_${l.id}`} placeholder="Batch" maxLength={60} />
-                <input className="field !w-[140px] text-[13px]" aria-label={`Expiry of ${l.description}`} name={`expires_${l.id}`} type="date" />
+                <DateInput className="field !w-[140px] text-[13px]" aria-label={`Expiry of ${l.description}`} name={`expires_${l.id}`} />
               </div>
             ))}
             <p id="receive-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that did not come. Only stock items are received. Batch and expiry: for items tracked by batch.</p>

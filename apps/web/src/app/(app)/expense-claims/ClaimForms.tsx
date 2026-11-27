@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useState } from "react";
 import { todayIn } from "@/lib/dates";
@@ -13,7 +14,7 @@ export function NewClaimForm({ accounts, taxRates }: { accounts: { id: string; c
     <form action={action} noValidate className="grid gap-4">
       {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-[18px]">
-        <div><label className="field-label" htmlFor="issue_date">Date</label><input className="field num" id="issue_date" name="issue_date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="issue_date">Date</label><DateInput className="field num" id="issue_date" name="issue_date" max={today} defaultValue={today} /></div>
         <div className="sm:col-span-2"><label className="field-label" htmlFor="notes">What it was for (optional)</label><input className="field" id="notes" name="notes" maxLength={2000} placeholder="Visit to Hawassa" /></div>
       </div>
       <div className="overflow-x-auto">

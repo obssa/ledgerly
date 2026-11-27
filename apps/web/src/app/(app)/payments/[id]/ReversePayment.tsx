@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
@@ -23,7 +24,7 @@ export function ReversePayment({ id, made = false }: { id: string; made?: boolea
         <input type="hidden" name="id" value={id} />
         <div>
           <label className="field-label" htmlFor="date">Date</label>
-          <input className="field" id="date" name="date" type="date" defaultValue={today} />
+          <DateInput className="field" id="date" name="date" defaultValue={today} />
         </div>
         <div>
           <label className="field-label" htmlFor="reason">Reason</label>

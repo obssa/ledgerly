@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
@@ -39,7 +40,7 @@ export function ConfirmForm({ id, planned, currency, baseCurrency, method, today
         <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-4">
           <div>
             <label className="field-label" htmlFor="payment_date">Day it went out</label>
-            <input className={`field ${bad("payment_date") ? "!border-bad" : ""}`} id="payment_date" name="payment_date" type="date" max={today} defaultValue={today} />
+            <DateInput className={`field ${bad("payment_date") ? "!border-bad" : ""}`} id="payment_date" name="payment_date" max={today} defaultValue={today} />
           </div>
           <div>
             <label className="field-label" htmlFor="withholding">Tax withheld</label>

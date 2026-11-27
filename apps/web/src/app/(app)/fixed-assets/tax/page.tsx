@@ -1,13 +1,16 @@
+import { parseDate, type DatePrefs } from "@/lib/dates";
+import { DateInput } from "@/components/DateInput";
 import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
-import { getTaxDepreciation } from "@/lib/data";
+import { getTaxDepreciation, getDatePrefs } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Tax depreciation" };
 
 const RULE: Record<string, string> = { straight_line: "Straight line", reducing_balance: "Reducing balance" };
-const yearEnd = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+/** A date from the form: as stored, or typed the company's way (it works without JavaScript). */
+const yearEnd = (v: unknown, prefs: DatePrefs) => (typeof v === "string" ? parseDate(v, prefs) ?? undefined : undefined);
 
 /**
  * Module 9c: a fiscal year's tax depreciation beside the books (061). Each asset's written-down value for tax, the
@@ -16,7 +19,7 @@ const yearEnd = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.
  */
 export default async function TaxDepreciationPage({ searchParams }: PageProps<"/fixed-assets/tax">) {
   const q = await searchParams;
-  const year = await getTaxDepreciation(yearEnd(q.year_end));
+  const year = await getTaxDepreciation(yearEnd(q.year_end, await getDatePrefs()));
 
   return (
     <>
@@ -26,7 +29,7 @@ export default async function TaxDepreciationPage({ searchParams }: PageProps<"/
       ) : (
         <>
           <form className="mb-4 flex flex-wrap items-end gap-2.5" action="/fixed-assets/tax">
-            <div><label className="field-label" htmlFor="year_end">Year ending</label><input className="field" id="year_end" name="year_end" type="date" defaultValue={year.to} /></div>
+            <div><label className="field-label" htmlFor="year_end">Year ending</label><DateInput plain className="field" id="year_end" name="year_end" defaultValue={year.to} /></div>
             <button type="submit" className="btn">Show</button>
             <p className="text-[13px] text-muted">From <span className="num"><Dt v={year.from} /></span> to <span className="num"><Dt v={year.to} /></span>. Each asset by its tax rule, or its book rule when it has none.</p>
           </form>

@@ -37,3 +37,19 @@ describe("text", () => {
     expect(text(form, "missing")).toBeUndefined();
   });
 });
+
+describe("text() of a date field", () => {
+  const form = (entries: [string, string][]) => { const f = new FormData(); for (const [k, v] of entries) f.append(k, v); return f; };
+
+  it("reads what was typed the company's way, before the stored value, with or without JavaScript", () => {
+    expect(text(form([["issue_date", "2026-11-01"], ["issue_date__typed", "27/11/2026"], ["__date_prefs", "DD/MM/YYYY|gregorian"]]), "issue_date")).toBe("2026-11-27");
+    expect(text(form([["due_date", ""], ["due_date__typed", "12/31/2026"], ["__date_prefs", "MM/DD/YYYY|gregorian"]]), "due_date")).toBe("2026-12-31");
+    expect(text(form([["d", ""], ["d__typed", "17/03/2019"], ["__date_prefs", "DD/MM/YYYY|ethiopian"]]), "d")).toBe("2026-11-26");
+  });
+
+  it("passes on a date it cannot read, for the API to refuse; an emptied field is not given", () => {
+    expect(text(form([["d", "2026-11-01"], ["d__typed", "31/02/2026"], ["__date_prefs", "DD/MM/YYYY|gregorian"]]), "d")).toBe("31/02/2026");
+    expect(text(form([["d", "2026-11-01"], ["d__typed", "  "], ["__date_prefs", "DD/MM/YYYY|gregorian"]]), "d")).toBeUndefined();
+    expect(text(form([["d", "2026-11-01"]]), "d")).toBe("2026-11-01");
+  });
+});

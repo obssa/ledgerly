@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import type { BankAccount, TaxKind } from "@/lib/api";
@@ -23,7 +24,7 @@ export function FileReturn({ kind, from, to }: { kind: TaxKind; from: string; to
       <input type="hidden" name="period_start" value={from} />
       <input type="hidden" name="period_end" value={to} />
       <div className="flex flex-wrap items-end gap-2.5">
-        <div><label className="field-label" htmlFor="filed_on">Filed on</label><input className="field" id="filed_on" name="filed_on" type="date" min={to} max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="filed_on">Filed on</label><DateInput className="field" id="filed_on" name="filed_on" min={to} max={today} defaultValue={today} /></div>
         <div className="min-w-[220px]">
           <label className="field-label" htmlFor="reference">Authority&apos;s reference (optional)</label>
           <input className="field" id="reference" name="reference" maxLength={100} placeholder="The receipt or acknowledgement number" />
@@ -47,7 +48,7 @@ export function SettleReturn({ id, periodEnd, due, banks }: { id: string; period
       <Message state={state} />
       <input type="hidden" name="id" value={id} />
       <div className="flex flex-wrap items-end gap-2.5">
-        <div><label className="field-label" htmlFor="settle_date">Paid on</label><input className="field" id="settle_date" name="date" type="date" min={periodEnd} max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="settle_date">Paid on</label><DateInput className="field" id="settle_date" name="date" min={periodEnd} max={today} defaultValue={today} /></div>
         {paying && (
           <div className="min-w-[220px]">
             <label className="field-label" htmlFor="bank_account_id">Paid from</label>

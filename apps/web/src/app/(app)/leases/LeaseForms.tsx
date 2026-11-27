@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useState } from "react";
 import { todayIn } from "@/lib/dates";
@@ -47,7 +48,7 @@ export function LeaseForm({ options }: { options: { liability: Choice[]; expense
             <option value="finance">Finance (the asset passes to you)</option>
           </select>
         </div>
-        <div><label className="field-label" htmlFor="lease-start">Starts on</label><input className={`field num ${bad("starts_on") ? "!border-bad" : ""}`} id="lease-start" name="starts_on" type="date" defaultValue={todayIn()} /></div>
+        <div><label className="field-label" htmlFor="lease-start">Starts on</label><DateInput className={`field num ${bad("starts_on") ? "!border-bad" : ""}`} id="lease-start" name="starts_on" defaultValue={todayIn()} /></div>
         <div><label className="field-label" htmlFor="lease-months">Months</label><input className={`field num ${bad("months") ? "!border-bad" : ""}`} id="lease-months" name="months" inputMode="numeric" placeholder="36" /></div>
         <div><label className="field-label" htmlFor="lease-payment">Monthly payment</label><input className={`field num ${bad("payment") ? "!border-bad" : ""}`} id="lease-payment" name="payment" inputMode="decimal" /></div>
       </div>
@@ -87,7 +88,7 @@ export function PayLease({ id, banks, next }: { id: string; banks: Choice[]; nex
       <input type="hidden" name="id" value={id} />
       <p className="text-[13px] text-muted">{next}</p>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-        <div><label className="field-label" htmlFor="pay-date">Paid on</label><input className="field num" id="pay-date" name="date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="pay-date">Paid on</label><DateInput className="field num" id="pay-date" name="date" max={today} defaultValue={today} /></div>
         <div>
           <label className="field-label" htmlFor="pay-bank">Paid from</label>
           <select className="field" id="pay-bank" name="bank_account_id" defaultValue=""><option value="" disabled>Choose</option>{banks.map((b) => <option key={b.id} value={b.id}>{b.code} {b.name}</option>)}</select>

@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -42,14 +43,14 @@ export function RetentionPanel({ invoiceId, retentions, canHold, canManage }: { 
           <input type="hidden" name="id" value={invoiceId} />
           <div><label className="field-label" htmlFor="r-percent">%</label><input className="field num w-[70px]" id="r-percent" name="percent" inputMode="decimal" placeholder="10" /></div>
           <div><label className="field-label" htmlFor="r-amount">or amount</label><input className="field num w-[110px]" id="r-amount" name="amount" inputMode="decimal" /></div>
-          <div><label className="field-label" htmlFor="r-held">Held on</label><input className="field" id="r-held" name="held_on" type="date" max={today} defaultValue={today} /></div>
+          <div><label className="field-label" htmlFor="r-held">Held on</label><DateInput className="field" id="r-held" name="held_on" max={today} defaultValue={today} /></div>
           <button type="submit" className="btn" disabled={holding}>{holding ? "Saving…" : "Hold"}</button>
         </form>
       )}
       {canManage && held.length > 0 && (
         <form action={release} className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
           <input type="hidden" name="id" value={invoiceId} />
-          <div><label className="field-label" htmlFor="r-released">Released on</label><input className="field" id="r-released" name="released_on" type="date" max={today} defaultValue={today} /></div>
+          <div><label className="field-label" htmlFor="r-released">Released on</label><DateInput className="field" id="r-released" name="released_on" max={today} defaultValue={today} /></div>
           <button type="submit" className="btn btn-primary" disabled={releasing}>{releasing ? "Releasing…" : `Release ${formatAmount(heldTotal.toFixed(2))}`}</button>
         </form>
       )}

@@ -46,4 +46,15 @@ describe("which date an as-of report shows", () => {
     expect(pickAsOf({ range: "today", shown: "today", as_of: "2026-09-15" }, ctx)).toEqual({ preset: "custom", asOf: "2026-09-15" });
     expect(pickAsOf({ as_of: "2026-09-30" }, ctx)).toEqual({ preset: "end_of_last_quarter", asOf: "2026-09-30" });
   });
+
+  it("reads dates typed in the filter the company's way, and stored dates from links", () => {
+    expect(pickRange({ range: "last_month", shown: "last_month", from: "05/10/2026", to: "31/10/2026" }, ctx, "all"))
+      .toEqual({ preset: "custom", from: "2026-10-05", to: "2026-10-31" });
+    const usa: PeriodContext = { ...ctx, dateFormat: "MM/DD/YYYY" };
+    expect(pickRange({ from: "10/01/2026", to: "10/31/2026" }, usa, "all")).toEqual({ preset: "last_month", from: "2026-10-01", to: "2026-10-31" });
+    expect(pickRange({ from: "31/10/2026" }, usa, "all")).toEqual({ preset: "all", from: null, to: null });   // not a date in MM/DD
+    const ethiopian: PeriodContext = { ...ctx, calendar: "ethiopian" };
+    expect(pickAsOf({ range: "custom", as_of: "10/03/2019" }, ethiopian)).toEqual({ preset: "custom", asOf: "2026-11-19" });
+    expect(pickAsOf({ as_of: "2026-09-30" }, ethiopian).asOf).toBe("2026-09-30");
+  });
 });

@@ -1,4 +1,4 @@
-import { isDate } from "./reports";
+import { parseDate } from "./dates";
 import { isAsOfPreset, isRangePreset, matchRange, resolveAsOf, resolveRange, type AsOfPreset, type PeriodContext, type RangePreset } from "./periods";
 
 /**
@@ -14,11 +14,17 @@ export interface PickedAsOf { preset: AsOfPreset; asOf: string }
 type Query = Record<string, string | string[] | undefined>;
 const one = (q: Query, k: string) => (typeof q[k] === "string" ? (q[k] as string) : undefined);
 
+/**
+ * A date from the URL: as stored ("2026-11-27", from links), or as typed in the filter in the company's format
+ * ("27/11/2026"; the Ethiopian calendar's numbers for a company on it). Null when it is not a date.
+ */
+const day = (q: Query, k: string, ctx: PeriodContext) => parseDate(one(q, k), { calendar: ctx.calendar, dateFormat: ctx.dateFormat ?? "DD/MM/YYYY" });
+
 export function pickRange(q: Query, ctx: PeriodContext, fallback: RangePreset, allowed?: readonly RangePreset[]): PickedRange {
   const ok = (p: RangePreset) => !allowed || allowed.includes(p);
   const range = one(q, "range"), shown = one(q, "shown");
-  const from = isDate(one(q, "from")) ? one(q, "from")! : null;
-  const to = isDate(one(q, "to")) ? one(q, "to")! : null;
+  const from = day(q, "from", ctx);
+  const to = day(q, "to", ctx);
   const typed = from !== null || to !== null;
 
   if (isRangePreset(range) && ok(range)) {
@@ -38,7 +44,7 @@ function named(preset: RangePreset, ctx: PeriodContext): PickedRange {
 /** The same for a report at one date ("As of"): `range` is an as-of preset, `as_of` the date. */
 export function pickAsOf(q: Query, ctx: PeriodContext, fallback: AsOfPreset = "today"): PickedAsOf {
   const range = one(q, "range"), shown = one(q, "shown");
-  const typed = isDate(one(q, "as_of")) ? one(q, "as_of")! : null;
+  const typed = day(q, "as_of", ctx);
   if (isAsOfPreset(range) && range !== "custom") {
     const date = resolveAsOf(range, ctx)!;
     return range === shown && typed && typed !== date ? { preset: "custom", asOf: typed } : { preset: range, asOf: date };

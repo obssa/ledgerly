@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import type { ProjectMilestone } from "@/lib/api";
@@ -28,7 +29,7 @@ export function AddMilestone({ projectId, hasContractValue }: { projectId: strin
         {hasContractValue && (
           <div><label className="field-label" htmlFor="m-percent">or % of contract</label><input className="field num w-[110px]" id="m-percent" name="percent" inputMode="decimal" /></div>
         )}
-        <div><label className="field-label" htmlFor="m-due">Due</label><input className="field" id="m-due" name="due_on" type="date" /></div>
+        <div><label className="field-label" htmlFor="m-due">Due</label><DateInput className="field" id="m-due" name="due_on" /></div>
         <button type="submit" className="btn" disabled={pending}>{pending ? "Adding…" : "Add milestone"}</button>
       </div>
     </form>
@@ -50,7 +51,7 @@ export function MilestoneControls({ projectId, milestone, incomeAccounts, canBil
             <input type="hidden" name="project_id" value={projectId} />
             <input type="hidden" name="milestone_id" value={milestone.id} />
             <label className="sr-only" htmlFor={`bd-${milestone.id}`}>Invoice date for {milestone.name}</label>
-            <input className="field !h-9 !w-auto" id={`bd-${milestone.id}`} name="issue_date" type="date" max={today} defaultValue={today} />
+            <DateInput className="field !h-9 !w-auto" id={`bd-${milestone.id}`} name="issue_date" max={today} defaultValue={today} />
             <label className="sr-only" htmlFor={`ba-${milestone.id}`}>Income account</label>
             <select className="field !h-9 !w-auto" id={`ba-${milestone.id}`} name="income_account_id">
               {incomeAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}

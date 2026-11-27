@@ -1,14 +1,17 @@
+import { parseDate, type DatePrefs } from "@/lib/dates";
+import { DateInput } from "@/components/DateInput";
 import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
-import { getRevaluationPreview, getRevaluations } from "@/lib/data";
+import { getRevaluationPreview, getRevaluations, getDatePrefs } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { drCr } from "@/lib/ledger";
 import { PostRevaluation } from "./PostRevaluation";
 
 export const metadata = { title: "Currency revaluation" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+/** A date from the form: as stored, or typed the company's way (it works without JavaScript). */
+const date = (v: unknown, prefs: DatePrefs) => (typeof v === "string" ? parseDate(v, prefs) ?? undefined : undefined);
 const KIND: Record<string, string> = { account: "Bank or wallet", invoice: "Invoice", credit_note: "Credit note", bill: "Bill", vendor_credit: "Supplier credit" };
 
 function Amount({ value }: { value: string }) {
@@ -19,7 +22,7 @@ function Amount({ value }: { value: string }) {
 /** Module 6: restate foreign-currency balances at a month end (IAS 21), reversed the next day; past runs with their reports. */
 export default async function RevaluationPage({ searchParams }: PageProps<"/revaluation">) {
   const q = await searchParams;
-  const asOf = date(q.as_of);
+  const asOf = date(q.as_of, await getDatePrefs());
   const given: Record<string, string> = {};
   for (const [k, v] of Object.entries(q)) {
     const m = /^rate_([A-Z]{3})$/.exec(k);
@@ -39,7 +42,7 @@ export default async function RevaluationPage({ searchParams }: PageProps<"/reva
               <h2 className="mb-1 text-[15px] font-bold">Revalue foreign balances</h2>
               <p className="mb-3 text-[13px] text-muted">Foreign-currency bank and wallet balances and open foreign-currency invoices and bills are restated at the day&apos;s rate; the difference is an unrealised exchange gain or loss.</p>
               <form className="flex flex-wrap items-end gap-2.5">
-                <div><label className="field-label" htmlFor="as_of">At the end of</label><input className="field" id="as_of" name="as_of" type="date" defaultValue={asOf ?? lastMonthEnd} /></div>
+                <div><label className="field-label" htmlFor="as_of">At the end of</label><DateInput plain className="field" id="as_of" name="as_of" defaultValue={asOf ?? lastMonthEnd} /></div>
                 {currencies.map((c) => (
                   <div key={c}><label className="field-label" htmlFor={`rate_${c}`}>{c} rate</label>
                     <input className="field num" id={`rate_${c}`} name={`rate_${c}`} inputMode="decimal" defaultValue={given[c] ?? preview?.preview?.rates[c] ?? ""} /></div>

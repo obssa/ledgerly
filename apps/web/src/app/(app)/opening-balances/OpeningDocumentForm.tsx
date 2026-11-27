@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useState } from "react";
 import { enterOpeningDocument } from "./actions";
@@ -55,11 +56,11 @@ export function OpeningDocumentForm({ conversionDate, customers, suppliers, curr
       <div className="flex flex-wrap gap-2.5">
         <div>
           <label className="field-label" htmlFor="issue_date">Issued on</label>
-          <input className={`field ${bad("issue_date")}`} id="issue_date" name="issue_date" type="date" max={conversionDate} />
+          <DateInput className={`field ${bad("issue_date")}`} id="issue_date" name="issue_date" max={conversionDate} />
         </div>
         <div>
           <label className="field-label" htmlFor="due_date">Due on</label>
-          <input className={`field ${bad("due_date")}`} id="due_date" name="due_date" type="date" />
+          <DateInput className={`field ${bad("due_date")}`} id="due_date" name="due_date" />
         </div>
         <div>
           <label className="field-label" htmlFor="currency">Currency</label>

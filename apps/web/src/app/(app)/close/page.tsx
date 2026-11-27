@@ -1,17 +1,20 @@
+import { parseDate, type DatePrefs } from "@/lib/dates";
+import { DateInput } from "@/components/DateInput";
 import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCloseChecklist, getYearEnd } from "@/lib/data";
+import { getCloseChecklist, getYearEnd, getDatePrefs } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { CloseForm, CloseYear, ReopenYear } from "./CloseForm";
 
 export const metadata = { title: "Close the books" };
 
-const date = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+/** A date from the form: as stored, or typed the company's way (it works without JavaScript). */
+const date = (v: unknown, prefs: DatePrefs) => (typeof v === "string" ? parseDate(v, prefs) ?? undefined : undefined);
 
 /** Module 6: the close checklist for a period end, and closing the books through it. */
 export default async function ClosePage({ searchParams }: PageProps<"/close">) {
-  const asked = date((await searchParams).period_end);
+  const asked = date((await searchParams).period_end, await getDatePrefs());
   const [checklist, yearEnd] = await Promise.all([getCloseChecklist(asked), getYearEnd()]);
 
   return (
@@ -20,7 +23,7 @@ export default async function ClosePage({ searchParams }: PageProps<"/close">) {
       {!checklist ? <p className="text-[14px] text-muted">Closing the books is for accountants, owners and admins (and not available in the demo).</p> : (
         <>
           <form className="mb-4 flex flex-wrap items-end gap-2.5">
-            <div><label className="field-label" htmlFor="period_end">Period ends on</label><input className="field" id="period_end" name="period_end" type="date" defaultValue={checklist.period_end} /></div>
+            <div><label className="field-label" htmlFor="period_end">Period ends on</label><DateInput plain className="field" id="period_end" name="period_end" defaultValue={checklist.period_end} /></div>
             <button type="submit" className="btn">Check</button>
             <p className="text-[13px] text-muted">
               {checklist.books_closed_until ? <>The books are closed through <span className="num font-semibold text-ink">{checklist.books_closed_until}</span>.</> : "No period is closed yet."}

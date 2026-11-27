@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import { createCompany, resendVerification } from "@/app/(auth)/actions";
@@ -78,7 +79,7 @@ export function OnboardingForm({ organisation = null }: { organisation?: string 
         </div>
         <div>
           <label className="field-label" htmlFor="conversion_date">Last bank statement date</label>
-          <input className="field" id="conversion_date" name="conversion_date" type="date" />
+          <DateInput className="field" id="conversion_date" name="conversion_date" />
           <p className="mt-1.5 text-[13px] text-muted">Opening balances are entered as at this date.</p>
         </div>
       </div>
@@ -112,7 +113,8 @@ function Field({ id, label, type = "text", required, invalid }: { id: string; la
   return (
     <div>
       <label className="field-label" htmlFor={id}>{label}</label>
-      <input className={`field ${invalid ? "!border-bad" : ""}`} id={id} name={id} type={type} required={required} aria-invalid={invalid || undefined} />
+      {type === "date" ? <DateInput className={`field ${invalid ? "!border-bad" : ""}`} id={id} name={id} required={required} aria-invalid={invalid || undefined} /> : (
+        <input className={`field ${invalid ? "!border-bad" : ""}`} id={id} name={id} type={type} required={required} aria-invalid={invalid || undefined} />)}
     </div>
   );
 }

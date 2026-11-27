@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useState } from "react";
 import { todayIn } from "@/lib/dates";
@@ -48,8 +49,8 @@ export function RecordPostDatedCheque({ customers, suppliers, banks, currencies,
         {direction === "in" && <div className="min-w-[150px] flex-1"><label className="field-label" htmlFor="pdc_bank">Their bank</label><input className="field" id="pdc_bank" name="drawn_on" maxLength={80} /></div>}
       </div>
       <div className="flex flex-wrap gap-2">
-        <div><label className="field-label" htmlFor="pdc_handed">{direction === "in" ? "Received on" : "Written on"}</label><input className="field" id="pdc_handed" name="handed_on" type="date" defaultValue={today} max={today} /></div>
-        <div><label className="field-label" htmlFor="pdc_date">Dated</label><input className="field" id="pdc_date" name="cheque_date" type="date" min={today} /></div>
+        <div><label className="field-label" htmlFor="pdc_handed">{direction === "in" ? "Received on" : "Written on"}</label><DateInput className="field" id="pdc_handed" name="handed_on" defaultValue={today} max={today} /></div>
+        <div><label className="field-label" htmlFor="pdc_date">Dated</label><DateInput className="field" id="pdc_date" name="cheque_date" min={today} /></div>
       </div>
       <div className="flex flex-wrap gap-2">
         <div>

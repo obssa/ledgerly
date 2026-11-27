@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -64,7 +65,7 @@ export function AssemblyPanel({ itemId, itemName, assembly, choices, warehouses 
           {message(buildState)}
           <div className="grid grid-cols-2 gap-2">
             <div><label className="field-label" htmlFor="build-qty">Build how many</label><input className="field num" id="build-qty" name="quantity" inputMode="decimal" defaultValue="1" /></div>
-            <div><label className="field-label" htmlFor="build-on">On</label><input className="field num" id="build-on" name="built_on" type="date" max={today} defaultValue={today} /></div>
+            <div><label className="field-label" htmlFor="build-on">On</label><DateInput className="field num" id="build-on" name="built_on" max={today} defaultValue={today} /></div>
             <div>
               <label className="field-label" htmlFor="build-wh">In</label>
               <select className="field" id="build-wh" name="warehouse_id">{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select>

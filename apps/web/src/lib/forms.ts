@@ -1,3 +1,4 @@
+import { DATE_PREFS_FIELD, TYPED, parseDate, pickDateFormat } from "./dates";
 import { ApiError } from "./api";
 
 /** What a form shows after a failed submit: one message, and the fields the API rejected. */
@@ -33,8 +34,21 @@ export function formStateFromError(error: unknown): FormState {
   return { error: "Evenbooks could not be reached. Try again in a minute." };
 }
 
-/** Text from a form field; empty means not given. */
+/** Text from a form field; empty means not given. A date field (DateInput) gives its date as stored, "YYYY-MM-DD". */
 export function text(form: FormData, name: string): string | undefined {
+  const typed = form.get(`${name}${TYPED}`);
+  if (typeof typed === "string") return typedDate(typed, form.get(DATE_PREFS_FIELD));
   const value = form.get(name);
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
+
+/**
+ * What was typed in a date field, read the company's way, as the stored "YYYY-MM-DD". What was typed is what counts,
+ * with or without JavaScript; a date that cannot be read is passed on as typed, for the API to refuse with its message.
+ */
+function typedDate(typed: string, prefs: FormDataEntryValue | null): string | undefined {
+  const t = typed.trim();
+  if (t === "") return undefined;
+  const [format, calendar] = (typeof prefs === "string" ? prefs : "").split("|");
+  return parseDate(t, { dateFormat: pickDateFormat(format), calendar: calendar === "ethiopian" ? "ethiopian" : "gregorian" }) ?? t;
 }

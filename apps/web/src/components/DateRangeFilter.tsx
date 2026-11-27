@@ -1,3 +1,4 @@
+import { DateInput } from "./DateInput";
 import { AS_OF_PRESETS, RANGE_PRESETS, type AsOfPreset, type RangePreset } from "@/lib/periods";
 
 type Keep = Record<string, string | string[] | undefined>;
@@ -44,8 +45,8 @@ export function DateRangeFilter({ picked, keep, fields, allowed, label = "Report
           })}
         </select>
       </div>
-      <div><label className="field-label" htmlFor="from">From</label><input className="field" id="from" name="from" type="date" defaultValue={picked.from ?? ""} /></div>
-      <div><label className="field-label" htmlFor="to">To</label><input className="field" id="to" name="to" type="date" defaultValue={picked.to ?? ""} /></div>
+      <div><label className="field-label" htmlFor="from">From</label><DateInput plain className="field !w-[150px]" id="from" name="from" defaultValue={picked.from ?? ""} /></div>
+      <div><label className="field-label" htmlFor="to">To</label><DateInput plain className="field !w-[150px]" id="to" name="to" defaultValue={picked.to ?? ""} /></div>
       {children}
       <button type="submit" className="btn">{button}</button>
     </form>
@@ -71,7 +72,7 @@ export function AsOfFilter({ picked, keep, fields, label = "As of", button = "Ru
           {AS_OF_PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
         </select>
       </div>
-      <div><label className="field-label" htmlFor="as_of">Date</label><input className="field" id="as_of" name="as_of" type="date" defaultValue={picked.asOf} /></div>
+      <div><label className="field-label" htmlFor="as_of">Date</label><DateInput plain className="field !w-[150px]" id="as_of" name="as_of" defaultValue={picked.asOf} /></div>
       {children}
       <button type="submit" className="btn">{button}</button>
     </form>

@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -41,7 +42,7 @@ export function InterestPanel({ invoiceId, interest }: { invoiceId: string; inte
           </p>
           <form action={charge} className="mt-3 flex flex-wrap items-end gap-2">
             <input type="hidden" name="id" value={invoiceId} />
-            <div><label className="field-label" htmlFor="li-through">Up to</label><input className="field" id="li-through" name="through" type="date" min={interest.from ?? undefined} max={today} defaultValue={today} /></div>
+            <div><label className="field-label" htmlFor="li-through">Up to</label><DateInput className="field" id="li-through" name="through" min={interest.from ?? undefined} max={today} defaultValue={today} /></div>
             <button type="submit" className="btn" disabled={charging}>{charging ? "Charging…" : "Charge interest"}</button>
           </form>
           <p className="mt-2 text-[12px] text-muted">Makes a draft invoice to the customer; nothing posts until it is approved.</p>
