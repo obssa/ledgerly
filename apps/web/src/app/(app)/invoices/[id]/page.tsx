@@ -1,7 +1,9 @@
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanySettings, getDocumentHistory, getInvoice, getMoneyAccounts, getOpenInvoices, getLateInterest, getWriteOffs, getCustomerChoices } from "@/lib/data";
+import { getCompanySettings, getCompanyToday, getDocumentHistory, getInvoice, getMoneyAccounts, getOpenInvoices, getLateInterest, getWriteOffs, getCustomerChoices } from "@/lib/data";
+import { creditStatus, paymentStatus } from "@/lib/docStatus";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { ApplyCredit } from "./ApplyCredit";
@@ -21,15 +23,6 @@ import { DocumentHistoryPanel } from "@/components/DocumentHistoryPanel";
 
 export const metadata = { title: "Invoice" };
 
-const STATUS: Record<string, { label: string; tone: "neutral" | "good" | "warn" | "bad" | "brand" }> = {
-  draft: { label: "Draft", tone: "neutral" },
-  awaiting_approval: { label: "Awaiting approval", tone: "warn" },
-  posted: { label: "Posted", tone: "brand" },
-  part_paid: { label: "Part paid", tone: "warn" },
-  paid: { label: "Paid", tone: "good" },
-  void: { label: "Void", tone: "neutral" },
-};
-
 /** One invoice: lines, totals, e-invoice state, warnings (credit limit) and what can be done next. */
 export default async function InvoicePage({ params, searchParams }: PageProps<"/invoices/[id]">) {
   const { id } = await params;
@@ -41,9 +34,9 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const customers = batchable ? await getCustomerChoices() : [];
   const interest = invoice.type === "invoice" && !invoice.demo && ["posted", "part_paid", "paid"].includes(invoice.status) ? await getLateInterest(invoice.id) : null;
   const creditNote = invoice.type === "credit_note";
-  const status = creditNote && invoice.status === "paid" ? { label: "Applied", tone: "good" as const }
-    : creditNote && invoice.status === "part_paid" ? { label: "Credit left", tone: "warn" as const }
-    : STATUS[invoice.status] ?? { label: invoice.status, tone: "neutral" as const };
+  await connection();
+  // In QuickBooks' words: "Overdue 12 days", "Due in 30 days", "Partially paid"; a credit note "Unapplied" or "Applied".
+  const status = creditNote ? creditStatus(invoice) : paymentStatus(invoice, await getCompanyToday());
   const submission = invoice.einvoice_submissions?.[0];
   const kind = creditNote ? "Credit note" : "Invoice";
   const canApply = creditNote && invoice.can.apply && ["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0 && !invoice.demo;
@@ -99,15 +92,15 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
                 </div>
               )}
               {creditNote && invoice.original && (
-                <div className="mt-1 text-[13px]">Corrects <Link href={`/invoices/${encodeURIComponent(invoice.original.id)}`} className="num font-semibold hover:underline">{invoice.original.number}</Link></div>
+                <div className="mt-1 text-[13px]">Original invoice <Link href={`/invoices/${encodeURIComponent(invoice.original.id)}`} className="num font-semibold hover:underline">{invoice.original.number}</Link></div>
               )}
               {creditNote && invoice.restock && <div className="mt-1 text-[13px]">The goods came back into stock</div>}
             </div>
             <div className="text-right">
-              <div><span className="text-muted">Issued</span> <span className="num">{invoice.issue_date}</span></div>
-              <div><span className="text-muted">Due</span> <span className="num">{invoice.due_date ?? "—"}</span></div>
+              <div><span className="text-muted">{creditNote ? "Credit note date" : "Invoice date"}</span> <span className="num">{invoice.issue_date}</span></div>
+              {!creditNote && <div><span className="text-muted">Due date</span> <span className="num">{invoice.due_date ?? "—"}</span></div>}
               {invoice.salesperson && <div><span className="text-muted">Salesperson</span> {invoice.salesperson.name}</div>}
-              {Number(invoice.fx_rate) !== 1 && <div className="text-muted">Rate <span className="num">{invoice.fx_rate}</span></div>}
+              {Number(invoice.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{invoice.fx_rate}</span></div>}
             </div>
           </div>
           <div className="mt-5 overflow-x-auto">
@@ -132,7 +125,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <div className="flex justify-between py-1"><dt>Subtotal</dt><dd className="num">{formatAmount(invoice.subtotal)}</dd></div>
             <div className="flex justify-between py-1"><dt>Tax</dt><dd className="num">{formatAmount(invoice.tax_total)}</dd></div>
             <div className="mt-1 flex justify-between border-t-2 border-ink pt-2 text-lg font-extrabold"><dt>Total</dt><dd className="num">{formatMoney(invoice.total, invoice.currency)}</dd></div>
-            <div className="flex justify-between py-1 font-semibold"><dt>{creditNote ? "Credit left" : "Still due"}</dt><dd className="num">{formatMoney(invoice.amount_due, invoice.currency)}</dd></div>
+            <div className="flex justify-between py-1 font-semibold"><dt>{creditNote ? "Remaining credit" : "Balance due"}</dt><dd className="num">{formatMoney(invoice.amount_due, invoice.currency)}</dd></div>
           </dl>
           {invoice.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{invoice.notes}</p>}
           {/* On paper: how to pay and the footer line, from the company's invoice template. */}

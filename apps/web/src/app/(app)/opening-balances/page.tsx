@@ -68,7 +68,7 @@ export default async function OpeningBalancesPage() {
           {documents.length > 0 && (
             <div className="mt-3 overflow-x-auto">
               <table className="tbl">
-                <thead><tr><th scope="col">Kind</th><th scope="col">Number</th><th scope="col">Customer or supplier</th><th scope="col">Issued</th><th scope="col">Due</th><th scope="col" className="!text-right">Open at conversion</th><th scope="col" className="!text-right">Still due</th></tr></thead>
+                <thead><tr><th scope="col">Type</th><th scope="col">No.</th><th scope="col">Name</th><th scope="col">Date</th><th scope="col">Due date</th><th scope="col" className="!text-right">Open at conversion</th><th scope="col" className="!text-right">Open balance</th></tr></thead>
                 <tbody>
                   {documents.map((d) => (
                     <tr key={d.id}>

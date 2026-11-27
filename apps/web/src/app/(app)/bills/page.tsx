@@ -3,20 +3,11 @@ import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
 import { connection } from "next/server";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import type { Bill } from "@/lib/api";
 import { getBills, getCompanyToday, getReportPeriod } from "@/lib/data";
+import { paymentStatus } from "@/lib/docStatus";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Bills" };
-
-function status(b: Bill, today: string) {
-  if (b.status === "draft") return <Pill>Draft</Pill>;
-  if (b.status === "awaiting_approval") return <Pill tone="warn">Awaiting approval</Pill>;
-  if (b.status === "void") return <Pill>Void</Pill>;
-  if (b.status === "paid") return <Pill tone="good">Paid</Pill>;
-  if (b.due_date !== null && b.due_date < today) return <Pill tone="bad">Overdue</Pill>;
-  return <Pill tone="brand">{b.status === "part_paid" ? "Part paid" : "To pay"}</Pill>;
-}
 
 /** Module 3: what suppliers have billed, newest first, and what is still to pay. */
 export default async function BillsPage({ searchParams }: PageProps<"/bills">) {
@@ -37,26 +28,29 @@ export default async function BillsPage({ searchParams }: PageProps<"/bills">) {
           <table className="tbl">
             <thead>
               <tr>
-                <th scope="col">Number</th><th scope="col">Supplier</th><th scope="col">Their reference</th><th scope="col">Issued</th><th scope="col">Due</th>
-                <th scope="col">Status</th><th scope="col" className="!text-right">Total</th><th scope="col" className="!text-right">To pay</th>
+                <th scope="col">Date</th><th scope="col">No.</th><th scope="col">Supplier</th><th scope="col">Supplier invoice no.</th><th scope="col">Due date</th>
+                <th scope="col" className="!text-right">Amount</th><th scope="col" className="!text-right">Open balance</th><th scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
-              {bills.length === 0 && <tr><td colSpan={8} className="text-muted">No bills yet.</td></tr>}
-              {bills.map((b) => (
-                <tr key={b.id}>
-                  <td className="num font-semibold">
-                    <Link href={`/bills/${encodeURIComponent(b.id)}`} className="hover:underline">{b.number ?? <span className="text-muted">Draft</span>}</Link>
-                  </td>
-                  <td>{b.contact.name}</td>
-                  <td className="num">{b.reference ?? "—"}</td>
-                  <td>{b.issue_date}</td>
-                  <td>{b.due_date ?? "—"}</td>
-                  <td>{status(b, today)}</td>
-                  <td className="num text-right">{formatMoney(b.total, b.currency)}</td>
-                  <td className="num text-right font-semibold">{formatMoney(b.amount_due, b.currency)}</td>
-                </tr>
-              ))}
+              {bills.length === 0 && <tr><td colSpan={8} className="text-muted">No bills in this period.</td></tr>}
+              {bills.map((b) => {
+                const s = paymentStatus(b, today);
+                return (
+                  <tr key={b.id}>
+                    <td className="num">{b.issue_date}</td>
+                    <td className="num font-semibold">
+                      <Link href={`/bills/${encodeURIComponent(b.id)}`} className="hover:underline">{b.number ?? <span className="text-muted">Draft</span>}</Link>
+                    </td>
+                    <td>{b.contact.name}</td>
+                    <td className="num">{b.reference ?? "—"}</td>
+                    <td className="num">{b.due_date ?? "—"}</td>
+                    <td className="num text-right">{formatMoney(b.total, b.currency)}</td>
+                    <td className="num text-right font-semibold">{formatMoney(b.status === "void" ? "0.00" : b.amount_due, b.currency)}</td>
+                    <td><Pill tone={s.tone}>{s.label}</Pill></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

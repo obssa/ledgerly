@@ -84,7 +84,7 @@ export function PaymentForm({ options }: { options: ReceiveOptions & { customer:
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Invoice</th><th scope="col">Issued</th><th scope="col">Due</th><th scope="col" className="!text-right">Still due</th><th scope="col" className="!text-right">Settle</th></tr>
+                <tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col">Due date</th><th scope="col" className="!text-right">Open balance</th><th scope="col" className="!text-right">Settle</th></tr>
               </thead>
               <tbody>
                 {invoices.map((inv, i) => (

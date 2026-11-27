@@ -28,14 +28,14 @@ export default async function GoodsReceivedPage({ searchParams }: PageProps<"/go
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Number</th><th scope="col">Arrived</th><th scope="col">Supplier</th><th scope="col">Purchase order</th>
-                  <th scope="col">Their delivery note</th><th scope="col">Warehouse</th><th scope="col">Status</th><th scope="col" className="!text-right">Value</th></tr>
+                <tr><th scope="col">Date</th><th scope="col">No.</th><th scope="col">Supplier</th><th scope="col">Purchase order</th>
+                  <th scope="col">Supplier delivery note no.</th><th scope="col">Warehouse</th><th scope="col">Status</th><th scope="col" className="!text-right">Amount</th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td className="num font-semibold"><Link href={`/goods-received/${encodeURIComponent(r.id)}`} className="hover:underline">{r.number}</Link></td>
                     <td className="num">{r.received_on}</td>
+                    <td className="num font-semibold"><Link href={`/goods-received/${encodeURIComponent(r.id)}`} className="hover:underline">{r.number}</Link></td>
                     <td>{r.supplier}</td>
                     <td className="num"><Link href={`/purchase-orders/${encodeURIComponent(r.purchase_order_id)}`} className="hover:underline">{r.order_number ?? "—"}</Link></td>
                     <td className="num">{r.reference ?? "—"}</td>

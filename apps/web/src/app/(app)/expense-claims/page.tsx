@@ -33,7 +33,7 @@ export default async function ExpenseClaimsPage({ searchParams }: PageProps<"/ex
           <p className="text-sm text-muted">No claims yet.</p>
         ) : (
           <table className="tbl">
-            <thead><tr><th scope="col">Date</th><th scope="col">Claimant</th><th scope="col">For</th><th scope="col">Status</th><th scope="col" className="!text-right">Amount</th></tr></thead>
+            <thead><tr><th scope="col">Date</th><th scope="col">Employee</th><th scope="col">Description</th><th scope="col">Status</th><th scope="col" className="!text-right">Amount</th></tr></thead>
             <tbody>
               {claims.data.map((c) => (
                 <tr key={c.id}>

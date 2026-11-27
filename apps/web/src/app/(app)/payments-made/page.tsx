@@ -1,6 +1,7 @@
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
+import { appliedTo, methodLabel } from "@/lib/docStatus";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getPaymentsMade, getScheduledPayments, getReportPeriod } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
@@ -30,8 +31,8 @@ export default async function PaymentsMadePage({ searchParams }: PageProps<"/pay
           <table className="tbl">
             <thead>
               <tr>
-                <th scope="col">Date</th><th scope="col">Supplier</th><th scope="col">Method</th><th scope="col">Reference</th><th scope="col">Bills</th>
-                <th scope="col" className="!text-right">Withheld</th><th scope="col" className="!text-right">Paid</th>
+                <th scope="col">Date</th><th scope="col">Supplier</th><th scope="col">Payment method</th><th scope="col">Reference no.</th><th scope="col">Applied to</th>
+                <th scope="col" className="!text-right">Withholding tax</th><th scope="col" className="!text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -40,9 +41,9 @@ export default async function PaymentsMadePage({ searchParams }: PageProps<"/pay
                 <tr key={p.id}>
                   <td className="num"><Link href={`/payments-made/${encodeURIComponent(p.id)}`} className="hover:underline">{p.payment_date}</Link></td>
                   <td>{p.contact?.name}{p.status === "reversed" && <> <Pill tone="bad">Reversed</Pill></>}</td>
-                  <td>{p.method.replace("_", " ")}</td>
+                  <td>{methodLabel(p.method)}</td>
                   <td className="num">{p.reference ?? "—"}</td>
-                  <td>{p.allocations_count ?? 0}</td>
+                  <td>{appliedTo(p.allocations_count, "bill")}</td>
                   <td className="num text-right">{p.withholding === "0.00" ? "—" : formatAmount(p.withholding)}</td>
                   <td className="num text-right font-semibold">{formatMoney(p.amount, p.currency)}</td>
                 </tr>

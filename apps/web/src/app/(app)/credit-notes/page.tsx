@@ -1,6 +1,7 @@
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
+import { creditStatus } from "@/lib/docStatus";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCreditNotes, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
@@ -21,20 +22,23 @@ export default async function CreditNotesPage({ searchParams }: PageProps<"/cred
       <Card className="!p-2" label="Credit notes">
         <div className="overflow-x-auto">
           <table className="tbl">
-            <thead><tr><th scope="col">Number</th><th scope="col">Customer</th><th scope="col">Corrects</th><th scope="col">Date</th><th scope="col">Status</th><th scope="col" className="!text-right">Credit</th><th scope="col" className="!text-right">Left</th></tr></thead>
+            <thead><tr><th scope="col">Date</th><th scope="col">No.</th><th scope="col">Customer</th><th scope="col">Original invoice</th><th scope="col" className="!text-right">Amount</th><th scope="col" className="!text-right">Open balance</th><th scope="col">Status</th></tr></thead>
             <tbody>
               {notes.length === 0 && <tr><td colSpan={7} className="text-muted">No credit notes yet. Issue one from a posted invoice.</td></tr>}
-              {notes.map((n) => (
-                <tr key={n.id}>
-                  <td className="num font-semibold"><Link href={`/invoices/${encodeURIComponent(n.id)}`} className="hover:underline">{n.number ?? <span className="text-muted">Draft</span>}</Link></td>
-                  <td>{n.contact.name}</td>
-                  <td className="num">{n.original?.number ?? "—"}</td>
-                  <td className="num">{n.issue_date}</td>
-                  <td>{n.status === "draft" ? <Pill>Draft</Pill> : n.status === "paid" ? <Pill tone="good">Applied</Pill> : n.status === "void" ? <Pill>Void</Pill> : <Pill tone="warn">Credit left</Pill>}</td>
-                  <td className="num text-right">{formatMoney(n.total, n.currency)}</td>
-                  <td className="num text-right font-semibold">{formatMoney(n.amount_due, n.currency)}</td>
-                </tr>
-              ))}
+              {notes.map((n) => {
+                const s = creditStatus(n);
+                return (
+                  <tr key={n.id}>
+                    <td className="num">{n.issue_date}</td>
+                    <td className="num font-semibold"><Link href={`/invoices/${encodeURIComponent(n.id)}`} className="hover:underline">{n.number ?? <span className="text-muted">Draft</span>}</Link></td>
+                    <td>{n.contact.name}</td>
+                    <td className="num">{n.original?.number ?? "—"}</td>
+                    <td className="num text-right">{formatMoney(n.total, n.currency)}</td>
+                    <td className="num text-right font-semibold">{formatMoney(n.status === "void" ? "0.00" : n.amount_due, n.currency)}</td>
+                    <td><Pill tone={s.tone}>{s.label}</Pill></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

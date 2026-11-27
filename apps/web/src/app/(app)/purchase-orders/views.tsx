@@ -41,19 +41,19 @@ export async function PurchaseOrderList({ q = {} }: { q?: Record<string, string 
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Number</th><th scope="col">Supplier</th><th scope="col">Issued</th><th scope="col">Expected by</th><th scope="col">Status</th><th scope="col" className="!text-right">Total</th></tr>
+                <tr><th scope="col">Date</th><th scope="col">No.</th><th scope="col">Supplier</th><th scope="col">Expected date</th><th scope="col" className="!text-right">Amount</th><th scope="col">Status</th></tr>
               </thead>
               <tbody>
                 {rows.map((o) => {
                   const s = statusOf(o.status);
                   return (
                     <tr key={o.id}>
+                      <td className="num">{o.issue_date}</td>
                       <td className="num font-semibold"><Link href={`/purchase-orders/${encodeURIComponent(o.id)}`} className="hover:underline">{o.number ?? <span className="text-muted">Draft</span>}</Link></td>
                       <td>{o.contact.name}</td>
-                      <td>{o.issue_date}</td>
-                      <td>{o.due_date ?? "—"}</td>
-                      <td><Pill tone={s.tone}>{s.label}</Pill></td>
+                      <td className="num">{o.due_date ?? "—"}</td>
                       <td className="num text-right">{formatMoney(o.total, o.currency)}</td>
+                      <td><Pill tone={s.tone}>{s.label}</Pill></td>
                     </tr>
                   );
                 })}
@@ -123,9 +123,9 @@ export async function PurchaseOrderView({ id, saved }: { id: string; saved?: boo
               {doc.contact.tax_id && <div className="num text-[13px] text-muted">TIN {doc.contact.tax_id}</div>}
             </div>
             <div className="text-right">
-              <div><span className="text-muted">Issued</span> <span className="num">{doc.issue_date}</span></div>
-              <div><span className="text-muted">Expected by</span> <span className="num">{doc.due_date ?? "—"}</span></div>
-              {Number(doc.fx_rate) !== 1 && <div className="text-muted">Rate <span className="num">{doc.fx_rate}</span></div>}
+              <div><span className="text-muted">Purchase order date</span> <span className="num">{doc.issue_date}</span></div>
+              <div><span className="text-muted">Expected date</span> <span className="num">{doc.due_date ?? "—"}</span></div>
+              {Number(doc.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{doc.fx_rate}</span></div>}
             </div>
           </div>
           <div className="mt-5 overflow-x-auto">
