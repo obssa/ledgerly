@@ -50,6 +50,7 @@ async function Invoice({ searchParams }: Pick<PageProps<"/invoice">, "searchPara
         <dt className="text-muted">Invoice no.</dt><dd className="num text-right font-semibold">{i.number}</dd>
         <dt className="text-muted">Bill to</dt><dd className="text-right">{view.customer}</dd>
         <dt className="text-muted">Invoice date</dt><dd className="num text-right"><Dt v={i.issue_date} /></dd>
+        {i.terms && <><dt className="text-muted">Terms</dt><dd className="text-right">{i.terms}</dd></>}
         {i.due_date && <><dt className="text-muted">Due date</dt><dd className="num text-right"><Dt v={i.due_date} /></dd></>}
       </dl>
       <ul className="mt-3 divide-y divide-line border-y border-line text-[13px]">

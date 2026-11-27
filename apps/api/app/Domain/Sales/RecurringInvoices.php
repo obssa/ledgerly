@@ -54,17 +54,18 @@ final class RecurringInvoices
             return ['made' => [], 'error' => null];
         }
         $lines = json_decode((string) $t->lines, true, 512, JSON_THROW_ON_ERROR);
-        $terms = (int) (DB::table('contacts')->where('id', $t->contact_id)->value('payment_terms_days') ?? 0);
+        $termId = DB::table('contacts')->where('id', $t->contact_id)->value('payment_terms_id');
         $next = (string) $t->next_on;
         $made = [];
         $error = $this->cannotMake($company, $t, $userId);
 
         while ($error === null && $next <= $today && count($made) < self::CATCH_UP && ($t->ends_on === null || $next <= (string) $t->ends_on)) {
             try {
-                $invoice = DB::transaction(function () use ($t, $lines, $next, $terms, $userId) {
+                $invoice = DB::transaction(function () use ($t, $lines, $next, $termId, $company, $userId) {
                     $draft = $this->drafts->handle([
                         'contact_id' => $t->contact_id, 'issue_date' => $next,
-                        'due_date' => (new DateTimeImmutable($next))->modify("+{$terms} days")->format('Y-m-d'),
+                        'due_date' => PaymentTerms::forContact($t->contact_id, $next, (string) $company->calendar),   // 109: by the customer's term
+                        'payment_terms_id' => $termId,
                         'currency' => $t->currency, 'prices_include_tax' => (bool) $t->prices_include_tax, 'warehouse_id' => $t->warehouse_id,
                         'notes' => $t->notes, 'lines' => $lines,
                     ], null, $userId);

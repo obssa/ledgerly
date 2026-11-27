@@ -70,7 +70,10 @@ final class CustomerTest extends TestCase
         $trail = $this->owner()->table('audit_log')->where(['company_id' => $this->c['company'], 'subject_type' => 'customer', 'subject_id' => $id])
             ->orderBy('id')->get(['action', 'before', 'after']);
         $this->assertSame(['updated', 'updated'], $trail->pluck('action')->all());
-        $this->assertEquals(['tax_exempt' => false, 'tax_exempt_reason' => null, 'payment_terms_days' => 30], json_decode($trail[0]->before, true));
+        $this->assertEquals(['tax_exempt' => false, 'tax_exempt_reason' => null, 'payment_terms_days' => 30, 'payment_terms_id' => null], json_decode($trail[0]->before, true));
+        // 0 days is the company's Due on receipt term (109), recorded with it.
+        $this->assertSame($this->owner()->table('payment_terms')->where(['company_id' => $this->c['company'], 'name' => 'Due on receipt'])->value('id'),
+            json_decode($trail[0]->after, true)['payment_terms_id']);
     }
 
     public function test_the_open_balance_is_what_posted_invoices_still_owe(): void

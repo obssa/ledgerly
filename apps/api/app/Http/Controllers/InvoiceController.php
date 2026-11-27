@@ -37,6 +37,8 @@ final class InvoiceController extends Controller
 
         return response()->json([
             ...$invoice->toArray(),
+            // 109: the term it is on, by name (a term turned off still reads back).
+            'payment_terms' => $invoice->payment_terms_id ? \App\Domain\Sales\Models\PaymentTerm::query()->find($invoice->payment_terms_id, ['id', 'name'])?->only(['id', 'name']) : null,
             // The salesperson's name only (044): read directly, not as a User model with its sign-in fields.
             'salesperson' => $invoice->salesperson_id ? DB::table('users')->where('id', $invoice->salesperson_id)->first(['id', 'name']) : null,
             // The quote or sales order it was made from (056), through the company-scoped model.

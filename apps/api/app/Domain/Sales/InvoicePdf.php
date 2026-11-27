@@ -47,6 +47,8 @@ final class InvoicePdf
         $address = implode(', ', array_filter([$company->address_line1 ?? null, $company->address_line2 ?? null, $company->city ?? null]));
         $contactLine = implode(' · ', array_filter([$company->phone ?? null, $company->email ?? null]));
         $clearance = $invoice->einvoiceSubmissions->firstWhere('status', 'cleared')?->clearance_number;
+        // 109: the term it is on, printed beside the due date as QuickBooks does (a term turned off still reads).
+        $termName = $invoice->payment_terms_id ? \App\Domain\Sales\Models\PaymentTerm::query()->whereKey($invoice->payment_terms_id)->value('name') : null;
         $original = $invoice->original_document_id ? DB::table('documents')->where(['company_id' => $company->getKey(), 'id' => $invoice->original_document_id])->value('number') : null;
         // The company's invoice template: its accent colour (validated as #RRGGBB when saved), how to pay, a footer line.
         $template = \App\Http\Controllers\CompanySettingsController::template($company->settings['invoice_template'] ?? []);
@@ -78,6 +80,8 @@ final class InvoicePdf
             . '</td><td style="border:none;vertical-align:top;text-align:right">'
             . '<h1>' . $title . ' ' . $e($invoice->number) . '</h1>'
             . '<div>Invoice date ' . $e((string) \App\Support\DateFormat::format($invoice->issue_date, $company)) . '</div>'
+            // 109: the term it is on, as QuickBooks prints it beside the due date.
+            . ($termName !== null ? '<div>Terms ' . $e($termName) . '</div>' : '')
             . ($invoice->due_date ? '<div>Due date ' . $e((string) \App\Support\DateFormat::format($invoice->due_date, $company)) . '</div>' : '')
             . ($original ? '<div>Corrects invoice ' . $e($original) . '</div>' : '')
             . '</td></tr></table>'

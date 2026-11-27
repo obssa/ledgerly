@@ -81,6 +81,41 @@ export async function saveNumbering(_: FormState | undefined, form: FormData): P
   }
 }
 
+/** A term from the form (109): days, or a day of the month and how near it a document goes to the next month. */
+function termBody(form: FormData) {
+  const kind = form.get("kind") === "day_of_month" ? "day_of_month" as const : "days" as const;
+  const whole = (name: string) => (text(form, name) === undefined ? null : Number(text(form, name)));
+  return {
+    name: text(form, "name") ?? "",
+    kind,
+    days: kind === "days" ? whole("days") : null,
+    day_of_month: kind === "day_of_month" ? whole("day_of_month") : null,
+    next_month_within: kind === "day_of_month" ? whole("next_month_within") ?? 0 : 0,
+  };
+}
+
+export async function addPaymentTerm(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const saved = await ledgerly.createPaymentTerm(termBody(form), ctx);
+    refresh();
+    return { notice: `${saved.name} added to the Terms list.` };
+  } catch (error) {
+    return refusal(error);
+  }
+}
+
+export async function savePaymentTerm(_: FormState | undefined, form: FormData): Promise<FormState> {
+  const ctx = await context();
+  try {
+    const saved = await ledgerly.updatePaymentTerm(text(form, "id") ?? "", { ...termBody(form), is_active: form.get("is_active") === "on" }, ctx);
+    refresh();
+    return { notice: saved.is_active ? "Saved." : `Saved. ${saved.name} is turned off: documents on it keep it, new ones cannot choose it.` };
+  } catch (error) {
+    return refusal(error);
+  }
+}
+
 export async function addDimension(_: FormState | undefined, form: FormData): Promise<FormState> {
   const ctx = await context();
   const body = { kind: text(form, "kind") ?? "", code: text(form, "code") ?? "", name: text(form, "name") ?? "" };

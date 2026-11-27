@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useId } from "react";
-import type { Supplier } from "@/lib/api";
+import { TermsSelect } from "@/components/TermsSelect";
+import type { PaymentTerm, Supplier } from "@/lib/api";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
 import { WITHHOLDING_SHOWN } from "@/lib/suppliers";
@@ -14,8 +15,9 @@ function Message({ state }: { state: FormState | undefined }) {
 }
 
 /** New supplier (no `supplier`) or edit. Read-only when the role cannot edit; the API checks again. */
-export function SupplierForm({ supplier, accounts, readOnly = false }: {
+export function SupplierForm({ supplier, accounts, readOnly = false, terms = [] }: {
   supplier?: Supplier; accounts: { id: string; code: string; name: string }[]; readOnly?: boolean;
+  terms?: PaymentTerm[];
 }) {
   const [state, action, pending] = useActionState(supplier ? saveSupplier : createSupplier, undefined);
   const bad = (name: string) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k === name || k.startsWith(`${name}.`)));
@@ -32,7 +34,7 @@ export function SupplierForm({ supplier, accounts, readOnly = false }: {
         <Field name="tax_id" label="Tax ID (TIN)" defaultValue={v("tax_id")} invalid={bad("tax_id")} />
         <Field name="email" label="Email" type="email" defaultValue={v("email")} invalid={bad("email")} />
         <Field name="phone" label="Phone" type="tel" defaultValue={v("phone")} invalid={bad("phone")} />
-        <Field name="payment_terms_days" label="Payment terms (days)" type="number" defaultValue={String(supplier?.payment_terms_days ?? 30)} invalid={bad("payment_terms_days")} />
+        <TermsSelect terms={terms} value={supplier?.payment_terms_id} days={supplier?.payment_terms_days} invalid={bad("payment_terms_id")} />
         <div>
           <label className="field-label" htmlFor="currency">Bill currency</label>
           <select className="field" id="currency" name="currency" defaultValue={supplier?.currency ?? ""}>

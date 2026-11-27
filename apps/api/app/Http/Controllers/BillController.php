@@ -40,6 +40,8 @@ final class BillController extends Controller
 
         return response()->json([
             ...$bill->toArray(),
+            // 109: the term it is on, by name (a term turned off still reads back).
+            'payment_terms' => $bill->payment_terms_id ? \App\Domain\Sales\Models\PaymentTerm::query()->find($bill->payment_terms_id, ['id', 'name'])?->only(['id', 'name']) : null,
             // Why it cannot be corrected in place (a payment, goods received…); null when it can.
             'correct_blocked' => $blocked,
             'warnings' => $bill->type === 'bill' ? $this->duplicates->warnings($bill) : [],

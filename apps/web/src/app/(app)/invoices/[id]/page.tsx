@@ -99,6 +99,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             </div>
             <div className="text-right">
               <div><span className="text-muted">{creditNote ? "Credit note date" : "Invoice date"}</span> <span className="num"><Dt v={invoice.issue_date} /></span></div>
+              {!creditNote && invoice.payment_terms && <div><span className="text-muted">Terms</span> {invoice.payment_terms.name}</div>}
               {!creditNote && <div><span className="text-muted">Due date</span> <span className="num"><Dt v={invoice.due_date} /></span></div>}
               {invoice.salesperson && <div><span className="text-muted">Salesperson</span> {invoice.salesperson.name}</div>}
               {Number(invoice.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{invoice.fx_rate}</span></div>}

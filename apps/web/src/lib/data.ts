@@ -3,10 +3,10 @@ import type { DocumentHistory } from "./history";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type PnlColumnsBy, type ProfitAndLossColumns, type JournalReport, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type PnlColumnsBy, type ProfitAndLossColumns, type JournalReport, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type PaymentTerm, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { paged, type ListQuery, type Paged } from "./lists";
 import type { RealizedGains, UnrealizedGains, TransactionReportData, BankPaymentFile, Bin, LeaseDetail, LeaseRegister, Tag, TagKind, TagReport, TransactionTags, DonorReport, IndustryTemplates, DirectCashFlow, FinancialNotes, ItemAssembly, ExpenseClaim, ExpenseClaimList, PurchaseRequisition, RequisitionList, InvoiceWriteOffs, LateInterestPreview, PriceList, PriceListDetail, ScheduledPayments, ScheduledPaymentDetail } from "./api";
-import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoInvoices, demoProfitAndLoss } from "./demo";
+import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoPaymentTerms, demoInvoices, demoProfitAndLoss } from "./demo";
 import { getSession } from "./session";
 import { DEFAULT_DATE_PREFS, formatDate, formatDateTime, pickDateFormat, todayIn, type DatePrefs } from "@/lib/dates";
 import type { AsOfPreset, PeriodContext, RangePreset } from "./periods";
@@ -342,6 +342,13 @@ export async function getDimensions(): Promise<Dimension[]> {
 }
 
 /** Numbering of the document types in use so far (invoices, credit notes, bills, expenses). */
+/** QuickBooks' Terms list (109): the active terms for the forms, or every term (turned-off ones too) for Settings. */
+export async function getPaymentTerms(all = false): Promise<PaymentTerm[]> {
+  await connection();
+  if (isDemoMode()) return demoPaymentTerms;
+  return (await withApi((ctx) => ledgerly.paymentTerms(ctx, all))).data;
+}
+
 export async function getNumbering(): Promise<Numbering[]> {
   await connection();
   const types = ["invoice", "credit_note", "sales_receipt", "quote", "sales_order", "bill", "vendor_credit", "purchase_order", "expense"];
@@ -376,7 +383,10 @@ export async function getCustomer(id: string): Promise<(Customer & { demo: boole
 
 export interface InvoiceOptions {
   /** The customers for an invoice, the suppliers for a bill. */
-  customers: { id: string; name: string; tax_id: string | null; currency: string | null; payment_terms_days: number; default_account_id?: string | null; price_list_id?: string | null }[];
+  customers: { id: string; name: string; tax_id: string | null; currency: string | null; payment_terms_days: number; payment_terms_id?: string | null; default_account_id?: string | null; price_list_id?: string | null }[];
+  /** 109: the Terms list (active terms) and the company's calendar, so the form sets the due date as QuickBooks does. */
+  terms?: PaymentTerm[];
+  calendar?: "gregorian" | "ethiopian";
   /** 080: the active price lists, each in its currency, with a price per item it lists. */
   priceLists?: { id: string; currency: string; prices: Record<string, string> }[];
   accounts: { id: string; code: string; name: string }[];
@@ -415,18 +425,22 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       currencies: ["ETB", "USD"],
       baseCurrency: "ETB",
       manualNumbers: false,
+      terms: demoPaymentTerms,
+      calendar: demoCompanySettings.calendar,
       demo: true,
     };
   }
-  const today = await getCompanyToday();
+  const { today, calendar } = await getCompanyDay();
   return withApi(async (ctx) => {
-    const [customers, accounts, rates, currencies, numbering, items, warehouses, people] = await Promise.all([
+    const [customers, accounts, rates, currencies, numbering, items, warehouses, people, terms] = await Promise.all([
       ledgerly.customers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
-      ledgerly.items({}, ctx), ledgerly.warehouses(ctx), ledgerly.people(ctx),
+      ledgerly.items({}, ctx), ledgerly.warehouses(ctx), ledgerly.people(ctx), ledgerly.paymentTerms(ctx),
     ]);
     return {
       people: people.data,
-      customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days, price_list_id: c.price_list_id ?? null })),
+      terms: terms.data,
+      calendar,
+      customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days, payment_terms_id: c.payment_terms_id ?? null, price_list_id: c.price_list_id ?? null })),
       priceLists: await ledgerly.priceListPrices(ctx).then((r) => r.data, (error) => {
         if (error instanceof ApiError && error.status === 403) return [];
         throw error;
@@ -453,14 +467,16 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
   if (isDemoMode()) {
     return { customers: [], accounts: [], taxRates: demoTaxRates, currencies: ["ETB"], baseCurrency: "ETB", manualNumbers: false, demo: true };
   }
-  const today = await getCompanyToday();
+  const { today, calendar } = await getCompanyDay();
   return withApi(async (ctx) => {
-    const [suppliers, accounts, rates, currencies, numbering, items, warehouses] = await Promise.all([
+    const [suppliers, accounts, rates, currencies, numbering, items, warehouses, terms] = await Promise.all([
       ledgerly.suppliers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
-      ledgerly.items({}, ctx), ledgerly.warehouses(ctx),
+      ledgerly.items({}, ctx), ledgerly.warehouses(ctx), ledgerly.paymentTerms(ctx),
     ]);
     return {
-      customers: suppliers.data.map((s) => ({ id: s.id, name: s.name, tax_id: s.tax_id, currency: s.currency, payment_terms_days: s.payment_terms_days, default_account_id: s.default_expense_account_id })),
+      terms: terms.data,
+      calendar,
+      customers: suppliers.data.map((s) => ({ id: s.id, name: s.name, tax_id: s.tax_id, currency: s.currency, payment_terms_days: s.payment_terms_days, payment_terms_id: s.payment_terms_id ?? null, default_account_id: s.default_expense_account_id })),
       accounts: accounts.data
         .filter((a) => a.is_active && (a.type === "expense" || (a.type === "asset" && ["fixed_asset", "prepayment"].includes(a.subtype ?? ""))))
         .map((a) => ({ id: a.id, code: a.code, name: a.name })),

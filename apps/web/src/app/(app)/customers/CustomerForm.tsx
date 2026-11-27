@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useId } from "react";
-import type { Customer } from "@/lib/api";
+import { TermsSelect } from "@/components/TermsSelect";
+import type { Customer, PaymentTerm } from "@/lib/api";
 import { EXEMPT_SHOWN } from "@/lib/customers";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
@@ -14,7 +15,9 @@ function Message({ state }: { state: FormState | undefined }) {
 }
 
 /** New customer (no `customer`) or edit. Read-only when the role cannot edit; the API checks again. */
-export function CustomerForm({ customer, readOnly = false, priceLists = [] }: { customer?: Customer; readOnly?: boolean; priceLists?: { id: string; name: string; currency: string }[] }) {
+export function CustomerForm({ customer, readOnly = false, priceLists = [], terms = [] }: {
+  customer?: Customer; readOnly?: boolean; priceLists?: { id: string; name: string; currency: string }[]; terms?: PaymentTerm[];
+}) {
   const [state, action, pending] = useActionState(customer ? saveCustomer : createCustomer, undefined);
   const bad = (name: string) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k === name || k.startsWith(`${name}.`)));
   const v = (name: keyof Customer) => (customer?.[name] as string | null | undefined) ?? "";
@@ -29,7 +32,7 @@ export function CustomerForm({ customer, readOnly = false, priceLists = [] }: { 
         <Field name="tax_id" label="Tax ID (TIN)" defaultValue={v("tax_id")} invalid={bad("tax_id")} />
         <Field name="email" label="Email" type="email" defaultValue={v("email")} invalid={bad("email")} />
         <Field name="phone" label="Phone" type="tel" defaultValue={v("phone")} invalid={bad("phone")} />
-        <Field name="payment_terms_days" label="Payment terms (days)" type="number" defaultValue={String(customer?.payment_terms_days ?? 30)} invalid={bad("payment_terms_days")} />
+        <TermsSelect terms={terms} value={customer?.payment_terms_id} days={customer?.payment_terms_days} invalid={bad("payment_terms_id")} />
         <Field name="credit_limit" label="Credit limit" defaultValue={customer?.credit_limit ?? ""} hint="Empty means no limit. Going over it warns, it does not block." invalid={bad("credit_limit")} />
         <div>
           <SelectLabel id="currency" label="Invoice currency" />

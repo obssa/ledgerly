@@ -42,4 +42,30 @@ trait ContactRules
 
         return $data;
     }
+
+    /** @return array<string, list<mixed>> the usual term (109): one of the company's terms in use (row-level security scopes the lookup) */
+    protected static function termsRules(): array
+    {
+        return ['payment_terms_id' => ['sometimes', 'nullable', 'uuid', \Illuminate\Validation\Rule::exists('payment_terms', 'id')->where('is_active', true)]];
+    }
+
+    /**
+     * The term and the days kept in step: a term gives its days (30 for a day of the month); days alone (an import, an
+     * older client) take the company's term of those days when there is one.
+     *
+     * @param array<string, mixed> $data @return array<string, mixed>
+     */
+    protected static function withTerms(array $data, bool $creating): array
+    {
+        if (! empty($data['payment_terms_id'])) {
+            $term = \App\Domain\Sales\Models\PaymentTerm::query()->find($data['payment_terms_id']);
+            $data['payment_terms_days'] = $term?->kind === 'days' ? (int) $term->days : 30;
+        } elseif (! array_key_exists('payment_terms_id', $data) && ($creating || array_key_exists('payment_terms_days', $data))) {
+            $days = (int) ($data['payment_terms_days'] ?? 30);
+            $data['payment_terms_id'] = \App\Domain\Sales\Models\PaymentTerm::query()->where(['kind' => 'days', 'days' => $days, 'is_active' => true])
+                ->orderByRaw('length(name)')->value('id');
+        }
+
+        return $data;
+    }
 }

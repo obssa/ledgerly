@@ -1,6 +1,7 @@
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
-import { getSuppliers } from "@/lib/data";
+import { termsLabel } from "@/components/TermsSelect";
+import { getPaymentTerms, getSuppliers } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Suppliers" };
@@ -9,7 +10,7 @@ export const metadata = { title: "Suppliers" };
 export default async function SuppliersPage({ searchParams }: PageProps<"/suppliers">) {
   const { q, archived } = await searchParams;
   const search = typeof q === "string" ? q.slice(0, 100) : "";
-  const { data, can, demo } = await getSuppliers({ search, archived: archived === "1" });
+  const [{ data, can, demo }, terms] = await Promise.all([getSuppliers({ search, archived: archived === "1" }), getPaymentTerms(true)]);
 
   return (
     <>
@@ -41,7 +42,7 @@ export default async function SuppliersPage({ searchParams }: PageProps<"/suppli
                     {!s.is_active && <span className="ml-2 text-[12px] font-normal text-muted">archived</span>}
                   </td>
                   <td className="num">{s.tax_id ?? "—"}</td>
-                  <td>{s.payment_terms_days === 0 ? "On receipt" : `${s.payment_terms_days} days`}</td>
+                  <td>{termsLabel(terms, s.payment_terms_id, s.payment_terms_days)}</td>
                   <td className="num text-right font-semibold">{formatAmount(s.open_balance)}</td>
                 </tr>
               ))}
