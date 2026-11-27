@@ -249,10 +249,21 @@ final class SaveInvoiceDraft
      *
      * @return array{header: array<string, mixed>, lines: list<array<string, mixed>>, totals: array{subtotal: string, tax_total: string, total: string}}
      */
+    /** Exclusive, inclusive or out of scope (110): tax_mode when given, else prices_include_tax. */
+    public static function taxMode(array $data): string
+    {
+        $mode = $data['tax_mode'] ?? null;
+
+        return in_array($mode, ['exclusive', 'inclusive', 'out_of_scope'], true) ? $mode : (! empty($data['prices_include_tax']) ? 'inclusive' : 'exclusive');
+    }
+
     public function calculate(array $data): array
     {
         $currency = $data['currency'];
-        $inclusive = (bool) ($data['prices_include_tax'] ?? false);
+        // 110: QuickBooks' Amounts are. Out of scope of tax: no rate and no tax on any line, whatever was sent.
+        $mode = self::taxMode($data);
+        $inclusive = $mode === 'inclusive';
+        $outOfScope = $mode === 'out_of_scope';
         $rates = DB::table('tax_rates')
             ->whereIn('id', array_filter(array_column($data['lines'], 'tax_rate_id')))
             ->pluck('rate', 'id');
@@ -260,6 +271,9 @@ final class SaveInvoiceDraft
         $amounts = [];
         $lineRows = [];
         foreach (array_values($data['lines']) as $i => $line) {
+            if ($outOfScope) {
+                $line['tax_rate_id'] = null;
+            }
             $rate = isset($line['tax_rate_id']) ? (string) ($rates[$line['tax_rate_id']] ?? '0') : '0';
             $result = $this->tax->line(
                 Money::of($line['unit_price'], $currency),
@@ -303,6 +317,7 @@ final class SaveInvoiceDraft
                 // 1 for the base currency; else the rate given, or the company's rate for the issue date.
                 'fx_rate' => $this->rates->forDocument($this->company->get(), $currency, $data['issue_date'], isset($data['fx_rate']) ? (string) $data['fx_rate'] : null),
                 'prices_include_tax' => $inclusive,
+                'out_of_scope' => $outOfScope,
                 'language' => $data['language'] ?? 'en',
                 'notes' => $data['notes'] ?? null,
                 'reference' => isset($data['reference']) && trim((string) $data['reference']) !== '' ? trim((string) $data['reference']) : null,

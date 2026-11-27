@@ -73,6 +73,8 @@ final class ExpenseController extends Controller
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'prices_include_tax' => ['boolean'],
+            // 110: QuickBooks' Amounts are. Given, it decides; else prices_include_tax does (exclusive or inclusive).
+            'tax_mode' => ['nullable', Rule::in(['exclusive', 'inclusive', 'out_of_scope'])],
             'notes' => ['nullable', 'string', 'max:2000'],
             'lines' => ['required', 'array', 'min:1', 'max:100'],
             'lines.*.description' => ['required', 'string', 'max:500'],

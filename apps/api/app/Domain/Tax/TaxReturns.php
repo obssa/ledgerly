@@ -197,6 +197,7 @@ final class TaxReturns
             ->join('documents as d', fn ($j) => $j->on('d.company_id', '=', 'dl.company_id')->on('d.id', '=', 'dl.document_id'))
             ->leftJoin('tax_rates as r', 'r.id', '=', 'dl.tax_rate_id')
             ->where('dl.company_id', $companyId)->whereIn('d.type', array_keys($types))->whereIn('d.status', self::POSTED)
+            ->where('d.out_of_scope', false)   // 110: out of scope of tax, not on the return
             ->whereBetween('d.issue_date', [$from, $to]);
         $rates = (clone $lines)->groupBy('r.code', 'r.name', 'r.rate', 'r.kind')->orderBy('r.code')
             ->select('r.code', 'r.name', 'r.rate', 'r.kind')

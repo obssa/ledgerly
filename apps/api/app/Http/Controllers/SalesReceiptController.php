@@ -77,6 +77,8 @@ final class SalesReceiptController extends Controller
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'prices_include_tax' => ['boolean'],
+            // 110: QuickBooks' Amounts are. Given, it decides; else prices_include_tax does (exclusive or inclusive).
+            'tax_mode' => ['nullable', Rule::in(['exclusive', 'inclusive', 'out_of_scope'])],
             'notes' => ['nullable', 'string', 'max:2000'],
             'warehouse_id' => ['nullable', 'uuid', Rule::exists('warehouses', 'id')->where('is_active', true)],   // for stock lines
             'salesperson_id' => ['nullable', 'uuid'],   // an active member of the company: checked in SaveInvoiceDraft (044)

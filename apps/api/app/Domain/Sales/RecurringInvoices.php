@@ -66,7 +66,7 @@ final class RecurringInvoices
                         'contact_id' => $t->contact_id, 'issue_date' => $next,
                         'due_date' => PaymentTerms::forContact($t->contact_id, $next, (string) $company->calendar),   // 109: by the customer's term
                         'payment_terms_id' => $termId,
-                        'currency' => $t->currency, 'prices_include_tax' => (bool) $t->prices_include_tax, 'warehouse_id' => $t->warehouse_id,
+                        'currency' => $t->currency, 'prices_include_tax' => (bool) $t->prices_include_tax, 'tax_mode' => $t->out_of_scope ? 'out_of_scope' : null, 'warehouse_id' => $t->warehouse_id,
                         'notes' => $t->notes, 'lines' => $lines,
                     ], null, $userId);
                     $draft->forceFill(['recurring_invoice_id' => $t->id])->save();

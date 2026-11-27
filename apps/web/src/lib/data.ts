@@ -3,7 +3,7 @@ import type { DocumentHistory } from "./history";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type PnlColumnsBy, type ProfitAndLossColumns, type JournalReport, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type PaymentTerm, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type PnlColumnsBy, type ProfitAndLossColumns, type JournalReport, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type PaymentTerm, type TaxMode, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { paged, type ListQuery, type Paged } from "./lists";
 import type { RealizedGains, UnrealizedGains, TransactionReportData, BankPaymentFile, Bin, LeaseDetail, LeaseRegister, Tag, TagKind, TagReport, TransactionTags, DonorReport, IndustryTemplates, DirectCashFlow, FinancialNotes, ItemAssembly, ExpenseClaim, ExpenseClaimList, PurchaseRequisition, RequisitionList, InvoiceWriteOffs, LateInterestPreview, PriceList, PriceListDetail, ScheduledPayments, ScheduledPaymentDetail } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoPaymentTerms, demoInvoices, demoProfitAndLoss } from "./demo";
@@ -387,6 +387,8 @@ export interface InvoiceOptions {
   /** 109: the Terms list (active terms) and the company's calendar, so the form sets the due date as QuickBooks does. */
   terms?: PaymentTerm[];
   calendar?: "gregorian" | "ethiopian";
+  /** 110: the company's default Amounts are for a new document. */
+  amountsAre?: TaxMode;
   /** 080: the active price lists, each in its currency, with a price per item it lists. */
   priceLists?: { id: string; currency: string; prices: Record<string, string> }[];
   accounts: { id: string; code: string; name: string }[];
@@ -430,7 +432,7 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       demo: true,
     };
   }
-  const { today, calendar } = await getCompanyDay();
+  const { today, calendar, amountsAre } = await getCompanyDay();
   return withApi(async (ctx) => {
     const [customers, accounts, rates, currencies, numbering, items, warehouses, people, terms] = await Promise.all([
       ledgerly.customers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
@@ -440,6 +442,7 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       people: people.data,
       terms: terms.data,
       calendar,
+      amountsAre,
       customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days, payment_terms_id: c.payment_terms_id ?? null, price_list_id: c.price_list_id ?? null })),
       priceLists: await ledgerly.priceListPrices(ctx).then((r) => r.data, (error) => {
         if (error instanceof ApiError && error.status === 403) return [];
@@ -467,7 +470,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
   if (isDemoMode()) {
     return { customers: [], accounts: [], taxRates: demoTaxRates, currencies: ["ETB"], baseCurrency: "ETB", manualNumbers: false, demo: true };
   }
-  const { today, calendar } = await getCompanyDay();
+  const { today, calendar, amountsAre } = await getCompanyDay();
   return withApi(async (ctx) => {
     const [suppliers, accounts, rates, currencies, numbering, items, warehouses, terms] = await Promise.all([
       ledgerly.suppliers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
@@ -476,6 +479,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
     return {
       terms: terms.data,
       calendar,
+      amountsAre,
       customers: suppliers.data.map((s) => ({ id: s.id, name: s.name, tax_id: s.tax_id, currency: s.currency, payment_terms_days: s.payment_terms_days, payment_terms_id: s.payment_terms_id ?? null, default_account_id: s.default_expense_account_id })),
       accounts: accounts.data
         .filter((a) => a.is_active && (a.type === "expense" || (a.type === "asset" && ["fixed_asset", "prepayment"].includes(a.subtype ?? ""))))
@@ -1704,12 +1708,12 @@ export async function getCompanyToday(): Promise<string> {
 }
 
 /** Today in the company's time zone, the calendar its dates are shown in and how it writes them, from one settings request. */
-export async function getCompanyDay(): Promise<{ today: string; calendar: CompanySettings["calendar"]; dateFormat: DatePrefs["dateFormat"]; timezone: string }> {
+export async function getCompanyDay(): Promise<{ today: string; calendar: CompanySettings["calendar"]; dateFormat: DatePrefs["dateFormat"]; timezone: string; amountsAre?: TaxMode }> {
   await connection();
   if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar, dateFormat: pickDateFormat(demoCompanySettings.date_format), timezone: demoCompanySettings.timezone };
   try {
     const settings = await withApi((ctx) => settingsOf(ctx.token, ctx.companyId));
-    return { today: todayIn(settings.timezone), calendar: settings.calendar, dateFormat: pickDateFormat(settings.date_format), timezone: settings.timezone };
+    return { today: todayIn(settings.timezone), calendar: settings.calendar, dateFormat: pickDateFormat(settings.date_format), timezone: settings.timezone, amountsAre: settings.amounts_are };
   } catch (error) {
     // A role without company.view still gets a date (Gregorian, DD/MM/YYYY, the defaults); redirects pass through.
     if (error instanceof ApiError) return { today: todayIn(), calendar: "gregorian", dateFormat: DEFAULT_DATE_PREFS.dateFormat, timezone: "" };

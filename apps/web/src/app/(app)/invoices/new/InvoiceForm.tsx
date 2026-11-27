@@ -4,7 +4,7 @@ import { DateInput } from "@/components/DateInput";
 import Link from "@/components/Link";
 import { startTransition, useActionState, useMemo, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
-import type { InvoiceDetail } from "@/lib/api";
+import type { InvoiceDetail, TaxMode } from "@/lib/api";
 import type { InvoiceOptions } from "@/lib/data";
 import { documentAmounts, lineAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
@@ -54,7 +54,7 @@ const KIND = {
 } as const;
 
 /** What the form needs from a saved document to edit it: an invoice draft, or a quote or sales order. */
-type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
+type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "tax_mode" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
   | "warehouse_id" | "number" | "notes" | "lines" | "lock_version"> & { status: string; reference?: string | null };
 
 const METHODS: Record<string, string> = {
@@ -137,7 +137,10 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const custom = numbering?.allow_custom ?? true;
   const suggested = manual ? "" : numbering?.next_number ?? "";
   const [currency, setCurrency] = useState(draft?.currency ?? options.baseCurrency);
-  const [inclusive, setInclusive] = useState(Boolean(draft?.prices_include_tax));
+  // QuickBooks' Amounts are (110): the document's own, else the company's default. Out of scope of tax: no tax at all.
+  const [mode, setMode] = useState<TaxMode>(draft ? draft.tax_mode ?? (draft.prices_include_tax ? "inclusive" : "exclusive") : options.amountsAre ?? "exclusive");
+  const inclusive = mode === "inclusive";
+  const untaxed = mode === "out_of_scope";
   const projects = options.projects ?? [];
   const [lines, setLines] = useState<Line[]>(draft && draft.lines.length > 0
     ? draft.lines.map((l, i) => ({ key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
@@ -175,12 +178,12 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   };
 
   const customer = options.customers.find((c) => c.id === customerId);
-  const rateOf = (id: string) => options.taxRates.find((t) => t.id === id)?.rate ?? "0";
+  const rateOf = (id: string) => (untaxed ? "0" : options.taxRates.find((t) => t.id === id)?.rate ?? "0");
   const valid = lines.filter((l) => isDecimal(l.quantity) && isDecimal(l.unitPrice));
   const totals = useMemo(
     () => documentAmounts(valid.map((l) => ({ quantity: plain(l.quantity), unitPrice: plain(l.unitPrice), taxRate: rateOf(l.taxRateId) })), currency, inclusive),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lines, inclusive, currency],
+    [lines, mode, currency],
   );
 
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -209,7 +212,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
       return [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, taxRateId: firstRate, ...filled }];
     });
   };
-  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, unit_id: l.unitId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}),
+  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: untaxed ? null : l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, unit_id: l.unitId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}),
     ...(l.batchNumber ? { batch_number: l.batchNumber, batch_expires_on: l.batchExpires || null } : {}) })));
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
   const bad = (name: string) => Boolean(state?.fields?.[name]);
@@ -355,11 +358,14 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             {currency !== options.baseCurrency && (
               <Field name="fx_rate" defaultValue={draft && currency === draft.currency && draft.currency !== options.baseCurrency ? draft.fx_rate : ""} label={`Rate (${options.baseCurrency} for 1 ${currency})`} hint="Empty: the company's rate for the issue date" invalid={bad("fx_rate")} />
             )}
-            <div className="flex items-end">
-              <label className="flex min-h-[42px] items-center gap-2 text-sm font-semibold">
-                <input type="checkbox" name="prices_include_tax" checked={inclusive} onChange={(e) => setInclusive(e.target.checked)} className="size-[18px] accent-brand" />
-                Prices include VAT
-              </label>
+            <div>
+              <label className="field-label" htmlFor="tax_mode">Amounts are</label>
+              <select className={`field ${bad("tax_mode") ? "!border-bad" : ""}`} id="tax_mode" name="tax_mode" value={mode} onChange={(e) => setMode(e.target.value as TaxMode)}>
+                <option value="exclusive">Exclusive of tax</option>
+                <option value="inclusive">Inclusive of tax</option>
+                <option value="out_of_scope">Out of scope of tax</option>
+              </select>
+              {untaxed && <p className="mt-1.5 text-[13px] text-muted">No tax on any line, and left off the VAT return. Zero-rated or exempt sales take their tax rate instead.</p>}
             </div>
           </div>
         </Card>
@@ -368,7 +374,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr>{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}<th scope="col">Description</th><th scope="col">Qty</th>{withUnits && <th scope="col">Unit</th>}<th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+                <tr>{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}<th scope="col">Description</th><th scope="col">Qty</th>{withUnits && <th scope="col">Unit</th>}<th scope="col">Unit price</th>{!untaxed && <th scope="col">Tax</th>}<th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
               </thead>
               <tbody>
                 {lines.map((l, i) => {
@@ -416,12 +422,14 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                         );
                       })()}
                       <td><input aria-label="Unit price" inputMode="decimal" className="field num w-[110px] text-right" value={l.unitPrice} onChange={(e) => update(l.key, { unitPrice: e.target.value })} /></td>
-                      <td>
-                        <select aria-label="Tax" className="field w-[130px]" value={l.taxRateId} onChange={(e) => update(l.key, { taxRateId: e.target.value })}>
-                          <option value="">No tax</option>
-                          {options.taxRates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                      </td>
+                      {!untaxed && (
+                        <td>
+                          <select aria-label="Tax" className="field w-[130px]" value={l.taxRateId} onChange={(e) => update(l.key, { taxRateId: e.target.value })}>
+                            <option value="">No tax</option>
+                            {options.taxRates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                        </td>
+                      )}
                       <td>
                         <select aria-label={words.account} className="field w-[160px]" value={l.accountId} onChange={(e) => update(l.key, { accountId: e.target.value })}>
                           {options.accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
@@ -457,7 +465,9 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             </div>
             <dl className="flex-[0_1_320px] text-sm">
               <div className="flex justify-between py-1.5"><dt>Subtotal</dt><dd className="num">{formatAmount(totals.subtotal, currency)}</dd></div>
-              <div className="flex justify-between py-1.5"><dt>Tax</dt><dd className="num">{formatAmount(totals.tax, currency)}</dd></div>
+              {untaxed
+                ? <div className="flex justify-between py-1.5 text-muted"><dt>Out of scope of tax</dt><dd>No tax</dd></div>
+                : <div className="flex justify-between py-1.5"><dt>Tax</dt><dd className="num">{formatAmount(totals.tax, currency)}</dd></div>}
               <div className="mt-1.5 flex justify-between border-t-2 border-ink pt-3 text-lg font-extrabold"><dt>Total</dt><dd className="num font-semibold">{formatMoney(totals.total, currency)}</dd></div>
             </dl>
           </div>

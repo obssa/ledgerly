@@ -56,10 +56,12 @@ export function invoiceBody(form: FormData): Record<string, unknown> {
     contact_id: value("contact_id"),
     issue_date: value("issue_date"),
     currency: value("currency"),
-    prices_include_tax: form.get("prices_include_tax") === "on",
+    // 110: Amounts are; the old checkbox still means inclusive.
+    prices_include_tax: form.get("tax_mode") === "inclusive" || form.get("prices_include_tax") === "on",
     lines: parseLines(form.get("lines")),
   };
   for (const name of ["due_date", "notes", "number", "reference", "paid_from_account_id", "payment_method", "warehouse_id", "salesperson_id", "payment_terms_id"]) if (value(name) !== "") body[name] = value(name);
+  if (["exclusive", "inclusive", "out_of_scope"].includes(value("tax_mode"))) body.tax_mode = value("tax_mode");
   // The next number shown, kept as it was: the server takes the next free one when it saves (someone may have taken it meanwhile).
   if (value("number_suggested") !== "" && value("number") === value("number_suggested")) delete body.number;
   if (clean(form.get("fx_rate")) !== "") body.fx_rate = clean(form.get("fx_rate"));

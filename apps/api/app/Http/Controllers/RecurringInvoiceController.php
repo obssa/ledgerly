@@ -68,7 +68,7 @@ final class RecurringInvoiceController extends Controller
         $name = $data['name'] ?? mb_substr(($invoice->contact?->name ?? 'Invoice') . ' · ' . ($lines[0]['description'] ?? 'repeated'), 0, 120);
         $row = [
             'id' => $id, 'company_id' => $invoice->company_id, 'name' => mb_strlen($name) >= 3 ? $name : 'Repeated invoice', 'contact_id' => $invoice->contact_id,
-            'currency' => $invoice->currency, 'prices_include_tax' => (bool) $invoice->prices_include_tax, 'warehouse_id' => $invoice->warehouse_id,
+            'currency' => $invoice->currency, 'prices_include_tax' => (bool) $invoice->prices_include_tax, 'out_of_scope' => (bool) $invoice->out_of_scope, 'warehouse_id' => $invoice->warehouse_id,
             'notes' => $invoice->notes, 'lines' => json_encode($lines, JSON_THROW_ON_ERROR), 'frequency' => $data['frequency'], 'next_on' => $data['next_on'],
             'ends_on' => $data['ends_on'] ?? null, 'post' => (bool) ($data['post'] ?? false), 'posts_as' => $request->user()->getKey(),
         ];

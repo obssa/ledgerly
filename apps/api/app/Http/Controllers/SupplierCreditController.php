@@ -76,7 +76,7 @@ final class SupplierCreditController extends Controller
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
         ], ['notes.required' => 'Say why: goods returned, a price corrected.']);
 
-        $credit = $save->handle([...$data, 'prices_include_tax' => (bool) $bill->prices_include_tax], null, $request->user()->getKey(), $bill);
+        $credit = $save->handle([...$data, 'prices_include_tax' => (bool) $bill->prices_include_tax, 'tax_mode' => $bill->tax_mode], null, $request->user()->getKey(), $bill);
 
         return response()->json($credit->load('lines'), 201);
     }

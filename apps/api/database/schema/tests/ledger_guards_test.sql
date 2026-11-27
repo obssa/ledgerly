@@ -5866,6 +5866,50 @@ BEGIN
   RAISE NOTICE 'PASS T134 terms are each company''s own, whole, named once and never deleted';
 END $$;
 
+-- T135: a document out of scope of tax (110) carries no tax: not on its lines, not in its total, not inclusive; one
+-- made out of scope keeps no taxed line once its transaction ends. Company A as f1, customer c1. Rolled back.
+DO $$
+DECLARE doc uuid; taxed uuid;
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due, out_of_scope)
+      VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 100, 100, 0, true) RETURNING id INTO doc;
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal)
+      VALUES (app_company_id(), doc, 1, 'Export of coffee', 1, 100, '00000000-0000-0000-0000-000000000a40', 100);
+    BEGIN
+      INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, line_tax)
+        VALUES (app_company_id(), doc, 2, 'Taxed', 1, 100, '00000000-0000-0000-0000-000000000a40', 100, 15);
+      RAISE EXCEPTION 'FAIL T135a: a line of an out-of-scope document carried tax';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, tax_total, total, amount_due, out_of_scope)
+        VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 100, 15, 115, 0, true);
+      RAISE EXCEPTION 'FAIL T135b: an out-of-scope document had a tax total';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due, out_of_scope, prices_include_tax)
+        VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 100, 100, 0, true, true);
+      RAISE EXCEPTION 'FAIL T135c: an out-of-scope document was tax-inclusive';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    -- A taxed draft turned out of scope without its lines written again.
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due)
+      VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 100, 100, 0) RETURNING id INTO taxed;
+    INSERT INTO document_lines (company_id, document_id, line_no, description, quantity, unit_price, account_id, line_subtotal, line_tax)
+      VALUES (app_company_id(), taxed, 1, 'Coffee', 1, 100, '00000000-0000-0000-0000-000000000a40', 100, 15);
+    BEGIN
+      UPDATE documents SET out_of_scope = true WHERE id = taxed;
+      SET CONSTRAINTS documents_out_of_scope_lines IMMEDIATE;
+      RAISE EXCEPTION 'FAIL T135d: a document turned out of scope kept a taxed line';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    SET CONSTRAINTS documents_out_of_scope_lines DEFERRED;
+    RAISE EXCEPTION 'T135 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T135 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T135 a document out of scope of tax carries no tax';
+END $$;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

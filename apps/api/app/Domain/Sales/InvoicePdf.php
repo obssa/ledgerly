@@ -90,7 +90,8 @@ final class InvoicePdf
             . '<table><thead><tr><th>Description</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Tax</th><th class="n">Amount</th></tr></thead>'
             . '<tbody>' . $rows . '</tbody></table>'
             . '<table class="totals"><tr><td>Subtotal</td><td class="n">' . $money($invoice->subtotal) . '</td></tr>'
-            . '<tr><td>Tax</td><td class="n">' . $money($invoice->tax_total) . '</td></tr>'
+            // 110: an invoice out of scope of tax says so instead of a tax line.
+            . ($invoice->out_of_scope ? '<tr><td>Out of scope of tax</td><td class="n"></td></tr>' : '<tr><td>Tax</td><td class="n">' . $money($invoice->tax_total) . '</td></tr>')
             . '<tr class="total"><td>Total</td><td class="n">' . $e($invoice->currency) . ' ' . $money($invoice->total) . '</td></tr>' . $due . '</table>'
             . ($clearance ? '<p>Registered with the tax authority: ' . $e((string) $clearance) . '</p>' : '')
             . ($invoice->notes ? '<p class="muted">' . nl2br($e($invoice->notes)) . '</p>' : '')

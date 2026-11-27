@@ -241,6 +241,7 @@ final class QuoteWorkflow
                 'currency' => $source->currency,
                 'fx_rate' => $source->currency === $this->current->get()->base_currency ? null : (string) $source->fx_rate,
                 'prices_include_tax' => (bool) $source->prices_include_tax,
+                'tax_mode' => $source->tax_mode,   // 110
                 'notes' => $source->notes,
                 'warehouse_id' => $source->warehouse_id,
                 'salesperson_id' => $source->salesperson_id,
