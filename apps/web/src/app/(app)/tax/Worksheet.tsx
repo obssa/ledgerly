@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card } from "@/components/ui";
 import type { TaxDocumentRow, TaxRateRow, TaxWithholdingRegister, TaxWorksheet } from "@/lib/api";
@@ -49,11 +50,11 @@ function Documents({ rows, caption, base }: { rows: TaxDocumentRow[]; caption: s
         {rows.length === 0 && <tr><td colSpan={span} className="text-muted">None in the period.</td></tr>}
         {rows.map((d) => (
           <tr key={d.id}>
-            <td className="num">{d.date}</td>
+            <td className="num"><Dt v={d.date} /></td>
             <td><Link href={`/${DOC_PATH[d.type] ?? "invoices"}/${encodeURIComponent(d.id)}`} className="hover:underline">{DOC_LABEL[d.type] ?? d.type} {d.number ?? ""}</Link></td>
             {refs && <td>{d.reference ?? ""}</td>}
             <td>{d.contact}</td><td className="num">{d.tax_id ?? "—"}</td>
-            {due && <td className="num">{d.due_date ?? ""}</td>}
+            {due && <td className="num"><Dt v={d.due_date} empty="" /></td>}
             {foreign && <><td>{d.currency !== base ? d.currency : ""}</td><td className="num text-right">{d.currency !== base ? d.exchange_rate : ""}</td></>}
             <td className="num text-right">{formatAmount(d.taxable)}</td><td className="num text-right">{formatAmount(d.tax)}</td>
             <td className="num text-right">{formatAmount(toString(parse(d.taxable) + parse(d.tax)))}</td>
@@ -75,7 +76,7 @@ function Register({ register, caption, path, who }: { register: TaxWithholdingRe
             {register.payments.length === 0 && <tr><td colSpan={6} className="text-muted">None in the period.</td></tr>}
             {register.payments.map((p) => (
               <tr key={p.id}>
-                <td className="num">{p.date}</td><td><Link href={`/${path}/${encodeURIComponent(p.id)}`} className="hover:underline">{p.contact ?? "—"}</Link></td>
+                <td className="num"><Dt v={p.date} /></td><td><Link href={`/${path}/${encodeURIComponent(p.id)}`} className="hover:underline">{p.contact ?? "—"}</Link></td>
                 <td className="num">{p.tax_id ?? "—"}</td><td>{p.certificate ?? "—"}</td>
                 <td className="num text-right">{formatAmount(p.gross)}</td><td className="num text-right">{formatAmount(p.withheld)}</td>
               </tr>
@@ -105,7 +106,7 @@ export function Worksheet({ sheet }: { sheet: TaxWorksheet }) {
           </div>
         </dl>
         <p className="mt-3 text-[13px] text-muted">
-          What the {name} accounts moved from <span className="num">{sheet.from}</span> to <span className="num">{sheet.to}</span> (settlements of earlier returns left out).
+          What the {name} accounts moved from <span className="num"><Dt v={sheet.from} /></span> to <span className="num"><Dt v={sheet.to} /></span> (settlements of earlier returns left out).
         </p>
       </Card>
       {vat && sheet.sales && sheet.purchases && (
@@ -138,7 +139,7 @@ export function Worksheet({ sheet }: { sheet: TaxWorksheet }) {
                 {sheet.other.entries.map((e) => (
                   <tr key={e.id}>
                     <td className="num"><Link href={`/journal/${encodeURIComponent(e.id)}`} className="hover:underline">#{e.number}</Link></td>
-                    <td className="num">{e.date}</td><td>{e.memo ?? e.source_type.replace(/_/g, " ")}</td>
+                    <td className="num"><Dt v={e.date} /></td><td>{e.memo ?? e.source_type.replace(/_/g, " ")}</td>
                     <td className="num text-right">{formatAmount(e.output)}</td>{vat && <td className="num text-right">{formatAmount(e.input)}</td>}
                   </tr>
                 ))}

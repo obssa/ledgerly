@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -38,13 +39,13 @@ export default async function BillsPage({ searchParams }: PageProps<"/bills">) {
                 const s = paymentStatus(b, today);
                 return (
                   <tr key={b.id}>
-                    <td className="num">{b.issue_date}</td>
+                    <td className="num"><Dt v={b.issue_date} /></td>
                     <td className="num font-semibold">
                       <Link href={`/bills/${encodeURIComponent(b.id)}`} className="hover:underline">{b.number ?? <span className="text-muted">Draft</span>}</Link>
                     </td>
                     <td>{b.contact.name}</td>
                     <td className="num">{b.reference ?? "—"}</td>
-                    <td className="num">{b.due_date ?? "—"}</td>
+                    <td className="num"><Dt v={b.due_date} /></td>
                     <td className="num text-right">{formatMoney(b.total, b.currency)}</td>
                     <td className="num text-right font-semibold">{formatMoney(b.status === "void" ? "0.00" : b.amount_due, b.currency)}</td>
                     <td><Pill tone={s.tone}>{s.label}</Pill></td>

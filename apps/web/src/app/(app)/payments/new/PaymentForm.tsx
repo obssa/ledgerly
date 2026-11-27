@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { startTransition, useActionState, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
 import type { ReceiveOptions } from "@/lib/data";
@@ -90,8 +92,8 @@ export function PaymentForm({ options }: { options: ReceiveOptions & { customer:
                 {invoices.map((inv, i) => (
                   <tr key={inv.id} className={bad(`allocations.${i}`) ? "bg-bad-tint" : ""}>
                     <td className="num font-semibold">{inv.number}</td>
-                    <td className="num">{inv.issue_date}</td>
-                    <td className="num">{inv.due_date ?? "—"}</td>
+                    <td className="num"><Dt v={inv.issue_date} /></td>
+                    <td className="num"><Dt v={inv.due_date} /></td>
                     <td className="num text-right">{formatAmount(inv.amount_due)}</td>
                     <td className="text-right">
                       <input aria-label={`Settle ${inv.number}`} inputMode="decimal" className={`field num ml-auto w-[130px] text-right ${problem ? "!border-bad" : ""}`} name={`alloc:${inv.id}`}

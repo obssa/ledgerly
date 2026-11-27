@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { exportPeriod } from "@/lib/periodParams";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
@@ -51,7 +52,7 @@ export default async function AuditLogPage({ searchParams }: PageProps<"/audit">
                   {log.data.length === 0 && <tr><td colSpan={6} className="text-muted">Nothing matches.</td></tr>}
                   {log.data.map((e) => (
                     <tr key={e.id} className="align-top">
-                      <td className="num whitespace-nowrap text-[13px]">{e.at.slice(0, 16).replace("T", " ")}</td>
+                      <td className="num whitespace-nowrap text-[13px]"><Dt v={e.at} time /></td>
                       <td className="text-[13px]">{e.user?.name ?? <span className="text-muted">{e.actor_type}</span>}{e.ip && <span className="block text-[11px] text-muted">{e.ip}</span>}</td>
                       <td className="text-[13px] font-semibold">{actionLabel(e.action)}</td>
                       <td className="text-[13px]">{e.subject_type.replace(/_/g, " ")}

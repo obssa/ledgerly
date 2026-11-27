@@ -1,3 +1,4 @@
+import { formatDate, formatDateTime, pickDateFormat } from "@/lib/dates";
 import { ApiError, ledgerly } from "@/lib/api";
 import { toCsv } from "@/lib/csv";
 import { getReportPeriod } from "@/lib/data";
@@ -48,7 +49,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
       contact_id: uuid("contact_id"), interval: /^\d{1,3}$/.test(q.get("interval") ?? "") ? (q.get("interval") as string) : undefined,
       periods: /^\d{1,2}$/.test(q.get("periods") ?? "") ? (q.get("periods") as string) : undefined };
     const [{ rows, heading, period: periodText }, settings] = await Promise.all([
-      exportRows(report as ExportableReport, { from: period.from, to: period.to, as_of: asOf, ...options, calendar: period.ctx.calendar }, ctx),
+      exportRows(report as ExportableReport, { from: period.from, to: period.to, as_of: asOf, ...options, calendar: period.ctx.calendar, dateFormat: period.ctx.dateFormat }, ctx),
       ledgerly.companySettings(ctx).catch(() => null),
     ]);
     await ledgerly.recordExport({
@@ -56,7 +57,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
       options: Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)), rows: Math.max(0, rows.length - 1),
     }, ctx);
 
-    const calendar = settings?.calendar ?? period.ctx.calendar;
+    const calendar = { calendar: settings?.calendar ?? period.ctx.calendar, dateFormat: settings?.date_format ?? period.ctx.dateFormat };
     const title = heading ?? reportTitle(report as ExportableReport, options);
     const identity: ReportIdentity = {
       company: settings?.trading_name || settings?.legal_name || "Evenbooks", legalName: settings?.legal_name ?? null,
@@ -67,12 +68,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
       prepared: preparedLabel(new Date(), settings?.timezone || "Africa/Addis_Ababa", calendar, person),
     };
     const top = headerRows(identity);
-    const sheet = [...top, ...rows, ...footerRows(identity)];
+    // Dates the company's way (Settings, Date format): a moment as its date and time in the company's time zone; a
+    // day as text in a CSV, and as a real date in Excel (shown in the same format) unless the calendar is Ethiopian,
+    // which Excel cannot show.
+    const prefs = { calendar: calendar.calendar, dateFormat: pickDateFormat(calendar.dateFormat) };
+    const dated = rows.map((row) => row.map((v) => {
+      if (typeof v !== "string") return v;
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return formatDateTime(v, prefs, settings?.timezone);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return format === "xlsx" && prefs.calendar === "gregorian" ? v : formatDate(v, prefs);
+      return v;
+    }));
+    const sheet = [...top, ...dated, ...footerRows(identity)];
     const file = exportFileName(identity, format);
     // A plain-ASCII name for old browsers, the real one (en dashes, Amharic) for the rest (RFC 6266).
     const disposition = `attachment; filename="${file.replace(/[^\x20-\x7e]/g, "-").replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(file)}`;
     if (format === "xlsx") {
-      const workbook = toXlsx(title, sheet, top.length);
+      const workbook = toXlsx(title, sheet, top.length, prefs.dateFormat);
       return new Response(workbook.buffer as ArrayBuffer, {
         headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": disposition, "Cache-Control": "no-store" },
       });

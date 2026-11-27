@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -39,7 +40,7 @@ export default async function CustomerPage({ params }: PageProps<"/customers/[id
             <ul className="text-sm">
               {customer.recent_invoices!.map((inv) => (
                 <li key={inv.id} className="flex justify-between gap-2 border-t border-line py-1.5">
-                  <span className="num">{inv.number ?? "Draft"} · {inv.issue_date}</span>
+                  <span className="num">{inv.number ?? "Draft"} · <Dt v={inv.issue_date} /></span>
                   <span className="num font-semibold">{formatMoney(inv.amount_due, inv.currency)}</span>
                 </li>
               ))}

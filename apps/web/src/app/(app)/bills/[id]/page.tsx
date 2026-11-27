@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -80,8 +81,8 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
               )}
             </div>
             <div className="text-right">
-              <div><span className="text-muted">{credit ? "Supplier credit date" : "Bill date"}</span> <span className="num">{bill.issue_date}</span></div>
-              {!credit && <div><span className="text-muted">Due date</span> <span className="num">{bill.due_date ?? "—"}</span></div>}
+              <div><span className="text-muted">{credit ? "Supplier credit date" : "Bill date"}</span> <span className="num"><Dt v={bill.issue_date} /></span></div>
+              {!credit && <div><span className="text-muted">Due date</span> <span className="num"><Dt v={bill.due_date} /></span></div>}
               {Number(bill.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{bill.fx_rate}</span></div>}
             </div>
           </div>
@@ -147,7 +148,7 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
             <Link href={`/payments-made/new?supplier=${encodeURIComponent(bill.contact.id)}`} className="btn justify-center">Pay this bill</Link>
             {bill.scheduled_payment ? (
               <Link href={`/payments-made/scheduled/${encodeURIComponent(bill.scheduled_payment.id)}`} className="rounded-lg bg-brand-tint px-3 py-2 text-center text-[13px] font-semibold text-brand hover:underline">
-                Payment of {formatAmount(bill.scheduled_payment.amount)} scheduled for {bill.scheduled_payment.pay_on}
+                Payment of {formatAmount(bill.scheduled_payment.amount)} scheduled for <Dt v={bill.scheduled_payment.pay_on} />
               </Link>
             ) : (
               <Link href={`/payments-made/scheduled/new?supplier=${encodeURIComponent(bill.contact.id)}`} className="btn justify-center">Schedule payment</Link>

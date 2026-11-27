@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
@@ -55,7 +56,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
         </dl>
         <p className="mt-3 text-[13px] text-muted">
           {p.customer ? <>For <Link href={`/customers/${encodeURIComponent(p.customer.id)}`} className="font-semibold hover:underline">{p.customer.name}</Link>. </> : "Internal. "}
-          {BILLING[p.billing]}{p.starts_on && <>, from <span className="num">{p.starts_on}</span></>}{p.ends_on && <> to <span className="num">{p.ends_on}</span></>}.
+          {BILLING[p.billing]}{p.starts_on && <>, from <span className="num"><Dt v={p.starts_on} /></span></>}{p.ends_on && <> to <span className="num"><Dt v={p.ends_on} /></span></>}.
           {" "}Read from the ledger lines tagged with the project{period.from || period.to ? ", for the period above" : ""}.
         </p>
       </Card>
@@ -77,7 +78,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
                   {(p.milestones ?? []).map((m) => (
                     <tr key={m.id} className="align-top">
                       <td className="font-semibold">{m.name}</td>
-                      <td className="num whitespace-nowrap">{m.due_on ?? ""}</td>
+                      <td className="num whitespace-nowrap"><Dt v={m.due_on} empty="" /></td>
                       <td className="num text-right">{formatAmount(m.amount)}</td>
                       <td>
                         <Pill tone={m.status === "paid" ? "good" : m.status === "planned" ? "neutral" : "warn"}>{MILESTONE[m.status]}</Pill>
@@ -135,7 +136,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
               {p.documents.length === 0 && <tr><td colSpan={4} className="text-muted">None yet.</td></tr>}
               {p.documents.map((d) => (
                 <tr key={d.id}>
-                  <td className="num">{d.date}</td>
+                  <td className="num"><Dt v={d.date} /></td>
                   <td><Link href={`/${DOC[d.type]?.[1] ?? "invoices"}/${encodeURIComponent(d.id)}`} className="hover:underline">{DOC[d.type]?.[0] ?? d.type} {d.number ?? ""}</Link></td>
                   <td>{d.contact}</td>
                   <td className="num text-right">{d.currency} {formatAmount(d.amount)}</td>

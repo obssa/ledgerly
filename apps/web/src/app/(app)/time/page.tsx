@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -45,7 +46,7 @@ export default async function TimesheetsPage({ searchParams }: PageProps<"/time"
                   {entries.data.length === 0 && <tr><td colSpan={7} className="text-muted">No hours logged.</td></tr>}
                   {entries.data.map((e) => (
                     <tr key={e.id}>
-                      <td className="num">{e.work_date}</td>
+                      <td className="num"><Dt v={e.work_date} /></td>
                       <td><Link href={`/projects/${encodeURIComponent(e.project.id)}`} className="hover:underline"><span className="num">{e.project.code}</span> {e.project.name}</Link></td>
                       <td>{e.user.name}</td>
                       <td>{e.note ?? ""}</td>

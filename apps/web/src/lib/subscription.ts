@@ -23,13 +23,13 @@ export const subscriptionStatus = (s: Subscription): string => STATUS[s.status] 
  * The line shown across the app, or null: read-only books always; an overdue payment; a trial ending within a week,
  * once billing is enforced. Never for the shared demo.
  */
-export function subscriptionNotice(s: Subscription | null): { tone: "bad" | "warn"; text: string } | null {
+export function subscriptionNotice(s: Subscription | null, date: (iso: string) => string = (iso) => iso): { tone: "bad" | "warn"; text: string } | null {
   if (!s || s.demo) return null;
   if (s.read_only) {
     return { tone: "bad", text: `The subscription is ${s.status}: the books are read-only. You can still view and export them.${s.can.manage ? " See Settings, Plan and billing, to pay." : ""}` };
   }
   if (s.status === "past_due") {
-    return { tone: "warn", text: `The payment for Evenbooks is overdue${s.until ? ` (paid until ${s.until})` : ""}. The books become read-only after a short grace period.` };
+    return { tone: "warn", text: `The payment for Evenbooks is overdue${s.until ? ` (paid until ${date(s.until)})` : ""}. The books become read-only after a short grace period.` };
   }
   if (s.status === "trial" && s.enforced && s.days_left !== null && s.days_left <= 7) {
     const when = s.days_left <= 0 ? "today" : s.days_left === 1 ? "tomorrow" : `in ${s.days_left} days`;

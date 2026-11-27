@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ApiError } from "@/lib/api";
@@ -39,7 +40,7 @@ async function Customers({ searchParams }: Pick<PageProps<"/staff">, "searchPara
         <ul className="grid gap-4">
           {companies.data.map((c) => (
             <li key={c.id} className="rounded-xl border border-line p-3">
-              <p className="font-bold">{c.trading_name || c.legal_name} <span className="text-[12px] font-normal text-muted">{c.country_code} · {c.status} · since {c.created_at.slice(0, 10)}</span></p>
+              <p className="font-bold">{c.trading_name || c.legal_name} <span className="text-[12px] font-normal text-muted">{c.country_code} · {c.status} · since <Dt v={c.created_at} /></span></p>
               <div className="mt-2"><StartSessionForm companyId={c.id} name={c.trading_name || c.legal_name} /></div>
             </li>
           ))}

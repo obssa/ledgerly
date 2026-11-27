@@ -77,8 +77,8 @@ final class InvoicePdf
             . ($contactLine !== '' ? '<div class="muted">' . $e($contactLine) . '</div>' : '')
             . '</td><td style="border:none;vertical-align:top;text-align:right">'
             . '<h1>' . $title . ' ' . $e($invoice->number) . '</h1>'
-            . '<div>Issued ' . $e($invoice->issue_date->format('j M Y')) . '</div>'
-            . ($invoice->due_date ? '<div>Due ' . $e($invoice->due_date->format('j M Y')) . '</div>' : '')
+            . '<div>Invoice date ' . $e((string) \App\Support\DateFormat::format($invoice->issue_date, $company)) . '</div>'
+            . ($invoice->due_date ? '<div>Due date ' . $e((string) \App\Support\DateFormat::format($invoice->due_date, $company)) . '</div>' : '')
             . ($original ? '<div>Corrects invoice ' . $e($original) . '</div>' : '')
             . '</td></tr></table>'
             . '<p><span class="muted">To</span><br><strong>' . $e($invoice->contact?->name) . '</strong>'

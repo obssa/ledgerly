@@ -56,7 +56,7 @@ final class QuoteWorkflow
     public function answerOnline(Document $quote, bool $accept, string $name, ?string $note = null): Document
     {
         if ($quote->due_date !== null && $quote->due_date->format('Y-m-d') < $this->current->today()) {
-            throw new LedgerException('This quote was valid until ' . $quote->due_date->format('j M Y') . ': ask the company for a new one.');
+            throw new LedgerException('This quote was valid until ' . \App\Support\DateFormat::format($quote->due_date, $this->current->get()) . ': ask the company for a new one.');
         }
         $reason = ($accept ? 'Accepted' : 'Declined') . " online by {$name}" . ($note !== null && trim($note) !== '' ? ': ' . trim($note) : '');
 

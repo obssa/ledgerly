@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getRecurringJournals } from "@/lib/data";
@@ -42,7 +43,7 @@ export default async function RecurringJournalsPage() {
                   </td>
                   <td>{REPEATS[t.frequency] ?? t.frequency}</td>
                   <td className="num">{t.is_active ? t.next_on : "—"}</td>
-                  <td className="num">{t.ends_on ?? "—"}</td>
+                  <td className="num"><Dt v={t.ends_on} /></td>
                   <td className="num text-right">{t.posted_count}</td>
                   <td className="num text-right">{formatAmount(t.total)}</td>
                 </tr>

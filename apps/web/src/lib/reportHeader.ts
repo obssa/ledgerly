@@ -1,5 +1,5 @@
 import type { Cell } from "./csv";
-import { formatDay, type Calendar } from "./periods";
+import { formatDay, type DateWords } from "./periods";
 
 /**
  * What every report says about itself, as QuickBooks' report header and footer do: whose books (company name, and the
@@ -19,7 +19,7 @@ export interface ReportIdentity {
 }
 
 /** "Wednesday, 26 November 2026, 10:15" in the company's time zone (and calendar). */
-export function preparedLabel(now: Date, timeZone: string, calendar: Calendar, by?: string | null): string {
+export function preparedLabel(now: Date, timeZone: string, calendar: DateWords, by?: string | null): string {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", weekday: "long", hour12: false })
     .formatToParts(now).map((p) => [p.type, p.value]));
   const iso = `${parts.year}-${parts.month}-${parts.day}`;

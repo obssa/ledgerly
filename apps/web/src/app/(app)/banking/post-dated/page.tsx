@@ -1,6 +1,7 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getPostDatedCheques } from "@/lib/data";
+import { getPostDatedCheques, getDateFormatter } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
 import { ChequeStep, RecordPostDatedCheque } from "./PostDatedForms";
 
@@ -13,6 +14,7 @@ const STATUS = { held: { label: "Held", tone: "warn" }, presented: { label: "Pre
  * books; on their date they are presented and become the cheque received or paid, or they are cancelled.
  */
 export default async function PostDatedChequesPage() {
+  const { date: fmtDate } = await getDateFormatter();
   const data = await getPostDatedCheques();
 
   return (
@@ -40,8 +42,8 @@ export default async function PostDatedChequesPage() {
                         const allowed = c.direction === "in" ? data.cheques.can.receive : data.cheques.can.pay;
                         return (
                           <tr key={c.id}>
-                            <td className="num">{c.cheque_date}{c.due && <span className="block text-[12px] font-semibold text-warn">Due</span>}</td>
-                            <td className="num">{c.cheque_number}<span className="block text-[12px] text-muted">{c.direction === "in" ? `received ${c.handed_on}` : `written ${c.handed_on}`}{c.drawn_on ? ` · ${c.drawn_on}` : ""}</span></td>
+                            <td className="num"><Dt v={c.cheque_date} />{c.due && <span className="block text-[12px] font-semibold text-warn">Due</span>}</td>
+                            <td className="num">{c.cheque_number}<span className="block text-[12px] text-muted">{c.direction === "in" ? `received ${fmtDate(c.handed_on)}` : `written ${fmtDate(c.handed_on)}`}{c.drawn_on ? ` · ${fmtDate(c.drawn_on)}` : ""}</span></td>
                             <td>{c.contact.name}</td>
                             <td className="text-[13px]">{c.account.code} {c.account.name}</td>
                             <td className="num text-right">{formatMoney(c.amount, c.currency)}</td>
@@ -49,7 +51,7 @@ export default async function PostDatedChequesPage() {
                               <Pill tone={s.tone}>{s.label}</Pill>
                               {c.payment_id && (
                                 <Link href={`/${c.direction === "in" ? "payments" : "payments-made"}/${encodeURIComponent(c.payment_id)}`} className="block text-[12px] font-semibold text-brand hover:underline">
-                                  The payment, {c.closed_on}
+                                  The payment, <Dt v={c.closed_on} />
                                 </Link>
                               )}
                             </td>

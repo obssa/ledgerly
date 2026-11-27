@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -97,8 +98,8 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
               {creditNote && invoice.restock && <div className="mt-1 text-[13px]">The goods came back into stock</div>}
             </div>
             <div className="text-right">
-              <div><span className="text-muted">{creditNote ? "Credit note date" : "Invoice date"}</span> <span className="num">{invoice.issue_date}</span></div>
-              {!creditNote && <div><span className="text-muted">Due date</span> <span className="num">{invoice.due_date ?? "—"}</span></div>}
+              <div><span className="text-muted">{creditNote ? "Credit note date" : "Invoice date"}</span> <span className="num"><Dt v={invoice.issue_date} /></span></div>
+              {!creditNote && <div><span className="text-muted">Due date</span> <span className="num"><Dt v={invoice.due_date} /></span></div>}
               {invoice.salesperson && <div><span className="text-muted">Salesperson</span> {invoice.salesperson.name}</div>}
               {Number(invoice.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{invoice.fx_rate}</span></div>}
             </div>

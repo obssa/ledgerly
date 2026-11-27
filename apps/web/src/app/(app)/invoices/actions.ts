@@ -1,5 +1,7 @@
 "use server";
 
+import { companyDate } from "@/lib/data";
+
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
@@ -229,9 +231,9 @@ export async function recurringInvoiceStep(_: FormState | undefined, form: FormD
   if (step === "make-due") {
     if (result.error) return { error: `Paused: ${result.error}` };
     const n = result.made?.length ?? 0;
-    return { notice: n === 0 ? `Nothing due yet: next on ${result.next_on}.` : `${n} invoice${n === 1 ? "" : "s"} made; next on ${result.next_on}.` };
+    return { notice: n === 0 ? `Nothing due yet: next on ${await companyDate(result.next_on)}.` : `${n} invoice${n === 1 ? "" : "s"} made; next on ${await companyDate(result.next_on)}.` };
   }
-  return { notice: step === "pause" ? "Paused." : `Resumed: next on ${result.next_on}.` };
+  return { notice: step === "pause" ? "Paused." : `Resumed: next on ${await companyDate(result.next_on)}.` };
 }
 
 export async function invoiceAction(_: FormState | undefined, form: FormData): Promise<FormState> {

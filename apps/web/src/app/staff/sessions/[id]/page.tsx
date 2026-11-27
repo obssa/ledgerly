@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -40,7 +41,7 @@ async function Session({ params }: Pick<PageProps<"/staff/sessions/[id]">, "para
         <form action={staffEndSession}><input type="hidden" name="id" value={view.session.id} /><button type="submit" className="btn">End the session</button></form>
       </div>
       <p className="mb-4 text-[13px] text-muted">
-        {c.country_code} · {c.base_currency} · {c.status} · converted {c.conversion_date ?? "—"} · books closed until {c.books_closed_until ?? "—"} ·
+        {c.country_code} · {c.base_currency} · {c.status} · converted <Dt v={c.conversion_date} /> · books closed until {c.books_closed_until ?? "—"} ·
         {" "}{view.journal_entries.n} journal entries, the last on {view.journal_entries.last ?? "—"}
       </p>
       <h2 className="mb-1 text-[15px] font-bold">Documents</h2>
@@ -54,7 +55,7 @@ async function Session({ params }: Pick<PageProps<"/staff/sessions/[id]">, "para
       </div>
       <h2 className="mb-1 text-[15px] font-bold">Latest audit records</h2>
       <ul className="text-[13px]">
-        {view.audit.map((a, i) => <li key={i} className="border-b border-line py-1"><span className="num text-muted">{a.created_at.slice(0, 16).replace("T", " ")}</span> {a.action} · {a.subject_type}{a.reason ? ` · ${a.reason}` : ""}</li>)}
+        {view.audit.map((a, i) => <li key={i} className="border-b border-line py-1"><span className="num text-muted"><Dt v={a.created_at} time /></span> {a.action} · {a.subject_type}{a.reason ? ` · ${a.reason}` : ""}</li>)}
       </ul>
     </>
   );

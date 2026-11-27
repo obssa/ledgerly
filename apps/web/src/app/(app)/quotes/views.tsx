@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -64,10 +65,10 @@ export async function QuoteList({ kind, q = {} }: { kind: QuoteKind; q?: Record<
                   const s = statusOf(kind, q.status);
                   return (
                     <tr key={q.id}>
-                      <td className="num">{q.issue_date}</td>
+                      <td className="num"><Dt v={q.issue_date} /></td>
                       <td className="num font-semibold"><Link href={`${w.path}/${encodeURIComponent(q.id)}`} className="hover:underline">{q.number ?? <span className="text-muted">Draft</span>}</Link></td>
                       <td>{q.contact.name}</td>
-                      <td className="num">{q.due_date ?? "—"}</td>
+                      <td className="num"><Dt v={q.due_date} /></td>
                       <td className="num text-right">{formatMoney(q.total, q.currency)}</td>
                       <td><Pill tone={s.tone}>{s.label}</Pill></td>
                     </tr>
@@ -164,7 +165,7 @@ export async function QuoteView({ kind, id, saved }: { kind: QuoteKind; id: stri
                   <li key={n.id} className="flex justify-between gap-2 border-t border-line py-1.5 first:border-t-0">
                     <span><Link href={`/delivery-notes/${encodeURIComponent(n.id)}`} className="num font-semibold hover:underline">{n.number}</Link>
                       {n.status === "void" && <span className="ml-1 text-muted">(void)</span>}</span>
-                    <span className="num text-muted">{n.delivered_on}</span>
+                    <span className="num text-muted"><Dt v={n.delivered_on} /></span>
                   </li>
                 ))}
               </ul>
@@ -193,8 +194,8 @@ function QuoteBody({ doc }: { doc: QuoteDetail }) {
           {doc.contact.tax_id && <div className="num text-[13px] text-muted">TIN {doc.contact.tax_id}</div>}
         </div>
         <div className="text-right">
-          <div><span className="text-muted">{w.one} date</span> <span className="num">{doc.issue_date}</span></div>
-          <div><span className="text-muted">{w.until}</span> <span className="num">{doc.due_date ?? "—"}</span></div>
+          <div><span className="text-muted">{w.one} date</span> <span className="num"><Dt v={doc.issue_date} /></span></div>
+          <div><span className="text-muted">{w.until}</span> <span className="num"><Dt v={doc.due_date} /></span></div>
           {doc.salesperson && <div><span className="text-muted">Salesperson</span> {doc.salesperson.name}</div>}
           {Number(doc.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{doc.fx_rate}</span></div>}
         </div>

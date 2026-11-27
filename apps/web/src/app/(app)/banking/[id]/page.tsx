@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
 import { AccountTabs } from "./AccountTabs";
@@ -35,10 +36,10 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
           <table className="tbl">
             <thead><tr><th scope="col">Date</th><th scope="col">Entry</th><th scope="col">What</th><th scope="col">Who</th><th scope="col" className="!text-right">In</th><th scope="col" className="!text-right">Out</th><th scope="col" className="!text-right">Balance</th></tr></thead>
             <tbody>
-              <tr><td className="num">{register.from}</td><td colSpan={5} className="font-semibold">Brought forward</td><td className="num text-right font-semibold">{formatAmount(register.opening)}</td></tr>
+              <tr><td className="num"><Dt v={register.from} /></td><td colSpan={5} className="font-semibold">Brought forward</td><td className="num text-right font-semibold">{formatAmount(register.opening)}</td></tr>
               {register.lines.map((l, i) => (
                 <tr key={`${l.entry}-${i}`}>
-                  <td className="num">{l.date}</td>
+                  <td className="num"><Dt v={l.date} /></td>
                   <td className="num">#{l.entry}</td>
                   <td>{l.memo ?? l.description ?? l.source_type}</td>
                   <td>{l.contact ?? "—"}</td>
@@ -48,7 +49,7 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
                 </tr>
               ))}
             </tbody>
-            <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={6}>Balance at {register.to}</td><td className="num text-right">{formatMoney(register.closing, register.currency)}</td></tr></tfoot>
+            <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={6}>Balance at <Dt v={register.to} /></td><td className="num text-right">{formatMoney(register.closing, register.currency)}</td></tr></tfoot>
           </table>
         </div>
       </Card>
@@ -74,7 +75,7 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
                 {counts.data.length === 0 && <tr><td colSpan={6} className="text-muted">Not counted yet.</td></tr>}
                 {counts.data.map((k) => (
                   <tr key={k.id}>
-                    <td className="num">{k.counted_on}</td><td>{k.counted_by}</td>
+                    <td className="num"><Dt v={k.counted_on} /></td><td>{k.counted_by}</td>
                     <td className="num text-right">{formatAmount(k.counted)}</td><td className="num text-right">{formatAmount(k.book_balance)}</td>
                     <td className={`num text-right font-semibold ${k.difference === "0.00" ? "" : k.difference.startsWith("-") ? "text-bad" : "text-good"}`}>{formatAmount(k.difference)}{k.entry ? <span className="ml-1 text-[12px] text-muted">#{k.entry}</span> : null}</td>
                     <td className="text-[13px] text-muted">{k.note ?? ""}</td>

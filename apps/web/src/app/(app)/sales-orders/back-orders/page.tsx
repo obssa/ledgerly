@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getBackOrders } from "@/lib/data";
@@ -40,7 +41,7 @@ export default async function BackOrdersPage() {
                     <tr key={l.line_id}>
                       <td><Link href={`/sales-orders/${encodeURIComponent(l.order_id)}`} className="num font-semibold hover:underline">{l.number ?? "draft"}</Link></td>
                       <td><Link href={`/customers/${encodeURIComponent(l.contact_id)}`} className="hover:underline">{l.customer}</Link></td>
-                      <td className="num">{l.due_date ?? "—"}</td>
+                      <td className="num"><Dt v={l.due_date} /></td>
                       <td>{l.item_name ?? l.description}{l.sku && <span className="num ml-1 text-[12px] text-muted">{l.sku}</span>}</td>
                       <td className="num text-right">{formatAmount(l.ordered)}</td>
                       <td className="num text-right">{formatAmount(l.delivered)}</td>

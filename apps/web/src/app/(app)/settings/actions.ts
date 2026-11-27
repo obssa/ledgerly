@@ -1,5 +1,7 @@
 "use server";
 
+import { companyDate } from "@/lib/data";
+
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
@@ -58,7 +60,7 @@ export async function addExchangeRate(_: FormState | undefined, form: FormData):
     return refusal(error);
   }
   refresh();
-  return { notice: `Rate saved: 1 ${body.currency} = ${body.rate} on ${body.rate_date}.` };
+  return { notice: `Rate saved: 1 ${body.currency} = ${body.rate} on ${await companyDate(body.rate_date)}.` };
 }
 
 export async function saveNumbering(_: FormState | undefined, form: FormData): Promise<FormState> {

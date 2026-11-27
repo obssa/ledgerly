@@ -136,7 +136,7 @@ final class QuoteTest extends TestCase
         });
         $mail = $sent->toMail(new \Illuminate\Notifications\AnonymousNotifiable());
         $this->assertStringStartsWith('Quote QT-', $mail->subject);
-        $this->assertStringContainsString('valid until 30 Nov 2026', implode("\n", (array) $mail->introLines));
+        $this->assertStringContainsString('valid until 30/11/2026', implode("\n", (array) $mail->introLines));
         $this->assertStringNotContainsString('Still due', implode("\n", (array) $mail->introLines));
         $this->assertSame(1, $this->owner()->table('audit_log')->where(['subject_id' => $mailed, 'action' => 'quote_emailed'])->count());
     }

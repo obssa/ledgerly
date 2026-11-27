@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -27,7 +28,7 @@ export default async function SalesReceiptPage({ params }: PageProps<"/sales-rec
         <Card className="min-w-0 flex-[2_1_560px]" label="Cash sale">
           <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 text-sm">
             <div><dt className="text-muted">Customer</dt><dd><Link href={`/customers/${encodeURIComponent(receipt.contact.id)}`} className="font-bold hover:underline">{receipt.contact.name}</Link></dd></div>
-            <div><dt className="text-muted">Date</dt><dd className="num">{receipt.issue_date}</dd></div>
+            <div><dt className="text-muted">Date</dt><dd className="num"><Dt v={receipt.issue_date} /></dd></div>
             <div><dt className="text-muted">Slip</dt><dd className="num">{receipt.reference ?? "—"}</dd></div>
             <div><dt className="text-muted">Received into</dt><dd>{receipt.paid_from ? `${receipt.paid_from.code} ${receipt.paid_from.name}` : "—"}</dd></div>
             <div><dt className="text-muted">Paid by</dt><dd>{METHOD[receipt.payment_method] ?? receipt.payment_method}</dd></div>

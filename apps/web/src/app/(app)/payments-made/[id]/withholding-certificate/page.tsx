@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { getCompanySettings, getPaymentMade } from "@/lib/data";
@@ -24,7 +25,7 @@ export default async function WithholdingCertificatePage({ params }: PageProps<"
       <section aria-label="Withholding certificate" className="max-w-[760px] rounded-[14px] border-2 border-ink bg-surface p-6 print:border print:p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="text-[20px] font-extrabold">Withholding tax certificate</h1>
-          <div className="text-right text-[13px] text-muted">No. <span className="num font-semibold text-ink">{payment.withholding_certificate ?? "—"}</span><br />Date <span className="num font-semibold text-ink">{payment.payment_date}</span></div>
+          <div className="text-right text-[13px] text-muted">No. <span className="num font-semibold text-ink">{payment.withholding_certificate ?? "—"}</span><br />Date <span className="num font-semibold text-ink"><Dt v={payment.payment_date} /></span></div>
         </div>
         {payment.status === "reversed" && <p className="mt-3 text-[15px] font-extrabold uppercase tracking-wide text-bad">Cancelled: the payment was reversed</p>}
         <div className="mt-6 grid gap-6 sm:grid-cols-2">

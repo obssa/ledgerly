@@ -1,3 +1,6 @@
+import { DatePrefsProvider } from "@/components/DatePrefs";
+import { pickDateFormat } from "@/lib/dates";
+import { Dt } from "@/components/Dt";
 import { Suspense } from "react";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formatAmount, formatMoney } from "@/lib/format";
@@ -34,9 +37,11 @@ async function Quote({ searchParams }: Pick<PageProps<"/quote">, "searchParams">
     throw error;
   }
   const q = view.quote;
+  // The company's date format and calendar (Settings), as the customer should read its dates.
+  const prefs = { calendar: view.company.calendar ?? "gregorian", dateFormat: pickDateFormat(view.company.date_format) } as const;
 
   return (
-    <>
+    <DatePrefsProvider prefs={prefs}>
       {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI from the API, the company's own logo */}
       {view.company.logo && <img src={view.company.logo} alt="" className="mb-2 max-h-[56px] max-w-[200px] object-contain" />}
       <p className="text-[13px] text-muted">A quote from</p>
@@ -45,8 +50,8 @@ async function Quote({ searchParams }: Pick<PageProps<"/quote">, "searchParams">
       <dl className="mt-3 grid grid-cols-2 gap-1 text-[13px]">
         <dt className="text-muted">Quote no.</dt><dd className="num text-right font-semibold">{q.number}</dd>
         <dt className="text-muted">Customer</dt><dd className="text-right">{view.customer}</dd>
-        <dt className="text-muted">Quote date</dt><dd className="num text-right">{q.issue_date}</dd>
-        {q.valid_until && <><dt className="text-muted">Expiration date</dt><dd className="num text-right">{q.valid_until}</dd></>}
+        <dt className="text-muted">Quote date</dt><dd className="num text-right"><Dt v={q.issue_date} /></dd>
+        {q.valid_until && <><dt className="text-muted">Expiration date</dt><dd className="num text-right"><Dt v={q.valid_until} /></dd></>}
       </dl>
       <ul className="mt-3 divide-y divide-line border-y border-line text-[13px]">
         {q.lines.map((l, i) => (
@@ -71,6 +76,6 @@ async function Quote({ searchParams }: Pick<PageProps<"/quote">, "searchParams">
       ) : (
         <p className="mt-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">This quote no longer waits for an answer. Contact {view.company.name}{view.company.email ? ` (${view.company.email})` : ""}.</p>
       )}
-    </>
+    </DatePrefsProvider>
   );
 }

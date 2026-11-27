@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getScheduledPayments } from "@/lib/data";
@@ -53,13 +54,13 @@ export default async function ScheduledPaymentsPage({ searchParams }: PageProps<
                 const near = dueLabel(p.pay_on, list!.today);
                 return (
                   <tr key={p.id} className={p.due ? "bg-warn-tint/40" : ""}>
-                    <td className="num"><Link href={`/payments-made/scheduled/${encodeURIComponent(p.id)}`} className="font-semibold text-ink hover:underline">{p.pay_on}</Link></td>
+                    <td className="num"><Link href={`/payments-made/scheduled/${encodeURIComponent(p.id)}`} className="font-semibold text-ink hover:underline"><Dt v={p.pay_on} /></Link></td>
                     <td>{p.contact.name}{p.reference && <span className="ml-1.5 text-[12px] text-muted">{p.reference}</span>}</td>
                     <td>{p.account.name}</td>
                     <td>{METHOD_LABEL[p.method] ?? p.method}</td>
                     <td>{p.bill_count}</td>
                     <td>
-                      {p.status === "paid" ? <Pill tone="good">Paid {p.closed_on}</Pill>
+                      {p.status === "paid" ? <Pill tone="good">Paid <Dt v={p.closed_on} /></Pill>
                         : p.status === "cancelled" ? <Pill>Cancelled</Pill>
                         : <Pill tone={near.tone}>{near.text}</Pill>}
                     </td>

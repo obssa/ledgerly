@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -31,7 +32,7 @@ export default async function GoodsReceiptPage({ params }: PageProps<"/goods-rec
               <div className="text-[13px]">Their delivery note <span className="num font-semibold">{r.reference ?? "—"}</span></div>
             </div>
             <div className="text-right">
-              <div><span className="text-muted">Arrived</span> <span className="num">{r.received_on}</span></div>
+              <div><span className="text-muted">Arrived</span> <span className="num"><Dt v={r.received_on} /></span></div>
               <div><span className="text-muted">Into</span> {r.warehouse}</div>
             </div>
           </div>

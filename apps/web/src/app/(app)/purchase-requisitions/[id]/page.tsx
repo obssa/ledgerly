@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -19,7 +20,7 @@ export default async function RequisitionPage({ params }: PageProps<"/purchase-r
       <PageTitle eyebrow={<Link href="/purchase-requisitions" className="hover:underline">Purchase requisitions</Link>} title={<>{r.reason} <Pill tone={status.tone}>{status.label}</Pill></>} />
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_560px]" label="What was asked for">
-          <p className="mb-3 text-sm text-muted">Asked by {r.requested_by_name} on <span className="num">{r.created_at.slice(0, 10)}</span>{r.needed_by && <>, needed by <span className="num">{r.needed_by}</span></>}.</p>
+          <p className="mb-3 text-sm text-muted">Asked by {r.requested_by_name} on <span className="num"><Dt v={r.created_at} /></span>{r.needed_by && <>, needed by <span className="num">{r.needed_by}</span></>}.</p>
           <table className="tbl">
             <thead><tr><th scope="col">What</th><th scope="col" className="!text-right">How many</th><th scope="col" className="!text-right">About, each</th></tr></thead>
             <tbody>

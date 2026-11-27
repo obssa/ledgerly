@@ -119,7 +119,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
         <ReportsNav current="/reports" />
         <Card className="min-w-0 flex-[4_1_560px]" label="Profit and loss statement">
           <ReportHeader title={by !== "total" ? `Profit and loss by ${DISPLAY_BY.find(([k]) => k === by)![1].toLowerCase()}` : cash ? "Profit and loss (cash basis)" : "Profit and loss"}
-            period={rangeLabel(period.picked, period.ctx.calendar)} filters={[by === "total" && before ? `Compared with ${periodLabel(before.from, before.to)}` : null]} />
+            period={rangeLabel(period.picked, period.ctx)} filters={[by === "total" && before ? `Compared with ${periodLabel(before.from, before.to)}` : null]} />
           {by !== "total" && (columns ? <ProfitAndLossColumnsView data={columns} labels={split?.labels} pct={pct} />
             : <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">More than 60 columns: choose a shorter period or longer columns.</p>)}
           {by === "total" && <>

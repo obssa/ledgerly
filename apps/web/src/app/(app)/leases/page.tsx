@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getLeases } from "@/lib/data";
@@ -43,7 +44,7 @@ export default async function LeasesPage() {
               </div>
             )}
           </Card>
-          <p className="mt-3 text-[13px] text-muted">To pay is the payments still to make on active leases, as at {r.as_of}, by when each falls due.</p>
+          <p className="mt-3 text-[13px] text-muted">To pay is the payments still to make on active leases, as at <Dt v={r.as_of} />, by when each falls due.</p>
         </>
       )}
     </>

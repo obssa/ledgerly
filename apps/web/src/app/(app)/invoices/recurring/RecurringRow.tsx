@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { useActionState } from "react";
 import type { RecurringInvoice } from "@/lib/api";
 import { recurringInvoiceStep } from "../actions";
@@ -15,8 +17,8 @@ export function RecurringRow({ row, manage }: { row: RecurringInvoice; manage: b
         {row.last_error && <div className="text-[12px] font-normal text-bad">{row.last_error}</div>}</td>
       <td>{row.customer}</td>
       <td>{EVERY[row.frequency]}</td>
-      <td className="num">{row.next_on}</td>
-      <td className="num">{row.ends_on ?? "—"}</td>
+      <td className="num"><Dt v={row.next_on} /></td>
+      <td className="num"><Dt v={row.ends_on} /></td>
       <td>{row.post ? "Posted invoices" : "Drafts"}</td>
       <td className="num text-right">{row.made_count}</td>
       <td>

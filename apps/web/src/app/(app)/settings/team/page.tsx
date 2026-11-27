@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getMembers } from "@/lib/data";
@@ -40,7 +41,7 @@ export default async function TeamPage() {
                       <td className="text-[13px]">{roleSummary(m.role, m.permissions)}</td>
                       <td className="text-[13px]">{m.can_correct ? <Pill tone="good">Yes</Pill> : <span className="text-muted">No</span>}</td>
                       <td><Pill tone={TONE[m.status]}>{m.status}</Pill>
-                        {m.status === "invited" && m.invited_at && <span className="block text-[11px] text-muted">since {m.invited_at.slice(0, 10)}</span>}</td>
+                        {m.status === "invited" && m.invited_at && <span className="block text-[11px] text-muted">since <Dt v={m.invited_at} /></span>}</td>
                       <td className="text-right"><MemberControls member={m} roles={team.roles} grantable={team.grantable} /></td>
                     </tr>
                   ))}

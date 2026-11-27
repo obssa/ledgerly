@@ -71,7 +71,7 @@ final class InvoiceReminders
                 number: (string) $invoice->number,
                 currency: (string) $invoice->currency,
                 amountDue: number_format((float) $invoice->amount_due, 2),
-                dueDate: $invoice->due_date?->format('j M Y'),
+                dueDate: \App\Support\DateFormat::format($invoice->due_date, $company),
             ));
         });
     }

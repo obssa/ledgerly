@@ -1,6 +1,7 @@
+import { Dt } from "@/components/Dt";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
-import { getCashForecast } from "@/lib/data";
+import { getCashForecast, getDateFormatter } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ExportLink, ReportsNav } from "../ReportsNav";
 
@@ -15,6 +16,7 @@ const SPANS = [4, 8, 13, 26] as const;
  * supplier payments scheduled, on their planned day.
  */
 export default async function CashForecastPage({ searchParams }: PageProps<"/reports/cash-forecast">) {
+  const { date: fmtDate } = await getDateFormatter();
   const { weeks } = await searchParams;
   const span = typeof weeks === "string" && (SPANS as readonly number[]).includes(Number(weeks)) ? Number(weeks) : 13;
   const f = await getCashForecast(span);
@@ -27,11 +29,11 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
         <ReportsNav current="/reports/cash-forecast" />
         {!f ? <p className="text-[14px] text-muted">Not available in the demo or for your role.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Cash forecast">
-            <ReportHeader title="Cash forecast" period={`The next ${span} weeks, from ${f.as_of}`} />
+            <ReportHeader title="Cash forecast" period={`The next ${span} weeks, from ${fmtDate(f.as_of)}`} />
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[13px] text-muted">From {f.as_of} · cash held now <span className="num font-semibold">{formatAmount(f.opening)}</span></div>
+              <div className="text-[13px] text-muted">From <Dt v={f.as_of} /> · cash held now <span className="num font-semibold">{formatAmount(f.opening)}</span></div>
               {f.goes_below_zero && f.lowest
-                ? <Pill tone="bad">Below zero from the week of {f.lowest.from}</Pill>
+                ? <Pill tone="bad">Below zero from the week of <Dt v={f.lowest.from} /></Pill>
                 : <Pill tone="good">Stays above zero</Pill>}
             </div>
             {(Number(f.overdue.receivables) > 0 || Number(f.overdue.payables) > 0) && (
@@ -54,7 +56,7 @@ export default async function CashForecastPage({ searchParams }: PageProps<"/rep
                 <tbody>
                   {f.data.map((w) => (
                     <tr key={w.week}>
-                      <td className="num">{w.from} – {w.to}</td>
+                      <td className="num"><Dt v={w.from} /> – <Dt v={w.to} /></td>
                       <td className="num text-right">{formatAmount(w.receivables)}</td>
                       <td className="num text-right">{formatAmount(w.cheques_in)}</td>
                       <td className="num text-right">{formatAmount(w.recurring_in ?? "0")}</td>

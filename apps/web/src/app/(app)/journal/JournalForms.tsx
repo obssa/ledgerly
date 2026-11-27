@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { useActionState, useState } from "react";
 import type { Account, Dimension, RecurringJournal } from "@/lib/api";
 import { todayIn } from "@/lib/dates";
@@ -191,7 +193,7 @@ export function ReclassifyForm({ lines, accounts, fromAccountId }: { lines: Recl
                     <input type="checkbox" id={`line-${l.line_id}`} name="line_ids" value={l.line_id} /></>
                   ) : <span className="text-[12px] text-muted">reversed</span>}
                 </td>
-                <td className="num">{l.date}</td>
+                <td className="num"><Dt v={l.date} /></td>
                 <td className="num">#{l.entry}</td>
                 <td>{l.description ?? l.memo ?? ""}</td>
                 <td className="num text-right">{l.debit === "0.00" ? "" : l.debit}</td>

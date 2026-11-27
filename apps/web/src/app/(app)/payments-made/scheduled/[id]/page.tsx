@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -29,7 +30,7 @@ export default async function ScheduledPaymentPage({ params, searchParams }: Pag
 
       {saved === "1" && open && (
         <p role="status" className="mb-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">
-          Scheduled for {plan.pay_on}. You will be reminded by email that day; nothing is in the books until you confirm it.
+          Scheduled for <Dt v={plan.pay_on} />. You will be reminded by email that day; nothing is in the books until you confirm it.
         </p>
       )}
 
@@ -50,7 +51,7 @@ export default async function ScheduledPaymentPage({ params, searchParams }: Pag
                     <tr key={b.id}>
                       <td className="num font-semibold"><Link href={`/bills/${encodeURIComponent(b.id)}`} className="text-ink hover:underline">{b.number ?? "—"}</Link></td>
                       <td className="num">{b.reference ?? "—"}</td>
-                      <td className="num">{b.due_date ?? "—"}</td>
+                      <td className="num"><Dt v={b.due_date} /></td>
                       <td className="num text-right">{b.status === "paid" ? <Pill tone="good">Paid</Pill> : formatAmount(b.amount_due)}</td>
                       <td className="num text-right font-semibold">{formatAmount(b.amount)}</td>
                     </tr>
@@ -66,11 +67,11 @@ export default async function ScheduledPaymentPage({ params, searchParams }: Pag
         <Card label="Details">
           <dl className="grid gap-3 text-[13.5px]">
             <div><dt className="text-muted">Status</dt><dd className="mt-0.5">
-              {plan.status === "paid" ? <Pill tone="good">Paid on {plan.closed_on}</Pill>
-                : plan.status === "cancelled" ? <Pill tone="neutral">Cancelled on {plan.closed_on}</Pill>
+              {plan.status === "paid" ? <Pill tone="good">Paid on <Dt v={plan.closed_on} /></Pill>
+                : plan.status === "cancelled" ? <Pill tone="neutral">Cancelled on <Dt v={plan.closed_on} /></Pill>
                 : <Pill tone={near.tone}>{near.text}</Pill>}
             </dd></div>
-            <div><dt className="text-muted">Pay on</dt><dd className="num font-semibold">{plan.pay_on}</dd></div>
+            <div><dt className="text-muted">Pay on</dt><dd className="num font-semibold"><Dt v={plan.pay_on} /></dd></div>
             <div><dt className="text-muted">From</dt><dd>{plan.account.code} {plan.account.name}</dd></div>
             <div><dt className="text-muted">Method</dt><dd>{METHOD_LABEL[plan.method] ?? plan.method}</dd></div>
             {plan.reference && <div><dt className="text-muted">Reference</dt><dd className="num">{plan.reference}</dd></div>}

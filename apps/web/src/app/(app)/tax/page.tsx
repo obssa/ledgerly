@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { CLOSED_RANGE_PRESETS } from "@/lib/periods";
 import Link from "@/components/Link";
@@ -45,7 +46,7 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
           {(centre.sheet.filed ?? []).length > 0 ? (
             <p role="status" className="mb-4 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">
               Filed: {(centre.sheet.filed ?? []).map((f) => (
-                <Link key={f.id} href={`/tax/returns/${encodeURIComponent(f.id)}`} className="mr-2 underline">{f.period_start} to {f.period_end} (on {f.filed_on})</Link>
+                <Link key={f.id} href={`/tax/returns/${encodeURIComponent(f.id)}`} className="mr-2 underline">{f.period_start} to {f.period_end} (on <Dt v={f.filed_on} />)</Link>
               ))}
             </p>
           ) : centre.sheet.can?.file ? (
@@ -65,7 +66,7 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
                     {(centre.calendar.kinds[k]?.periods ?? []).slice(0, 6).map((p) => (
                       <tr key={p.period_start}>
                         <td><Link href={`/tax?${new URLSearchParams({ kind: k, from: p.period_start, to: p.period_end }).toString()}`} className="num hover:underline">{p.period_start.slice(0, 7)}</Link></td>
-                        <td className="num">{p.due_on}</td>
+                        <td className="num"><Dt v={p.due_on} /></td>
                         <td>{p.return ? <Link href={`/tax/returns/${encodeURIComponent(p.return.id)}`}><Pill tone={STATUS[p.status][1]}>{STATUS[p.status][0]}</Pill></Link> : <Pill tone={STATUS[p.status][1]}>{STATUS[p.status][0]}</Pill>}</td>
                       </tr>
                     ))}
@@ -97,9 +98,9 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
                   {centre.returns.map((r) => (
                     <tr key={r.id}>
                       <td><Link href={`/tax/returns/${encodeURIComponent(r.id)}`} className="font-semibold hover:underline">{r.kind === "vat" ? "VAT" : "Withholding"}</Link></td>
-                      <td className="num">{r.period_start} to {r.period_end}</td><td className="num">{r.filed_on}</td><td>{r.reference ?? ""}</td>
+                      <td className="num">{r.period_start} to {r.period_end}</td><td className="num"><Dt v={r.filed_on} /></td><td>{r.reference ?? ""}</td>
                       <td className="num text-right">{formatAmount(r.net)}</td>
-                      <td>{r.settled_on ? <Pill tone="good">{r.settled_on}</Pill> : <Pill tone="warn">Not yet</Pill>}</td>
+                      <td>{r.settled_on ? <Pill tone="good"><Dt v={r.settled_on} /></Pill> : <Pill tone="warn">Not yet</Pill>}</td>
                     </tr>
                   ))}
                 </tbody>

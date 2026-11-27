@@ -206,7 +206,7 @@ final class QuoteController extends Controller
         Notification::route('mail', [$to => (string) $contact->name])->notify(new InvoiceSent(
             company: (string) ($company->trading_name ?: $company->legal_name), companyTin: $company->tin ? (string) $company->tin : null,
             replyTo: $company->email ? (string) $company->email : null, customer: (string) $contact->name, number: (string) $document->number,
-            kind: (string) $document->type, issueDate: $document->issue_date->format('j M Y'), dueDate: $document->due_date?->format('j M Y'), currency: (string) $document->currency,
+            kind: (string) $document->type, issueDate: (string) \App\Support\DateFormat::format($document->issue_date, $company), dueDate: \App\Support\DateFormat::format($document->due_date, $company), currency: (string) $document->currency,
             lines: $document->lines->map(fn ($l) => ['description' => (string) $l->description, 'quantity' => rtrim(rtrim((string) $l->quantity, '0'), '.'),
                 'unit_price' => $money($l->unit_price), 'amount' => $money(bcadd((string) $l->line_subtotal, (string) $l->line_tax, 2))])->values()->all(),
             subtotal: $money($document->subtotal), tax: $money($document->tax_total), total: $money($document->total), amountDue: $money($document->total),

@@ -133,6 +133,8 @@ final class CompanySettingsController extends Controller
             'late_interest.account_id' => ['nullable', 'uuid', 'required_with:late_interest.rate'],
             // Reminders of tax returns due (054): on unless turned off.
             'tax_reminders' => ['sometimes', 'boolean'],
+            // How dates are written everywhere (QuickBooks: Date format); day first unless chosen otherwise.
+            'date_format' => ['sometimes', 'required', Rule::in(\App\Support\DateFormat::FORMATS)],
             // How invoices look on paper and as PDF files: an accent colour, how to pay, a footer line.
             'invoice_template' => ['sometimes', 'array:accent,payment_details,footer'],
             'invoice_template.accent' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
@@ -173,6 +175,10 @@ final class CompanySettingsController extends Controller
             $company->settings = [...($company->settings ?? []), 'late_interest' => empty($li['rate'])
                 ? ['rate' => null, 'account_id' => null] : ['rate' => (string) $li['rate'], 'account_id' => (string) $li['account_id']]];
             unset($data['late_interest']);
+        }
+        if (array_key_exists('date_format', $data)) {
+            $company->settings = [...($company->settings ?? []), 'date_format' => (string) $data['date_format']];
+            unset($data['date_format']);
         }
         if (array_key_exists('tax_reminders', $data)) {
             $company->settings = [...($company->settings ?? []), 'tax_reminders' => (bool) $data['tax_reminders']];
@@ -292,6 +298,7 @@ final class CompanySettingsController extends Controller
                 'tax_id_label' => $pack->taxIdLabel,
                 'calendars' => array_values(array_unique(['gregorian', ...$pack->calendars])),
                 'legal_forms' => self::LEGAL_FORMS,
+                'date_formats' => \App\Support\DateFormat::FORMATS,
                 // Where interest on late payment may go (079): the company's own income accounts in use.
                 'income_accounts' => \App\Domain\Ledger\Models\Account::query()->where(['type' => 'income', 'is_active' => true])->orderBy('code')
                     ->get(['id', 'code', 'name'])->map(fn ($a) => ['id' => $a->getKey(), 'code' => $a->code, 'name' => $a->name])->all(),
@@ -316,6 +323,7 @@ final class CompanySettingsController extends Controller
         $fields['approval'] = array_intersect_key($company->settings['approval'] ?? [], array_flip(self::APPROVAL_LIMITS));
         $fields['reminders'] = \App\Domain\Sales\InvoiceReminders::settingsOf($company);
         $fields['tax_reminders'] = (bool) ($company->settings['tax_reminders'] ?? true);
+        $fields['date_format'] = \App\Support\DateFormat::of($company);
         $fields['late_interest'] = \App\Domain\Sales\LateInterest::settingsOf($company);
         $fields['invoice_template'] = self::template($company->settings['invoice_template'] ?? []);
 

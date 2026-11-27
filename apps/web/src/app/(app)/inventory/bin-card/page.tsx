@@ -1,3 +1,5 @@
+import { isDateKey, isMomentKey } from "@/lib/columns";
+import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { ColumnCustomizer } from "@/components/ColumnCustomizer";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
@@ -24,6 +26,7 @@ const def = (c: BinColumn) => BIN_COLUMNS.find((d) => d.key === c)!;
 function cell(c: BinColumn, r: BinRow) {
   const v = r[c];
   if (v === null || v === "") return "";
+  if (isDateKey(c) || isMomentKey(c)) return <Dt v={String(v)} time={isMomentKey(c)} />;
   if (c === "kind") return KIND[v] ?? v;
   if ((c === "qty_in" || c === "qty_out") && v === "0.00") return "";
   if (def(c).kind === "money" || def(c).kind === "count") return formatAmount(v);
@@ -67,7 +70,7 @@ export default async function BinCardPage({ searchParams }: PageProps<"/inventor
       <ColumnCustomizer defs={BIN_COLUMNS} cols={cols} keep={keep} moveHref={(next) => href({ cols: next.join(",") })} resetHref={href({})} />
       <Card className="!p-2" label="Bin card">
         <div className="px-3 pt-3">
-          <ReportHeader title="Bin card" period={rangeLabel(period.picked, period.ctx.calendar)} filters={[`Item: ${item.name}`, warehouse ? `Warehouse: ${warehouse.name}` : null]} />
+          <ReportHeader title="Bin card" period={rangeLabel(period.picked, period.ctx)} filters={[`Item: ${item.name}`, warehouse ? `Warehouse: ${warehouse.name}` : null]} />
         </div>
         <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Bin card">
           <table className="tbl">

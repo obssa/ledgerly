@@ -93,6 +93,24 @@ final class CompanySettingsTest extends TestCase
         $this->save(['version' => $settings->json('version'), 'trading_name' => 'Abyssinia'])->assertOk();
     }
 
+    public function test_the_date_format_is_day_first_by_default_changes_any_time_and_is_audited(): void
+    {
+        $settings = $this->settings()->assertOk()->assertJsonPath('date_format', 'DD/MM/YYYY')
+            ->assertJsonPath('options.date_formats', ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']);
+
+        $this->save(['version' => $settings->json('version'), 'date_format' => 'DD.MM.YY'])->assertUnprocessable()->assertJsonValidationErrors(['date_format']);
+
+        // Not part of the foundation: it changes after anything is posted too.
+        $this->post_an_entry();
+        $settings = $this->settings();
+        $this->save(['version' => $settings->json('version'), 'date_format' => 'MM/DD/YYYY'])->assertOk()->assertJsonPath('date_format', 'MM/DD/YYYY');
+        $this->settings()->assertJsonPath('date_format', 'MM/DD/YYYY');
+
+        $audit = $this->owner()->table('audit_log')->where(['company_id' => $this->company, 'action' => 'updated', 'subject_type' => 'company'])->sole();
+        $this->assertSame('DD/MM/YYYY', $this->decoded($audit->before)['date_format']);
+        $this->assertSame('MM/DD/YYYY', $this->decoded($audit->after)['date_format']);
+    }
+
     public function test_the_country_cannot_be_changed_here(): void
     {
         $this->save(['version' => $this->settings()->json('version'), 'country_code' => 'KE', 'trading_name' => 'X'])->assertOk();

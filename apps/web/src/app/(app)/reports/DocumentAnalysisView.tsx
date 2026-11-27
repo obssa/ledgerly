@@ -29,7 +29,7 @@ export async function DocumentAnalysisView({ side, q }: { side: "sales" | "purch
         <ReportsNav current={`/reports/${side}`} />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label={side === "sales" ? "Sales" : "Purchases"}>
-            <div className="px-3 pt-3"><ReportHeader title={`${side === "sales" ? "Sales" : "Purchases"} by ${label.toLowerCase()}`} period={rangeLabel(period.picked, period.ctx.calendar)}
+            <div className="px-3 pt-3"><ReportHeader title={`${side === "sales" ? "Sales" : "Purchases"} by ${label.toLowerCase()}`} period={rangeLabel(period.picked, period.ctx)}
               filters={[`Before tax, ${side === "sales" ? "credit notes" : "supplier credits"} taken off`]} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">

@@ -25,7 +25,7 @@ export default async function FinancialHealthPage({ searchParams }: PageProps<"/
         <ReportsNav current="/reports/financial-health" />
         {!h ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <div className="min-w-0 flex-[4_1_560px]">
-            <ReportHeader title="Financial health" period={rangeLabel(period.picked, period.ctx.calendar)} filters={[`Balances at the end; margins, DSO and DPO over ${h.days} days`]} />
+            <ReportHeader title="Financial health" period={rangeLabel(period.picked, period.ctx)} filters={[`Balances at the end; margins, DSO and DPO over ${h.days} days`]} />
             <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
               {[
                 ["Current ratio", showRatio(h.ratios.current_ratio), `Current assets ${formatAmount(h.figures.current_assets)} ÷ current liabilities ${formatAmount(h.figures.current_liabilities)}`],

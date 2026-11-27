@@ -2,13 +2,14 @@ import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getDonorReport, getReportPeriod } from "@/lib/data";
+import { getDonorReport, getReportPeriod, getDateFormatter } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Donor report" };
 
 /** Module 9a (093): what a grant was spent on against its budget, what it brought in, and the funds left, for its donor. */
 export default async function DonorReportPage({ params, searchParams }: PageProps<"/projects/[id]/donor-report">) {
+  const { date: fmtDate } = await getDateFormatter();
   const { id } = await params;
   const q = await searchParams;
   const period = await getReportPeriod(q, "all");
@@ -27,7 +28,7 @@ export default async function DonorReportPage({ params, searchParams }: PageProp
         <div className="mb-3 text-center">
           <div className="text-[17px] font-extrabold">{r.project.name}</div>
           <div className="text-[13px] text-muted">
-            {r.grant.donor ? `Grant from ${r.grant.donor.name}` : "Grant"}{r.grant.reference ? ` · ${r.grant.reference}` : ""} · {r.from ? `${r.from} to ${r.to}` : `to ${r.to}`}
+            {r.grant.donor ? `Grant from ${r.grant.donor.name}` : "Grant"}{r.grant.reference ? ` · ${r.grant.reference}` : ""} · {r.from ? `${fmtDate(r.from)} to ${fmtDate(r.to)}` : `to ${fmtDate(r.to)}`}
           </div>
         </div>
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 text-sm">

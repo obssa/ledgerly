@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { getPaymentMade } from "@/lib/data";
@@ -20,7 +21,7 @@ export default async function ChequePage({ params }: PageProps<"/payments-made/[
       <section aria-label="Cheque" className="max-w-[760px] rounded-[14px] border-2 border-ink bg-surface p-6 print:border print:p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="text-[13px] text-muted">Cheque <span className="num font-semibold text-ink">{payment.cheque_number}</span></div>
-          <div className="text-right text-[13px] text-muted">Date <span className="num font-semibold text-ink">{payment.payment_date}</span></div>
+          <div className="text-right text-[13px] text-muted">Date <span className="num font-semibold text-ink"><Dt v={payment.payment_date} /></span></div>
         </div>
         {payment.status === "reversed" && <p className="mt-3 text-[15px] font-extrabold uppercase tracking-wide text-bad">Cancelled</p>}
         <div className="mt-6 border-b border-ink pb-1 text-[15px]">Pay <span className="font-bold">{payment.contact?.name}</span></div>

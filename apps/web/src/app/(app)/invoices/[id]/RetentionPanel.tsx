@@ -1,5 +1,7 @@
 "use client";
 
+import { Dt } from "@/components/Dt";
+
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
 import type { InvoiceRetention } from "@/lib/api";
@@ -29,8 +31,8 @@ export function RetentionPanel({ invoiceId, retentions, canHold, canManage }: { 
         <ul className="mt-2 flex flex-col gap-1 text-[13px]">
           {retentions.map((r) => (
             <li key={r.id}>
-              <span className="num font-semibold">{formatAmount(r.amount)}</span> held on <span className="num">{r.held_on}</span>
-              {r.released_on ? <>, released on <span className="num">{r.released_on}</span></> : ", still held"}
+              <span className="num font-semibold">{formatAmount(r.amount)}</span> held on <span className="num"><Dt v={r.held_on} /></span>
+              {r.released_on ? <>, released on <span className="num"><Dt v={r.released_on} /></span></> : ", still held"}
             </li>
           ))}
         </ul>

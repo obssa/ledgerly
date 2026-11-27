@@ -1,3 +1,5 @@
+import { isDateKey, isMomentKey } from "@/lib/columns";
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
@@ -80,7 +82,7 @@ export async function AgeingReport({ kind, q }: { kind: "invoice" | "bill"; q: Q
                 <select className="field" id="group" name="group" defaultValue={group}>{AGE_GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
             </ColumnCustomizer>
           )}
-          <ReportHeader title={title} period={asOfLabel(at.asOf, at.ctx.calendar)}
+          <ReportHeader title={title} period={asOfLabel(at.asOf, at.ctx)}
             filters={[periodsNote, detail ? `Grouped by ${group === "age" ? "ageing period" : k.partyWord.toLowerCase()}` : null]} />
           {detail ? <Detail kind={kind} rows={rows} cols={cols} group={group} ageing={ageing} /> : <Summary kind={kind} ageing={ageing} />}
           <ReportFooter basis={null} currency={ageing.currency ?? undefined} />
@@ -150,6 +152,7 @@ function Detail({ kind, rows, cols, group, ageing }: { kind: "invoice" | "bill";
   const cell = (c: AgeColumn, r: AgeRow) => {
     const v = r[c];
     if (v === null || v === "") return "";
+    if (isDateKey(c) || isMomentKey(c)) return <Dt v={String(v)} time={isMomentKey(c)} />;
     if (c === "type") return r.type === "credit" ? k.credits : typeLabel(String(v));
     if (c === "age") return <Pill tone={tone(String(v), buckets)}>{bucketLabel(String(v))}</Pill>;
     if (c === "number") return <Link href={`${k.doc}/${encodeURIComponent(r.id)}`} className="font-semibold text-ink hover:underline">{String(v)}</Link>;

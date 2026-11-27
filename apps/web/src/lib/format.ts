@@ -1,4 +1,5 @@
 import { parse, toString, type Scaled } from "./decimal";
+import { formatDay, type DateWords } from "./periods";
 
 /** "501745.00" → "501,745.00": always 2 decimals, grouping only, no float conversion. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- currency kept in the signature for call sites
@@ -34,8 +35,7 @@ export function toEthiopian(date: Date): { year: number; month: number; day: num
  * A day written out in the company's own calendar (Settings, Calendar), and only that one: "Wednesday, 25 November
  * 2026" for Gregorian, "Wednesday, Hidar 16, 2019" for Ethiopian. The date is a UTC midnight, as the API's dates are.
  */
-export function formatLongDate(date: Date, calendar: "gregorian" | "ethiopian"): string {
+export function formatLongDate(date: Date, words: DateWords): string {
   const weekday = date.toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
-  if (calendar === "ethiopian") return `${weekday}, ${toEthiopian(date).label}`;
-  return date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  return `${weekday}, ${formatDay(date.toISOString().slice(0, 10), words)}`;
 }

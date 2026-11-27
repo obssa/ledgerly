@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -37,12 +38,12 @@ export default async function JournalEntryPage({ params, searchParams }: PagePro
         title={<>Entry <span className="num">#{e.number}</span> {e.status === "reversed" ? <Pill>Reversed</Pill> : <Pill tone="good">Posted</Pill>}</>} />
       <Card className="mb-4" label="Entry">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">
-          <div><dt className="text-muted">Date</dt><dd className="num">{e.date}</dd></div>
+          <div><dt className="text-muted">Date</dt><dd className="num"><Dt v={e.date} /></dd></div>
           <div><dt className="text-muted">Made by</dt><dd>{from ? <Link href={from} className="font-semibold text-brand hover:underline">{e.source_label}{e.document?.number ? ` ${e.document.number}` : ""}</Link> : e.source_label}</dd></div>
           <div><dt className="text-muted">Posted by</dt><dd>{e.posted_by ?? "—"}</dd></div>
           {e.currency && Number(e.fx_rate) !== 1 && <div><dt className="text-muted">Currency</dt><dd className="num">{e.currency} at {e.fx_rate}</dd></div>}
           {e.reverses && <div><dt className="text-muted">Reverses</dt><dd><Link href={`/journal/${encodeURIComponent(e.reverses.id)}`} className="num hover:underline">#{e.reverses.number}</Link></dd></div>}
-          {e.reversed_by && <div><dt className="text-muted">Reversed by</dt><dd><Link href={`/journal/${encodeURIComponent(e.reversed_by.id)}`} className="num hover:underline">#{e.reversed_by.number}</Link> on <span className="num">{e.reversed_by.date}</span></dd></div>}
+          {e.reversed_by && <div><dt className="text-muted">Reversed by</dt><dd><Link href={`/journal/${encodeURIComponent(e.reversed_by.id)}`} className="num hover:underline">#{e.reversed_by.number}</Link> on <span className="num"><Dt v={e.reversed_by.date} /></span></dd></div>}
         </dl>
         {e.memo && <p className="mt-3 text-[14px]">{e.memo}</p>}
       </Card>

@@ -1,4 +1,7 @@
 "use client";
+import { formatDate, todayIn } from "@/lib/dates";
+
+import { Dt } from "@/components/Dt";
 
 import { useActionState, useId, type ReactNode } from "react";
 import { FiscalStartFields } from "@/components/FiscalStartFields";
@@ -6,9 +9,8 @@ import type { CompanySettings, Currencies, Dimension, Numbering } from "@/lib/ap
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
-import { VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN, TEMPLATE_SHOWN, INTEREST_SHOWN } from "@/lib/settings";
+import { DATE_FORMAT_CHOICES, VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN, TEMPLATE_SHOWN, INTEREST_SHOWN } from "@/lib/settings";
 import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock, toggleDimension } from "./actions";
-import { todayIn } from "@/lib/dates";
 
 type Settings = CompanySettings & { demo: boolean };
 
@@ -70,6 +72,10 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
         {field("region", "Region")}
         {field("postal_code", "Postal code")}
         {field("timezone", "Time zone", { required: true, hint: "For example Africa/Addis_Ababa" })}
+        {/* How every date is written: lists, reports, documents, emails and exports (QuickBooks: Date format). */}
+        <Select name="date_format" label="Date format" defaultValue={settings.date_format ?? "DD/MM/YYYY"}>
+          {DATE_FORMAT_CHOICES.map((f) => <option key={f} value={f}>{f} (today: {formatDate(todayIn(settings.timezone), { calendar: settings.calendar, dateFormat: f })})</option>)}
+        </Select>
         <Select name="accounting_basis" label="Reports default to" defaultValue={settings.accounting_basis} disabled={locked("accounting_basis")}>
           <option value="accrual">Accrual basis</option>
           <option value="cash">Cash basis (a view of the same books)</option>
@@ -234,7 +240,7 @@ export function CurrenciesPanel({ settings, currencies }: { settings: Settings; 
               <tr key={c.currency} className="border-t border-line">
                 <td className="py-2 font-semibold">{c.currency}{!c.is_enabled && <span className="ml-2 text-[12px] font-normal text-muted">off</span>}</td>
                 <td className="num py-2 text-right">
-                  {c.latest_rate ? <>{c.latest_rate}<span className="block text-[12px] text-muted">{c.latest_rate_date}</span></> : <span className="text-muted">none yet</span>}
+                  {c.latest_rate ? <>{c.latest_rate}<span className="block text-[12px] text-muted"><Dt v={c.latest_rate_date} /></span></> : <span className="text-muted">none yet</span>}
                 </td>
                 <td className="py-2 text-right">
                   {manage && (

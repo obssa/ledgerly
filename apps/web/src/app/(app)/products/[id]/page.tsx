@@ -1,7 +1,7 @@
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getItem, getItemAssembly, getItems, getSupplierChoices, getWarehouses } from "@/lib/data";
+import { getItem, getItemAssembly, getItems, getSupplierChoices, getWarehouses, getDateFormatter } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { AdjustStock, ItemForm } from "../ItemForms";
 import { ItemUnits } from "./ItemUnits";
@@ -14,6 +14,7 @@ export const metadata = { title: "Item" };
 
 /** One item: what is on hand in each warehouse (with its bin card), its details, and stock adjustments. */
 export default async function ItemPage({ params }: PageProps<"/products/[id]">) {
+  const { date: fmtDate } = await getDateFormatter();
   const { id } = await params;
   const [item, warehouses, suppliers] = await Promise.all([getItem(id), getWarehouses(), getSupplierChoices()]);
   if (!item) notFound();
@@ -62,7 +63,7 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
               <ul className="mt-2 text-sm">
                 {item.batches!.map((b) => (
                   <li key={`${b.id}-${b.warehouse ?? ""}`} className="flex justify-between gap-2 border-t border-line py-1.5">
-                    <span><span className="num font-semibold">{b.number}</span> <span className="text-muted">{b.expires_on ? `expires ${b.expires_on}` : "no expiry"}</span></span>
+                    <span><span className="num font-semibold">{b.number}</span> <span className="text-muted">{b.expires_on ? `expires ${fmtDate(b.expires_on)}` : "no expiry"}</span></span>
                     <span className="num">{b.quantity ?? "0.00"} {item.unit}{b.warehouse ? ` · ${b.warehouse}` : ""}</span>
                   </li>
                 ))}

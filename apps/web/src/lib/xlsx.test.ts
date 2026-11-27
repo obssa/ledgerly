@@ -62,4 +62,14 @@ describe("xlsx", () => {
     expect(xml).toContain('<c r="A4" t="inlineStr"><is><t xml:space="preserve">2026<');   // a title row is text
     expect(xml).toContain('<c r="B7" s="2"><v>100.00</v></c>');              // a figure is a number
   });
+
+  it("writes a date as a real Excel date in the company's format, as QuickBooks' Excel export does", async () => {
+    const { excelSerial } = await import("./xlsx");
+    expect(excelSerial("1900-03-01")).toBe(61);
+    expect(excelSerial("2026-11-27")).toBe(46353);
+    const xml = sheetXml([["Date", "Amount"], ["2026-11-27", "10.00"]]);
+    expect(xml).toContain('<c r="A2" s="3"><v>46353</v></c>');
+    expect(unzip(toXlsx("x", [["Date"], ["2026-11-27"]], 0, "MM/DD/YYYY"))["xl/styles.xml"]).toContain('formatCode="mm/dd/yyyy"');
+    expect(unzip(toXlsx("x", [["Date"], ["2026-11-27"]]))["xl/styles.xml"]).toContain('formatCode="dd/mm/yyyy"');
+  });
 });

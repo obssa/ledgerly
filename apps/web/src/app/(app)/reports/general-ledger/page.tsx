@@ -1,10 +1,12 @@
+import { isDateKey, isMomentKey } from "@/lib/columns";
+import { Dt } from "@/components/Dt";
 import { rangeLabel } from "@/lib/periods";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
 import { exportPeriod } from "@/lib/periodParams";
 import { Card, PageTitle } from "@/components/ui";
-import { getChart, getDimensions, getGeneralLedger, getReportPeriod } from "@/lib/data";
+import { getChart, getDimensions, getGeneralLedger, getReportPeriod, getDateFormatter } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { parse, toString } from "@/lib/decimal";
 import { ExportLink } from "../ReportsNav";
@@ -33,6 +35,7 @@ const MONEY = new Set<GlColumn>(["debit", "credit", "amount", "foreign_amount"])
 function cell(c: GlColumn, r: GlRow) {
   const v = r[c];
   if (v === null || v === "") return "";
+  if (isDateKey(c) || isMomentKey(c)) return <Dt v={String(v)} time={isMomentKey(c)} />;
   if (c === "balance") return <Balance value={r.balance} />;
   if (MONEY.has(c)) return v === "0.00" && (c === "debit" || c === "credit") ? "" : formatAmount(v);
   if (c === "type") return typeLabel(v);
@@ -51,6 +54,7 @@ function cell(c: GlColumn, r: GlRow) {
  * created and posted by.
  */
 export default async function GeneralLedgerPage({ searchParams }: PageProps<"/reports/general-ledger">) {
+  const { date: fmtDate } = await getDateFormatter();
   const q = await searchParams;
   const period = await getReportPeriod(q);
   const filters = {
@@ -94,7 +98,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
       {!gl && <p className="text-[14px] text-muted">{chart.demo ? "Not available in the demo." : "Check the dates: the period ends on or after it starts."}</p>}
       {gl?.truncated && <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">Only the first lines of a long period are shown: choose a shorter period or one account.</p>}
       {gl && gl.accounts.length === 0 && <p className="text-[14px] text-muted">Nothing posted in this period.</p>}
-      {gl && gl.accounts.length > 0 && <ReportHeader title="General ledger" period={rangeLabel(period.picked, period.ctx.calendar)}
+      {gl && gl.accounts.length > 0 && <ReportHeader title="General ledger" period={rangeLabel(period.picked, period.ctx)}
         filters={[filters.account_id ? chart.data.find((c) => c.id === filters.account_id)?.name : "Every account"]} />}
       {gl?.accounts.map((a) => (
         <Card key={a.account_id} className="mb-4 !p-2" label={`${a.code} ${a.name}`}>
@@ -111,7 +115,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
               <thead><tr>{cols.map((c) => <th key={c} scope="col" className={align(c).includes("text-right") ? "!text-right" : ""}>{def(c).label}</th>)}</tr></thead>
               <tbody>
                 <tr className="font-semibold">{cols.map((c, i) => (
-                  <td key={c} className={align(c)}>{c === "balance" ? <Balance value={a.opening} /> : i === 0 ? `Brought forward at ${gl.from}` : ""}</td>
+                  <td key={c} className={align(c)}>{c === "balance" ? <Balance value={a.opening} /> : i === 0 ? `Brought forward at ${fmtDate(gl.from)}` : ""}</td>
                 ))}</tr>
                 {a.lines.map((l) => {
                   const r = glRow(l);
@@ -122,7 +126,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
                 <tr className="border-t-2 border-ink font-bold">{cols.map((c, i) => (
                   <td key={c} className={align(c)}>
                     {c === "balance" ? <Balance value={a.closing} /> : c === "debit" ? formatAmount(a.debits) : c === "credit" ? formatAmount(a.credits)
-                      : c === "amount" ? formatAmount(net(a.debits, a.credits)) : i === 0 ? `Balance at ${gl.to}` : ""}
+                      : c === "amount" ? formatAmount(net(a.debits, a.credits)) : i === 0 ? `Balance at ${fmtDate(gl.to)}` : ""}
                   </td>
                 ))}</tr>
               </tfoot>

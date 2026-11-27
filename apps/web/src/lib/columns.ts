@@ -46,4 +46,8 @@ export function withoutUnusedForeign<K extends string>(cols: K[], rows: readonly
   return kept.length > 0 ? kept : cols;
 }
 
+/** A column holding a date ("date", "due_date", "moved_on") or a moment ("created_at"): written the company's way. */
+export const isDateKey = (key: string) => /^(date|.+_date|.+_on)$/.test(key);
+export const isMomentKey = (key: string) => /_at$/.test(key);
+
 export const rightAligned = (kind: Kind) => kind === "money" || kind === "count" || kind === "rate";

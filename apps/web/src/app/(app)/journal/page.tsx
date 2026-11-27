@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -37,7 +38,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               <tbody>
                 {requests.data.map((r) => (
                   <tr key={r.id}>
-                    <td className="num">{r.date}</td>
+                    <td className="num"><Dt v={r.date} /></td>
                     <td><Link href={`/journal/requests/${encodeURIComponent(r.id)}`} className="font-semibold hover:underline">{r.memo}</Link></td>
                     <td>{r.requested_by ?? "—"}</td>
                     <td className="num text-right">{formatAmount(r.total)}</td>
@@ -67,7 +68,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
               {journal.data.map((e) => (
                 <tr key={e.id}>
                   <td className="num font-semibold"><Link href={`/journal/${encodeURIComponent(e.id)}`} className="hover:underline">#{e.number}</Link></td>
-                  <td className="num">{e.date}</td>
+                  <td className="num"><Dt v={e.date} /></td>
                   <td>{e.memo ?? "—"}{e.status === "reversed" && <span className="ml-2"><Pill>Reversed</Pill></span>}</td>
                   <td className="text-[13px] text-muted">{e.source_type.replace(/_/g, " ")}</td>
                   <td className="text-[13px]">{e.posted_by ?? "—"}</td>

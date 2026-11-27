@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getFixedAssets } from "@/lib/data";
@@ -45,7 +46,7 @@ export default async function FixedAssetsPage({ searchParams }: PageProps<"/fixe
                     <tr key={a.id}>
                       <td><Link href={`/fixed-assets/${encodeURIComponent(a.id)}`} className="font-semibold hover:underline"><span className="num">{a.code}</span> {a.name}</Link>
                         {a.status === "disposed" && <span className="ml-2"><Pill>Disposed</Pill></span>}</td>
-                      <td>{a.category ?? "—"}</td><td>{a.location?.name ?? "—"}</td><td className="num">{a.acquired_on}</td>
+                      <td>{a.category ?? "—"}</td><td>{a.location?.name ?? "—"}</td><td className="num"><Dt v={a.acquired_on} /></td>
                       <td className="num text-right">{formatAmount(a.cost)}</td><td className="num text-right">{formatAmount(a.depreciated)}</td>
                       <td className="num text-right font-semibold">{formatAmount(a.book_value)}</td>
                     </tr>

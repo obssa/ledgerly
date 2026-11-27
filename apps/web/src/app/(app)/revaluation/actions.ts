@@ -1,5 +1,7 @@
 "use server";
 
+import { companyDate } from "@/lib/data";
+
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
@@ -25,5 +27,5 @@ export async function postRevaluation(_: FormState | undefined, form: FormData):
     return formStateFromError(error);
   }
   refresh();
-  return { notice: `Posted as entry #${posted.entry.number}, net ${posted.net}; reversed on ${posted.reversal.date}.` };
+  return { notice: `Posted as entry #${posted.entry.number}, net ${posted.net}; reversed on ${await companyDate(posted.reversal.date)}.` };
 }

@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -28,7 +29,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
               {payments.length === 0 && <tr><td colSpan={6} className="text-muted">No payments yet.</td></tr>}
               {payments.map((p) => (
                 <tr key={p.id}>
-                  <td className="num"><Link href={`/payments/${encodeURIComponent(p.id)}`} className="hover:underline">{p.payment_date}</Link></td>
+                  <td className="num"><Link href={`/payments/${encodeURIComponent(p.id)}`} className="hover:underline"><Dt v={p.payment_date} /></Link></td>
                   <td>{p.contact?.name}{p.status === "reversed" && <> <Pill tone="bad">Reversed</Pill></>}</td>
                   <td>{methodLabel(p.method)}</td>
                   <td className="num">{p.reference ?? "—"}</td>

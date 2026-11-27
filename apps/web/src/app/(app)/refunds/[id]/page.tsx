@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -23,7 +24,7 @@ export default async function RefundPage({ params }: PageProps<"/refunds/[id]">)
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_520px]" label="Refund">
           <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 text-sm">
-            <div><dt className="text-muted">Date</dt><dd className="num">{refund.payment_date}</dd></div>
+            <div><dt className="text-muted">Date</dt><dd className="num"><Dt v={refund.payment_date} /></dd></div>
             <div><dt className="text-muted">Way</dt><dd>{out ? "Paid to the customer" : "Received from the supplier"}</dd></div>
             <div><dt className="text-muted">Method</dt><dd>{refund.method.replace("_", " ")}</dd></div>
             <div><dt className="text-muted">Reference</dt><dd className="num">{refund.reference ?? "—"}</dd></div>

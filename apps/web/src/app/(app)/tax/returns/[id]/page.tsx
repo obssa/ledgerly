@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -20,10 +21,10 @@ export default async function TaxReturnPage({ params }: PageProps<"/tax/returns/
         title={<>{label}, <span className="num">{r.period_start}</span> to <span className="num">{r.period_end}</span> {r.settled_on ? <Pill tone="good">Paid</Pill> : <Pill tone="warn">Filed, not paid</Pill>}</>} />
       <Card className="mb-4" label="Return">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">
-          <div><dt className="text-muted">Filed on</dt><dd className="num">{r.filed_on}</dd></div>
+          <div><dt className="text-muted">Filed on</dt><dd className="num"><Dt v={r.filed_on} /></dd></div>
           <div><dt className="text-muted">Reference</dt><dd>{r.reference ?? "—"}</dd></div>
           <div><dt className="text-muted">Recorded by</dt><dd>{r.filed_by ?? "—"}</dd></div>
-          {r.settlement && <div><dt className="text-muted">Settled</dt><dd><Link href={`/journal/${encodeURIComponent(r.settlement.id)}`} className="num hover:underline">#{r.settlement.number}</Link>, <span className="num">{r.settlement.date}</span></dd></div>}
+          {r.settlement && <div><dt className="text-muted">Settled</dt><dd><Link href={`/journal/${encodeURIComponent(r.settlement.id)}`} className="num hover:underline">#{r.settlement.number}</Link>, <span className="num"><Dt v={r.settlement.date} /></span></dd></div>}
         </dl>
         <p className="mt-3 text-[13px] text-muted">The figures below are as they were when the return was filed. The period is locked for this tax: a correction goes into a later return.</p>
       </Card>

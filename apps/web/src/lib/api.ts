@@ -42,6 +42,8 @@ export interface CompanySettings {
   accounting_basis: "accrual" | "cash";
   base_currency: string;
   calendar: "gregorian" | "ethiopian";
+  /** How dates are written (Settings, Date format); absent means DD/MM/YYYY. */
+  date_format?: "DD/MM/YYYY" | "MM/DD/YYYY" | "YYYY-MM-DD";
   fiscal_year_start_month: number;
   conversion_date: string | null;
   /** Nothing may post on or before this date. */
@@ -1663,7 +1665,7 @@ export interface ExpenseClaimList {
 /** GET public/quote (065): a quote as its customer sees it through the emailed link. */
 /** 099: an invoice seen through a shared link, without an account. */
 export interface PublicInvoice {
-  company: { name: string; tin: string | null; email: string | null; phone: string | null; logo?: string | null; payment_details?: string | null };
+  company: { name: string; tin: string | null; email: string | null; phone: string | null; logo?: string | null; payment_details?: string | null; date_format?: string; calendar?: "gregorian" | "ethiopian" };
   customer: string | null;
   invoice: {
     number: string; issue_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; total: string; amount_due: string; paid: boolean;
@@ -1674,7 +1676,7 @@ export interface PublicInvoice {
 /** An invoice or quote sent by WhatsApp: its link, the message, and the WhatsApp link that opens the chat with it written. */
 export interface SharedDocument { url: string; message: string; expires_at: string; to: string | null; whatsapp_url: string; status: string }
 export interface PublicQuote {
-  company: { name: string; tin: string | null; email: string | null; phone: string | null; logo?: string | null; payment_details?: string | null };
+  company: { name: string; tin: string | null; email: string | null; phone: string | null; logo?: string | null; payment_details?: string | null; date_format?: string; calendar?: "gregorian" | "ethiopian" };
   customer: string | null;
   quote: {
     number: string; issue_date: string; valid_until: string | null; currency: string; subtotal: string; tax_total: string; total: string;

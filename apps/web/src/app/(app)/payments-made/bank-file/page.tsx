@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getBankAccounts, getBankPaymentFile } from "@/lib/data";
@@ -65,7 +66,7 @@ export default async function BankPaymentFilePage({ searchParams }: PageProps<"/
                   {file.rows.map((r) => (
                     <tr key={r.payment_id}>
                       <td><Link href={`/payments-made/${encodeURIComponent(r.payment_id)}`} className="hover:underline">{r.supplier}</Link>
-                        {r.details_changed_on && <span className="ml-1.5 text-[12px] font-semibold text-bad">details changed {r.details_changed_on}</span>}</td>
+                        {r.details_changed_on && <span className="ml-1.5 text-[12px] font-semibold text-bad">details changed <Dt v={r.details_changed_on} /></span>}</td>
                       <td>{r.institution}</td>
                       <td className="num">{r.account_number}<span className="block text-[12px] text-muted">{r.account_name}</span></td>
                       <td>{r.reference ?? ""}</td>

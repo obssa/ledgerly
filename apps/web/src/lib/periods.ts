@@ -1,4 +1,5 @@
 import { daysInMonth as ethDaysInMonth, ETHIOPIAN_MONTHS, fromGregorian, toGregorian } from "./ethiopian";
+import type { DateFormat } from "./dates";
 
 /**
  * Report periods, as QuickBooks offers them ("Report period": All dates, Today, This month to date, Last fiscal
@@ -17,7 +18,13 @@ export interface PeriodContext {
   fiscalStartMonth: number;
   /** The company's fiscal years as set up (they win over the start month, e.g. a first, short year). */
   fiscalYears?: { starts_on: string; ends_on: string }[];
+  /** How the company writes dates (Settings, Date format): month first puts the month first in words too. */
+  dateFormat?: DateFormat;
 }
+
+/** A calendar, or the company's date preferences (a PeriodContext will do): what words for a date depend on. */
+export type DateWords = Calendar | { calendar: Calendar; dateFormat?: DateFormat };
+const wordsOf = (w: DateWords) => (typeof w === "string" ? { calendar: w, dateFormat: undefined } : w);
 
 /** A period; null means open at that end (All dates, Since 30 days ago). */
 export interface Range { from: string | null; to: string | null }
@@ -250,15 +257,16 @@ export function matchRange(range: Range, ctx: PeriodContext, allowed: readonly R
 
 const GREGORIAN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-/** "26 November 2026", or "Hidar 17, 2019" in the Ethiopian calendar. */
-export function formatDay(iso: string, cal: Calendar): string {
-  if (cal === "ethiopian") { const e = fromGregorian(iso); return `${ETHIOPIAN_MONTHS[e.month - 1]} ${e.day}, ${e.year}`; }
-  const [y, m, d] = iso.split("-").map(Number);
-  return `${d} ${GREGORIAN_MONTHS[m - 1]} ${y}`;
+/** "26 November 2026" ("November 26, 2026" when the company writes the month first), or "Hidar 17, 2019" in the Ethiopian calendar. */
+export function formatDay(iso: string, words: DateWords): string {
+  const { calendar, dateFormat } = wordsOf(words);
+  if (calendar === "ethiopian") { const e = fromGregorian(iso); return `${ETHIOPIAN_MONTHS[e.month - 1]} ${e.day}, ${e.year}`; }
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return dateFormat === "MM/DD/YYYY" ? `${GREGORIAN_MONTHS[m - 1]} ${d}, ${y}` : `${d} ${GREGORIAN_MONTHS[m - 1]} ${y}`;
 }
 
 /** What a report header says about its period: "1 July 2026 – 26 November 2026", "All dates", "From 27 October 2026". */
-export function rangeLabel(range: Range, cal: Calendar): string {
+export function rangeLabel(range: Range, cal: DateWords): string {
   if (!range.from && !range.to) return "All dates";
   if (!range.from) return `Up to ${formatDay(range.to!, cal)}`;
   if (!range.to) return `From ${formatDay(range.from, cal)}`;
@@ -266,7 +274,7 @@ export function rangeLabel(range: Range, cal: Calendar): string {
   return `${formatDay(range.from, cal)} – ${formatDay(range.to, cal)}`;
 }
 
-export const asOfLabel = (iso: string, cal: Calendar) => `As of ${formatDay(iso, cal)}`;
+export const asOfLabel = (iso: string, cal: DateWords) => `As of ${formatDay(iso, cal)}`;
 
 /** Presets with both ends: for reports that need a start and an end (ratios over a number of days). */
 export const CLOSED_RANGE_PRESETS: readonly RangePreset[] = RANGE_PRESETS.map((p) => p.key).filter((k) => k !== "all" && !k.startsWith("since_"));

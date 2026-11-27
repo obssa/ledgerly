@@ -211,7 +211,7 @@ final class InvoiceController extends Controller
         \Illuminate\Support\Facades\Notification::route('mail', [$to => (string) $contact->name])->notify(new \App\Notifications\InvoiceSent(
             company: (string) ($company->trading_name ?: $company->legal_name), companyTin: $company->tin ? (string) $company->tin : null,
             replyTo: $company->email ? (string) $company->email : null, customer: (string) $contact->name, number: (string) $invoice->number,
-            kind: $invoice->type, issueDate: $invoice->issue_date->format('j M Y'), dueDate: $invoice->due_date?->format('j M Y'), currency: (string) $invoice->currency,
+            kind: $invoice->type, issueDate: (string) \App\Support\DateFormat::format($invoice->issue_date, $company), dueDate: \App\Support\DateFormat::format($invoice->due_date, $company), currency: (string) $invoice->currency,
             lines: $invoice->lines->map(fn ($l) => ['description' => (string) $l->description, 'quantity' => rtrim(rtrim((string) $l->quantity, '0'), '.'),
                 'unit_price' => $money($l->unit_price), 'amount' => $money(bcadd((string) $l->line_subtotal, (string) $l->line_tax, 2))])->values()->all(),
             subtotal: $money($invoice->subtotal), tax: $money($invoice->tax_total), total: $money($invoice->total), amountDue: $money($invoice->amount_due),

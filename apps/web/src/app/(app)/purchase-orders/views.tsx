@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -48,10 +49,10 @@ export async function PurchaseOrderList({ q = {} }: { q?: Record<string, string 
                   const s = statusOf(o.status);
                   return (
                     <tr key={o.id}>
-                      <td className="num">{o.issue_date}</td>
+                      <td className="num"><Dt v={o.issue_date} /></td>
                       <td className="num font-semibold"><Link href={`/purchase-orders/${encodeURIComponent(o.id)}`} className="hover:underline">{o.number ?? <span className="text-muted">Draft</span>}</Link></td>
                       <td>{o.contact.name}</td>
-                      <td className="num">{o.due_date ?? "—"}</td>
+                      <td className="num"><Dt v={o.due_date} /></td>
                       <td className="num text-right">{formatMoney(o.total, o.currency)}</td>
                       <td><Pill tone={s.tone}>{s.label}</Pill></td>
                     </tr>
@@ -123,8 +124,8 @@ export async function PurchaseOrderView({ id, saved }: { id: string; saved?: boo
               {doc.contact.tax_id && <div className="num text-[13px] text-muted">TIN {doc.contact.tax_id}</div>}
             </div>
             <div className="text-right">
-              <div><span className="text-muted">Purchase order date</span> <span className="num">{doc.issue_date}</span></div>
-              <div><span className="text-muted">Expected date</span> <span className="num">{doc.due_date ?? "—"}</span></div>
+              <div><span className="text-muted">Purchase order date</span> <span className="num"><Dt v={doc.issue_date} /></span></div>
+              <div><span className="text-muted">Expected date</span> <span className="num"><Dt v={doc.due_date} /></span></div>
               {Number(doc.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{doc.fx_rate}</span></div>}
             </div>
           </div>
@@ -185,7 +186,7 @@ export async function PurchaseOrderView({ id, saved }: { id: string; saved?: boo
                 {receipts.map((r) => (
                   <li key={r.id} className="flex justify-between gap-2 border-t border-line py-1.5 first:border-t-0">
                     <span><Link href={`/goods-received/${encodeURIComponent(r.id)}`} className="num font-semibold hover:underline">{r.number}</Link>
-                      <span className="num ml-1 text-muted">{r.received_on}</span>
+                      <span className="num ml-1 text-muted"><Dt v={r.received_on} /></span>
                       {r.status === "void" && <span className="ml-1 text-muted">(void)</span>}</span>
                     <span className="num">{formatAmount(r.value ?? "0")}</span>
                   </li>

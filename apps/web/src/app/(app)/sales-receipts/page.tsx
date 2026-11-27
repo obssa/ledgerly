@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
@@ -32,7 +33,7 @@ export default async function SalesReceiptsPage({ searchParams }: PageProps<"/sa
               {receipts.length === 0 && <tr><td colSpan={6} className="text-muted">No cash sales yet. A sale paid on the spot is recorded here, without an invoice to collect.</td></tr>}
               {receipts.map((r) => (
                 <tr key={r.id}>
-                  <td className="num">{r.issue_date}</td>
+                  <td className="num"><Dt v={r.issue_date} /></td>
                   <td className="num font-semibold">
                     <Link href={`/sales-receipts/${encodeURIComponent(r.id)}`} className="hover:underline">{r.number ?? "—"}</Link>
                     {r.status === "void" && <> <Pill>Void</Pill></>}

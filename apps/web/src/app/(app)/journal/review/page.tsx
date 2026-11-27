@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { CLOSED_RANGE_PRESETS } from "@/lib/periods";
 import Link from "@/components/Link";
@@ -55,10 +56,10 @@ export default async function ReviewQueuePage({ searchParams }: PageProps<"/jour
                   {queue.data.map((e) => (
                     <tr key={e.id}>
                       <td className="num font-semibold"><Link href={`/journal/${encodeURIComponent(e.id)}`} className="hover:underline">#{e.number}</Link></td>
-                      <td className="num">{e.date}</td>
+                      <td className="num"><Dt v={e.date} /></td>
                       <td>{e.memo ?? e.source_type.replace(/_/g, " ")}{e.status === "reversed" && <span className="ml-2"><Pill>Reversed</Pill></span>}</td>
                       <td><span className="flex flex-wrap gap-1">{e.flags.map((f) => <Pill key={f} tone="warn">{LABELS[f] ?? f}</Pill>)}</span></td>
-                      <td className="text-[13px]">{e.posted_by ?? "—"}<span className="block num text-muted">{e.posted_at}</span></td>
+                      <td className="text-[13px]">{e.posted_by ?? "—"}<span className="block num text-muted"><Dt v={e.posted_at} time /></span></td>
                       <td className="num text-right">{formatAmount(e.total)}</td>
                       <td>
                         {e.review ? (

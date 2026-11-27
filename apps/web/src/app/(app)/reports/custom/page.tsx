@@ -46,7 +46,7 @@ export default async function CustomReportPage({ searchParams }: PageProps<"/rep
         <ReportsNav current="/reports/custom" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Custom report">
-            <div className="px-3 pt-3"><ReportHeader title="Custom report" period={rangeLabel(period.picked, period.ctx.calendar)} filters={[CUSTOM_MEASURES.find(([v]) => v === o.measure)?.[1]]} /></div>
+            <div className="px-3 pt-3"><ReportHeader title="Custom report" period={rangeLabel(period.picked, period.ctx)} filters={[CUSTOM_MEASURES.find(([v]) => v === o.measure)?.[1]]} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">{rowLabel}</th>

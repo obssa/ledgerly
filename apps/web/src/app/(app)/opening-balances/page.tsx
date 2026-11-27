@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getOpeningBalances } from "@/lib/data";
@@ -45,7 +46,7 @@ export default async function OpeningBalancesPage() {
         ) : (
           <>
             <p className="max-w-[720px] text-sm text-muted">
-              Copy each balance from your old system&apos;s trial balance as at <strong className="num text-ink">{opening.conversion_date}</strong>,
+              Copy each balance from your old system&apos;s trial balance as at <strong className="num text-ink"><Dt v={opening.conversion_date} /></strong>,
               in {opening.base_currency}. If debits and credits differ, the difference goes to Opening balance equity, so the books
               balance and the difference stays visible. Entering them again replaces the previous figures; the change is kept in the
               history. Customer and supplier balances and stock are entered from their open invoices, bills and stock counts.
@@ -59,7 +60,7 @@ export default async function OpeningBalancesPage() {
         <Card className="mt-4 max-w-[1000px]" label="Open invoices and bills">
           <h2 className="text-[17px] font-bold">Open invoices and bills from the old books</h2>
           <p className="mt-1 max-w-[720px] text-sm text-muted">
-            Enter each invoice a customer still owed, and each bill still owed to a supplier, on {opening.conversion_date}: its number,
+            Enter each invoice a customer still owed, and each bill still owed to a supplier, on <Dt v={opening.conversion_date} />: its number,
             dates and the amount still open. It posts on the conversion date against opening balance equity (no sale, cost or tax again),
             is never sent to the tax authority, and is paid, aged and stated like any other. Many at once:{" "}
             <Link href="/import?kind=open-invoices" className="font-bold text-brand">import invoices</Link> or{" "}
@@ -78,8 +79,8 @@ export default async function OpeningBalancesPage() {
                         {d.reference && <span className="text-[12px] text-muted"> ({d.reference})</span>}
                       </td>
                       <td>{d.contact?.name}</td>
-                      <td className="num">{d.issue_date}</td>
-                      <td className="num">{d.due_date ?? "—"}</td>
+                      <td className="num"><Dt v={d.issue_date} /></td>
+                      <td className="num"><Dt v={d.due_date} /></td>
                       <td className="num text-right">{formatMoney(d.total, d.currency)}</td>
                       <td className="num text-right font-semibold">{formatMoney(d.amount_due, d.currency)}</td>
                     </tr>

@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import { Dt } from "@/components/Dt";
 import { Card } from "@/components/ui";
 import { actionLabel, changesOf, type DocumentHistory } from "@/lib/history";
 
@@ -7,12 +8,10 @@ import { actionLabel, changesOf, type DocumentHistory } from "@/lib/history";
  * line that changed), voided, emailed… Each correction can open the version it replaced. From the append-only audit
  * log and saved versions, so nothing here can be edited.
  */
-export function DocumentHistoryPanel({ history, timeZone, auditHref }: { history: DocumentHistory | null; timeZone: string; auditHref?: string }) {
+export function DocumentHistoryPanel({ history, auditHref }: { history: DocumentHistory | null; timeZone?: string; auditHref?: string }) {
   if (!history) return null;
-  const when = (iso: string) => {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone });
-  };
+  // In the company's date format and time zone (DatePrefsProvider has both).
+  const when = (iso: string) => <Dt v={iso} time />;
   const versionFor = (after: unknown) => {
     try {
       const v = (typeof after === "string" ? JSON.parse(after) : after) as { version_saved?: number } | null;
@@ -78,8 +77,8 @@ function VersionSnapshot({ snapshot }: { snapshot: Record<string, unknown> }) {
   return (
     <div className="mt-1.5 rounded-lg border border-line-soft p-2">
       <dl className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-        <dt className="text-muted">Date</dt><dd className="num">{f("issue_date").slice(0, 10)}</dd>
-        <dt className="text-muted">Due</dt><dd className="num">{f("due_date").slice(0, 10)}</dd>
+        <dt className="text-muted">Date</dt><dd className="num"><Dt v={f("issue_date")} /></dd>
+        <dt className="text-muted">Due</dt><dd className="num"><Dt v={f("due_date")} /></dd>
         <dt className="text-muted">Total</dt><dd className="num font-semibold">{f("currency")} {f("total")}</dd>
       </dl>
       {lines.length > 0 && (

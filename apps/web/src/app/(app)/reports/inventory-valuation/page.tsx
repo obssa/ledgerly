@@ -29,7 +29,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
             </p>
           )}
           <Card className="!p-2" label="Inventory valuation">
-            <div className="px-3 pt-3"><ReportHeader title="Inventory valuation" period={asOfLabel(asOf, at.ctx.calendar)} filters={["Values at cost"]} /></div>
+            <div className="px-3 pt-3"><ReportHeader title="Inventory valuation" period={asOfLabel(asOf, at.ctx)} filters={["Values at cost"]} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col">Warehouse</th><th scope="col" className="!text-right">Quantity</th><th scope="col" className="!text-right">Average cost</th><th scope="col" className="!text-right">Value</th></tr></thead>

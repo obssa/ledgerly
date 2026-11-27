@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -17,7 +18,7 @@ function Lines({ lines, empty }: { lines: ReconciliationLine[]; empty: string })
           {lines.length === 0 && <tr><td colSpan={5} className="text-muted">{empty}</td></tr>}
           {lines.map((l, i) => (
             <tr key={`${l.entry}-${i}`}>
-              <td className="num">{l.date}</td><td className="num">#{l.entry}</td><td>{l.memo ?? l.source_type}</td><td>{l.contact ?? "—"}</td>
+              <td className="num"><Dt v={l.date} /></td><td className="num">#{l.entry}</td><td>{l.memo ?? l.source_type}</td><td>{l.contact ?? "—"}</td>
               <td className="num text-right">{formatAmount(l.amount)}</td>
             </tr>
           ))}
@@ -39,7 +40,7 @@ export default async function ReconciliationPage({ params }: PageProps<"/banking
       <PageTitle
         eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / <Link href={back} className="hover:underline">
           <span className="num">{r.account.code}</span> {r.account.name}: reconcile</Link></>}
-        title={<>Statement to <span className="num">{r.statement_date}</span> {r.status === "completed" ? <Pill tone="good">Reconciled</Pill> : r.status === "undone" ? <Pill>Undone</Pill> : <Pill tone="warn">In progress</Pill>}</>}
+        title={<>Statement to <span className="num"><Dt v={r.statement_date} /></span> {r.status === "completed" ? <Pill tone="good">Reconciled</Pill> : r.status === "undone" ? <Pill>Undone</Pill> : <Pill tone="warn">In progress</Pill>}</>}
       />
       {r.status === "draft" ? (
         <>
@@ -58,7 +59,7 @@ export default async function ReconciliationPage({ params }: PageProps<"/banking
               <div><dt className="text-muted">Not yet on the statement</dt><dd className="num font-semibold">{formatAmount(r.outstanding_total ?? "0.00")}</dd></div>
               <div><dt className="text-muted">Balance in the books</dt><dd className="num font-semibold">{formatAmount(r.book_balance ?? "0.00")}</dd></div>
             </dl>
-            {r.status === "undone" && <p className="mt-3 text-[13px] text-muted">Undone{r.undone_at ? ` on ${r.undone_at.slice(0, 10)}` : ""}: {r.undo_reason}</p>}
+            {r.status === "undone" && <p className="mt-3 text-[13px] text-muted">Undone{r.undone_at ? <> on <Dt v={r.undone_at} /></> : ""}: {r.undo_reason}</p>}
           </Card>
           <Card className="mb-4 !p-2" label="Cleared"><h2 className="px-3 pt-2 text-[15px] font-bold">Cleared ({r.cleared?.length ?? 0})</h2><Lines lines={r.cleared ?? []} empty="Nothing cleared." /></Card>
           <Card className="mb-4 !p-2" label="Outstanding"><h2 className="px-3 pt-2 text-[15px] font-bold">In the books, not yet on the statement ({r.outstanding?.length ?? 0})</h2><Lines lines={r.outstanding ?? []} empty="Nothing outstanding." /></Card>

@@ -10,6 +10,9 @@ const OPTIONAL = [
   "address_line1", "address_line2", "city", "region", "postal_code", "conversion_date",
 ] as const;
 
+/** The date formats a company can choose (Settings, Date format), as the API accepts them. */
+export const DATE_FORMAT_CHOICES = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"] as const;
+
 /** Approval limits a company can set (base currency). */
 export const APPROVAL_LIMITS = ["invoice_above", "bill_above", "journal_above"] as const;
 
@@ -36,6 +39,7 @@ export function settingsBody(form: FormData): Record<string, unknown> {
   for (const name of REQUIRED) if (form.has(name)) body[name] = value(name);
   for (const name of OPTIONAL) if (form.has(name)) body[name] = value(name) === "" ? null : value(name);
   if (form.has("fiscal_year_start_month")) body.fiscal_year_start_month = Number(value("fiscal_year_start_month"));
+  if (form.has("date_format") && (DATE_FORMAT_CHOICES as readonly string[]).includes(value("date_format"))) body.date_format = value("date_format");
   if (form.has(VAT_SHOWN)) body.vat_registered = form.get("vat_registered") === "on";
   // Approval limits: above them someone other than the creator approves. Empty means no limit.
   const limits = APPROVAL_LIMITS.filter((k) => form.has(`approval.${k}`));

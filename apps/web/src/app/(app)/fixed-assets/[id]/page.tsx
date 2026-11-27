@@ -1,3 +1,4 @@
+import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
@@ -24,10 +25,10 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
           <div><dt className="text-muted">Depreciated</dt><dd className="num text-[18px] font-bold">{formatAmount(a.depreciated)}</dd></div>
           <div><dt className="text-muted">Book value</dt><dd className="num text-[18px] font-bold">{formatAmount(a.book_value)}</dd></div>
           <div><dt className="text-muted">Residual value</dt><dd className="num">{formatAmount(a.residual_value)}</dd></div>
-          <div><dt className="text-muted">Depreciation</dt><dd>{how}, from <span className="num">{a.depreciation_starts_on}</span></dd></div>
+          <div><dt className="text-muted">Depreciation</dt><dd>{how}, from <span className="num"><Dt v={a.depreciation_starts_on} /></span></dd></div>
           <div><dt className="text-muted">Kept on</dt><dd><span className="num">{a.asset_account.code}</span> {a.asset_account.name}</dd></div>
           <div><dt className="text-muted">Where, and who keeps it</dt><dd>{a.location?.name ?? "—"}{a.custodian ? `, ${a.custodian}` : ""}</dd></div>
-          {a.disposal && <div><dt className="text-muted">Disposed of</dt><dd><Link href={`/journal/${encodeURIComponent(a.disposal.entry_id)}`} className="num hover:underline">{a.disposal.date}</Link>
+          {a.disposal && <div><dt className="text-muted">Disposed of</dt><dd><Link href={`/journal/${encodeURIComponent(a.disposal.entry_id)}`} className="num hover:underline"><Dt v={a.disposal.date} /></Link>
             {a.disposal.proceeds !== "0.00" ? <>, sold for <span className="num">{formatAmount(a.disposal.proceeds)}</span></> : ", scrapped"}</dd></div>}
         </dl>
       </Card>
@@ -58,7 +59,7 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
           <ul className="text-sm">
             {a.impairments!.map((i) => (
               <li key={i.id} className="flex justify-between gap-2 border-t border-line py-1.5">
-                <span><Link href={`/journal/${encodeURIComponent(i.entry_id)}`} className="num hover:underline">{i.impaired_on}</Link> · {i.reason}</span>
+                <span><Link href={`/journal/${encodeURIComponent(i.entry_id)}`} className="num hover:underline"><Dt v={i.impaired_on} /></Link> · {i.reason}</span>
                 <span className="num">{formatAmount(i.amount)}</span>
               </li>
             ))}
@@ -71,7 +72,7 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
           <ul className="text-sm">
             {a.revaluations!.map((r) => (
               <li key={r.id} className="flex flex-wrap justify-between gap-2 border-t border-line py-1.5">
-                <span><Link href={`/journal/${encodeURIComponent(r.entry_id)}`} className="num hover:underline">{r.revalued_on}</Link> · {r.reason}</span>
+                <span><Link href={`/journal/${encodeURIComponent(r.entry_id)}`} className="num hover:underline"><Dt v={r.revalued_on} /></Link> · {r.reason}</span>
                 <span className="num">{formatAmount(r.carrying_before)} → {formatAmount(r.fair_value)}
                   <span className="ml-2 text-[12px] text-muted">surplus {formatAmount(r.to_surplus)} · profit or loss {formatAmount(r.to_profit)}</span></span>
               </li>

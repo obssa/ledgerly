@@ -23,7 +23,7 @@ export default async function ChangesInEquityPage({ searchParams }: PageProps<"/
         <ReportsNav current="/reports/changes-in-equity" />
         {!soce ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
           <Card className="min-w-0 flex-[4_1_560px]" label="Statement of changes in equity">
-            <ReportHeader title="Statement of changes in equity" period={rangeLabel(period.picked, period.ctx.calendar)} filters={[`Profit for the period ${formatAmount(soce.net_profit, soce.currency)}`]} />
+            <ReportHeader title="Statement of changes in equity" period={rangeLabel(period.picked, period.ctx)} filters={[`Profit for the period ${formatAmount(soce.net_profit, soce.currency)}`]} />
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead><tr><th scope="col">Equity</th><th scope="col" className="!text-right">At the start</th><th scope="col" className="!text-right">Movement</th><th scope="col" className="!text-right">At the end</th></tr></thead>

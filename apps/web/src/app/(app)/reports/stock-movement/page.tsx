@@ -31,7 +31,7 @@ export default async function StockMovementPage({ searchParams }: PageProps<"/re
         <ReportsNav current="/reports/stock-movement" />
         {!r ? <p className="text-[14px] text-muted">Not available in the demo, or for that period.</p> : (
           <Card className="!p-2 min-w-0 flex-[4_1_560px]" label="Stock movement">
-            <div className="px-3 pt-3"><ReportHeader title="Stock movement" period={rangeLabel(period.picked, period.ctx.calendar)}
+            <div className="px-3 pt-3"><ReportHeader title="Stock movement" period={rangeLabel(period.picked, period.ctx)}
               filters={[r.warehouse?.name ?? "All warehouses (transfers between them left out)", "Values at cost"]} /></div>
             <div className="overflow-x-auto">
               <table className="tbl">
