@@ -76,11 +76,10 @@ final class LateInterest
                 throw ValidationException::withMessages(['rate' => ['The income account set for interest is no longer in use: choose another in the company settings.']]);
             }
 
-            $terms = (int) (DB::table('contacts')->where('id', $invoice->contact_id)->value('payment_terms_days') ?? 0);
             $today = $this->current->today();
             $draft = $this->drafts->handle([
                 'contact_id' => $invoice->contact_id, 'issue_date' => $today,
-                'due_date' => (new DateTimeImmutable($today))->modify("+{$terms} days")->format('Y-m-d'),
+                'due_date' => PaymentTerms::forContact($invoice->contact_id, $today, (string) $this->current->get()->calendar),   // 109
                 'currency' => $invoice->currency, 'prices_include_tax' => false,
                 'notes' => "Interest on late payment of {$invoice->number}.",
                 'lines' => [['description' => mb_substr("Interest on {$invoice->number}: {$p['days']} days from {$p['from']} to {$through} at {$p['rate']}% a year on {$p['owed']} owed", 0, 500),

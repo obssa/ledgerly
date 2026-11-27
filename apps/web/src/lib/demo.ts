@@ -1,4 +1,4 @@
-import type { CompanySettings, Currencies, Customer, Dimension, Invoice, Numbering, ProfitAndLoss } from "./api";
+import type { CompanySettings, Currencies, Customer, Dimension, Invoice, Numbering, PaymentTerm, ProfitAndLoss } from "./api";
 
 /** Sample data for demo mode (no LEDGERLY_API_URL). Fictional company and customers. */
 
@@ -58,6 +58,15 @@ export const demoCustomers: Customer[] = [
   { id: "c1", name: "Sheger Grand Hotel", tax_id: "0012345678", email: "ap@sheger.example", phone: "+251 11 555 0101", currency: null, payment_terms_days: 30, credit_limit: "600000.00", is_active: true, open_balance: "598145.00" },
   { id: "c2", name: "Bole Brew Café", tax_id: null, email: null, phone: "+251 91 100 2000", currency: null, payment_terms_days: 15, credit_limit: null, is_active: true, open_balance: "58250.00" },
   { id: "c3", name: "Rift Valley Roasters Ltd", tax_id: null, email: "accounts@rvr.example", phone: null, currency: "USD", payment_terms_days: 45, credit_limit: null, is_active: true, open_balance: "166808.93" },
+];
+
+/** QuickBooks' usual terms (109), as every company starts with. */
+export const demoPaymentTerms: PaymentTerm[] = [
+  { id: "term-0", name: "Due on receipt", kind: "days", days: 0, day_of_month: null, next_month_within: 0, is_active: true },
+  { id: "term-15", name: "Net 15", kind: "days", days: 15, day_of_month: null, next_month_within: 0, is_active: true },
+  { id: "term-30", name: "Net 30", kind: "days", days: 30, day_of_month: null, next_month_within: 0, is_active: true },
+  { id: "term-60", name: "Net 60", kind: "days", days: 60, day_of_month: null, next_month_within: 0, is_active: true },
+  { id: "term-eom", name: "Due end of month", kind: "day_of_month", days: null, day_of_month: 31, next_month_within: 0, is_active: true },
 ];
 
 export const demoNumbering: Numbering[] = [

@@ -5821,6 +5821,51 @@ BEGIN
   RAISE NOTICE 'PASS T133 a document number is unique per kind whatever its letter case';
 END $$;
 
+-- T134: terms (109) are each company's own: a customer or document takes only its company's, a term is whole (days, or
+-- a day of the month), named once in any letter case, never deleted, and another company does not see it. Rolled back.
+DO $$
+DECLARE a_term uuid; b_term uuid;
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000b', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f2', true);
+    INSERT INTO payment_terms (company_id, name, kind, days) VALUES (app_company_id(), 'Net 45 T134', 'days', 45) RETURNING id INTO b_term;
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    IF EXISTS (SELECT 1 FROM payment_terms WHERE id = b_term) THEN
+      RAISE EXCEPTION 'FAIL T134a: company A saw company B''s term';
+    END IF;
+    INSERT INTO payment_terms (company_id, name, kind, day_of_month, next_month_within) VALUES (app_company_id(), 'Due 10th T134', 'day_of_month', 10, 5) RETURNING id INTO a_term;
+    UPDATE contacts SET payment_terms_id = a_term WHERE id = '00000000-0000-0000-0000-0000000000c1';
+    BEGIN
+      UPDATE contacts SET payment_terms_id = b_term WHERE id = '00000000-0000-0000-0000-0000000000c1';
+      RAISE EXCEPTION 'FAIL T134b: a customer took another company''s term';
+    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO documents (company_id, type, number, contact_id, issue_date, currency, subtotal, total, amount_due, payment_terms_id)
+        VALUES (app_company_id(), 'invoice', 'INV-T134', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0, b_term);
+      RAISE EXCEPTION 'FAIL T134c: an invoice took another company''s term';
+    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+    INSERT INTO documents (company_id, type, number, contact_id, issue_date, currency, subtotal, total, amount_due, payment_terms_id)
+      VALUES (app_company_id(), 'invoice', 'INV-T134', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0, a_term);
+    BEGIN
+      INSERT INTO payment_terms (company_id, name, kind, days, day_of_month) VALUES (app_company_id(), 'Mixed T134', 'days', 30, 10);
+      RAISE EXCEPTION 'FAIL T134d: a term had both days and a day of the month';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO payment_terms (company_id, name, kind, days) VALUES (app_company_id(), 'due 10TH t134', 'days', 10);
+      RAISE EXCEPTION 'FAIL T134e: two terms had the same name in other letter cases';
+    EXCEPTION WHEN unique_violation THEN NULL; END;
+    BEGIN
+      DELETE FROM payment_terms WHERE id = a_term;
+      RAISE EXCEPTION 'FAIL T134f: a term was deleted';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    UPDATE payment_terms SET is_active = false WHERE id = a_term;
+    RAISE EXCEPTION 'T134 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T134 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T134 terms are each company''s own, whole, named once and never deleted';
+END $$;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

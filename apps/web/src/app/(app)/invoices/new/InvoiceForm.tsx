@@ -16,6 +16,7 @@ import { saveQuote } from "../../quotes/actions";
 import { savePurchaseOrder } from "../../purchase-orders/actions";
 import { todayIn } from "@/lib/dates";
 import { findBarcode } from "@/lib/barcodes";
+import { describeTerm, dueDate as termDueDate } from "@/lib/terms";
 
 /** The words and postings that differ between a sales invoice and a supplier's bill; the form is the same. */
 const KIND = {
@@ -53,7 +54,7 @@ const KIND = {
 } as const;
 
 /** What the form needs from a saved document to edit it: an invoice draft, or a quote or sales order. */
-type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
+type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
   | "warehouse_id" | "number" | "notes" | "lines" | "lock_version"> & { status: string; reference?: string | null };
 
 const METHODS: Record<string, string> = {
@@ -116,6 +117,20 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
 
   const [customerId, setCustomerId] = useState(draft?.contact.id ?? "");
   const [issueDate, setIssueDate] = useState(draft?.issue_date ?? today);
+  // QuickBooks' Terms (109), on invoices and bills: the term sets the due date from the date, in the company's calendar;
+  // changing the customer brings their usual term, changing the date or the term sets it again; a date typed stands.
+  const termed = kind === "invoice" || kind === "bill";
+  const terms = options.terms ?? [];
+  const calendar = options.calendar ?? "gregorian";
+  const dueBy = (date: string, id: string, contactId: string): string => {
+    const term = terms.find((t) => t.id === id);
+    if (term) return termDueDate(date, term, calendar);
+    const contact = options.customers.find((c) => c.id === contactId);
+    return contact ? addDays(date, contact.payment_terms_days) : "";
+  };
+  const [termId, setTermId] = useState(draft ? draft.payment_terms_id ?? "" : "");
+  const [due, setDue] = useState(draft?.due_date ?? "");
+  const term = terms.find((t) => t.id === termId);
   // This kind's numbering (108): the next number shown, editable when custom numbers are allowed; a book is typed.
   const numbering = options.numbers?.find((n) => n.doc_type === kind);
   const manual = numbering ? numbering.mode === "manual" : options.manualNumbers;
@@ -229,6 +244,11 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 onChange={(e) => {
                   setCustomerId(e.target.value);
                   const c = options.customers.find((x) => x.id === e.target.value);
+                  if (termed) {
+                    const usual = c?.payment_terms_id && terms.some((t) => t.id === c.payment_terms_id) ? c.payment_terms_id : "";
+                    setTermId(usual);
+                    setDue(c ? dueBy(issueDate, usual, c.id) : "");
+                  }
                   if (c?.currency && options.currencies.includes(c.currency)) setCurrency(c.currency);
                   // A supplier's usual expense account goes on the lines that still have the first account.
                   const usual = c?.default_account_id;
@@ -239,7 +259,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 <option value="">Choose a {words.who}</option>
                 {options.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              {customer && <p className="mt-1.5 text-[13px] text-muted">{customer.tax_id ? <>TIN <span className="num">{customer.tax_id}</span> · </> : "No TIN · "}Terms {customer.payment_terms_days} days</p>}
+              {customer && <p className="mt-1.5 text-[13px] text-muted">{customer.tax_id ? <>TIN <span className="num">{customer.tax_id}</span> · </> : "No TIN · "}Usual terms: {terms.find((t) => t.id === customer.payment_terms_id)?.name ?? `${customer.payment_terms_days} days`}</p>}
             </div>
             {kind === "bill" && <Field name="reference" label="Supplier's invoice number" hint="As printed on their invoice" defaultValue={draft?.reference ?? ""} invalid={bad("reference")} />}
             {onTheSpot && (
@@ -275,9 +295,36 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             )}
             <div>
               <label className="field-label" htmlFor="issue_date">Issue date</label>
-              <DateInput className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" value={issueDate} onValue={(v) => setIssueDate(v)} />
+              <DateInput className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" value={issueDate} onValue={(v) => {
+                setIssueDate(v);
+                if (termed && customerId && /^\d{4}-\d{2}-\d{2}$/.test(v)) setDue(dueBy(v, termId, customerId));
+              }} />
             </div>
-            {!onTheSpot && (
+            {termed && (
+              <div>
+                <label className="field-label" htmlFor="payment_terms_id">Terms</label>
+                <select className={`field ${bad("payment_terms_id") ? "!border-bad" : ""}`} id="payment_terms_id" name="payment_terms_id" value={termId}
+                  aria-describedby="payment_terms_hint"
+                  onChange={(e) => {
+                    setTermId(e.target.value);
+                    if (customerId) setDue(dueBy(issueDate, e.target.value, customerId));
+                  }}>
+                  <option value="">{customer ? `None (${customer.payment_terms_days} days)` : "None"}</option>
+                  {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <p id="payment_terms_hint" className="mt-1.5 text-[13px] text-muted">
+                  {term ? describeTerm(term) : "Sets the due date"} · <Link href="/settings#terms" className="font-semibold text-primary hover:underline">Terms list</Link>
+                </p>
+              </div>
+            )}
+            {termed && (
+              <div>
+                <label className="field-label" htmlFor="due_date">Due date</label>
+                <DateInput className={`field ${bad("due_date") ? "!border-bad" : ""}`} id="due_date" name="due_date" value={due} onValue={(v) => setDue(v)}
+                  aria-invalid={bad("due_date") || undefined} />
+              </div>
+            )}
+            {!onTheSpot && !termed && (
               <Field key={`${customerId}-${issueDate}`} name="due_date" label={kind === "quote" ? "Valid until" : kind === "sales_order" ? "Deliver by" : purchase ? "Expected by" : "Due date"} type="date"
                 defaultValue={draft?.due_date && customerId === draft.contact.id && issueDate === draft.issue_date ? draft.due_date
                   : kind === "quote" ? addDays(issueDate, 30) : kind === "sales_order" || purchase ? "" : customer ? addDays(issueDate, customer.payment_terms_days) : ""} invalid={bad("due_date")} />

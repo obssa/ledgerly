@@ -10,7 +10,6 @@ use App\Domain\Sales\Actions\SaveInvoiceDraft;
 use App\Domain\Sales\Models\Contact;
 use App\Domain\Sales\Models\Document;
 use App\Domain\Tenancy\Support\CurrentCompany;
-use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -54,11 +53,11 @@ final class BatchInvoices
         return DB::transaction(function () use ($source, $customers, $lines, $issueDate, $post, $userId) {
             $made = [];
             foreach ($customers as $customer) {
-                $terms = (int) ($customer->payment_terms_days ?? 0);
                 try {
                     $draft = $this->drafts->handle([
                         'contact_id' => $customer->getKey(), 'issue_date' => $issueDate,
-                        'due_date' => (new DateTimeImmutable($issueDate))->modify("+{$terms} days")->format('Y-m-d'),
+                        'due_date' => PaymentTerms::forContact($customer->getKey(), $issueDate, (string) $this->current->get()->calendar),   // 109
+                        'payment_terms_id' => $customer->payment_terms_id,
                         'currency' => $source->currency, 'prices_include_tax' => (bool) $source->prices_include_tax, 'warehouse_id' => $source->warehouse_id,
                         'notes' => $source->notes, 'lines' => $lines,
                     ], null, $userId);

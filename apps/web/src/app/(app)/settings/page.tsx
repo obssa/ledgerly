@@ -1,8 +1,8 @@
 import { Dt } from "@/components/Dt";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCompanySettings, getCurrencies, getDimensions, getNumbering, getSubscription } from "@/lib/data";
+import { getCompanySettings, getCurrencies, getDimensions, getNumbering, getPaymentTerms, getSubscription } from "@/lib/data";
 import { subscriptionStatus } from "@/lib/subscription";
-import { CompanyProfileForm, CurrenciesPanel, DimensionsPanel, NumberingPanel, PeriodLockForm } from "./SettingsForms";
+import { CompanyProfileForm, CurrenciesPanel, DimensionsPanel, NumberingPanel, PeriodLockForm, TermsPanel } from "./SettingsForms";
 import { LogoCard } from "./LogoCard";
 import { DemoBooks } from "./DemoBooks";
 import { getSession } from "@/lib/session";
@@ -15,7 +15,7 @@ export const metadata = { title: "Company settings" };
  */
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const { logo } = await searchParams;
-  const [settings, currencies, numbering, dimensions, subscription] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering(), getDimensions(), getSubscription()]);
+  const [settings, currencies, numbering, dimensions, subscription, terms] = await Promise.all([getCompanySettings(), getCurrencies(), getNumbering(), getDimensions(), getSubscription(), getPaymentTerms(true)]);
   const year = settings.fiscal_years.at(-1);
   const { demo } = await getSession();   // the demo role's label: the demo's own buttons are its owner's
   // The same two buttons for the owners of a test company (104), which is real books, not the demo.
@@ -72,10 +72,21 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <Card label="Numbering">
             <h2 className="text-[19px] font-bold">Numbering</h2>
             <p className="mt-1.5 text-sm text-muted">
-              Drafts have no number. A number is given when the document is posted, in order and without gaps.
+              A document is numbered when it is saved: the next in the sequence, or a number a person types (each number once).
+              A draft deleted later leaves a gap.
             </p>
             <NumberingPanel settings={settings} numbering={numbering} />
           </Card>
+
+          <div id="terms" className="scroll-mt-20">
+            <Card label="Terms">
+              <h2 className="text-[19px] font-bold">Terms</h2>
+              <p className="mt-1.5 text-sm text-muted">
+                The terms customers and suppliers are on. A term sets the due date of an invoice or bill from its date; the due date can still be changed on the document.
+              </p>
+              <TermsPanel settings={settings} terms={terms} />
+            </Card>
+          </div>
 
           <Card label="Fiscal year">
             <h2 className="text-[19px] font-bold">Fiscal year</h2>

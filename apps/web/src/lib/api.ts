@@ -122,6 +122,18 @@ export interface OpeningDocument {
   status: string;
 }
 
+/** QuickBooks' Terms (109): days ("Net 30"), or a day of the month ("Due end of month" is day 31, the last). */
+export interface PaymentTerm {
+  id: string;
+  name: string;
+  kind: "days" | "day_of_month";
+  days: number | null;
+  day_of_month: number | null;
+  /** A document dated within this many days of the day falls due the next month. */
+  next_month_within: number;
+  is_active: boolean;
+}
+
 /** GET /numbering: how each type of document is numbered, and the number the next posted one would get. */
 export interface Numbering {
   doc_type: string;
@@ -162,6 +174,8 @@ export interface Customer {
   website?: string | null;
   currency: string | null;
   payment_terms_days: number;
+  /** 109: their usual term (QuickBooks' Terms); the days follow it. */
+  payment_terms_id?: string | null;
   credit_limit: string | null;
   /** 080: the price list (customer group) they buy at. */
   price_list_id?: string | null;
@@ -779,6 +793,8 @@ export interface Supplier {
   website?: string | null;
   currency: string | null;
   payment_terms_days: number;
+  /** 109: their usual term. */
+  payment_terms_id?: string | null;
   address?: Address;
   payout?: Payout;
   default_expense_account_id: string | null;
@@ -837,6 +853,9 @@ export interface Invoice {
   contact: Contact;
   issue_date: string;
   due_date: string | null;
+  /** 109: the term it is on, and its name. */
+  payment_terms_id?: string | null;
+  payment_terms?: { id: string; name: string } | null;
   currency: string;
   subtotal: string;
   tax_total: string;
@@ -1688,7 +1707,7 @@ export interface PublicInvoice {
   company: { name: string; tin: string | null; email: string | null; phone: string | null; logo?: string | null; payment_details?: string | null; date_format?: string; calendar?: "gregorian" | "ethiopian" };
   customer: string | null;
   invoice: {
-    number: string; issue_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; total: string; amount_due: string; paid: boolean;
+    number: string; issue_date: string; due_date: string | null; terms?: string | null; currency: string; subtotal: string; tax_total: string; total: string; amount_due: string; paid: boolean;
     notes: string | null; lines: { description: string; quantity: string; unit_price: string; amount: string }[];
   };
   expires_at: string;
@@ -1868,6 +1887,9 @@ export const ledgerly = {
   updateDimension: (id: string, body: { name?: string; is_active?: boolean }, ctx: RequestOptions) =>
     api<Dimension>(`dimensions/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   numbering: (ctx: RequestOptions) => api<{ data: Numbering[] }>("numbering", ctx),
+  paymentTerms: (ctx: RequestOptions, all = false) => api<{ data: PaymentTerm[] }>(all ? "payment-terms?include_inactive=1" : "payment-terms", ctx),
+  createPaymentTerm: (body: Omit<PaymentTerm, "id" | "is_active">, ctx: RequestOptions) => api<PaymentTerm>("payment-terms", { ...ctx, method: "POST", body }),
+  updatePaymentTerm: (id: string, body: Omit<PaymentTerm, "id">, ctx: RequestOptions) => api<PaymentTerm>(`payment-terms/${encodeURIComponent(id)}`, { ...ctx, method: "PUT", body }),
   saveNumbering: (body: Omit<Numbering, "next_number">, ctx: RequestOptions) => api<Numbering>("numbering", { ...ctx, method: "PUT", body }),
   customers: (q: { search?: string; include_archived?: string }, ctx: RequestOptions) =>
     api<{ data: Customer[]; can: { create: boolean; edit: boolean } }>("customers", { ...ctx, query: q }),

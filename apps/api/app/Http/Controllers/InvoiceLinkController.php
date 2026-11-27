@@ -34,6 +34,8 @@ final class InvoiceLinkController extends Controller
             'customer' => $invoice->contact?->name,
             'invoice' => [
                 'number' => $invoice->number, 'issue_date' => $invoice->issue_date->format('Y-m-d'), 'due_date' => $invoice->due_date?->format('Y-m-d'),
+                // 109: the term it is on, by name.
+                'terms' => $invoice->payment_terms_id ? \App\Domain\Sales\Models\PaymentTerm::query()->whereKey($invoice->payment_terms_id)->value('name') : null,
                 'currency' => $invoice->currency, 'subtotal' => (string) $invoice->subtotal, 'tax_total' => (string) $invoice->tax_total, 'total' => (string) $invoice->total,
                 'amount_due' => (string) $invoice->amount_due, 'paid' => $invoice->status === 'paid', 'notes' => $invoice->notes,
                 'lines' => $invoice->lines->map(fn ($l) => ['description' => $l->description, 'quantity' => (string) $l->quantity, 'unit_price' => (string) $l->unit_price,

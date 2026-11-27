@@ -1,7 +1,7 @@
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getCostAccounts, getSupplier } from "@/lib/data";
+import { getCostAccounts, getPaymentTerms, getSupplier } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { ArchiveSupplier, SupplierForm } from "../SupplierForm";
 
@@ -10,7 +10,7 @@ export const metadata = { title: "Supplier" };
 /** One supplier: what the company owes them, their recent posted bills, and their details. */
 export default async function SupplierPage({ params }: PageProps<"/suppliers/[id]">) {
   const { id } = await params;
-  const [supplier, accounts] = await Promise.all([getSupplier(id), getCostAccounts()]);
+  const [supplier, accounts, terms] = await Promise.all([getSupplier(id), getCostAccounts(), getPaymentTerms(true)]);
   if (!supplier) notFound();
   const editable = Boolean(supplier.can?.edit) && !supplier.demo;
 
@@ -46,7 +46,7 @@ export default async function SupplierPage({ params }: PageProps<"/suppliers/[id
           )}
         </Card>
         <Card className="min-w-0 flex-[2_1_560px]" label="Supplier details">
-          <SupplierForm supplier={supplier} accounts={accounts} readOnly={!editable} />
+          <SupplierForm supplier={supplier} accounts={accounts} readOnly={!editable} terms={terms} />
           {!editable && !supplier.demo && <p className="mt-4 text-sm text-muted">Only an accountant, bookkeeper, owner or admin can change a supplier.</p>}
         </Card>
       </div>

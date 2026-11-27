@@ -6,6 +6,7 @@ namespace App\Domain\Banking;
 
 use App\Domain\Ledger\Money;
 use App\Domain\Ledger\RecurringJournals;
+use App\Domain\Sales\PaymentTerms;
 use App\Domain\Sales\RecurringInvoices;
 use App\Domain\Tax\TaxCalculator;
 use DateTimeImmutable;
@@ -141,10 +142,15 @@ final class CashForecast
             }
         }
         $tax = new TaxCalculator();
+        // 109: when money is expected, by the customer's or supplier's term (else its days), in the company's calendar.
+        $calendar = (string) DB::table('companies')->where('id', $companyId)->value('calendar');
+        $termsOf = DB::table('payment_terms')->where('company_id', $companyId)->get(['id', 'kind', 'days', 'day_of_month', 'next_month_within'])->keyBy('id');
+        $dueBy = fn (string $on, ?string $termId, $days): string => PaymentTerms::dueDate($on,
+            $termId !== null && isset($termsOf[$termId]) ? $termsOf[$termId] : ['kind' => 'days', 'days' => (int) ($days ?? 0)], $calendar);
         $taxRates = DB::table('tax_rates')->where('company_id', $companyId)->pluck('rate', 'id');
         foreach (DB::table('recurring_invoices as r')->join('contacts as c', 'c.id', '=', 'r.contact_id')
             ->where(['r.company_id' => $companyId, 'r.is_active' => true])->where('r.next_on', '<=', $end)
-            ->get(['r.next_on', 'r.ends_on', 'r.frequency', 'r.lines', 'r.currency', 'r.prices_include_tax', 'c.payment_terms_days']) as $t) {
+            ->get(['r.next_on', 'r.ends_on', 'r.frequency', 'r.lines', 'r.currency', 'r.prices_include_tax', 'c.payment_terms_days', 'c.payment_terms_id']) as $t) {
             // Totalled the way the invoice it makes will be (SaveInvoiceDraft::calculate).
             $amounts = [];
             foreach (json_decode((string) $t->lines, true, 512, JSON_THROW_ON_ERROR) as $l) {
@@ -156,9 +162,8 @@ final class CashForecast
             if (bccomp($base, '0', 2) <= 0) {
                 continue;
             }
-            $terms = (int) ($t->payment_terms_days ?? 0);
             foreach ($occurrences($t, RecurringInvoices::advance(...)) as $on) {
-                $paid = (new DateTimeImmutable($on))->modify("+{$terms} days")->format('Y-m-d');
+                $paid = $dueBy($on, $t->payment_terms_id, $t->payment_terms_days);
                 if ($paid <= $end) {
                     $i = $weekOf($paid);
                     $rows[$i]['recurring_in'] = bcadd($rows[$i]['recurring_in'], $base, 2);
@@ -172,13 +177,12 @@ final class CashForecast
             ->whereNotNull('source_document_id')->groupBy('source_document_id')->select('source_document_id')
             ->selectRaw('sum(total)::numeric(20,2)::text AS total')->pluck('total', 'source_document_id');
         foreach (DB::table('documents as o')->join('contacts as c', 'c.id', '=', 'o.contact_id')->where(['o.company_id' => $companyId, 'o.status' => 'accepted'])
-            ->whereIn('o.type', ['sales_order', 'purchase_order'])->get(['o.id', 'o.type', 'o.issue_date', 'o.due_date', 'o.total', 'o.currency', 'c.payment_terms_days']) as $o) {
+            ->whereIn('o.type', ['sales_order', 'purchase_order'])->get(['o.id', 'o.type', 'o.issue_date', 'o.due_date', 'o.total', 'o.currency', 'c.payment_terms_days', 'c.payment_terms_id']) as $o) {
             $left = bcsub((string) $o->total, (string) ($made[$o->id] ?? '0'), 2);
             if (bccomp($left, '0', 2) <= 0) {
                 continue;
             }
-            $terms = (int) ($o->payment_terms_days ?? 0);
-            $paid = (new DateTimeImmutable(substr((string) ($o->due_date ?? $o->issue_date), 0, 10)))->modify("+{$terms} days")->format('Y-m-d');
+            $paid = $dueBy(substr((string) ($o->due_date ?? $o->issue_date), 0, 10), $o->payment_terms_id, $o->payment_terms_days);
             if ($paid > $end) {
                 continue;
             }

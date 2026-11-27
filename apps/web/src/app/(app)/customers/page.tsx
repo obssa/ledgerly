@@ -1,6 +1,7 @@
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
-import { getCustomers } from "@/lib/data";
+import { termsLabel } from "@/components/TermsSelect";
+import { getCustomers, getPaymentTerms } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Customers" };
@@ -9,7 +10,7 @@ export const metadata = { title: "Customers" };
 export default async function CustomersPage({ searchParams }: PageProps<"/customers">) {
   const { q, archived } = await searchParams;
   const search = typeof q === "string" ? q.slice(0, 100) : "";
-  const { data, can, demo } = await getCustomers({ search, archived: archived === "1" });
+  const [{ data, can, demo }, terms] = await Promise.all([getCustomers({ search, archived: archived === "1" }), getPaymentTerms(true)]);
 
   return (
     <>
@@ -46,7 +47,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
                     {!c.is_active && <span className="ml-2 text-[12px] font-normal text-muted">archived</span>}
                   </td>
                   <td className="num">{c.tax_id ?? "—"}</td>
-                  <td>{c.payment_terms_days === 0 ? "On receipt" : `${c.payment_terms_days} days`}</td>
+                  <td>{termsLabel(terms, c.payment_terms_id, c.payment_terms_days)}</td>
                   <td className="num text-right">{c.credit_limit ? formatAmount(c.credit_limit) : "—"}</td>
                   <td className="num text-right font-semibold">{formatAmount(c.open_balance)}</td>
                 </tr>

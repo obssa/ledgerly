@@ -47,6 +47,8 @@ trait CompanyFixtures
 
         $ids['dimension'] = $this->postJson('/api/v1/dimensions', ['kind' => 'location', 'code' => 'HQ', 'name' => "{$name} head office"], $h)
             ->assertCreated()->json('id');
+        $ids['payment_term'] = $this->postJson('/api/v1/payment-terms', ['name' => 'Due on the 10th', 'kind' => 'day_of_month', 'day_of_month' => 10], $h)
+            ->assertCreated()->json('id');   // 109
         $this->putJson('/api/v1/currencies', ['currency' => 'USD', 'enabled' => true], $h)->assertOk();
         $this->postJson('/api/v1/exchange-rates', ['currency' => 'USD', 'rate_date' => '2026-11-02', 'rate' => '134.523333'], $h)->assertCreated();
 
@@ -258,6 +260,7 @@ trait CompanyFixtures
             'lease' => $ids['lease'],
             'bin' => $ids['bin'],
             'timeEntry' => $ids['time_entry'],
+            'paymentTerm' => $ids['payment_term'],
             'milestone' => $ids['milestone'],
             'cheque' => $ids['post_dated_cheque'],
             'scheduledPayment' => $ids['scheduled_payment'],

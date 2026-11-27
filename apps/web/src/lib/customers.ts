@@ -19,6 +19,8 @@ export function customerBody(form: FormData): Record<string, unknown> {
   if (form.has("name")) body.name = value("name");
   for (const name of OPTIONAL) if (form.has(name)) body[name] = value(name) === "" ? null : value(name);
   if (form.has("payment_terms_days")) body.payment_terms_days = Number(value("payment_terms_days") || 0);
+  // 109: their usual term; "None" keeps the days they had.
+  if (form.has("payment_terms_id")) body.payment_terms_id = value("payment_terms_id") === "" ? null : value("payment_terms_id");
   if (form.has("credit_limit")) body.credit_limit = value("credit_limit") === "" ? null : value("credit_limit").replace(/[,\s]/g, "");
   if (form.has(EXEMPT_SHOWN)) body.tax_exempt = form.get("tax_exempt") === "on";
 

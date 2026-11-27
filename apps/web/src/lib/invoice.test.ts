@@ -30,6 +30,11 @@ describe("invoiceBody", () => {
     expect(kept).not.toHaveProperty("number_suggested");
     expect(invoiceBody(form([["number", "202601-22"], ["number_suggested", "INV-2027-0022"], ["lines", "[]"]]))).toMatchObject({ number: "202601-22" });
   });
+
+  it("sends the term with the due date it set, and no term when none is chosen", () => {
+    expect(invoiceBody(form([["payment_terms_id", "t30"], ["due_date", "2026-12-02"], ["lines", "[]"]]))).toMatchObject({ payment_terms_id: "t30", due_date: "2026-12-02" });
+    expect(invoiceBody(form([["payment_terms_id", ""], ["lines", "[]"]]))).not.toHaveProperty("payment_terms_id");
+  });
 });
 
 describe("parseLines", () => {

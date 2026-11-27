@@ -27,7 +27,7 @@ final class CustomerController extends Controller
 {
     use ContactRules;
 
-    private const FIELDS = ['name', 'tax_id', 'email', 'phone', 'website', 'currency', 'payment_terms_days', 'credit_limit',
+    private const FIELDS = ['name', 'tax_id', 'email', 'phone', 'website', 'currency', 'payment_terms_days', 'payment_terms_id', 'credit_limit',
         'tax_exempt', 'tax_exempt_reason', 'address', 'delivery_address', 'notes', 'is_active', 'price_list_id'];
 
     public function __construct(private readonly AuditLogger $audit)
@@ -49,7 +49,7 @@ final class CustomerController extends Controller
                 ->where('name', 'ilike', '%' . addcslashes($s, '%_\\') . '%')
                 ->orWhere('tax_id', $s)))
             ->orderByRaw('lower(name)')->limit(500)
-            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'credit_limit', 'is_active', 'price_list_id']);
+            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'payment_terms_id', 'credit_limit', 'is_active', 'price_list_id']);
 
         $balances = $this->balances($customers->pluck('id')->all());
 
@@ -135,6 +135,7 @@ final class CustomerController extends Controller
             'website' => ['sometimes', 'nullable', 'url', 'max:200'],
             'currency' => ['sometimes', 'nullable', Rule::in(Currency::all())],
             'payment_terms_days' => ['sometimes', 'integer', 'between:0,365'],
+            ...self::termsRules(),
             'credit_limit' => ['sometimes', 'nullable', 'decimal:0,2', 'min:0', 'max:999999999999999999'],
             'tax_exempt' => ['sometimes', 'boolean'],
             'tax_exempt_reason' => ['sometimes', 'nullable', 'string', 'max:300'],
@@ -146,7 +147,7 @@ final class CustomerController extends Controller
             ...self::addressRules('delivery_address'),
         ]);
 
-        return self::tidyContact($data, $current, ['address', 'delivery_address']);
+        return self::withTerms(self::tidyContact($data, $current, ['address', 'delivery_address']), $creating);
     }
 
     /** @return array<string, mixed> */

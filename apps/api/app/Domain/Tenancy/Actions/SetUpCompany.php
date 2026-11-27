@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Tenancy\Actions;
 
+use App\Domain\Sales\PaymentTerms;
 use App\Domain\Tenancy\Models\Company;
 use App\Domain\Tenancy\Models\Membership;
 use App\Domain\Tenancy\Models\Organisation;
@@ -119,6 +120,11 @@ final class SetUpCompany
                 'effective_from' => $r['effective_from'],
                 'created_at' => $now,
             ], $pack->taxRates));
+
+            // QuickBooks' usual terms (109): Due on receipt, Net 15, 30 and 60, Due end of month.
+            DB::table('payment_terms')->insert(array_map(fn (array $t) => [
+                'id' => (string) Str::uuid7(), 'company_id' => $companyId, ...$t, 'created_at' => $now, 'updated_at' => $now,
+            ], PaymentTerms::DEFAULTS));
 
             DB::table('audit_log')->insert([
                 'company_id' => $companyId,

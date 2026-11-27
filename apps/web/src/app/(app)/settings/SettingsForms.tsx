@@ -4,14 +4,15 @@ import { formatDate, todayIn } from "@/lib/dates";
 
 import { Dt } from "@/components/Dt";
 
-import { useActionState, useId, type ReactNode } from "react";
+import { useActionState, useId, useState, type ReactNode } from "react";
 import { FiscalStartFields } from "@/components/FiscalStartFields";
-import type { CompanySettings, Currencies, Dimension, Numbering } from "@/lib/api";
+import type { CompanySettings, Currencies, Dimension, Numbering, PaymentTerm } from "@/lib/api";
+import { describeTerm } from "@/lib/terms";
 import { INDUSTRIES } from "@/lib/countries";
 import { CURRENCIES } from "@/lib/decimal";
 import type { FormState } from "@/lib/forms";
 import { DATE_FORMAT_CHOICES, VAT_SHOWN, REMINDERS_SHOWN, TAX_REMINDERS_SHOWN, TEMPLATE_SHOWN, INTEREST_SHOWN } from "@/lib/settings";
-import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, setCurrency, setPeriodLock, toggleDimension } from "./actions";
+import { addDimension, addExchangeRate, saveCompanySettings, saveNumbering, addPaymentTerm, savePaymentTerm, setCurrency, setPeriodLock, toggleDimension } from "./actions";
 
 type Settings = CompanySettings & { demo: boolean };
 
@@ -375,6 +376,63 @@ const DOC_TYPES: Record<string, string> = {
 };
 
 /**
+ * QuickBooks' Terms list (109): each term sets the due date of the invoices and bills on it, from their date in the
+ * company's calendar. Days ("Net 30"), or a day of the month ("Due end of month" is day 31, the last day of any month),
+ * due the next month when a document is dated within so many days of it. Turned off, never deleted.
+ */
+export function TermsPanel({ settings, terms }: { settings: Settings; terms: PaymentTerm[] }) {
+  const manage = settings.can.manage && !settings.demo;
+  return (
+    <div className="mt-3 flex flex-col gap-4">
+      {terms.map((t) => <TermRow key={t.id} term={t} manage={manage} />)}
+      {manage && <TermRow manage />}
+    </div>
+  );
+}
+
+function TermRow({ term, manage }: { term?: PaymentTerm; manage: boolean }) {
+  const [state, action, pending] = useActionState(term ? savePaymentTerm : addPaymentTerm, undefined);
+  const [kind, setKind] = useState<PaymentTerm["kind"]>(term?.kind ?? "days");
+  const bad = (name: string) => Boolean(state?.fields?.[name]);
+  return (
+    <form action={action} className="border-t border-line pt-3" noValidate>
+      {term && <input type="hidden" name="id" value={term.id} />}
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[15px] font-bold">{term ? term.name : "Add a term"}</h3>
+        {term && <span className="text-[13px] text-muted">{term.is_active ? describeTerm(term) : "Turned off"}</span>}
+      </div>
+      <Message state={state} />
+      <fieldset disabled={!manage} className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2.5">
+        <legend className="sr-only">{term ? `Term ${term.name}` : "New term"}</legend>
+        <TextField name="name" label="Name" defaultValue={term?.name ?? ""} invalid={bad("name")} />
+        <Select name="kind" label="Due" defaultValue={kind} onChange={(v) => setKind(v as PaymentTerm["kind"])}>
+          <option value="days">In a number of days</option>
+          <option value="day_of_month">On a day of the month</option>
+        </Select>
+        {kind === "days"
+          ? <TextField name="days" label="Days" type="number" defaultValue={String(term?.days ?? 30)} invalid={bad("days")} />
+          : (
+            <>
+              <Select name="day_of_month" label="Day" defaultValue={String(term?.day_of_month ?? 31)}>
+                {Array.from({ length: 30 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                <option value="31">Last day of the month</option>
+              </Select>
+              <TextField name="next_month_within" label="Next month if dated within (days)" type="number" defaultValue={String(term?.next_month_within ?? 0)} invalid={bad("next_month_within")} />
+            </>
+          )}
+      </fieldset>
+      {term && (
+        <label className="mt-2 flex items-center gap-2.5 text-sm">
+          <input type="checkbox" name="is_active" defaultChecked={term.is_active} disabled={!manage} className="size-4" />
+          In use (turned off, it stays on the documents that have it)
+        </label>
+      )}
+      {manage && <button type="submit" className="btn mt-3" disabled={pending}>{pending ? "Saving…" : term ? "Save" : "Add term"}</button>}
+    </form>
+  );
+}
+
+/**
  * Numbering per document type. Automatic numbers are given in order when a document is saved, as QuickBooks does (a draft
  * deleted later leaves a gap), and a person may type their own unless custom numbers are off; manual numbering is for
  * pre-printed, authority-approved invoice books. The counter is never set by hand: it skips numbers already used.
@@ -448,12 +506,14 @@ function TextField({ name, label, type = "text", defaultValue = "", required, di
   );
 }
 
-function Select({ name, label, defaultValue, disabled, children }: { name: string; label: string; defaultValue: string; disabled?: boolean; children: ReactNode }) {
+function Select({ name, label, defaultValue, disabled, onChange, children }: {
+  name: string; label: string; defaultValue: string; disabled?: boolean; onChange?: (value: string) => void; children: ReactNode;
+}) {
   const id = useId();
   return (
     <div>
       <label className="field-label" htmlFor={id}>{label}</label>
-      <select className="field" id={id} name={name} defaultValue={defaultValue} disabled={disabled}>{children}</select>
+      <select className="field" id={id} name={name} defaultValue={defaultValue} disabled={disabled} onChange={onChange && ((e) => onChange(e.target.value))}>{children}</select>
     </div>
   );
 }

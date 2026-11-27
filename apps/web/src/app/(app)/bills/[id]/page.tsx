@@ -82,6 +82,7 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
             </div>
             <div className="text-right">
               <div><span className="text-muted">{credit ? "Supplier credit date" : "Bill date"}</span> <span className="num"><Dt v={bill.issue_date} /></span></div>
+              {!credit && bill.payment_terms && <div><span className="text-muted">Terms</span> {bill.payment_terms.name}</div>}
               {!credit && <div><span className="text-muted">Due date</span> <span className="num"><Dt v={bill.due_date} /></span></div>}
               {Number(bill.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{bill.fx_rate}</span></div>}
             </div>

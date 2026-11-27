@@ -68,6 +68,7 @@ use App\Http\Controllers\LogoController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\NumberingController;
+use App\Http\Controllers\PaymentTermController;
 use App\Http\Controllers\OpeningBalanceController;
 use App\Http\Controllers\PaymentMadeController;
 use App\Http\Controllers\PaymentReceivedController;
@@ -246,6 +247,9 @@ Route::prefix('v1')->group(function () {
 
             Route::get('numbering', [NumberingController::class, 'index']);
             Route::put('numbering', [NumberingController::class, 'update']);
+            Route::get('payment-terms', [PaymentTermController::class, 'index']);   // 109: QuickBooks' Terms list
+            Route::post('payment-terms', [PaymentTermController::class, 'store']);
+            Route::put('payment-terms/{paymentTerm}', [PaymentTermController::class, 'update'])->whereUuid('paymentTerm');
 
             Route::get('opening-balances', [OpeningBalanceController::class, 'show']);
             Route::put('opening-balances', [OpeningBalanceController::class, 'update']);

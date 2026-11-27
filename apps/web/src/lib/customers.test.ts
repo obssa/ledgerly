@@ -15,6 +15,11 @@ describe("customerBody", () => {
     ]))).toEqual({ name: "Sheger Grand Hotel", tax_id: null, email: "ap@sheger.example", payment_terms_days: 15, credit_limit: "250000.00" });
   });
 
+  it("sends the usual term, and none as null so the days they had stay", () => {
+    expect(customerBody(form([["payment_terms_id", "t60"]]))).toEqual({ payment_terms_id: "t60" });
+    expect(customerBody(form([["payment_terms_id", ""]]))).toEqual({ payment_terms_id: null });
+  });
+
   it("builds addresses without empty parts and with an upper-case country", () => {
     expect(customerBody(form([["address.line1", "Bole Road"], ["address.city", "Addis Ababa"], ["address.line2", ""], ["address.country", "et"]]))).toEqual({
       address: { line1: "Bole Road", city: "Addis Ababa", country: "ET" },

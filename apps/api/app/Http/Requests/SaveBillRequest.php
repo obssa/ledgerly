@@ -47,6 +47,8 @@ final class SaveBillRequest extends FormRequest
             'number' => ['nullable', 'string', 'max:40'],      // automatic numbering: none until posted
             'issue_date' => ['required', 'date_format:Y-m-d'],
             'due_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:issue_date'],
+            // 109: the term it is on (QuickBooks' Terms); sets the due date when none is typed.
+            'payment_terms_id' => ['nullable', 'uuid', Rule::exists('payment_terms', 'id')],
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'prices_include_tax' => ['boolean'],

@@ -230,14 +230,14 @@ final class QuoteWorkflow
             }
 
             $today = $this->current->today();
-            $terms = (int) (DB::table('contacts')->where('id', $source->contact_id)->value('payment_terms_days') ?? 0);
             $data = [
                 'contact_id' => $source->contact_id,
                 'number' => $number,
                 'issue_date' => $today,
                 'due_date' => $to !== 'sales_order'
-                    ? (new DateTimeImmutable($today))->modify("+{$terms} days")->format('Y-m-d')
+                    ? \App\Domain\Sales\PaymentTerms::forContact($source->contact_id, $today, (string) $this->current->get()->calendar)
                     : ($source->due_date !== null && $source->due_date->format('Y-m-d') >= $today ? $source->due_date->format('Y-m-d') : null),
+                'payment_terms_id' => $to !== 'sales_order' ? DB::table('contacts')->where('id', $source->contact_id)->value('payment_terms_id') : null,
                 'currency' => $source->currency,
                 'fx_rate' => $source->currency === $this->current->get()->base_currency ? null : (string) $source->fx_rate,
                 'prices_include_tax' => (bool) $source->prices_include_tax,

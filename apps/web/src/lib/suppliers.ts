@@ -20,6 +20,8 @@ export function supplierBody(form: FormData): Record<string, unknown> {
   if (form.has("name")) body.name = value("name");
   for (const name of OPTIONAL) if (form.has(name)) body[name] = value(name) === "" ? null : value(name);
   if (form.has("payment_terms_days")) body.payment_terms_days = Number(value("payment_terms_days") || 0);
+  // 109: their usual term; "None" keeps the days they had.
+  if (form.has("payment_terms_id")) body.payment_terms_id = value("payment_terms_id") === "" ? null : value("payment_terms_id");
   if (form.has(WITHHOLDING_SHOWN)) body.withholding_exempt = form.get("withholding_exempt") === "on";
 
   if (ADDRESS.some((part) => form.has(`address.${part}`))) {

@@ -28,7 +28,7 @@ final class SupplierController extends Controller
 {
     use ContactRules;
 
-    private const FIELDS = ['name', 'tax_id', 'email', 'phone', 'website', 'currency', 'payment_terms_days', 'address', 'payout',
+    private const FIELDS = ['name', 'tax_id', 'email', 'phone', 'website', 'currency', 'payment_terms_days', 'payment_terms_id', 'address', 'payout',
         'default_expense_account_id', 'withholding_exempt', 'withholding_exempt_reason', 'notes', 'is_active'];
 
     private const PAYOUT = ['bank_name', 'account_name', 'account_number', 'mobile_money_provider', 'mobile_money_number'];
@@ -52,7 +52,7 @@ final class SupplierController extends Controller
                 ->where('name', 'ilike', '%' . addcslashes($s, '%_\\') . '%')
                 ->orWhere('tax_id', $s)))
             ->orderBy('name')->limit(500)
-            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'default_expense_account_id', 'is_active']);
+            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'payment_terms_id', 'default_expense_account_id', 'is_active']);
 
         $balances = $this->balances($suppliers->pluck('id')->all());
 
@@ -138,6 +138,7 @@ final class SupplierController extends Controller
             'website' => ['sometimes', 'nullable', 'url', 'max:200'],
             'currency' => ['sometimes', 'nullable', Rule::in(Currency::all())],
             'payment_terms_days' => ['sometimes', 'integer', 'between:0,365'],
+            ...self::termsRules(),
             // Loaded through the company's own rows (row-level security); the database checks it again (019).
             'default_expense_account_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('accounts', 'id')->whereIn('type', ['expense', 'asset'])],
             'withholding_exempt' => ['sometimes', 'boolean'],
@@ -153,7 +154,7 @@ final class SupplierController extends Controller
             ...self::addressRules('address'),
         ]);
 
-        return self::tidyContact($data, $current, ['address', 'payout']);
+        return self::withTerms(self::tidyContact($data, $current, ['address', 'payout']), $creating);
     }
 
     /** @return array<string, mixed> */

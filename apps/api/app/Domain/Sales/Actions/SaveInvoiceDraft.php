@@ -8,6 +8,8 @@ use App\Domain\Inventory\Models\Item;
 use App\Domain\Ledger\ExchangeRates;
 use App\Domain\Ledger\Models\Account;
 use App\Domain\Sales\DocumentNumbers;
+use App\Domain\Sales\Models\PaymentTerm;
+use App\Domain\Sales\PaymentTerms;
 use App\Domain\Ledger\Exceptions\LedgerException;
 use App\Domain\Ledger\Money;
 use App\Domain\Sales\Models\Document;
@@ -292,7 +294,11 @@ final class SaveInvoiceDraft
             'header' => [
                 'contact_id' => $data['contact_id'],
                 'issue_date' => $data['issue_date'],
-                'due_date' => $data['due_date'] ?? null,
+                // 109: the term given sets the due date when none is typed; a typed date stands, the term with it (QuickBooks).
+                'due_date' => $data['due_date'] ?? (empty($data['payment_terms_id']) ? null
+                    : PaymentTerms::dueDate($data['issue_date'], PaymentTerm::query()->findOrFail($data['payment_terms_id'])->only(['kind', 'days', 'day_of_month', 'next_month_within']),
+                        (string) $this->company->get()->calendar)),
+                'payment_terms_id' => $data['payment_terms_id'] ?? null,
                 'currency' => $currency,
                 // 1 for the base currency; else the rate given, or the company's rate for the issue date.
                 'fx_rate' => $this->rates->forDocument($this->company->get(), $currency, $data['issue_date'], isset($data['fx_rate']) ? (string) $data['fx_rate'] : null),
