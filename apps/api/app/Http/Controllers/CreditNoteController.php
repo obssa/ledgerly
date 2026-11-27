@@ -90,7 +90,7 @@ final class CreditNoteController extends Controller
             'restock' => ['sometimes', 'boolean'],   // the goods came back into stock (058)
         ], ['notes.required' => 'Say why: the reason is printed on the credit note.']);
 
-        $creditNote = $save->handle([...$data, 'prices_include_tax' => (bool) $invoice->prices_include_tax], null, $request->user()->getKey(), $invoice);
+        $creditNote = $save->handle([...$data, 'prices_include_tax' => (bool) $invoice->prices_include_tax, 'tax_mode' => $invoice->tax_mode], null, $request->user()->getKey(), $invoice);
 
         return response()->json($creditNote->load('lines'), 201);
     }

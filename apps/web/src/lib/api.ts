@@ -60,6 +60,8 @@ export interface CompanySettings {
   reminders?: { enabled: boolean; days: number[] };
   /** Email reminders of tax returns due (054): on unless turned off. */
   tax_reminders?: boolean;
+  /** 110: the default Amounts are of new documents. */
+  amounts_are?: TaxMode;
   /** Interest on late payment (079): an annual rate and the income account it goes to. */
   late_interest?: { rate: string | null; account_id: string | null };
   /** How invoices look on paper and as PDF files. */
@@ -121,6 +123,9 @@ export interface OpeningDocument {
   amount_due: string;
   status: string;
 }
+
+/** QuickBooks' Amounts are (110): exclusive of tax, inclusive of tax, or out of scope of tax. */
+export type TaxMode = "exclusive" | "inclusive" | "out_of_scope";
 
 /** QuickBooks' Terms (109): days ("Net 30"), or a day of the month ("Due end of month" is day 31, the last). */
 export interface PaymentTerm {
@@ -856,6 +861,8 @@ export interface Invoice {
   /** 109: the term it is on, and its name. */
   payment_terms_id?: string | null;
   payment_terms?: { id: string; name: string } | null;
+  /** 110: Amounts are; out of scope of tax carries no tax at all. */
+  tax_mode?: TaxMode;
   currency: string;
   subtotal: string;
   tax_total: string;

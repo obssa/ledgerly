@@ -21,8 +21,11 @@ class Document extends Model
     protected $fillable = [
         'type', 'number', 'contact_id', 'issue_date', 'due_date', 'currency', 'fx_rate', 'prices_include_tax',
         'language', 'notes', 'location_id', 'custom_fields', 'created_by', 'original_document_id', 'reference',
-        'paid_from_account_id', 'payment_method', 'warehouse_id', 'salesperson_id', 'payment_terms_id',
+        'paid_from_account_id', 'payment_method', 'warehouse_id', 'salesperson_id', 'payment_terms_id', 'out_of_scope',
     ];
+
+    /** 110: read back as QuickBooks' Amounts are. */
+    protected $appends = ['tax_mode'];
 
     protected function casts(): array
     {
@@ -30,11 +33,23 @@ class Document extends Model
             'issue_date' => 'date:Y-m-d',   // sent as 2026-11-16, not a timestamp
             'due_date' => 'date:Y-m-d',
             'prices_include_tax' => 'boolean',
+            'out_of_scope' => 'boolean',
             'custom_fields' => 'array',
             'lock_version' => 'integer',
             'opening' => 'boolean',
             'restock' => 'boolean',
         ];
+    }
+
+    /** Exclusive of tax, inclusive of tax, or out of scope of tax (110). */
+    public function getTaxModeAttribute(): ?string
+    {
+        $raw = $this->getAttributes();
+        if (! array_key_exists('prices_include_tax', $raw)) {
+            return null;   // read with a few columns only (a list, a link)
+        }
+
+        return ! empty($raw['out_of_scope']) ? 'out_of_scope' : ($this->prices_include_tax ? 'inclusive' : 'exclusive');
     }
 
     public function lines(): HasMany

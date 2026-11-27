@@ -41,6 +41,7 @@ export function settingsBody(form: FormData): Record<string, unknown> {
   if (form.has("fiscal_year_start_month")) body.fiscal_year_start_month = Number(value("fiscal_year_start_month"));
   if (form.has("date_format") && (DATE_FORMAT_CHOICES as readonly string[]).includes(value("date_format"))) body.date_format = value("date_format");
   if (form.has(VAT_SHOWN)) body.vat_registered = form.get("vat_registered") === "on";
+  if (["exclusive", "inclusive", "out_of_scope"].includes(value("amounts_are"))) body.amounts_are = value("amounts_are");
   // Approval limits: above them someone other than the creator approves. Empty means no limit.
   const limits = APPROVAL_LIMITS.filter((k) => form.has(`approval.${k}`));
   if (limits.length > 0) {

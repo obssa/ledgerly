@@ -135,6 +135,8 @@ final class CompanySettingsController extends Controller
             'tax_reminders' => ['sometimes', 'boolean'],
             // How dates are written everywhere (QuickBooks: Date format); day first unless chosen otherwise.
             'date_format' => ['sometimes', 'required', Rule::in(\App\Support\DateFormat::FORMATS)],
+            // 110: QuickBooks' default "Amounts are" for new sales and purchase documents.
+            'amounts_are' => ['sometimes', 'required', Rule::in(['exclusive', 'inclusive', 'out_of_scope'])],
             // How invoices look on paper and as PDF files: an accent colour, how to pay, a footer line.
             'invoice_template' => ['sometimes', 'array:accent,payment_details,footer'],
             'invoice_template.accent' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
@@ -179,6 +181,10 @@ final class CompanySettingsController extends Controller
         if (array_key_exists('date_format', $data)) {
             $company->settings = [...($company->settings ?? []), 'date_format' => (string) $data['date_format']];
             unset($data['date_format']);
+        }
+        if (array_key_exists('amounts_are', $data)) {
+            $company->settings = [...($company->settings ?? []), 'amounts_are' => (string) $data['amounts_are']];
+            unset($data['amounts_are']);
         }
         if (array_key_exists('tax_reminders', $data)) {
             $company->settings = [...($company->settings ?? []), 'tax_reminders' => (bool) $data['tax_reminders']];
@@ -324,6 +330,7 @@ final class CompanySettingsController extends Controller
         $fields['reminders'] = \App\Domain\Sales\InvoiceReminders::settingsOf($company);
         $fields['tax_reminders'] = (bool) ($company->settings['tax_reminders'] ?? true);
         $fields['date_format'] = \App\Support\DateFormat::of($company);
+        $fields['amounts_are'] = (string) ($company->settings['amounts_are'] ?? 'exclusive');
         $fields['late_interest'] = \App\Domain\Sales\LateInterest::settingsOf($company);
         $fields['invoice_template'] = self::template($company->settings['invoice_template'] ?? []);
 

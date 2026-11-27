@@ -78,6 +78,12 @@ export function CompanyProfileForm({ settings }: { settings: Settings }) {
         <Select name="date_format" label="Date format" defaultValue={settings.date_format ?? "DD/MM/YYYY"}>
           {DATE_FORMAT_CHOICES.map((f) => <option key={f} value={f}>{f} (today: {formatDate(todayIn(settings.timezone), { calendar: settings.calendar, dateFormat: f })})</option>)}
         </Select>
+        {/* QuickBooks' default Amounts are (110): how new invoices, bills and receipts start. */}
+        <Select name="amounts_are" label="New documents: amounts are" defaultValue={settings.amounts_are ?? "exclusive"}>
+          <option value="exclusive">Exclusive of tax</option>
+          <option value="inclusive">Inclusive of tax</option>
+          <option value="out_of_scope">Out of scope of tax</option>
+        </Select>
         <Select name="accounting_basis" label="Reports default to" defaultValue={settings.accounting_basis} disabled={locked("accounting_basis")}>
           <option value="accrual">Accrual basis</option>
           <option value="cash">Cash basis (a view of the same books)</option>

@@ -31,6 +31,12 @@ describe("invoiceBody", () => {
     expect(invoiceBody(form([["number", "202601-22"], ["number_suggested", "INV-2027-0022"], ["lines", "[]"]]))).toMatchObject({ number: "202601-22" });
   });
 
+  it("sends Amounts are, and inclusive as prices that include tax", () => {
+    expect(invoiceBody(form([["tax_mode", "out_of_scope"], ["lines", "[]"]]))).toMatchObject({ tax_mode: "out_of_scope", prices_include_tax: false });
+    expect(invoiceBody(form([["tax_mode", "inclusive"], ["lines", "[]"]]))).toMatchObject({ tax_mode: "inclusive", prices_include_tax: true });
+    expect(invoiceBody(form([["tax_mode", "anything"], ["lines", "[]"]]))).not.toHaveProperty("tax_mode");
+  });
+
   it("sends the term with the due date it set, and no term when none is chosen", () => {
     expect(invoiceBody(form([["payment_terms_id", "t30"], ["due_date", "2026-12-02"], ["lines", "[]"]]))).toMatchObject({ payment_terms_id: "t30", due_date: "2026-12-02" });
     expect(invoiceBody(form([["payment_terms_id", ""], ["lines", "[]"]]))).not.toHaveProperty("payment_terms_id");

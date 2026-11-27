@@ -50,6 +50,8 @@ final class SaveInvoiceRequest extends FormRequest
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'prices_include_tax' => ['boolean'],
+            // 110: QuickBooks' Amounts are. Given, it decides; else prices_include_tax does (exclusive or inclusive).
+            'tax_mode' => ['nullable', Rule::in(['exclusive', 'inclusive', 'out_of_scope'])],
             'language' => ['nullable', 'in:en'],
             // The version the client read; a save is refused (409) if someone else saved in between.
             'lock_version' => ['nullable', 'integer', 'min:1'],

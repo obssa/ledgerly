@@ -150,12 +150,12 @@ final class CashForecast
         $taxRates = DB::table('tax_rates')->where('company_id', $companyId)->pluck('rate', 'id');
         foreach (DB::table('recurring_invoices as r')->join('contacts as c', 'c.id', '=', 'r.contact_id')
             ->where(['r.company_id' => $companyId, 'r.is_active' => true])->where('r.next_on', '<=', $end)
-            ->get(['r.next_on', 'r.ends_on', 'r.frequency', 'r.lines', 'r.currency', 'r.prices_include_tax', 'c.payment_terms_days', 'c.payment_terms_id']) as $t) {
+            ->get(['r.next_on', 'r.ends_on', 'r.frequency', 'r.lines', 'r.currency', 'r.prices_include_tax', 'r.out_of_scope', 'c.payment_terms_days', 'c.payment_terms_id']) as $t) {
             // Totalled the way the invoice it makes will be (SaveInvoiceDraft::calculate).
             $amounts = [];
             foreach (json_decode((string) $t->lines, true, 512, JSON_THROW_ON_ERROR) as $l) {
                 $amounts[] = $tax->line(Money::of((string) $l['unit_price'], (string) $t->currency), (string) $l['quantity'],
-                    (string) ($l['discount_rate'] ?? '0'), (string) ($taxRates[$l['tax_rate_id'] ?? ''] ?? '0'), (bool) $t->prices_include_tax);
+                    (string) ($l['discount_rate'] ?? '0'), $t->out_of_scope ? '0' : (string) ($taxRates[$l['tax_rate_id'] ?? ''] ?? '0'), (bool) $t->prices_include_tax);
             }
             $total = $tax->document($amounts, (string) $t->currency)->total->toDecimalString();
             $base = bcmul($total, $rateOf((string) $t->currency), 2);
