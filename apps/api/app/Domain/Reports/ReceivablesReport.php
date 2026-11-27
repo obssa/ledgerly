@@ -139,7 +139,7 @@ final class ReceivablesReport
             SQL, [$companyId, $receivableAccountId, $contactId, $from])->balance);
 
         $rows = DB::select(<<<'SQL'
-            SELECT l.entry_date::text AS date, e.id AS entry_id, e.number AS entry, e.source_type, e.memo,
+            SELECT l.entry_date::text AS date, e.id AS entry_id, e.number AS entry, e.source_type, coalesce(d.message_on_statement, e.memo) AS memo,
                    coalesce(d.number, p.reference) AS reference, d.id AS document_id, p.id AS payment_id, l.debit::text AS debit, l.credit::text AS credit,
                    coalesce(d.type, CASE p.direction WHEN 'in' THEN 'payment_received' WHEN 'out' THEN 'payment_made' END, e.source_type) AS type,
                    d.due_date::text AS due_date,

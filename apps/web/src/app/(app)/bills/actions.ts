@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
+import { afterSave } from "@/lib/afterSave";
 import { invoiceBody } from "@/lib/invoice";
 import { getSession } from "@/lib/session";
 
@@ -54,14 +55,18 @@ export async function createBill(_: FormState | undefined, form: FormData): Prom
     return refusal(error);
   }
   if (correcting) redirect(`/bills/${encodeURIComponent(id)}?corrected=1`);
+  // 112: its tags now; files chosen on the form go up from the browser before the page opens.
+  const pending = await afterSave("bill", id, form, ctx, `/bills/${encodeURIComponent(id)}`);
   if (form.get("intent") === "approve") {
     try {
       await ledgerly.approveBill(id, ctx);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) redirect("/sign-in");
+      if (pending?.next) return { next: { ...pending.next, href: `${pending.next.href}?posted=0` } };
       redirect(`/bills/${encodeURIComponent(id)}?posted=0`); // saved as a draft; the bill page says so
     }
   }
+  if (pending) return pending;
   redirect(`/bills/${encodeURIComponent(id)}`);
 }
 

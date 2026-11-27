@@ -883,6 +883,16 @@ export interface Invoice {
   class_id?: string | null;
   location_id?: string | null;
   custom_fields?: Record<string, string>;
+  /** 112: addresses as printed, who it is emailed to, how it ships, the statement's message. */
+  billing_address?: string | null;
+  shipping_address?: string | null;
+  email_to?: string | null;
+  email_cc?: string | null;
+  email_bcc?: string | null;
+  ship_via?: string | null;
+  ship_date?: string | null;
+  tracking_number?: string | null;
+  message_on_statement?: string | null;
   currency: string;
   subtotal: string;
   tax_total: string;

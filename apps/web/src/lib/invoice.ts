@@ -71,6 +71,10 @@ export function invoiceBody(form: FormData): Record<string, unknown> {
   if (["exclusive", "inclusive", "out_of_scope"].includes(value("tax_mode"))) body.tax_mode = value("tax_mode");
   // 111: the class and location of the whole document (when tracked so), and the company's custom fields.
   for (const name of ["class_id", "location_id"]) if (value(name) !== "") body[name] = value(name);
+  // 112: shown on the form, they are sent even when emptied (an empty one clears it).
+  for (const name of ["billing_address", "shipping_address", "email_to", "email_cc", "email_bcc", "ship_via", "ship_date", "tracking_number", "message_on_statement"]) {
+    if (form.has(name)) body[name] = value(name) === "" ? null : value(name);
+  }
   const custom: Record<string, string> = {};
   for (const [key, v] of form.entries()) if (key.startsWith("custom_fields.") && typeof v === "string") custom[key.slice("custom_fields.".length)] = v.trim();
   if (Object.keys(custom).length > 0) body.custom_fields = custom;

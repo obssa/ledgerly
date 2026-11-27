@@ -90,8 +90,17 @@ final class InvoicePdf
             . ($invoice->due_date ? '<div>Due date ' . $e((string) \App\Support\DateFormat::format($invoice->due_date, $company)) . '</div>' : '')
             . ($original ? '<div>Corrects invoice ' . $e($original) . '</div>' : '')
             . '</td></tr></table>'
-            . '<p><span class="muted">To</span><br><strong>' . $e($invoice->contact?->name) . '</strong>'
-            . ($invoice->contact?->tax_id ? '<br>TIN ' . $e($invoice->contact->tax_id) : '') . '</p>'
+            // 112: Bill to with its address as printed, and Ship to with how it ships, side by side as QuickBooks prints them.
+            . '<table style="margin:0"><tr><td style="border:none;vertical-align:top"><span class="muted">Bill to</span><br><strong>' . $e($invoice->contact?->name) . '</strong>'
+            . ($invoice->contact?->tax_id ? '<br>TIN ' . $e($invoice->contact->tax_id) : '')
+            . ($invoice->billing_address ? '<br>' . nl2br($e($invoice->billing_address)) : '') . '</td>'
+            . ($invoice->shipping_address || $invoice->ship_via || $invoice->tracking_number
+                ? '<td style="border:none;vertical-align:top"><span class="muted">Ship to</span><br>' . nl2br($e((string) $invoice->shipping_address))
+                    . ($invoice->ship_via ? '<br>Ship via ' . $e($invoice->ship_via) : '')
+                    . ($invoice->ship_date ? '<br>Shipping date ' . $e((string) \App\Support\DateFormat::format($invoice->ship_date, $company)) : '')
+                    . ($invoice->tracking_number ? '<br>Tracking no. ' . $e($invoice->tracking_number) : '') . '</td>'
+                : '')
+            . '</tr></table>'
             . '<table><thead><tr><th>Description</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Tax</th><th class="n">Amount</th></tr></thead>'
             . '<tbody>' . $rows . '</tbody></table>'
             . '<table class="totals"><tr><td>Subtotal</td><td class="n">' . $money($invoice->subtotal) . '</td></tr>'

@@ -52,7 +52,7 @@ final class SupplierController extends Controller
                 ->where('name', 'ilike', '%' . addcslashes($s, '%_\\') . '%')
                 ->orWhere('tax_id', $s)))
             ->orderBy('name')->limit(500)
-            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'payment_terms_id', 'default_expense_account_id', 'is_active']);
+            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'payment_terms_id', 'default_expense_account_id', 'is_active', 'address']);   // 112: the mailing address a new bill shows
 
         $balances = $this->balances($suppliers->pluck('id')->all());
 

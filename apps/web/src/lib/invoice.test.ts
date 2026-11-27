@@ -46,6 +46,12 @@ describe("invoiceBody", () => {
     expect(invoiceBody(form([["lines", "[]"]]))).not.toHaveProperty("custom_fields");
   });
 
+  it("sends the addresses, email and shipping shown on the form, an emptied one as null, and leaves out those not shown", () => {
+    const body = invoiceBody(form([["billing_address", " Bole Road\nAddis Ababa "], ["email_to", "ap@hotel.example"], ["email_cc", ""], ["ship_via", "Ethiopian Cargo"], ["lines", "[]"]]));
+    expect(body).toMatchObject({ billing_address: "Bole Road\nAddis Ababa", email_to: "ap@hotel.example", email_cc: null, ship_via: "Ethiopian Cargo" });
+    expect(body).not.toHaveProperty("shipping_address");
+  });
+
   it("sends the term with the due date it set, and no term when none is chosen", () => {
     expect(invoiceBody(form([["payment_terms_id", "t30"], ["due_date", "2026-12-02"], ["lines", "[]"]]))).toMatchObject({ payment_terms_id: "t30", due_date: "2026-12-02" });
     expect(invoiceBody(form([["payment_terms_id", ""], ["lines", "[]"]]))).not.toHaveProperty("payment_terms_id");

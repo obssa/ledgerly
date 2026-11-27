@@ -9,6 +9,8 @@ export interface FormState {
   /** The API's name for a refusal the screen reacts to, such as "EmailNotVerified". */
   code?: string;
   fields?: Record<string, string[]>;
+  /** A document saved with files still to send (112): the browser sends them to the upload route, then opens href. */
+  next?: { kind: "invoice" | "bill" | "expense"; id: string; href: string };
 }
 
 /**
