@@ -78,3 +78,29 @@ describe("a payment says what it settles", () => {
     expect(problemOf([], 0, false, "invoice")).toBeNull();
   });
 });
+
+describe("a payment through an account in another currency (QuickBooks' way)", () => {
+  it("offers accounts in the payment's currency first, then the company's, never a third", async () => {
+    const { paymentAccounts } = await import("./payments");
+    const accounts = [{ id: "birr", currency: null }, { id: "eur", currency: "EUR" }, { id: "usd", currency: "USD" }];
+    expect(paymentAccounts(accounts, "USD", "ETB").map((a) => a.id)).toEqual(["usd", "birr"]);
+    expect(paymentAccounts(accounts, "ETB", "ETB").map((a) => a.id)).toEqual(["birr"]);
+  });
+
+  it("works out the bank's rate from what the account moved", async () => {
+    const { bankRate } = await import("./payments");
+    expect(bankRate("14000", "100")).toBe("140.000000");
+    expect(bankRate("31,000.00".replace(/,/g, ""), "200")).toBe("155.000000");
+    expect(bankRate("100", "3")).toBe("33.333333");
+    expect(bankRate("", "100")).toBeNull();
+    expect(bankRate("100", "0")).toBeNull();
+  });
+
+  it("lets a contact be paid in their own currency, their open documents' or the company's", async () => {
+    const { paymentCurrencies } = await import("./payments");
+    expect(paymentCurrencies(null, [{ currency: "USD" }, { currency: "USD" }], "ETB", ["USD"])).toEqual(["USD", "ETB"]);
+    expect(paymentCurrencies("USD", [], "ETB", ["USD"])).toEqual(["USD", "ETB"]);
+    expect(paymentCurrencies(null, [], "ETB", [])).toEqual(["ETB"]);
+    expect(paymentCurrencies("GBP", [], "ETB", ["USD"])).toEqual(["ETB"]);   // a currency turned off is not offered
+  });
+});

@@ -5732,6 +5732,73 @@ RESET ROLE;
 DELETE FROM test_companies;
 SET ROLE ledgerly_web;
 
+-- T132: a payment's money account is in the payment's currency or the company's (107, QuickBooks). Company A (ETB) as
+-- f1: customer c1, bank a10 (birr), a new dollar wallet and a new euro wallet. A dollar payment into the birr bank keeps
+-- what the bank received in birr; into the dollar wallet it keeps nothing else; into the euro wallet it is refused; a
+-- birr payment through the dollar wallet is refused; the birr kept never changes. Rolled back.
+DO $$
+DECLARE
+  c1  constant uuid := '00000000-0000-0000-0000-0000000000c1';
+  a10 constant uuid := '00000000-0000-0000-0000-000000000a10';
+  usd constant uuid := '00000000-0000-0000-0000-000000000a31';
+  eur constant uuid := '00000000-0000-0000-0000-000000000a32';
+  p1  constant uuid := '00000000-0000-0000-0000-000000000f31';
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    INSERT INTO accounts (id, company_id, code, name, type, subtype, currency) VALUES
+      (usd, app_company_id(), '1131', 'Dollar wallet', 'asset', 'mobile_money', 'USD'),
+      (eur, app_company_id(), '1132', 'Euro wallet', 'asset', 'mobile_money', 'EUR');
+
+    INSERT INTO payments (id, company_id, direction, contact_id, account_id, payment_date, method, currency, fx_rate, amount, account_amount)
+      VALUES (p1, app_company_id(), 'in', c1, a10, '2027-11-10', 'bank_transfer', 'USD', 155, 200, 31000);
+    INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, fx_rate, amount)
+      VALUES (app_company_id(), 'in', c1, usd, '2027-11-10', 'bank_transfer', 'USD', 155, 200);
+    BEGIN
+      INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, fx_rate, amount)
+        VALUES (app_company_id(), 'in', c1, a10, '2027-11-10', 'bank_transfer', 'USD', 155, 200);
+      RAISE EXCEPTION 'FAIL T132a: a dollar payment into the birr bank kept no birr amount';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, fx_rate, amount, account_amount)
+        VALUES (app_company_id(), 'in', c1, usd, '2027-11-10', 'bank_transfer', 'USD', 155, 200, 31000);
+      RAISE EXCEPTION 'FAIL T132b: a payment into an account in its own currency kept another amount';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, fx_rate, amount, account_amount)
+        VALUES (app_company_id(), 'in', c1, eur, '2027-11-10', 'bank_transfer', 'USD', 155, 200, 180);
+      RAISE EXCEPTION 'FAIL T132c: a dollar payment went into a euro account';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, amount, account_amount)
+        VALUES (app_company_id(), 'in', c1, usd, '2027-11-10', 'bank_transfer', 'ETB', 31000, 200);
+      RAISE EXCEPTION 'FAIL T132d: a birr payment went through the dollar wallet';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, fx_rate, amount, account_amount)
+        VALUES (app_company_id(), 'in', c1, a10, '2027-11-10', 'bank_transfer', 'USD', 155, 200, 0);
+      RAISE EXCEPTION 'FAIL T132e: a birr amount of nothing was kept';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      UPDATE payments SET account_amount = 30000 WHERE id = p1;
+      RAISE EXCEPTION 'FAIL T132f: the birr amount of a recorded payment changed';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+
+    -- A scheduled dollar payment may go out of the birr bank; not out of the euro wallet.
+    INSERT INTO scheduled_payments (company_id, contact_id, account_id, pay_on, method, currency, created_by)
+      VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000c8', a10, '2027-11-20', 'bank_transfer', 'USD', app_user_id());
+    BEGIN
+      INSERT INTO scheduled_payments (company_id, contact_id, account_id, pay_on, method, currency, created_by)
+        VALUES (app_company_id(), '00000000-0000-0000-0000-0000000000c8', eur, '2027-11-20', 'bank_transfer', 'USD', app_user_id());
+      RAISE EXCEPTION 'FAIL T132g: a dollar payment was scheduled out of a euro account';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    RAISE EXCEPTION 'T132 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T132 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T132 a payment goes through an account in its own currency or the company''s, the birr it moved kept and frozen';
+END $$;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

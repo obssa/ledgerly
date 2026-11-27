@@ -245,7 +245,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 <div>
                   <label className="field-label" htmlFor="paid_from_account_id">{kind === "expense" ? "Paid from" : "Received into"}</label>
                   <select className={`field ${bad("paid_from_account_id") ? "!border-bad" : ""}`} id="paid_from_account_id" name="paid_from_account_id">
-                    {(options.moneyAccounts ?? []).filter((a) => (a.currency ?? options.baseCurrency) === currency).map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                    {(options.moneyAccounts ?? []).filter((a) => [currency, options.baseCurrency].includes(a.currency ?? options.baseCurrency)).map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
                   </select>
                 </div>
                 <div>

@@ -32,6 +32,8 @@ export async function recordRefund(_: FormState | undefined, form: FormData): Pr
     method: text(form, "method") ?? "", currency: text(form, "currency") ?? "", amount: (text(form, "amount") ?? "").replace(/[,\s]/g, ""),
   };
   for (const name of ["reference", "credit_id", "payment_id"]) if (text(form, name)) body[name] = text(form, name);
+  // Through an account in the company's currency: what it moved (107).
+  if (text(form, "account_amount")) body.account_amount = (text(form, "account_amount") ?? "").replace(/[,\s]/g, "");
   if (text(form, "method") === "cheque" && text(form, "cheque_number")) body.cheque_number = text(form, "cheque_number");
   let id: string;
   try {

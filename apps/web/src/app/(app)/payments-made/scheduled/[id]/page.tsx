@@ -38,6 +38,7 @@ export default async function ScheduledPaymentPage({ params, searchParams }: Pag
         <div className="grid gap-4">
           {open && plan.can.pay && context && (
             <ConfirmForm id={plan.id} planned={plan.amount} currency={plan.currency} baseCurrency={context.baseCurrency} method={plan.method}
+              throughBase={plan.currency !== context.baseCurrency && !plan.account.currency}
               today={plan.today} bills={plan.bills} advice={context.advice} />
           )}
           <Card className="!p-2" label="Bills">

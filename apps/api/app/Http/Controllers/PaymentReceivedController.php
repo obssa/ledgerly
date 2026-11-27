@@ -76,6 +76,8 @@ final class PaymentReceivedController extends Controller
             'cheque_number' => ChequeNumbers::RULE,   // the payer's cheque, if it is one
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            // Through an account in the company's currency: what it moved, in that currency (107).
+            'account_amount' => ['nullable', 'decimal:0,2', 'gt:0'],
             'amount' => ['required', 'decimal:0,2', 'gt:0', 'max:999999999999999999'],
             'fee' => ['nullable', 'decimal:0,2', 'min:0'],
             'withholding' => ['nullable', 'decimal:0,2', 'min:0'],

@@ -1,3 +1,4 @@
+import { paymentAccounts } from "@/lib/payments";
 import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import { PageTitle } from "@/components/ui";
@@ -26,7 +27,7 @@ export default async function EditScheduledPaymentPage({ params }: PageProps<"/p
       <PageTitle eyebrow={<Link href={`/payments-made/scheduled/${encodeURIComponent(plan.id)}`} className="hover:underline">Money out / Scheduled payments / {plan.contact.name}</Link>}
         title="Edit scheduled payment" />
       <ScheduleForm supplier={plan.contact} currency={plan.currency} today={plan.today} bills={bills}
-        accounts={options.accounts.filter((a) => (a.currency ?? options.baseCurrency) === plan.currency)}
+        accounts={paymentAccounts(options.accounts, plan.currency, options.baseCurrency)}
         initial={{ id: plan.id, pay_on: plan.pay_on, account_id: plan.account.id, method: plan.method, reference: plan.reference, note: plan.note,
           bills: Object.fromEntries(plan.bills.map((b) => [b.id, b.amount])) }} />
     </>

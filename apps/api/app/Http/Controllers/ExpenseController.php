@@ -86,8 +86,11 @@ final class ExpenseController extends Controller
 
         // Loaded through the company-scoped model (CLAUDE.md rule 4); the account's currency is the expense's.
         $account = Account::query()->findOrFail($data['paid_from_account_id']);
-        if (($account->currency ?? $this->current->get()->base_currency) !== $data['currency']) {
-            throw ValidationException::withMessages(['paid_from_account_id' => ["{$account->name} is kept in " . ($account->currency ?? $this->current->get()->base_currency) . ", not {$data['currency']}."]]);
+        // In its currency or the company's (QuickBooks): a dollar expense through a birr account moves the total at
+        // the expense's rate in birr.
+        $held = $account->currency ?? $this->current->get()->base_currency;
+        if ($held !== $data['currency'] && $held !== $this->current->get()->base_currency) {
+            throw ValidationException::withMessages(['paid_from_account_id' => ["{$account->name} is kept in {$held}: a {$data['currency']} expense goes through an account in {$data['currency']} or in {$this->current->get()->base_currency}."]]);
         }
 
         $userId = $request->user()->getKey();

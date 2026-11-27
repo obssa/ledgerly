@@ -8,6 +8,7 @@ use App\Domain\Audit\AuditLogger;
 use App\Domain\Ledger\ExchangeRates;
 use App\Domain\Ledger\Models\Account;
 use App\Domain\Ledger\Money;
+use App\Domain\Ledger\PaymentAccount;
 use App\Domain\Ledger\PostingService;
 use App\Domain\Purchases\BillPaymentPostingBuilder;
 use App\Domain\Sales\Models\Contact;
@@ -59,12 +60,11 @@ final class RecordRefund
             if ($account === null || ! in_array($account->subtype, self::MONEY_SUBTYPES, true)) {
                 throw ValidationException::withMessages(['account_id' => ['Choose a bank, cash or mobile-money account of this company.']]);
             }
-            if (($account->currency ?? $company->base_currency) !== $currency) {
-                throw ValidationException::withMessages(['account_id' => ["{$account->name} is kept in " . ($account->currency ?? $company->base_currency) . ", not {$currency}."]]);
-            }
+            // An account in the payment's currency, or in the company's with what it moved (107, QuickBooks).
+            $moved = PaymentAccount::amountMoved($account, $company, $currency, $data['account_amount'] ?? null);
             $amount = Money::of($data['amount'], $currency);
             $fee = Money::of($data['fee'] ?? '0', $currency);
-            $rate = $this->rates->forDocument($company, $currency, $data['payment_date'], $data['fx_rate'] ?? null);
+            $rate = $moved !== null ? PaymentAccount::rate($moved, $amount) : $this->rates->forDocument($company, $currency, $data['payment_date'], $data['fx_rate'] ?? null);
 
             // What is given back, and the rate it sits at in the books.
             [$credit, $original, $bookedRate] = $this->source($data, $contact, $currency, $amount, $customer);
@@ -74,7 +74,7 @@ final class RecordRefund
                 'id' => $refundId, 'company_id' => $company->getKey(), 'direction' => $customer ? 'out' : 'in', 'kind' => 'refund',
                 'contact_id' => $contact->getKey(), 'account_id' => $account->getKey(), 'payment_date' => $data['payment_date'],
                 'method' => $data['method'], 'reference' => $data['reference'] ?? null, 'currency' => $currency, 'fx_rate' => $rate,
-                'amount' => $amount->toDecimalString(), 'fee' => $fee->toDecimalString(), 'withholding' => '0',
+                'amount' => $amount->toDecimalString(), 'fee' => $fee->toDecimalString(), 'withholding' => '0', 'account_amount' => $moved?->toDecimalString(),
                 'refunds_payment_id' => $original?->getKey(),
                 'cheque_number' => ($data['method'] ?? null) === 'cheque' ? ($data['cheque_number'] ?? null) : null,
             ]);
@@ -83,7 +83,7 @@ final class RecordRefund
                 'companyId' => $company->getKey(), 'paymentId' => $refundId, 'date' => new DateTimeImmutable($data['payment_date']),
                 'baseCurrency' => $company->base_currency, 'paymentRate' => $rate, 'bankAccountId' => $account->getKey(),
                 'feeAccountId' => Account::system('bank_charges')->getKey(), 'withholdingAccountId' => Account::system($customer ? 'withholding_payable' : 'withholding_receivable')->getKey(),
-                'fxAccountId' => Account::system('fx_gain_loss')->getKey(), 'amount' => $amount, 'fee' => $fee, 'withholding' => Money::zero($currency),
+                'fxAccountId' => Account::system('fx_gain_loss')->getKey(), 'amount' => $amount, 'fee' => $fee, 'withholding' => Money::zero($currency), 'accountAmount' => $moved,
             ];
             $draft = $customer
                 ? $this->out->paid(...$common, supplierId: $contact->getKey(), payableAccountId: Account::system('accounts_receivable')->getKey(),

@@ -91,6 +91,8 @@ final class RefundController extends Controller
             'cheque_number' => ChequeNumbers::RULE,
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            // Through an account in the company's currency: what it moved, in that currency (107).
+            'account_amount' => ['nullable', 'decimal:0,2', 'gt:0'],
             'amount' => ['required', 'decimal:0,2', 'gt:0', 'max:999999999999999999'],
             'fee' => ['nullable', 'decimal:0,2', 'min:0'],
             'credit_id' => ['nullable', 'uuid', 'required_without:payment_id', 'prohibits:payment_id'],

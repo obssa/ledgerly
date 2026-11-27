@@ -114,6 +114,8 @@ final class PaymentMadeController extends Controller
             'reference' => ['nullable', 'string', 'max:100'],
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            // Through an account in the company's currency: what it moved, in that currency (107).
+            'account_amount' => ['nullable', 'decimal:0,2', 'gt:0'],
             'bills' => ['required', 'array', 'min:1', 'max:' . \App\Domain\Purchases\BatchPayments::MAX_BILLS],
             'bills.*.bill_id' => ['required', 'uuid', 'distinct'],
             'bills.*.amount' => ['nullable', 'decimal:0,2', 'gt:0'],
@@ -141,6 +143,8 @@ final class PaymentMadeController extends Controller
             'reference' => ['nullable', 'string', 'max:100'],
             'currency' => ['required', Rule::in(Currency::all())],
             'fx_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            // Through an account in the company's currency: what it moved, in that currency (107).
+            'account_amount' => ['nullable', 'decimal:0,2', 'gt:0'],
             'amount' => ['required', 'decimal:0,2', 'gt:0', 'max:999999999999999999'],
             'fee' => ['nullable', 'decimal:0,2', 'min:0'],
             'withholding' => ['nullable', 'decimal:0,2', 'min:0'],

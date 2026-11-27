@@ -1173,12 +1173,15 @@ export async function getPayOptions(supplierId: string | null): Promise<PayOptio
 }
 
 /** Bank, cash and wallet accounts in one currency: where a refund is paid from or into. */
-export async function getMoneyAccounts(currency: string): Promise<{ id: string; code: string; name: string }[]> {
+export async function getMoneyAccounts(currency: string): Promise<{ id: string; code: string; name: string; currency: string; base: string }[]> {
   await connection();
   if (isDemoMode()) return [];
   const [{ data }, currencies] = await withApi((ctx) => Promise.all([ledgerly.accounts(ctx), ledgerly.currencies(ctx)]));
-  return data.filter((a) => a.is_active && ["bank", "cash", "mobile_money"].includes(a.subtype ?? "") && (a.currency ?? currencies.base_currency) === currency)
-    .map((a) => ({ id: a.id, code: a.code, name: a.name }));
+  const base = currencies.base_currency;
+  // In the currency asked for, or the company's (QuickBooks: a dollar refund through a birr account), the first ones first.
+  return data.filter((a) => a.is_active && ["bank", "cash", "mobile_money"].includes(a.subtype ?? "") && [currency, base].includes(a.currency ?? base))
+    .map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency ?? base, base }))
+    .sort((x, y) => Number(y.currency === currency) - Number(x.currency === currency));
 }
 
 /** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
