@@ -369,11 +369,15 @@ export function DimensionsPanel({ settings, dimensions }: { settings: Settings; 
   );
 }
 
-const DOC_TYPES: Record<string, string> = { invoice: "Invoices", credit_note: "Credit notes", bill: "Bills", expense: "Expenses" };
+const DOC_TYPES: Record<string, string> = {
+  invoice: "Invoices", credit_note: "Credit notes", sales_receipt: "Cash sales", quote: "Quotes", sales_order: "Sales orders",
+  bill: "Bills (our number)", vendor_credit: "Supplier credits", purchase_order: "Purchase orders", expense: "Expenses",
+};
 
 /**
- * Numbering per document type. Automatic numbers are given in order when a document is posted, so they have no gaps;
- * manual numbering is for pre-printed, authority-approved invoice books. The counter is never set by hand.
+ * Numbering per document type. Automatic numbers are given in order when a document is saved, as QuickBooks does (a draft
+ * deleted later leaves a gap), and a person may type their own unless custom numbers are off; manual numbering is for
+ * pre-printed, authority-approved invoice books. The counter is never set by hand: it skips numbers already used.
  */
 export function NumberingPanel({ settings, numbering }: { settings: Settings; numbering: Numbering[] }) {
   const manage = settings.can.manage && !settings.demo;
@@ -410,6 +414,10 @@ function NumberingRow({ n, manage }: { n: Numbering; manage: boolean }) {
       <label className="mt-2 flex items-center gap-2.5 text-sm">
         <input type="checkbox" name="include_year" defaultChecked={n.include_year} disabled={!manage} className="size-4" />
         Fiscal year in the number (restarts at 1 each year)
+      </label>
+      <label className="mt-1.5 flex items-center gap-2.5 text-sm">
+        <input type="checkbox" name="allow_custom" defaultChecked={n.allow_custom ?? true} disabled={!manage} className="size-4" />
+        Custom numbers: a person may type their own number (each number once)
       </label>
       {manage && <button type="submit" className="btn mt-3" disabled={pending}>{pending ? "Saving…" : "Save"}</button>}
     </form>

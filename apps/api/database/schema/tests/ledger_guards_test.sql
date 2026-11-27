@@ -5799,6 +5799,28 @@ BEGIN
   RAISE NOTICE 'PASS T132 a payment goes through an account in its own currency or the company''s, the birr it moved kept and frozen';
 END $$;
 
+-- T133: a document number is unique per company and kind whatever its letter case (108); another kind may use it.
+-- Company A as f1, customer c1. Rolled back.
+DO $$
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    INSERT INTO documents (company_id, type, number, contact_id, issue_date, currency, subtotal, total, amount_due)
+      VALUES (app_company_id(), 'invoice', 'INV-T133', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0);
+    BEGIN
+      INSERT INTO documents (company_id, type, number, contact_id, issue_date, currency, subtotal, total, amount_due)
+        VALUES (app_company_id(), 'invoice', 'inv-t133', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0);
+      RAISE EXCEPTION 'FAIL T133a: two invoices had the same number in other letter cases';
+    EXCEPTION WHEN unique_violation THEN NULL; END;
+    INSERT INTO documents (company_id, type, number, contact_id, issue_date, currency, subtotal, total, amount_due)
+      VALUES (app_company_id(), 'quote', 'inv-t133', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0);
+    RAISE EXCEPTION 'T133 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T133 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T133 a document number is unique per kind whatever its letter case';
+END $$;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

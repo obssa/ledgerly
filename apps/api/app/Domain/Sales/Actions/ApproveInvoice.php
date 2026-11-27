@@ -81,7 +81,7 @@ final class ApproveInvoice
                 app(SaveInvoiceDraft::class)->assertCreditable($original, (string) $invoice->total, $invoice);
             }
 
-            // Gapless: the number is taken in this transaction, so a posting that fails takes none.
+            // Saved before 108 without a number (numbers were given at posting then): it takes the next one now.
             if ($invoice->number === null) {
                 if (! $this->numbers->isAutomatic($company->getKey(), $invoice->type)) {
                     throw new LedgerException("This company numbers {$invoice->type}s by hand: type the number first.");

@@ -35,13 +35,14 @@ final class CreditNoteTest extends TestCase
 
     public function test_a_credit_note_is_posted_and_settles_part_of_its_invoice(): void
     {
-        $id = $this->draft($this->c['invoice'], '200')->assertCreated()
-            ->assertJsonPath('type', 'credit_note')->assertJsonPath('number', null)
-            ->assertJsonPath('contact_id', $this->c['contact'])->assertJsonPath('original_document_id', $this->c['invoice'])
-            ->json('id');
+        $saved = $this->draft($this->c['invoice'], '200')->assertCreated()
+            ->assertJsonPath('type', 'credit_note')
+            ->assertJsonPath('contact_id', $this->c['contact'])->assertJsonPath('original_document_id', $this->c['invoice']);
+        $id = $saved->json('id');
+        $this->assertMatchesRegularExpression('/^CN-2027-\d{4}$/', $saved->json('number'));   // numbered when saved (108)
 
         $this->postJson("/api/v1/invoices/{$id}/approve", [], $this->h)->assertOk()
-            ->assertJsonPath('number', 'CN-2027-0001')->assertJsonPath('status', 'paid')->assertJsonPath('warnings', []);
+            ->assertJsonPath('number', $saved->json('number'))->assertJsonPath('status', 'paid')->assertJsonPath('warnings', []);
 
         // 1,000.00 due - 200.00 credited = 800.00
         $this->assertSame(['part_paid', '800.00'], [

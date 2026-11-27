@@ -20,34 +20,34 @@ import { findBarcode } from "@/lib/barcodes";
 /** The words and postings that differ between a sales invoice and a supplier's bill; the form is the same. */
 const KIND = {
   invoice: {
-    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Number (from your invoice book)",
+    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Invoice no.",
     notes: "Notes for the customer (optional)", noun: "invoice", posting: [["Dr Accounts receivable", "total"], ["Cr Income", "subtotal"], ["Cr Tax payable", "tax"]],
   },
   bill: {
-    party: "Supplier", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
+    party: "Supplier", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our bill no.",
     notes: "Notes (optional)", noun: "bill", posting: [["Dr Expense or asset", "subtotal"], ["Dr VAT receivable", "tax"], ["Cr Accounts payable", "total"]],
   },
   // A cash sale (070): paid at once, posted at once into the money account it went into.
   sales_receipt: {
-    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Our number",
+    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Sales receipt no.",
     notes: "Notes for the customer (optional)", noun: "cash sale", posting: [["Dr Received into", "total"], ["Cr Income", "subtotal"], ["Cr Tax payable", "tax"]],
   },
   expense: {
-    party: "Paid to", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Our number",
+    party: "Paid to", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Expense no.",
     notes: "Notes (optional)", noun: "expense", posting: [["Dr Expense or asset", "subtotal"], ["Dr VAT receivable", "tax"], ["Cr Paid from", "total"]],
   },
   // Quotes and sales orders post nothing (056): no posting preview.
   quote: {
-    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Number (from your quote book)",
+    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Quote no.",
     notes: "Notes for the customer (optional)", noun: "quote", posting: [],
   },
   sales_order: {
-    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Order number",
+    party: "Customer", who: "customer", parties: "customers", newParty: "/customers/new", account: "Income account", numberLabel: "Order no.",
     notes: "Notes for the customer (optional)", noun: "sales order", posting: [],
   },
   // A purchase order posts nothing either (068): its bills do.
   purchase_order: {
-    party: "Supplier", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Order number",
+    party: "Supplier", who: "supplier", parties: "suppliers", newParty: "/suppliers/new", account: "Expense account", numberLabel: "Order no.",
     notes: "Notes for the supplier (optional)", noun: "purchase order", posting: [],
   },
 } as const;
@@ -116,6 +116,11 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
 
   const [customerId, setCustomerId] = useState(draft?.contact.id ?? "");
   const [issueDate, setIssueDate] = useState(draft?.issue_date ?? today);
+  // This kind's numbering (108): the next number shown, editable when custom numbers are allowed; a book is typed.
+  const numbering = options.numbers?.find((n) => n.doc_type === kind);
+  const manual = numbering ? numbering.mode === "manual" : options.manualNumbers;
+  const custom = numbering?.allow_custom ?? true;
+  const suggested = manual ? "" : numbering?.next_number ?? "";
   const [currency, setCurrency] = useState(draft?.currency ?? options.baseCurrency);
   const [inclusive, setInclusive] = useState(Boolean(draft?.prices_include_tax));
   const projects = options.projects ?? [];
@@ -256,7 +261,18 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 </div>
               </>
             )}
-            {options.manualNumbers && !revision && !correcting && <Field name="number" label={words.numberLabel} defaultValue={draft?.number ?? ""} invalid={bad("number")} />}
+            {!revision && !correcting && (
+              <div>
+                <label className="field-label" htmlFor="number">{words.numberLabel}</label>
+                {/* The next number in the sequence, or the person's own (QuickBooks' Custom transaction numbers); unique. */}
+                <input className={`field num ${bad("number") ? "!border-bad" : ""}`} id="number" name="number" defaultValue={draft?.number ?? suggested}
+                  readOnly={!manual && !custom} aria-describedby="number-hint" />
+                {!draft?.number && suggested && <input type="hidden" name="number_suggested" value={suggested} />}
+                <p id="number-hint" className="mt-1.5 text-[12.5px] text-muted">
+                  {manual ? "From your book: each number once." : custom ? "Next in the sequence; type your own if you like (each number once)." : "Next in the sequence."}
+                </p>
+              </div>
+            )}
             <div>
               <label className="field-label" htmlFor="issue_date">Issue date</label>
               <DateInput className={`field ${bad("issue_date") ? "!border-bad" : ""}`} id="issue_date" name="issue_date" value={issueDate} onValue={(v) => setIssueDate(v)} />
@@ -450,7 +466,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             ))}
           </dl>
           <p className="mt-3 text-[13px] text-muted">
-            {options.manualNumbers ? "The number is the one you type." : `The ${words.noun} gets its number when it is posted.`}{" "}
+            {manual ? "The number is the one you type." : `The ${words.noun} is numbered when it is saved: the next in the sequence, or your own.`}{" "}
             {kind === "invoice"
               ? "Where e-invoicing applies, posting also sends it to the tax authority."
               : kind === "sales_receipt"

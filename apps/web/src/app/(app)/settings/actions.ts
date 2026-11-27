@@ -71,6 +71,7 @@ export async function saveNumbering(_: FormState | undefined, form: FormData): P
       mode: form.get("mode") === "manual" ? "manual" : "automatic",
       prefix: text(form, "prefix") ?? "",
       include_year: form.get("include_year") === "on",
+      allow_custom: form.get("allow_custom") === "on",
       padding: Number(text(form, "padding") ?? 4),
     }, ctx);
     refresh();

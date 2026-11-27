@@ -10,8 +10,10 @@ use Tests\RefreshLedgerDatabase;
 use Tests\TestCase;
 
 /**
- * Module 1, numbering: automatic numbers are taken when an invoice is posted, in order and without gaps, restarting
- * each fiscal year; manual numbering takes the number from the invoice book; a posted number never changes.
+ * Module 1, numbering, as QuickBooks gives numbers: a document takes the next number in the sequence when it is saved,
+ * or the person's own (Custom transaction numbers), unique whatever its letter case; the sequence skips a number already
+ * typed and restarts each fiscal year; manual numbering takes the number from the invoice book; a posted number never
+ * changes.
  * Roles: PermissionMatrixTest. Database rules: T40.
  */
 final class NumberingTest extends TestCase
@@ -33,28 +35,44 @@ final class NumberingTest extends TestCase
         $this->actingAs($this->createUser('Hana', 'hana@example.test'), 'sanctum');
     }
 
-    public function test_a_draft_has_no_number_and_posting_takes_the_next_one(): void
+    public function test_a_document_takes_the_next_number_when_saved_or_its_own_unique_one(): void
     {
         $this->company(['fiscal_year_start_month' => 7]);   // Gregorian, July to June: Nov 2026 is in fiscal year 2027
+        $next = fn () => collect($this->getJson('/api/v1/numbering', $this->h)->json('data'))->firstWhere('doc_type', 'invoice')['next_number'];
 
-        $first = $this->draft()->assertCreated()->assertJsonPath('number', null)->json('id');
-        $second = $this->draft()->assertCreated()->json('id');
-        $this->draft(['number' => 'MY-OWN-1'])->assertUnprocessable()->assertJsonValidationErrors('number');
+        $this->assertSame('INV-2027-0001', $next());
+        $first = $this->draft()->assertCreated()->assertJsonPath('number', 'INV-2027-0001')->json('id');
+        $this->draft()->assertCreated()->assertJsonPath('number', 'INV-2027-0002');
+        // The person's own number, unique whatever its letter case; the sequence then skips it.
+        $this->draft(['number' => 'MY-OWN-1'])->assertCreated()->assertJsonPath('number', 'MY-OWN-1');
+        $this->draft(['number' => 'my-own-1'])->assertUnprocessable()->assertJsonValidationErrors('number');
+        $this->draft(['number' => 'inv-2027-0001'])->assertUnprocessable()->assertJsonValidationErrors('number');
+        $this->draft(['number' => 'INV-2027-0003'])->assertCreated();
+        $this->assertSame('INV-2027-0004', $next());
+        $this->draft()->assertCreated()->assertJsonPath('number', 'INV-2027-0004');
 
-        $this->approve($second)->assertOk()->assertJsonPath('number', 'INV-2027-0001');
-        $this->approve($first)->assertOk()->assertJsonPath('number', 'INV-2027-0002');
+        // Saving a draft again keeps its number; posting keeps it too.
+        $this->putJson("/api/v1/invoices/{$first}", $this->body(), $this->h)->assertOk()->assertJsonPath('number', 'INV-2027-0001');
+        $this->approve($first)->assertOk()->assertJsonPath('number', 'INV-2027-0001');
+
+        // Custom numbers can be turned off: the next number only.
+        $this->putJson('/api/v1/numbering', ['doc_type' => 'invoice', 'mode' => 'automatic', 'prefix' => 'INV-', 'include_year' => true, 'padding' => 4, 'allow_custom' => false], $this->h)
+            ->assertOk()->assertJsonPath('allow_custom', false);
+        $this->draft(['number' => 'MY-OWN-2'])->assertUnprocessable()->assertJsonValidationErrors('number');
 
         // The next fiscal year starts again at 1.
-        $this->approve($this->draft(['issue_date' => '2027-07-01'])->json('id'))->assertOk()->assertJsonPath('number', 'INV-2028-0001');
+        $this->draft(['issue_date' => '2027-07-01'])->assertCreated()->assertJsonPath('number', 'INV-2028-0001');
     }
 
-    public function test_a_posting_that_fails_takes_no_number(): void
+    public function test_a_posting_that_fails_keeps_the_number_the_draft_was_saved_with(): void
     {
         $this->company(['fiscal_year_start_month' => 7]);
         $this->putJson('/api/v1/company/period-lock', ['books_closed_until' => '2026-11-10'], $this->h)->assertOk();
 
-        $this->approve($this->draft(['issue_date' => '2026-11-05'])->json('id'))->assertUnprocessable();
-        $this->approve($this->draft(['issue_date' => '2026-11-12'])->json('id'))->assertOk()->assertJsonPath('number', 'INV-2027-0001');
+        $refused = $this->draft(['issue_date' => '2026-11-05'])->assertJsonPath('number', 'INV-2027-0001')->json('id');
+        $this->approve($refused)->assertUnprocessable();
+        $this->assertSame('INV-2027-0001', $this->owner()->table('documents')->where('id', $refused)->value('number'));
+        $this->approve($this->draft(['issue_date' => '2026-11-12'])->json('id'))->assertOk()->assertJsonPath('number', 'INV-2027-0002');
     }
 
     public function test_the_ethiopian_calendar_names_the_year_in_its_own_calendar(): void

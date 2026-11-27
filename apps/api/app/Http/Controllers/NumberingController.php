@@ -46,6 +46,8 @@ final class NumberingController extends Controller
             'prefix' => ['present', 'nullable', 'string', 'regex:/^[A-Za-z0-9\/._-]{0,12}$/'],
             'include_year' => ['required', 'boolean'],
             'padding' => ['required', 'integer', 'between:1,8'],
+            // QuickBooks' Custom transaction numbers: a person may type their own number instead of the next one.
+            'allow_custom' => ['sometimes', 'boolean'],
         ], ['prefix.regex' => 'Up to 12 letters, digits and / . _ -']);
         $data['prefix'] ??= '';
 
@@ -53,7 +55,7 @@ final class NumberingController extends Controller
         DB::table('document_numbering')->upsert(
             [['company_id' => $company->getKey(), ...$data, 'updated_at' => now()]],
             ['company_id', 'doc_type'],
-            ['mode', 'prefix', 'include_year', 'padding', 'updated_at'],
+            ['mode', 'prefix', 'include_year', 'padding', ...(array_key_exists('allow_custom', $data) ? ['allow_custom'] : []), 'updated_at'],
         );
         $after = $this->numbers->settings($company->getKey(), $data['doc_type']);
 
