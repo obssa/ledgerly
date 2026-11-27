@@ -6,8 +6,8 @@ import { formatAmount } from "@/lib/format";
  * "% change" against the first comparison, as QuickBooks lays a comparison out. `extra` adds a column after the
  * report's own period (the profit and loss's % of income).
  */
-export function CompareTable({ lines, headers, diff, extra, codes = false }: {
-  lines: Line[]; headers: string[]; diff: Diff; extra?: { header: string; value: (l: Line) => string }; codes?: boolean;
+export function CompareTable({ lines, headers, diff, extra, codes = false, first = "Account" }: {
+  lines: Line[]; headers: string[]; diff: Diff; extra?: { header: string; value: (l: Line) => string }; codes?: boolean; first?: string;
 }) {
   const compared = headers.length > 1;
   const amount = compared && (diff === "amount" || diff === "both");
@@ -19,7 +19,7 @@ export function CompareTable({ lines, headers, diff, extra, codes = false }: {
       <table className="tbl">
         <thead>
           <tr>
-            <th scope="col">Account</th>
+            <th scope="col">{first}</th>
             {headers.map((h, i) => <th key={i} scope="col" className="!text-right whitespace-nowrap">{h}</th>)}
             {extra && <th scope="col" className="!text-right">{extra.header}</th>}
             {amount && <th scope="col" className="!text-right">Change</th>}

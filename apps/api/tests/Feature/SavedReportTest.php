@@ -128,6 +128,8 @@ final class SavedReportTest extends TestCase
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'balance-sheet', 'options' => ['c1' => 'previous_year', 'c2' => 'custom', 'c2_as_of' => '2025-06-30']]), $this->h)->assertCreated();
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'profit-and-loss', 'options' => ['c1' => 'custom', 'c1_from' => '2026-02-30']]), $this->h)
             ->assertUnprocessable()->assertJsonValidationErrors('options.c1_from');
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'sales', 'options' => ['group' => 'item', 'c1' => 'previous_year', 'diff' => 'both']]), $this->h)->assertCreated();
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'ar-ageing', 'options' => ['c1' => 'end_of_last_month']]), $this->h)->assertCreated();
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'balance-sheet', 'options' => ['c1' => 'previous_period']]), $this->h)
             ->assertUnprocessable()->assertJsonValidationErrors('options.c1');
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'cash-flow', 'period' => 'custom', 'from' => '2026-11-30', 'to' => '2026-10-31']), $this->h)->assertUnprocessable();

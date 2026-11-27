@@ -1,3 +1,8 @@
+import { CompareFilter } from "@/components/CompareFilter";
+import { CompareTable } from "@/components/CompareTable";
+import { measureLines } from "@/lib/compareLinesMeasure";
+import { COMPARE_FIELDS, compareQuery, pickAsOfComparisons, pickDiff } from "@/lib/compare";
+import { formatDate } from "@/lib/dates";
 import { isDateKey, isMomentKey } from "@/lib/columns";
 import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
@@ -42,7 +47,18 @@ export async function AgeingReport({ kind, q }: { kind: "invoice" | "bill"; q: Q
   const detail = q.view === "detail";
   const at = await getReportAsOf(q);
   const periods = pickPeriods(q);
-  const ageing = await (kind === "bill" ? getApAgeing : getArAgeing)(at.asOf, periods);
+  const asOf = at.asOf;
+  const cmp = pickAsOfComparisons(detail ? { c1: "none" } : q, asOf, at.ctx);
+  const diff = pickDiff(q, "pct");
+  const prefs = { calendar: at.ctx.calendar, dateFormat: at.ctx.dateFormat ?? "DD/MM/YYYY" } as const;
+  const headers = [formatDate(asOf, prefs), ...cmp.dates.map((d) => d.label)];
+  const comparedWith = cmp.dates.length ? `Compared with ${cmp.dates.map((d) => d.label).join(", ")}` : null;
+  const [ageing, ...others] = await Promise.all([asOf, ...cmp.dates.map((d) => d.asOf)].map((d) => (kind === "bill" ? getApAgeing : getArAgeing)(d, periods)));
+  // The summary compared: the total each customer (or supplier) owes at each date.
+  const lines = !detail && cmp.dates.length && ageing && others.every(Boolean)
+    ? measureLines([ageing, ...others] as NonNullable<typeof ageing>[], (x) => x.rows, (row) => row.contact_id, (row) => row.total, (row) => row.name,
+      { label: "Total", value: (x) => x.totals.total ?? "0.00" })
+    : null;
   const rows = ageing ? ageRows(ageing) : [];
   const cols = withoutUnusedForeign(chooseColumns(q, AGE_COLUMNS, AGE_DEFAULTS), rows, q, AGE_FOREIGN);
   const group = pickAgeGroup(q);
@@ -50,7 +66,7 @@ export async function AgeingReport({ kind, q }: { kind: "invoice" | "bill"; q: Q
   const keep: Record<string, string | undefined> = {
     as_of: at.asOf, view: detail ? "detail" : undefined,
     interval: periods.interval !== 30 ? String(periods.interval) : undefined, periods: periods.periods !== 4 ? String(periods.periods) : undefined,
-    ...(detail ? { group: group !== "age" ? group : undefined, cols: custom ? cols.join(",") : undefined } : {}),
+    ...(detail ? { group: group !== "age" ? group : undefined, cols: custom ? cols.join(",") : undefined } : compareQuery(cmp.slots, diff)),
   };
   const href = (extra: Record<string, string | undefined>) =>
     `${k.path}?${new URLSearchParams(Object.entries({ ...keep, ...extra }).filter(([, v]) => v) as [string, string][])}`;
@@ -69,11 +85,12 @@ export async function AgeingReport({ kind, q }: { kind: "invoice" | "bill"; q: Q
             { key: "summary", href: href({ view: undefined, cols: undefined, group: undefined }), label: "Summary", active: !detail },
             { key: "detail", href: href({ view: "detail" }), label: "Detail", active: detail },
           ]} />
-          <AsOfFilter picked={at.picked} keep={keep} fields={["interval", "periods"]} label="Days late counted at">
+          <AsOfFilter picked={at.picked} keep={keep} fields={["interval", "periods", ...COMPARE_FIELDS]} label="Days late counted at">
             <div><label className="field-label" htmlFor="interval">Days per ageing period</label>
               <input className="field w-[110px]" id="interval" name="interval" type="number" min={1} max={365} defaultValue={periods.interval} /></div>
             <div><label className="field-label" htmlFor="periods">Number of periods</label>
               <input className="field w-[110px]" id="periods" name="periods" type="number" min={2} max={12} defaultValue={periods.periods} /></div>
+            {!detail && <CompareFilter slots={cmp.slots} diff={diff} asOf />}
           </AsOfFilter>
           {detail && (
             <ColumnCustomizer defs={AGE_COLUMNS} cols={cols} keep={keep} moveHref={(next) => href({ cols: next.join(",") })}
@@ -83,8 +100,10 @@ export async function AgeingReport({ kind, q }: { kind: "invoice" | "bill"; q: Q
             </ColumnCustomizer>
           )}
           <ReportHeader title={title} period={asOfLabel(at.asOf, at.ctx)}
-            filters={[periodsNote, detail ? `Grouped by ${group === "age" ? "ageing period" : k.partyWord.toLowerCase()}` : null]} />
-          {detail ? <Detail kind={kind} rows={rows} cols={cols} group={group} ageing={ageing} /> : <Summary kind={kind} ageing={ageing} />}
+            filters={[periodsNote, detail ? `Grouped by ${group === "age" ? "ageing period" : k.partyWord.toLowerCase()}` : null, lines ? (kind === "bill" ? "What we owe" : "What each owes") : null, comparedWith]} />
+          {detail ? <Detail kind={kind} rows={rows} cols={cols} group={group} ageing={ageing} />
+            : lines ? <Card className="!p-2" label={`${k.short} ageing compared`}><CompareTable first={k.partyWord} lines={lines} headers={headers} diff={diff} /></Card>
+            : <Summary kind={kind} ageing={ageing} />}
           <ReportFooter basis={null} currency={ageing.currency ?? undefined} />
           <p className="mt-3 text-[13px] text-muted">Amounts in the company&apos;s currency, {k.note}</p>
         </>
