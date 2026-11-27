@@ -1,8 +1,13 @@
+import { Fragment } from "react";
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { AsOfFilter } from "@/components/DateRangeFilter";
+import { CompareFilter } from "@/components/CompareFilter";
 import { asOfLabel, resolveRange } from "@/lib/periods";
+import { COMPARE_FIELDS, compareQuery, pickAsOfComparisons } from "@/lib/compare";
+import { trialBalanceLines } from "@/lib/compareLines";
+import { formatDate } from "@/lib/dates";
 import { getTrialBalance, getReportAsOf } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { ExportLink } from "../ReportsNav";
@@ -10,40 +15,57 @@ import { trialTotals } from "@/lib/ledger";
 
 export const metadata = { title: "Trial balance" };
 
-/** Module 6: every account's balance at a date, debits against credits; each account opens its general ledger. */
+/**
+ * Module 6: every account's balance at a date, debits against credits; each account opens its general ledger. Compared
+ * with up to three other dates, a debit and credit column for each, as QuickBooks shows a trial balance compared.
+ */
 export default async function TrialBalancePage({ searchParams }: PageProps<"/reports/trial-balance">) {
   const q = await searchParams;
   const at = await getReportAsOf(q);
   const asOf = at.asOf;
-  const rows = await getTrialBalance(asOf);
-  const totals = trialTotals(rows ?? []);
+  const cmp = pickAsOfComparisons(q, asOf, at.ctx);
+  const dates = [asOf, ...cmp.dates.map((d) => d.asOf)];
+  const results = await Promise.all(dates.map((d) => getTrialBalance(d)));
+  const rows = results[0];
+  const all = results.every(Boolean) ? (results as NonNullable<(typeof results)[number]>[]) : null;
+  const totals = (all ?? []).map((r) => trialTotals(r));
+  const lines = all ? trialBalanceLines(all) : [];
+  const prefs = { calendar: at.ctx.calendar, dateFormat: at.ctx.dateFormat ?? "DD/MM/YYYY" } as const;
+  const compared = dates.length > 1;
   // Each account opens its ledger for the fiscal year up to this date.
   const from = resolveRange("this_fiscal_year", { ...at.ctx, today: asOf })?.from ?? asOf;
+  const money = (v: string | null) => (v === null || v === "0.00" ? "" : formatAmount(v));
 
   return (
     <>
       <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>}
-        title={<>Trial balance {rows && (totals.balanced ? <Pill tone="good">Balanced</Pill> : <Pill tone="bad">Out of balance</Pill>)}</>}
-        actions={<ExportLink report="trial-balance" params={{ as_of: asOf }} />} />
-      <AsOfFilter picked={at.picked} keep={q} />
-      {!rows ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
+        title={<>Trial balance {rows && (totals[0]?.balanced ? <Pill tone="good">Balanced</Pill> : <Pill tone="bad">Out of balance</Pill>)}</>}
+        actions={<ExportLink report="trial-balance" params={{ as_of: asOf, ...compareQuery(cmp.slots, null) }} />} />
+      <AsOfFilter picked={at.picked} keep={q} fields={["compare", ...COMPARE_FIELDS]}>
+        <CompareFilter slots={cmp.slots} diff="none" asOf />
+      </AsOfFilter>
+      {!rows || !all ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <Card className="!p-2" label="Trial balance">
-          <div className="px-3 pt-3"><ReportHeader title="Trial balance" period={asOfLabel(asOf, at.ctx)} /></div>
+          <div className="px-3 pt-3"><ReportHeader title="Trial balance" period={asOfLabel(asOf, at.ctx)}
+            filters={[compared ? `Compared with ${cmp.dates.map((d) => d.label).join(", ")}` : null]} /></div>
           <div className="overflow-x-auto">
             <table className="tbl">
-              <thead><tr><th scope="col">Code</th><th scope="col">Account</th><th scope="col" className="!text-right">Debit</th><th scope="col" className="!text-right">Credit</th></tr></thead>
+              <thead>
+                {compared && <tr><th colSpan={2} />{dates.map((d) => <th key={d} colSpan={2} scope="colgroup" className="!text-center">{formatDate(d, prefs)}</th>)}</tr>}
+                <tr><th scope="col">Code</th><th scope="col">Account</th>{dates.map((d) => <Fragment key={d}><th scope="col" className="!text-right">Debit</th><th scope="col" className="!text-right">Credit</th></Fragment>)}</tr>
+              </thead>
               <tbody>
-                {rows.length === 0 && <tr><td colSpan={4} className="text-muted">Nothing posted yet.</td></tr>}
-                {rows.map((r) => (
-                  <tr key={r.account_id}>
+                {lines.length === 0 && <tr><td colSpan={2 + 2 * dates.length} className="text-muted">Nothing posted yet.</td></tr>}
+                {lines.map((r) => (
+                  <tr key={r.code}>
                     <td className="num">{r.code}</td>
                     <td><Link href={`/reports/general-ledger?account_id=${encodeURIComponent(r.account_id)}&from=${from}&to=${asOf}`} className="hover:underline">{r.name}</Link></td>
-                    <td className="num text-right">{r.debit === "0.00" ? "" : formatAmount(r.debit)}</td>
-                    <td className="num text-right">{r.credit === "0.00" ? "" : formatAmount(r.credit)}</td>
+                    {r.values.map((v, i) => <td key={i} className="num text-right">{money(v)}</td>)}
                   </tr>
                 ))}
               </tbody>
-              <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={2}>Total</td><td className="num text-right">{formatAmount(totals.debit)}</td><td className="num text-right">{formatAmount(totals.credit)}</td></tr></tfoot>
+              <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={2}>Total</td>
+                {totals.map((t, i) => <Fragment key={i}><td className="num text-right">{formatAmount(t.debit)}</td><td className="num text-right">{formatAmount(t.credit)}</td></Fragment>)}</tr></tfoot>
             </table>
           </div>
           <ReportFooter />

@@ -1,123 +1,73 @@
 import { ReportFooter, ReportHeader } from "@/components/ReportHeader";
 import { Card, PageTitle, Pill, Segmented } from "@/components/ui";
 import { getCashFlow, getDirectCashFlow, getReportPeriod } from "@/lib/data";
-import { formatAmount } from "@/lib/format";
 import { rangeLabel } from "@/lib/periods";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { CompareFilter } from "@/components/CompareFilter";
+import { CompareTable } from "@/components/CompareTable";
+import { COMPARE_FIELDS, compareQuery, periodColumnLabel, pickDiff, pickRangeComparisons } from "@/lib/compare";
+import { cashFlowLines, directCashFlowLines } from "@/lib/compareLines";
 import { periodQuery, exportPeriod } from "@/lib/periodParams";
 import { ExportLink, ReportsNav } from "../ReportsNav";
 
 export const metadata = { title: "Cash flow statement" };
 
-const TITLES = { operating: "Operating activities", investing: "Investing activities", financing: "Financing activities" } as const;
-
-/** Module 10: the cash flow statement for a period, indirect or direct method, reconciled to the cash accounts. */
+/**
+ * Module 10: the cash flow statement for a period, indirect or direct method, reconciled to the cash accounts, compared
+ * with up to three other periods (previous period, the same period last year, any preset or dates of the reader's own).
+ */
 export default async function CashFlowPage({ searchParams }: PageProps<"/reports/cash-flow">) {
   const params = await searchParams;
   const period = await getReportPeriod(params);
   const direct = params.method === "direct";
-  const link = (method: string) => `/reports/cash-flow?${new URLSearchParams({ ...periodQuery(period.picked), ...(method === "direct" ? { method } : {}) })}`;
-  if (direct) return <DirectPage period={period} params={params} link={link} />;
-  const cf = await getCashFlow({ from: period.from, to: period.to });
+  const cmp = pickRangeComparisons(params, period.picked, period.ctx);
+  const diff = pickDiff(params, "none");
+  const shown = compareQuery(cmp.slots, diff);
+  const link = (method: string) => `/reports/cash-flow?${new URLSearchParams({ ...periodQuery(period.picked), ...shown, ...(method === "direct" ? { method } : {}) })}`;
+  const ranges = [{ from: period.from, to: period.to }, ...cmp.periods];
+  const results = direct
+    ? await Promise.all(ranges.map((r) => getDirectCashFlow({ from: r.from, to: r.to })))
+    : await Promise.all(ranges.map((r) => getCashFlow({ from: r.from, to: r.to })));
+  const first = results[0];
+  const all = results.every(Boolean);
+  const ownLabel = period.picked.from && period.picked.to ? periodColumnLabel({ from: period.picked.from, to: period.picked.to }, period.ctx) : "This period";
+  const headers = [cmp.periods.length ? ownLabel : "Amount", ...cmp.periods.map((p) => p.label)];
+  const lines = !all ? [] : direct
+    ? directCashFlowLines(results as NonNullable<Awaited<ReturnType<typeof getDirectCashFlow>>>[])
+    : cashFlowLines(results as NonNullable<Awaited<ReturnType<typeof getCashFlow>>>[]);
 
-  return (
-    <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement" actions={<ExportLink report="cash-flow" params={{ ...exportPeriod(period.picked) }} />} />
-      <DateRangeFilter picked={period.picked} keep={params} />
-      <MethodLinks link={link} direct={false} />
-      <div className="flex flex-wrap items-start gap-4">
-        <ReportsNav current="/reports/cash-flow" />
-        {!cf ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
-          <Card className="min-w-0 flex-[4_1_560px]" label="Cash flow statement">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <ReportHeader title="Cash flow statement (indirect method)" period={rangeLabel(period.picked, period.ctx)} />
-              {cf.balanced ? <Pill tone="good">Agrees with the cash accounts</Pill> : <Pill tone="bad">Does not agree with the cash accounts</Pill>}
-            </div>
-            <div className="overflow-x-auto">
-              <table className="tbl">
-                <tbody>
-                  {(Object.keys(TITLES) as (keyof typeof TITLES)[]).map((k) => (
-                    <SectionRows key={k} title={TITLES[k]} total={cf.totals[k]} currency={cf.currency}
-                      rows={k === "operating" ? [{ code: "", name: "Net profit for the period", amount: cf.net_profit }, ...cf.sections.operating] : cf.sections[k]} />
-                  ))}
-                  <tr className="bg-[#f0faf7] font-extrabold"><td>Net change in cash</td><td className="num text-right">{formatAmount(cf.net_change, cf.currency)}</td></tr>
-                  <tr><td className="pl-7">Cash at the start</td><td className="num text-right">{formatAmount(cf.opening_cash, cf.currency)}</td></tr>
-                  <tr className="bg-side font-extrabold text-white"><td>Cash at the end</td><td className="num text-right">{formatAmount(cf.closing_cash, cf.currency)}</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-3 text-[13px] text-muted">
-              Cash is the cash, bank and mobile-money accounts (receipts not yet banked included). Investing is property, plant and equipment at cost; financing is
-              loans and capital; everything else on the balance sheet is working capital, with depreciation added back as a charge that used no cash.
-            </p>
-            <ReportFooter basis={null} currency={cf.currency} />
-          </Card>
-        )}
-      </div>
-    </>
-  );
-}
-
-function MethodLinks({ link, direct }: { link: (method: string) => string; direct: boolean }) {
-  return (
-    <Segmented label="Method" size="sm" items={[
-      { key: "indirect", href: link("indirect"), label: "Indirect (from the profit)", active: !direct },
-      { key: "direct", href: link("direct"), label: "Direct (cash received and paid)", active: direct },
-    ]} />
-  );
-}
-
-/** The direct method: what the cash accounts received and paid, by what it was for. */
-async function DirectPage({ period, params, link }: { period: Awaited<ReturnType<typeof getReportPeriod>>; params: Record<string, string | string[] | undefined>; link: (method: string) => string }) {
-  const cf = await getDirectCashFlow({ from: period.from, to: period.to });
-  const sections = [["Operating activities", ["customers", "suppliers", "employees", "taxes", "other"], "operating"], ["Investing activities", ["investing"], "investing"],
-    ["Financing activities", ["financing"], "financing"]] as const;
   return (
     <>
       <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement"
-        actions={<ExportLink report="cash-flow" params={{ ...exportPeriod(period.picked), method: "direct" }} />} />
-      <DateRangeFilter picked={period.picked} keep={params} />
-      <MethodLinks link={link} direct />
+        actions={<ExportLink report="cash-flow" params={{ ...exportPeriod(period.picked), ...shown, ...(direct ? { method: "direct" } : {}) }} />} />
+      <DateRangeFilter picked={period.picked} keep={params} fields={COMPARE_FIELDS}>
+        <CompareFilter slots={cmp.slots} diff={diff} />
+      </DateRangeFilter>
+      <Segmented label="Method" size="sm" items={[
+        { key: "indirect", href: link("indirect"), label: "Indirect (from the profit)", active: !direct },
+        { key: "direct", href: link("direct"), label: "Direct (cash received and paid)", active: direct },
+      ]} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/cash-flow" />
-        {!cf ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
-          <Card className="min-w-0 flex-[4_1_560px]" label="Cash flow statement, direct method">
+        {!first || !all ? <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p> : (
+          <Card className="min-w-0 flex-[4_1_560px]" label={direct ? "Cash flow statement, direct method" : "Cash flow statement"}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <ReportHeader title="Cash flow statement (direct method)" period={rangeLabel(period.picked, period.ctx)} />
-              {cf.balanced ? <Pill tone="good">Agrees with the cash accounts</Pill> : <Pill tone="bad">Does not agree with the cash accounts</Pill>}
+              <ReportHeader title={direct ? "Cash flow statement (direct method)" : "Cash flow statement (indirect method)"} period={rangeLabel(period.picked, period.ctx)}
+                filters={[cmp.periods.length ? `Compared with ${cmp.periods.map((p) => p.label).join(", ")}` : null]} />
+              {first.balanced ? <Pill tone="good">Agrees with the cash accounts</Pill> : <Pill tone="bad">Does not agree with the cash accounts</Pill>}
             </div>
-            <div className="overflow-x-auto">
-              <table className="tbl">
-                <tbody>
-                  {sections.map(([title, keys, total]) => (
-                    <SectionRows key={title} title={title} total={cf.totals[total]} currency={cf.currency}
-                      rows={cf.lines.filter((l) => (keys as readonly string[]).includes(l.key) && (l.accounts.length > 0 || keys.length > 1)).map((l) => ({ code: l.key, name: l.label, amount: l.amount }))} />
-                  ))}
-                  <tr className="bg-[#f0faf7] font-extrabold"><td>Net change in cash</td><td className="num text-right">{formatAmount(cf.net_change, cf.currency)}</td></tr>
-                  <tr><td className="pl-7">Cash at the start</td><td className="num text-right">{formatAmount(cf.opening_cash, cf.currency)}</td></tr>
-                  <tr className="bg-side font-extrabold text-white"><td>Cash at the end</td><td className="num text-right">{formatAmount(cf.closing_cash, cf.currency)}</td></tr>
-                </tbody>
-              </table>
-            </div>
+            <CompareTable lines={lines} headers={headers} diff={diff} />
             <p className="mt-3 text-[13px] text-muted">
-              Every entry that moved a cash, bank or mobile-money account is shown by its other side: sales and receivables are received from customers, expenses,
-              stock and payables are paid to suppliers, and so on. Money moved between the company&apos;s own cash accounts cancels out.
+              {direct
+                ? <>Every entry that moved a cash, bank or mobile-money account is shown by its other side: sales and receivables are received from customers, expenses,
+                  stock and payables are paid to suppliers, and so on. Money moved between the company&apos;s own cash accounts cancels out.</>
+                : <>Cash is the cash, bank and mobile-money accounts (receipts not yet banked included). Investing is property, plant and equipment at cost; financing is
+                  loans and capital; everything else on the balance sheet is working capital, with depreciation added back as a charge that used no cash.</>}
             </p>
-            <ReportFooter basis={null} currency={cf.currency} />
+            <ReportFooter basis={null} currency={first.currency} />
           </Card>
         )}
       </div>
-    </>
-  );
-}
-
-function SectionRows({ title, rows, total, currency }: { title: string; rows: { code: string; name: string; amount: string }[]; total: string; currency: string }) {
-  return (
-    <>
-      <tr><th scope="rowgroup" colSpan={2} className="!border-0 !pt-5 !text-[13px] !text-ink">{title}</th></tr>
-      {rows.length === 0 && <tr><td className="pl-7 text-muted" colSpan={2}>None in the period.</td></tr>}
-      {rows.map((r) => <tr key={`${r.code}-${r.name}`}><td className="pl-7">{r.name}</td><td className="num text-right">{formatAmount(r.amount, currency)}</td></tr>)}
-      <tr className="font-bold"><td>Cash from {title.toLowerCase()}</td><td className="num text-right">{formatAmount(total, currency)}</td></tr>
     </>
   );
 }

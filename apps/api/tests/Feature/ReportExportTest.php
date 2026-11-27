@@ -39,6 +39,9 @@ final class ReportExportTest extends TestCase
             'options' => ['contact_id' => $c['contact']]], $h)->assertCreated();
         $this->postJson('/api/v1/reports/exports', ['report' => 'cash-forecast', 'format' => 'xlsx', 'as_of' => '2026-11-26', 'rows' => 16, 'options' => ['weeks' => '13']], $h)->assertCreated();
         $this->postJson('/api/v1/reports/exports', ['report' => 'cash-flow', 'format' => 'csv', 'from' => '2026-07-08', 'to' => '2026-11-26', 'rows' => 9, 'options' => ['method' => 'direct']], $h)->assertCreated();
+        // A comparison is recorded as the page had it: each period compared with, and the change columns.
+        $this->postJson('/api/v1/reports/exports', ['report' => 'profit-and-loss', 'format' => 'xlsx', 'from' => '2026-07-01', 'to' => '2026-09-30', 'rows' => 20,
+            'options' => ['c1' => 'previous_year', 'c2' => 'custom', 'c2_from' => '2024-07-01', 'c2_to' => '2024-09-30', 'diff' => 'both']], $h)->assertCreated();
         // A report's Customize choices are recorded with it: the columns in order, the sort, the ageing's periods.
         $this->postJson('/api/v1/reports/exports', ['report' => 'open-invoices', 'format' => 'csv', 'rows' => 3,
             'options' => ['cols' => 'date,number,name,due_date,amount,open_balance,foreign_amount,foreign_open_balance,currency', 'sort' => 'date', 'dir' => 'asc', 'group' => 'name']], $h)->assertCreated();

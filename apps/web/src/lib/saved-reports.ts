@@ -34,7 +34,9 @@ export const SCHEDULES: [string, string][] = [["none", "Not sent"], ["weekly", "
 
 /** The report options a saved report keeps (each report takes some of them; the API checks which). */
 export const OPTION_KEYS = ["group", "kind", "account_id", "warehouse_id", "rows", "columns", "measure", "account_type", "project_id", "location_id", "class_id",
-  "cols", "sort", "dir", "status", "view", "interval", "periods"] as const;
+  "cols", "sort", "dir", "status", "view", "interval", "periods",
+  // The financial statements: basis, Display columns by, % of income, method, and the comparisons (lib/compare.ts).
+  "by", "pct", "basis", "method", "diff", "c1", "c1_from", "c1_to", "c1_as_of", "c2", "c2_from", "c2_to", "c2_as_of", "c3", "c3_from", "c3_to", "c3_as_of"] as const;
 
 /** The report page for a saved report, for the dates its period covers today, with its options. */
 export function savedReportUrl(r: { report: string; period?: string; covers: { from?: string | null; to?: string | null; as_of?: string | null }; options: Record<string, string> }): string {
