@@ -114,6 +114,26 @@ final class BankAccountsTest extends TestCase
             'amount' => '1550', 'amount_received' => '10'], $this->h)->assertUnprocessable()->assertJsonValidationErrors('fx_rate');
         $this->assertSame(1, $this->owner()->table('audit_log')->where(['subject_id' => $usd, 'action' => 'money_transferred'])
             ->whereRaw("after->>'received_currency' = 'USD'")->count());
+
+        // Shown the QuickBooks way: the dollar account's balance in dollars beside its value in birr (chart, trial balance),
+        // each register line at its rate and in birr, and the general ledger running in dollars too.
+        $register = $this->getJson("/api/v1/bank-accounts/{$usd}/register?from=2026-11-01&to=2026-11-30", $this->h)->assertOk()
+            ->assertJsonPath('base_currency', 'ETB')->assertJsonPath('lines.0.amount_base', '154500.00')->assertJsonPath('lines.0.rate', '154.500000');
+        $this->assertSame('708.00', $register->json('closing'));
+        $chart = collect($this->getJson('/api/v1/chart', $this->h)->assertOk()->json('data'))->keyBy('id');
+        $this->assertSame('708.00', $chart[$usd]['foreign_balance']);
+        $this->assertSame('109391.00', $chart[$usd]['balance']);
+        $this->assertArrayNotHasKey('foreign_balance', $chart[$this->c['bank']]);
+        $tb = collect($this->getJson('/api/v1/reports/trial-balance?as_of=2026-11-30', $this->h)->assertOk()->json('data'))->keyBy('account_id');
+        $this->assertSame(['USD', '708.00', '109391.00'], [$tb[$usd]['currency'], $tb[$usd]['foreign_balance'], $tb[$usd]['debit']]);
+        $this->assertNull($tb[$this->c['bank']]['currency']);
+        $gl = collect($this->getJson('/api/v1/reports/general-ledger?from=2026-11-01&to=2026-11-30', $this->h)->assertOk()->json('accounts'))->keyBy('account_id');
+        $this->assertSame(['USD', '0.00', '708.00'], [$gl[$usd]['currency'], $gl[$usd]['foreign_opening'], $gl[$usd]['foreign_closing']]);
+        $this->assertSame(['1000.00', 'USD', '1000.00'], [$gl[$usd]['lines'][0]['foreign_amount'], $gl[$usd]['lines'][0]['currency'], $gl[$usd]['lines'][0]['foreign_balance']]);
+        // The birr bank's side of a dollar purchase is birr: no foreign amount on it.
+        $birr = collect($gl[$this->c['bank']]['lines'])->firstWhere('entry', $buy->json('number'));
+        $this->assertNull($birr['foreign_amount']);
+        $this->assertNull($birr['currency']);
     }
 
     public function test_a_deposit_banks_undeposited_receipts(): void

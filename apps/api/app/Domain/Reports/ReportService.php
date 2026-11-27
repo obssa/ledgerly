@@ -17,18 +17,28 @@ use Illuminate\Support\Facades\DB;
  */
 final class ReportService
 {
-    /** @return list<array{account_id: string, code: string, name: string, type: string, debit: string, credit: string}> */
+    /**
+     * Every account's balance at a date, debit or credit, in the company's currency; an account kept in another currency
+     * (a dollar bank account) also with that currency and its balance in it, as QuickBooks shows a foreign balance.
+     *
+     * @return list<array{account_id: string, code: string, name: string, type: string, debit: string, credit: string, currency: ?string, foreign_balance: ?string}>
+     */
     public function trialBalance(string $companyId, string $asOf): array
     {
+        $base = (string) DB::table('companies')->where('id', $companyId)->value('base_currency');
+
         return DB::select(<<<'SQL'
             SELECT a.id AS account_id, a.code, a.name, a.type,
                    greatest(t.debit - t.credit, 0)::numeric(20,2)::text AS debit,
-                   greatest(t.credit - t.debit, 0)::numeric(20,2)::text AS credit
+                   greatest(t.credit - t.debit, 0)::numeric(20,2)::text AS credit,
+                   CASE WHEN a.currency <> ? THEN a.currency END AS currency,
+                   CASE WHEN a.currency <> ? THEN (SELECT coalesce(sum(l.amount_txn), 0)::numeric(20,2)::text FROM journal_lines l
+                     WHERE l.company_id = a.company_id AND l.account_id = a.id AND l.entry_date <= ?::date) END AS foreign_balance
               FROM trial_balance(?::uuid, ?::date) t
               JOIN accounts a ON a.id = t.account_id
              WHERE t.debit <> t.credit
              ORDER BY a.code
-            SQL, [$companyId, $asOf]);
+            SQL, [$base, $base, $asOf, $companyId, $asOf]);
     }
 
     /**
@@ -101,11 +111,14 @@ final class ReportService
         // Each account's balance in its natural sign: assets debit-positive, the rest credit-positive.
         $rows = DB::select(<<<'SQL'
             SELECT a.code, a.name, a.type,
-                   (CASE WHEN a.type IN ('asset', 'expense') THEN t.debit - t.credit ELSE t.credit - t.debit END)::numeric(20,2)::text AS amount
+                   (CASE WHEN a.type IN ('asset', 'expense') THEN t.debit - t.credit ELSE t.credit - t.debit END)::numeric(20,2)::text AS amount,
+                   CASE WHEN a.currency <> ? THEN a.currency END AS currency,
+                   CASE WHEN a.currency <> ? THEN (SELECT (CASE WHEN a.type IN ('asset', 'expense') THEN 1 ELSE -1 END * coalesce(sum(l.amount_txn), 0))::numeric(20,2)::text
+                     FROM journal_lines l WHERE l.company_id = a.company_id AND l.account_id = a.id AND l.entry_date <= ?::date) END AS foreign_balance
               FROM trial_balance(?::uuid, ?::date) t
               JOIN accounts a ON a.id = t.account_id
              ORDER BY a.code
-            SQL, [$companyId, $asOf]);
+            SQL, [$currency, $currency, $asOf, $companyId, $asOf]);
 
         $sections = ['assets' => [], 'liabilities' => [], 'equity' => []];
         $sum = ['asset' => Money::zero($currency), 'liability' => Money::zero($currency), 'equity' => Money::zero($currency), 'income' => Money::zero($currency), 'expense' => Money::zero($currency)];
@@ -116,7 +129,9 @@ final class ReportService
 
             $key = match ($row->type) { 'asset' => 'assets', 'liability' => 'liabilities', 'equity' => 'equity', default => null };
             if ($key !== null && ! $amount->isZero()) {
-                $sections[$key][] = ['code' => $row->code, 'name' => $row->name, 'amount' => $amount->toDecimalString()];
+                $sections[$key][] = ['code' => $row->code, 'name' => $row->name, 'amount' => $amount->toDecimalString(),
+                    // An account kept in another currency: its balance in that currency too (QuickBooks' foreign balance).
+                    ...($row->currency !== null ? ['currency' => $row->currency, 'foreign_balance' => $row->foreign_balance] : [])];
             }
         }
 
@@ -258,7 +273,7 @@ final class ReportService
 
     /** The fields of each general ledger line (Customize, Columns); also the list a saved report may keep. */
     public const LEDGER_COLUMNS = ['date', 'type', 'number', 'entry', 'name', 'memo', 'split', 'due_date', 'debit', 'credit', 'amount', 'balance',
-        'foreign_amount', 'currency', 'exchange_rate', 'location', 'class', 'project', 'created_by', 'posted_by'];
+        'foreign_amount', 'foreign_balance', 'currency', 'exchange_rate', 'location', 'class', 'project', 'created_by', 'posted_by'];
 
     /**
      * The general ledger for a period: for each account (or the one asked for), the balance brought forward, every
@@ -281,6 +296,9 @@ final class ReportService
         };
         $opening = $scoped(DB::table('journal_lines as l'))->where('l.entry_date', '<', $from)->groupBy('l.account_id')
             ->select('l.account_id')->selectRaw('sum(l.debit - l.credit)::numeric(20,2)::text AS balance')->pluck('balance', 'account_id');
+        // An account kept in another currency also runs in that currency, from its own amounts (amount_txn).
+        $foreignOpening = $scoped(DB::table('journal_lines as l'))->where('l.entry_date', '<', $from)->groupBy('l.account_id')
+            ->select('l.account_id')->selectRaw('sum(l.amount_txn)::numeric(20,2)::text AS balance')->pluck('balance', 'account_id');
         $lines = $this->withTransactions($scoped(DB::table('journal_lines as l')), $base)
             ->whereBetween('l.entry_date', [$from, $to])
             ->orderBy('l.entry_date')->orderBy('e.number')->orderBy('l.line_no')->limit(self::GL_MAX_LINES + 1)
@@ -289,26 +307,33 @@ final class ReportService
         $lines = $lines->take(self::GL_MAX_LINES)->groupBy('account_id');
 
         $ids = collect([...$opening->keys(), ...$lines->keys(), ...($accountId ? [$accountId] : [])])->unique()->values();
-        $accounts = DB::table('accounts')->where('company_id', $companyId)->whereIn('id', $ids->all())->orderBy('code')->get(['id', 'code', 'name', 'type']);
+        $accounts = DB::table('accounts')->where('company_id', $companyId)->whereIn('id', $ids->all())->orderBy('code')->get(['id', 'code', 'name', 'type', 'currency']);
 
         return [
-            'accounts' => $accounts->map(function ($a) use ($opening, $lines, $base) {
+            'accounts' => $accounts->map(function ($a) use ($opening, $foreignOpening, $lines, $base) {
                 $balance = Money::of((string) ($opening[$a->id] ?? '0'), $base);
                 $start = $balance;
                 $debits = Money::zero($base);
                 $credits = Money::zero($base);
-                $rows = collect($lines[$a->id] ?? [])->map(function ($l) use (&$balance, &$debits, &$credits, $base) {
+                $foreign = $a->currency !== null && $a->currency !== $base;
+                $fx = Money::of((string) ($foreignOpening[$a->id] ?? '0'), $foreign ? $a->currency : $base);
+                $fxStart = $fx;
+                $rows = collect($lines[$a->id] ?? [])->map(function ($l) use (&$balance, &$debits, &$credits, &$fx, $foreign, $base) {
                     $d = Money::of((string) $l->debit, $base);
                     $c = Money::of((string) $l->credit, $base);
                     $balance = $balance->plus($d)->minus($c);
                     $debits = $debits->plus($d);
                     $credits = $credits->plus($c);
+                    if ($foreign) {
+                        $fx = $fx->plus(Money::of((string) $l->amount_txn, $fx->currency));
+                    }
 
-                    return [...$this->lineFields($l, $d, $c), 'balance' => $balance->toDecimalString()];
+                    return [...$this->lineFields($l, $d, $c), 'balance' => $balance->toDecimalString(), ...($foreign ? ['foreign_balance' => $fx->toDecimalString()] : [])];
                 })->values()->all();
 
                 return ['account_id' => $a->id, 'code' => $a->code, 'name' => $a->name, 'type' => $a->type, 'opening' => $start->toDecimalString(),
-                    'lines' => $rows, 'debits' => $debits->toDecimalString(), 'credits' => $credits->toDecimalString(), 'closing' => $balance->toDecimalString()];
+                    'lines' => $rows, 'debits' => $debits->toDecimalString(), 'credits' => $credits->toDecimalString(), 'closing' => $balance->toDecimalString(),
+                    ...($foreign ? ['currency' => $a->currency, 'foreign_opening' => $fxStart->toDecimalString(), 'foreign_closing' => $fx->toDecimalString()] : [])];
             })->values()->all(),
             'truncated' => $truncated,
         ];
@@ -363,14 +388,30 @@ final class ReportService
             ->leftJoin('dimensions as loc', fn ($j) => $j->on('loc.company_id', '=', 'l.company_id')->on('loc.id', '=', 'l.location_id'))
             ->leftJoin('dimensions as cls', fn ($j) => $j->on('cls.company_id', '=', 'l.company_id')->on('cls.id', '=', 'l.class_id'))
             ->leftJoin('dimensions as prj', fn ($j) => $j->on('prj.company_id', '=', 'l.company_id')->on('prj.id', '=', 'l.project_id'))
-            ->select(['l.id as line_id', 'l.account_id', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.status', 'e.memo', 'l.description',
+            ->join('accounts as la', fn ($j) => $j->on('la.company_id', '=', 'l.company_id')->on('la.id', '=', 'l.account_id'))
+            ->select(['l.id as line_id', 'l.account_id', 'l.amount_txn', 'l.entry_date as date', 'e.id as entry_id', 'e.number as entry', 'e.source_type', 'e.status', 'e.memo', 'l.description',
                 'c.name as contact', 'l.debit', 'l.credit', 'd.id as document_id', 'p.id as payment_id', 'd.due_date', 'cu.name as created_by', 'pu.name as posted_by',
                 'loc.name as location', 'cls.name as class', 'prj.name as project'])
             ->selectRaw("coalesce(d.type, CASE p.direction WHEN 'in' THEN 'payment_received' WHEN 'out' THEN 'payment_made' END, e.source_type) AS type")
             ->selectRaw('coalesce(d.number, p.reference) AS number')
-            ->selectRaw('CASE WHEN e.currency <> ? THEN l.amount_txn::text END AS foreign_amount', [$base])
-            ->selectRaw('CASE WHEN e.currency <> ? THEN e.currency END AS currency', [$base])
-            ->selectRaw('CASE WHEN e.currency <> ? THEN e.fx_rate::text END AS exchange_rate', [$base])
+            // The foreign amount of a line, as QuickBooks shows it: on an account kept in another currency, in that
+            // currency; on the company's own-currency bank, cash or wallet, none (a transfer from dollars is birr there);
+            // on any other account, the transaction's own currency when it is not the company's.
+            ->selectRaw(<<<'SQL'
+                CASE WHEN la.currency <> ? THEN l.amount_txn::text
+                     WHEN la.subtype IN ('bank', 'mobile_money', 'cash') OR la.system_key = 'undeposited_funds' THEN NULL
+                     WHEN e.currency <> ? THEN l.amount_txn::text END AS foreign_amount
+                SQL, [$base, $base])
+            ->selectRaw(<<<'SQL'
+                CASE WHEN la.currency <> ? THEN la.currency
+                     WHEN la.subtype IN ('bank', 'mobile_money', 'cash') OR la.system_key = 'undeposited_funds' THEN NULL
+                     WHEN e.currency <> ? THEN e.currency END AS currency
+                SQL, [$base, $base])
+            ->selectRaw(<<<'SQL'
+                CASE WHEN la.currency <> ? THEN (CASE WHEN e.currency = la.currency THEN e.fx_rate::text END)
+                     WHEN la.subtype IN ('bank', 'mobile_money', 'cash') OR la.system_key = 'undeposited_funds' THEN NULL
+                     WHEN e.currency <> ? THEN e.fx_rate::text END AS exchange_rate
+                SQL, [$base, $base])
             ->selectRaw(<<<'SQL'
                 (SELECT CASE WHEN count(DISTINCT o.account_id) = 1 THEN min(oa.code || ' ' || oa.name) WHEN count(*) > 1 THEN '-Split-' END
                    FROM journal_lines o JOIN accounts oa ON oa.company_id = o.company_id AND oa.id = o.account_id

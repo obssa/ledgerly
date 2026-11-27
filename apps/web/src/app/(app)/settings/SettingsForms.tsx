@@ -220,7 +220,10 @@ export function CurrenciesPanel({ settings, currencies }: { settings: Settings; 
   const enabled = currencies.data.filter((c) => c.is_enabled);
   const manage = settings.can.manage && !settings.demo;
   const enterRates = settings.can.enter_rates && !settings.demo && enabled.length > 0;
-  const today = todayIn();
+  const today = todayIn(settings.timezone);
+  // A rate older than the API uses (7 days) asks for a fresh one before the next document in that currency.
+  const maxAge = currencies.rate_max_age_days ?? 7;
+  const stale = (date: string | null) => !date || (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${date}T00:00:00Z`)) / 86_400_000 > maxAge;
 
   return (
     <div>
@@ -232,6 +235,7 @@ export function CurrenciesPanel({ settings, currencies }: { settings: Settings; 
           <thead>
             <tr className="text-left text-[12px] uppercase tracking-wide text-muted">
               <th className="py-1.5 font-bold">Currency</th>
+              <th className="py-1.5 font-bold">Accounts held in it</th>
               <th className="py-1.5 text-right font-bold">Latest rate ({currencies.base_currency})</th>
               <th className="py-1.5" />
             </tr>
@@ -240,8 +244,16 @@ export function CurrenciesPanel({ settings, currencies }: { settings: Settings; 
             {currencies.data.map((c) => (
               <tr key={c.currency} className="border-t border-line">
                 <td className="py-2 font-semibold">{c.currency}{!c.is_enabled && <span className="ml-2 text-[12px] font-normal text-muted">off</span>}</td>
+                <td className="py-2 text-[13px]">{c.accounts && c.accounts.length > 0
+                  ? c.accounts.map((a) => <a key={a.id} href={`/banking/${encodeURIComponent(a.id)}`} className="block hover:underline"><span className="num text-muted">{a.code}</span> {a.name}</a>)
+                  : <span className="text-muted">—</span>}</td>
                 <td className="num py-2 text-right">
                   {c.latest_rate ? <>{c.latest_rate}<span className="block text-[12px] text-muted"><Dt v={c.latest_rate_date} /></span></> : <span className="text-muted">none yet</span>}
+                  {c.is_enabled && stale(c.latest_rate_date) && (
+                    <span role="status" className="mt-1 block text-[12px] font-semibold text-warn">
+                      {c.latest_rate ? `Older than ${maxAge} days` : "Enter a rate"}: new {c.currency} documents need a rate of the day
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 text-right">
                   {manage && (

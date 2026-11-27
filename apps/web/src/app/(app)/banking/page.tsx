@@ -2,6 +2,7 @@ import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getBankAccounts, getCurrencies } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
+import { parse, toString } from "@/lib/decimal";
 import { DepositReceipts, NewBankAccount, TransferMoney } from "./BankingForms";
 
 export const metadata = { title: "Banking and cash" };
@@ -13,6 +14,9 @@ export default async function BankingPage() {
   const [{ data, can, demo }, currencies] = await Promise.all([getBankAccounts(), getCurrencies()]);
   const money = data.filter((a) => a.kind !== "undeposited_funds");
   const sameCurrency = money.filter((a) => a.currency === currencies.base_currency);
+  // Accounts in more than one currency: each also in the company's currency, and the total held (QuickBooks' home-currency balance).
+  const multi = data.some((a) => a.currency !== currencies.base_currency);
+  const held = toString(data.reduce((t, a) => t + parse(a.balance_base), 0n));
 
   return (
     <>
@@ -20,7 +24,7 @@ export default async function BankingPage() {
       <Card className="!p-2" label="Accounts">
         <div className="overflow-x-auto">
           <table className="tbl">
-            <thead><tr><th scope="col">Code</th><th scope="col">Account</th><th scope="col">Kind</th><th scope="col">Where</th><th scope="col" className="!text-right">Balance</th></tr></thead>
+            <thead><tr><th scope="col">Code</th><th scope="col">Account</th><th scope="col">Kind</th><th scope="col">Where</th><th scope="col" className="!text-right">Balance</th>{multi && <th scope="col" className="!text-right">In {currencies.base_currency}</th>}</tr></thead>
             <tbody>
               {data.length === 0 && <tr><td colSpan={5} className="text-muted">{demo ? "Not available in the demo." : "No money accounts yet."}</td></tr>}
               {data.map((a) => (
@@ -30,9 +34,11 @@ export default async function BankingPage() {
                   <td>{KIND[a.kind] ?? a.kind}</td>
                   <td className="text-[13px] text-muted">{[a.bank_details?.bank_name ?? a.bank_details?.provider, a.bank_details?.account_number ?? a.bank_details?.wallet_number].filter(Boolean).join(" · ") || "—"}</td>
                   <td className="num text-right font-semibold">{a.currency !== currencies.base_currency && <span className="mr-1 text-muted">{a.currency}</span>}{formatAmount(a.balance)}</td>
+                  {multi && <td className="num text-right">{formatAmount(a.balance_base)}</td>}
                 </tr>
               ))}
             </tbody>
+            {multi && <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={5}>Cash and bank held, in {currencies.base_currency}</td><td className="num text-right">{formatAmount(held)}</td></tr></tfoot>}
           </table>
         </div>
       </Card>

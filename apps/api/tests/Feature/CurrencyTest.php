@@ -43,8 +43,8 @@ final class CurrencyTest extends TestCase
         $this->getJson('/api/v1/currencies', $this->h)->assertOk()
             ->assertJsonPath('base_currency', 'ETB')
             ->assertJsonPath('data', [
-                ['currency' => 'EUR', 'is_enabled' => false, 'latest_rate' => null, 'latest_rate_date' => null],
-                ['currency' => 'USD', 'is_enabled' => true, 'latest_rate' => '134.523333', 'latest_rate_date' => '2026-11-02'],
+                ['currency' => 'EUR', 'is_enabled' => false, 'latest_rate' => null, 'latest_rate_date' => null, 'accounts' => []],
+                ['currency' => 'USD', 'is_enabled' => true, 'latest_rate' => '134.523333', 'latest_rate_date' => '2026-11-02', 'accounts' => []],
             ]);
         $this->assertSame(['currency_enabled', 'currency_enabled', 'currency_disabled'],
             $this->owner()->table('audit_log')->where('company_id', $this->c['company'])->where('subject_type', 'currency')->orderBy('id')->pluck('action')->all());

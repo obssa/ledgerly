@@ -19,7 +19,7 @@ export function transactionHref(t: { type?: string | null; document_id?: string 
 
 export type GlRow = {
   id: string; entry_id: string; document_id: string | null; payment_id: string | null; date: string; type: string; number: string | null; entry: string; name: string | null;
-  memo: string | null; split: string | null; due_date: string | null; debit: string; credit: string; amount: string; balance: string; foreign_amount: string | null;
+  memo: string | null; split: string | null; due_date: string | null; debit: string; credit: string; amount: string; balance: string; foreign_amount: string | null; foreign_balance: string | null;
   currency: string | null; exchange_rate: string | null; location: string | null; class: string | null; project: string | null; created_by: string | null; posted_by: string | null;
 };
 export type GlColumn = Exclude<keyof GlRow, "id" | "entry_id" | "document_id" | "payment_id">;
@@ -38,6 +38,7 @@ export const GL_COLUMNS: ColumnDef<GlColumn>[] = [
   { key: "amount", label: "Amount", group: "Amounts", kind: "money" },
   { key: "balance", label: "Balance", group: "Amounts", kind: "money" },
   { key: "foreign_amount", label: "Foreign amount", group: "Foreign currency", kind: "money" },
+  { key: "foreign_balance", label: "Foreign balance", group: "Foreign currency", kind: "money" },
   { key: "currency", label: "Currency", group: "Foreign currency", kind: "text" },
   { key: "exchange_rate", label: "Exchange rate", group: "Foreign currency", kind: "rate" },
   { key: "location", label: "Location", group: "Tracking", kind: "text" },
@@ -46,14 +47,14 @@ export const GL_COLUMNS: ColumnDef<GlColumn>[] = [
   { key: "created_by", label: "Created by", group: "People", kind: "text" },
   { key: "posted_by", label: "Posted by", group: "People", kind: "text" },
 ];
-export const GL_DEFAULTS: GlColumn[] = ["date", "type", "number", "name", "memo", "split", "debit", "credit", "balance", "foreign_amount", "currency"];
-export const GL_FOREIGN: GlColumn[] = ["foreign_amount", "currency", "exchange_rate"];
+export const GL_DEFAULTS: GlColumn[] = ["date", "type", "number", "name", "memo", "split", "debit", "credit", "balance", "foreign_amount", "foreign_balance", "currency"];
+export const GL_FOREIGN: GlColumn[] = ["foreign_amount", "foreign_balance", "currency", "exchange_rate"];
 
 export function glRow(l: LedgerLine): GlRow {
   return {
     id: l.line_id, entry_id: l.entry_id, document_id: l.document_id ?? null, payment_id: l.payment_id ?? null, date: l.date, type: l.type ?? l.source_type,
     number: l.number ?? null, entry: `#${l.entry}`, name: l.contact, memo: l.description ?? l.memo, split: l.split ?? null, due_date: l.due_date ?? null,
-    debit: l.debit, credit: l.credit, amount: l.amount ?? "", balance: l.balance, foreign_amount: l.foreign_amount ?? null, currency: l.currency ?? null,
+    debit: l.debit, credit: l.credit, amount: l.amount ?? "", balance: l.balance, foreign_amount: l.foreign_amount ?? null, foreign_balance: l.foreign_balance ?? null, currency: l.currency ?? null,
     exchange_rate: l.exchange_rate ?? null, location: l.location ?? null, class: l.class ?? null, project: l.project ?? null,
     created_by: l.created_by ?? null, posted_by: l.posted_by ?? null,
   };
