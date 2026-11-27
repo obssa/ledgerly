@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
@@ -53,7 +54,7 @@ export function RefundPanel({ side, contactId, currency, left, creditId, payment
           </div>
           <div>
             <label className="field-label" htmlFor="refund_date">Date</label>
-            <input className="field" id="refund_date" name="payment_date" type="date" defaultValue={today} />
+            <DateInput className="field" id="refund_date" name="payment_date" defaultValue={today} />
           </div>
           <div>
             <label className="field-label" htmlFor="refund_cheque">Cheque number (cheques only)</label>

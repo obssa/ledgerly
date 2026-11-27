@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import { todayIn } from "@/lib/dates";
@@ -35,7 +36,7 @@ export function CountForm({ warehouseId, binId, showBins, lines }: {
         </table>
       </div>
       <div className="flex flex-wrap items-end gap-2.5 px-3 pb-3">
-        <div><label className="field-label" htmlFor="date">Counted on</label><input className="field" id="date" name="date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="date">Counted on</label><DateInput className="field" id="date" name="date" max={today} defaultValue={today} /></div>
         <div className="min-w-[220px] flex-1"><label className="field-label" htmlFor="note">Note</label><input className="field" id="note" name="note" maxLength={300} placeholder="Month-end count" /></div>
         <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Recording…" : "Record the count"}</button>
       </div>

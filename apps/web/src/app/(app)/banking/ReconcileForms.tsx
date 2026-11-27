@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -29,7 +30,7 @@ export function StartReconciliation({ accountId, opening, today }: { accountId: 
       <input type="hidden" name="account_id" value={accountId} />
       <div>
         <label className="field-label" htmlFor="statement_date">Statement ends on</label>
-        <input className="field" id="statement_date" name="statement_date" type="date" max={today} defaultValue={today} />
+        <DateInput className="field" id="statement_date" name="statement_date" max={today} defaultValue={today} />
       </div>
       <div>
         <label className="field-label" htmlFor="ending_balance">Ending balance on the statement</label>
@@ -58,7 +59,7 @@ export function ReconcileWorkspace({ r }: { r: Reconciliation }) {
       <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-4">
         <div>
           <label className="field-label" htmlFor="statement_date">Statement ends on</label>
-          <input className="field" id="statement_date" name="statement_date" type="date" defaultValue={r.statement_date} />
+          <DateInput className="field" id="statement_date" name="statement_date" defaultValue={r.statement_date} />
         </div>
         <div>
           <label className="field-label" htmlFor="ending_balance">Ending balance ({r.account.currency})</label>

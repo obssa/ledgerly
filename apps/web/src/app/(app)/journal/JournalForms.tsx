@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -100,7 +101,7 @@ export function NewJournal({ accounts, dimensions }: { accounts: Account[]; dime
       <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         <div>
           <label className="field-label" htmlFor="date">Date</label>
-          <input className={`field ${bad("date") ? "!border-bad" : ""}`} id="date" name="date" type="date" max={today} defaultValue={today} />
+          <DateInput className={`field ${bad("date") ? "!border-bad" : ""}`} id="date" name="date" max={today} defaultValue={today} />
         </div>
         <div className="col-span-2 min-w-0">
           <label className="field-label" htmlFor="memo">Memo</label>
@@ -108,7 +109,7 @@ export function NewJournal({ accounts, dimensions }: { accounts: Account[]; dime
         </div>
         <div>
           <label className="field-label" htmlFor="reverse_on">Reverse on (optional)</label>
-          <input className={`field ${bad("reverse_on") ? "!border-bad" : ""}`} id="reverse_on" name="reverse_on" type="date" aria-describedby="reverse_on_help" />
+          <DateInput className={`field ${bad("reverse_on") ? "!border-bad" : ""}`} id="reverse_on" name="reverse_on" aria-describedby="reverse_on_help" />
           <p id="reverse_on_help" className="mt-1 text-[12px] text-muted">For an accrual: its reversal posts with it, dated this day.</p>
         </div>
       </div>
@@ -152,11 +153,11 @@ export function RecurringForm({ accounts, dimensions, template }: { accounts: Ac
         </div>
         <div>
           <label className="field-label" htmlFor="next_on">{template ? "Next entry on" : "First entry on"}</label>
-          <input className={`field ${bad("next_on") ? "!border-bad" : ""}`} id="next_on" name="next_on" type="date" defaultValue={template?.next_on ?? today} />
+          <DateInput className={`field ${bad("next_on") ? "!border-bad" : ""}`} id="next_on" name="next_on" defaultValue={template?.next_on ?? today} />
         </div>
         <div>
           <label className="field-label" htmlFor="ends_on">Last entry by (optional)</label>
-          <input className={`field ${bad("ends_on") ? "!border-bad" : ""}`} id="ends_on" name="ends_on" type="date" defaultValue={template?.ends_on ?? ""} />
+          <DateInput className={`field ${bad("ends_on") ? "!border-bad" : ""}`} id="ends_on" name="ends_on" defaultValue={template?.ends_on ?? ""} />
         </div>
       </div>
       <JournalLines lines={lines} setLines={setLines} accounts={accounts} dimensions={dimensions} bad={bad} />
@@ -213,7 +214,7 @@ export function ReclassifyForm({ lines, accounts, fromAccountId }: { lines: Recl
         </div>
         <div>
           <label className="field-label" htmlFor="reclass_date">Date of the journal</label>
-          <input className={`field ${bad("date") ? "!border-bad" : ""}`} id="reclass_date" name="date" type="date" max={today} defaultValue={today} />
+          <DateInput className={`field ${bad("date") ? "!border-bad" : ""}`} id="reclass_date" name="date" max={today} defaultValue={today} />
         </div>
         <div className="col-span-2 min-w-0">
           <label className="field-label" htmlFor="reclass_memo">Memo (optional)</label>
@@ -254,7 +255,7 @@ export function RecurringStep({ id, active, nextOn }: { id: string; active: bool
       {!active && (
         <div>
           <label className="field-label" htmlFor="resume_next_on">Resume from</label>
-          <input className="field" id="resume_next_on" name="next_on" type="date" defaultValue={nextOn} />
+          <DateInput className="field" id="resume_next_on" name="next_on" defaultValue={nextOn} />
         </div>
       )}
       <button type="submit" className="btn" disabled={pending}>{active ? "Pause" : "Resume"}</button>
@@ -282,7 +283,7 @@ export function ReverseJournal({ id, date }: { id: string; date: string }) {
       <input type="hidden" name="id" value={id} />
       <div>
         <label className="field-label" htmlFor="reverse_date">Reverse on</label>
-        <input className="field" id="reverse_date" name="date" type="date" min={date} max={today} defaultValue={today} />
+        <DateInput className="field" id="reverse_date" name="date" min={date} max={today} defaultValue={today} />
       </div>
       <div className="min-w-[260px] flex-1">
         <label className="field-label" htmlFor="reverse_reason">Why</label>

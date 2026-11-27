@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useState } from "react";
 import type { Account, Dimension, FixedAsset } from "@/lib/api";
@@ -115,7 +116,7 @@ export function RevalueAsset({ id, bookValue, accounts, kept }: { id: string; bo
         a fall takes this asset&rsquo;s surplus first, then profit or loss.
       </p>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-        <div><label className="field-label" htmlFor="rev-date">Date</label><input className="field num" id="rev-date" name="date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="rev-date">Date</label><DateInput className="field num" id="rev-date" name="date" max={today} defaultValue={today} /></div>
         <div><label className="field-label" htmlFor="rev-fair">Fair value</label><input className="field num" id="rev-fair" name="fair_value" inputMode="decimal" /></div>
         <div>
           <label className="field-label" htmlFor="rev-surplus">Surplus kept on</label>
@@ -143,7 +144,7 @@ export function ImpairAsset({ id, bookValue }: { id: string; bookValue: string }
       <input type="hidden" name="id" value={id} />
       <p className="text-[13px] text-muted">Carried at {bookValue}. If it is worth less (damaged, idle, obsolete), write it down by the difference.</p>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-        <div><label className="field-label" htmlFor="imp-date">Date</label><input className="field num" id="imp-date" name="date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="imp-date">Date</label><DateInput className="field num" id="imp-date" name="date" max={today} defaultValue={today} /></div>
         <div><label className="field-label" htmlFor="imp-amount">Write down by</label><input className="field num" id="imp-amount" name="amount" inputMode="decimal" /></div>
       </div>
       <div><label className="field-label" htmlFor="imp-reason">Why it is worth less</label><input className="field" id="imp-reason" name="reason" maxLength={500} placeholder="Dropped; board replaced" /></div>
@@ -161,7 +162,7 @@ export function DisposeAsset({ id, bookValue, banks }: { id: string; bookValue: 
       <Message state={state} />
       <input type="hidden" name="id" value={id} />
       <div className="flex flex-wrap items-end gap-2.5">
-        <div><label className="field-label" htmlFor="dispose_date">Date it went</label><input className={`field ${bad("date") ? "!border-bad" : ""}`} id="dispose_date" name="date" type="date" max={todayIn()} defaultValue={todayIn()} /></div>
+        <div><label className="field-label" htmlFor="dispose_date">Date it went</label><DateInput className={`field ${bad("date") ? "!border-bad" : ""}`} id="dispose_date" name="date" max={todayIn()} defaultValue={todayIn()} /></div>
         <div><label className="field-label" htmlFor="proceeds">Sold for</label><input className={`field num w-[140px] ${bad("proceeds") ? "!border-bad" : ""}`} id="proceeds" name="proceeds" inputMode="decimal" placeholder="0.00 if scrapped" /></div>
         <div className="min-w-[200px]">
           <label className="field-label" htmlFor="bank_account_id">Paid into</label>

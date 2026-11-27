@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -44,7 +45,7 @@ export function BatchPayForm({ bills, accounts, currency }: { bills: Bill[]; acc
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
           </select>
         </div>
-        <div><label className="field-label" htmlFor="payment_date">Date</label><input className="field num" id="payment_date" name="payment_date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="payment_date">Date</label><DateInput className="field num" id="payment_date" name="payment_date" max={today} defaultValue={today} /></div>
         <div>
           <label className="field-label" htmlFor="method">Method</label>
           <select className="field" id="method" name="method" defaultValue="bank_transfer">

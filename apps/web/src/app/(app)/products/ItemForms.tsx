@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import type { Item } from "@/lib/api";
@@ -185,8 +186,9 @@ function Field({ name, label, type = "text", defaultValue = "", invalid, hint }:
   return (
     <div>
       <label className="field-label" htmlFor={name}>{label}</label>
-      <input className={`field ${invalid ? "!border-bad" : ""}`} id={name} name={name} type={type} defaultValue={defaultValue} aria-invalid={invalid || undefined}
-        aria-describedby={hint ? `${name}-hint` : undefined} />
+      {type === "date" ? <DateInput className={`field ${invalid ? "!border-bad" : ""}`} id={name} name={name} defaultValue={defaultValue} aria-invalid={invalid || undefined} aria-describedby={hint ? `${name}-hint` : undefined} /> : (
+        <input className={`field ${invalid ? "!border-bad" : ""}`} id={name} name={name} type={type} defaultValue={defaultValue} aria-invalid={invalid || undefined}
+        aria-describedby={hint ? `${name}-hint` : undefined} />)}
       {hint && <p id={`${name}-hint`} className="mt-1.5 text-[13px] text-muted">{hint}</p>}
     </div>
   );

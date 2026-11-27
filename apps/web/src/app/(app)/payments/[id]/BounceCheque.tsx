@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import { Card } from "@/components/ui";
@@ -22,7 +23,7 @@ export function BounceCheque({ id, received }: { id: string; received: string })
         <input type="hidden" name="id" value={id} />
         <div>
           <label className="field-label" htmlFor="bounce_date">Returned by the bank on</label>
-          <input className="field" id="bounce_date" name="date" type="date" min={received} max={today} defaultValue={today} />
+          <DateInput className="field" id="bounce_date" name="date" min={received} max={today} defaultValue={today} />
         </div>
         <div>
           <label className="field-label" htmlFor="bounce_fee">The bank&apos;s charge</label>

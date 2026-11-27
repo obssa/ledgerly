@@ -1,13 +1,14 @@
+import { parseDate } from "@/lib/dates";
+import { DateInput } from "@/components/DateInput";
 import { Dt } from "@/components/Dt";
 import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
-import { getBankAccounts, getBankPaymentFile } from "@/lib/data";
+import { getBankAccounts, getBankPaymentFile, getDatePrefs } from "@/lib/data";
 import { todayIn } from "@/lib/dates";
 import { formatAmount } from "@/lib/format";
 
 export const metadata = { title: "Bank payment file" };
 
-const isDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /**
  * Module 3: the bank payment file. The supplier payments recorded from one account on one day, by bank transfer or
@@ -16,7 +17,8 @@ const isDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{
  */
 export default async function BankPaymentFilePage({ searchParams }: PageProps<"/payments-made/bank-file">) {
   const q = await searchParams;
-  const date = isDate(q.date) ? q.date : todayIn();
+  // As stored, or typed the company's way (the form works without JavaScript).
+  const date = (typeof q.date === "string" ? parseDate(q.date, await getDatePrefs()) : null) ?? todayIn();
   const method = q.method === "mobile_money" ? "mobile_money" : "bank_transfer";
   const accounts = await getBankAccounts();
   const money = accounts.data.filter((a) => a.is_active && (method === "mobile_money" ? a.kind === "mobile_money" : a.kind === "bank"));
@@ -32,7 +34,7 @@ export default async function BankPaymentFilePage({ searchParams }: PageProps<"/
       {title}
       <Card className="mb-4 max-w-[900px]" label="Which payments">
         <form className="flex flex-wrap items-end gap-2.5" method="get">
-          <div><label className="field-label" htmlFor="date">Paid on</label><input className="field" id="date" name="date" type="date" defaultValue={date} /></div>
+          <div><label className="field-label" htmlFor="date">Paid on</label><DateInput plain className="field" id="date" name="date" defaultValue={date} /></div>
           <div>
             <label className="field-label" htmlFor="method">By</label>
             <select className="field" id="method" name="method" defaultValue={method}>

@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import { todayIn } from "@/lib/dates";
@@ -29,7 +30,7 @@ export function LogTime({ projects, projectId }: { projects: Option[]; projectId
             {projects.map((p) => <option key={p.id} value={p.id}>{p.code} {p.name}</option>)}
           </select>
         </div>
-        <div><label className="field-label" htmlFor="work_date">Day</label><input className={`field ${bad("work_date") ? "!border-bad" : ""}`} id="work_date" name="work_date" type="date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="work_date">Day</label><DateInput className={`field ${bad("work_date") ? "!border-bad" : ""}`} id="work_date" name="work_date" max={today} defaultValue={today} /></div>
         <div><label className="field-label" htmlFor="hours">Hours</label><input className={`field num w-[90px] ${bad("hours") ? "!border-bad" : ""}`} id="hours" name="hours" inputMode="decimal" placeholder="2.5" /></div>
         <div><label className="field-label" htmlFor="rate">Rate (optional)</label><input className={`field num w-[110px] ${bad("rate") ? "!border-bad" : ""}`} id="rate" name="rate" inputMode="decimal" /></div>
         <label className="flex items-center gap-2 pb-2 text-[14px]"><input type="checkbox" name="billable" defaultChecked /> Billable</label>
@@ -60,8 +61,8 @@ export function BillTime({ projectId, incomeAccounts }: { projectId: string; inc
       <Message state={state} />
       <input type="hidden" name="project_id" value={projectId} />
       <div className="flex flex-wrap items-end gap-2.5">
-        <div><label className="field-label" htmlFor="issue_date">Invoice date</label><input className="field" id="issue_date" name="issue_date" type="date" max={today} defaultValue={today} /></div>
-        <div><label className="field-label" htmlFor="up_to">Hours up to (optional)</label><input className="field" id="up_to" name="up_to" type="date" /></div>
+        <div><label className="field-label" htmlFor="issue_date">Invoice date</label><DateInput className="field" id="issue_date" name="issue_date" max={today} defaultValue={today} /></div>
+        <div><label className="field-label" htmlFor="up_to">Hours up to (optional)</label><DateInput className="field" id="up_to" name="up_to" /></div>
         <div className="min-w-[200px]">
           <label className="field-label" htmlFor="income_account_id">Income account</label>
           <select className="field" id="income_account_id" name="income_account_id">{incomeAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}</select>

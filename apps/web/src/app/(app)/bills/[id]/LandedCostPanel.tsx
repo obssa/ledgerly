@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -72,7 +73,7 @@ export function LandedCostPanel({ billId, landed, base }: { billId: string; land
             </div>
             <div>
               <label className="field-label" htmlFor="lc_date">Date</label>
-              <input className="field" id="lc_date" name="date" type="date" defaultValue={todayIn()} max={todayIn()} />
+              <DateInput className="field" id="lc_date" name="date" defaultValue={todayIn()} max={todayIn()} />
             </div>
           </div>
           <div><button type="submit" className="btn" disabled={pending}>{pending ? "Adding…" : "Add to the cost of the goods"}</button></div>

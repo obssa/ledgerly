@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useState } from "react";
 import type { PurchaseRequisition } from "@/lib/api";
@@ -22,7 +23,7 @@ export function NewRequisition() {
       <Message state={state} />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-[18px]">
         <div className="sm:col-span-2"><label className="field-label" htmlFor="reason">What it is for</label><input className="field" id="reason" name="reason" required minLength={3} maxLength={500} placeholder="For the cafe counter" /></div>
-        <div><label className="field-label" htmlFor="needed_by">Needed by (optional)</label><input className="field num" id="needed_by" name="needed_by" type="date" min={today} /></div>
+        <div><label className="field-label" htmlFor="needed_by">Needed by (optional)</label><DateInput className="field num" id="needed_by" name="needed_by" min={today} /></div>
       </div>
       <table className="w-full text-sm">
         <thead><tr className="text-left text-[12px] text-muted"><th className="py-1 pr-2">What</th><th className="py-1 pr-2">How many</th><th className="py-1">About, each (optional)</th></tr></thead>

@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -100,7 +101,7 @@ export function ScheduleForm({ supplier, currency, bills, accounts, today, initi
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
           <div>
             <label className="field-label" htmlFor="pay_on">Pay on</label>
-            <input className={`field ${bad("pay_on") ? "!border-bad" : ""}`} id="pay_on" name="pay_on" type="date" min={today}
+            <DateInput className={`field ${bad("pay_on") ? "!border-bad" : ""}`} id="pay_on" name="pay_on" min={today}
               defaultValue={initial?.pay_on ?? firstDue ?? today} aria-describedby="pay_on-hint" />
             <p id="pay_on-hint" className="mt-1.5 text-[13px] text-muted">You get an email that morning.</p>
           </div>

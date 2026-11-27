@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import { todayIn } from "@/lib/dates";
@@ -24,11 +25,11 @@ export function RepeatInvoice({ invoiceId, canPost }: { invoiceId: string; canPo
           </div>
           <div>
             <label className="field-label" htmlFor="repeat-next">First on</label>
-            <input className="field num" id="repeat-next" name="next_on" type="date" defaultValue={today} min={today} />
+            <DateInput className="field num" id="repeat-next" name="next_on" defaultValue={today} min={today} />
           </div>
           <div>
             <label className="field-label" htmlFor="repeat-ends">Until (optional)</label>
-            <input className="field num" id="repeat-ends" name="ends_on" type="date" min={today} />
+            <DateInput className="field num" id="repeat-ends" name="ends_on" min={today} />
           </div>
           <div>
             <label className="field-label" htmlFor="repeat-name">Name (optional)</label>

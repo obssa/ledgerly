@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -41,7 +42,7 @@ export function BadDebtPanel({ invoiceId, writeOffs, canManage, owed, issueDate 
         <form action={writeOff} noValidate className="mt-3 flex flex-wrap items-end gap-2">
           <input type="hidden" name="id" value={invoiceId} />
           <div><label className="field-label" htmlFor="bd-amount">Amount</label><input className="field num w-[110px]" id="bd-amount" name="amount" inputMode="decimal" placeholder={formatAmount(owed)} /></div>
-          <div><label className="field-label" htmlFor="bd-date">Date</label><input className="field" id="bd-date" name="date" type="date" min={issueDate} max={today} defaultValue={today} /></div>
+          <div><label className="field-label" htmlFor="bd-date">Date</label><DateInput className="field" id="bd-date" name="date" min={issueDate} max={today} defaultValue={today} /></div>
           <div className="min-w-[180px] flex-1"><label className="field-label" htmlFor="bd-reason">Reason</label><input className="field w-full" id="bd-reason" name="reason" required minLength={3} maxLength={500} placeholder="Customer closed the business" /></div>
           <button type="submit" className="btn" disabled={writingOff}>{writingOff ? "Writing off…" : "Write off"}</button>
         </form>
@@ -49,7 +50,7 @@ export function BadDebtPanel({ invoiceId, writeOffs, canManage, owed, issueDate 
       {canManage && standing.length > 0 && (
         <form action={reverse} className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
           <input type="hidden" name="id" value={invoiceId} />
-          <div><label className="field-label" htmlFor="bd-back">Reversed on</label><input className="field" id="bd-back" name="date" type="date" min={standing[0].written_off_on} max={today} defaultValue={today} /></div>
+          <div><label className="field-label" htmlFor="bd-back">Reversed on</label><DateInput className="field" id="bd-back" name="date" min={standing[0].written_off_on} max={today} defaultValue={today} /></div>
           <div className="min-w-[160px] flex-1"><label className="field-label" htmlFor="bd-why">Reason</label><input className="field w-full" id="bd-why" name="reason" maxLength={500} placeholder="Paid after all" /></div>
           <button type="submit" className="btn btn-primary" disabled={reversing}>{reversing ? "Reversing…" : `Reverse ${formatAmount(standing[0].amount)}`}</button>
         </form>

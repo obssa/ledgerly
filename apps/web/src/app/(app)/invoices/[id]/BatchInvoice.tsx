@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
 import { todayIn } from "@/lib/dates";
@@ -26,7 +27,7 @@ export function BatchInvoice({ invoiceId, customers, canPost }: { invoiceId: str
         </fieldset>
         <div>
           <label className="field-label" htmlFor="batch-date">Dated</label>
-          <input className="field num" id="batch-date" name="issue_date" type="date" defaultValue={today} />
+          <DateInput className="field num" id="batch-date" name="issue_date" defaultValue={today} />
         </div>
         {canPost && (
           <label className="flex items-center gap-2 text-[13px]" htmlFor="batch-post">

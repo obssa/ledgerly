@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 import { formatDate, todayIn } from "@/lib/dates";
 
 import { Dt } from "@/components/Dt";
@@ -410,7 +411,8 @@ function TextField({ name, label, type = "text", defaultValue = "", required, di
   return (
     <div>
       <label className="field-label" htmlFor={id}>{label}</label>
-      <input
+      {type === "date" ? <DateInput className={`field ${invalid ? "!border-bad" : ""}`} id={id} name={name} defaultValue={defaultValue} required={required} disabled={disabled} aria-invalid={invalid || undefined} aria-describedby={hint ? `${id}-hint` : undefined} /> : (
+        <input
         className={`field ${invalid ? "!border-bad" : ""}`}
         id={id}
         name={name}
@@ -420,7 +422,7 @@ function TextField({ name, label, type = "text", defaultValue = "", required, di
         disabled={disabled}
         aria-invalid={invalid || undefined}
         aria-describedby={hint ? `${id}-hint` : undefined}
-      />
+      />)}
       {hint && <p id={`${id}-hint`} className="mt-1.5 text-[13px] text-muted">{hint}</p>}
     </div>
   );

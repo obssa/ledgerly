@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { Dt } from "@/components/Dt";
 
@@ -128,7 +129,7 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
           <Field name="fee" label="Bank fee" invalid={bad("fee")} />
           <div>
             <label className="field-label" htmlFor="payment_date">Date</label>
-            <input className={`field ${bad("payment_date") ? "!border-bad" : ""}`} id="payment_date" name="payment_date" type="date" defaultValue={today} />
+            <DateInput className={`field ${bad("payment_date") ? "!border-bad" : ""}`} id="payment_date" name="payment_date" defaultValue={today} />
           </div>
           <div>
             <label className="field-label" htmlFor="method">Method</label>

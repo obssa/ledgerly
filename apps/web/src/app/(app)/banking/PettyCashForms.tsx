@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useState } from "react";
 import type { BankAccount } from "@/lib/api";
@@ -47,7 +48,7 @@ export function TopUpForm({ account, sources }: { account: BankAccount; sources:
       </div>
       <div>
         <label className="field-label" htmlFor="topup_date">Date</label>
-        <input className="field" id="topup_date" name="date" type="date" defaultValue={today} />
+        <DateInput className="field" id="topup_date" name="date" defaultValue={today} />
       </div>
       <input type="hidden" name="memo" value={`Top-up of ${account.name}`} />
       <button type="submit" className="btn" disabled={pending}>{pending ? "Posting…" : "Top up"}</button>
@@ -69,7 +70,7 @@ export function CashCountForm({ account }: { account: BankAccount }) {
       <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
         <div>
           <label className="field-label" htmlFor="counted_on">Counted on</label>
-          <input className="field" id="counted_on" name="counted_on" type="date" max={today} defaultValue={today} />
+          <DateInput className="field" id="counted_on" name="counted_on" max={today} defaultValue={today} />
         </div>
         <div>
           <label className="field-label" htmlFor="counted_by_name">Counted by</label>

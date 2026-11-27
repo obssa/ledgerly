@@ -1,4 +1,5 @@
 "use client";
+import { DateInput } from "@/components/DateInput";
 
 import { useActionState, useMemo, useState } from "react";
 import { Card } from "@/components/ui";
@@ -61,7 +62,7 @@ export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
           )}
           <div>
             <label className="field-label" htmlFor="issue_date">Date</label>
-            <input className="field" id="issue_date" name="issue_date" type="date" defaultValue={today} min={invoice.issue_date} />
+            <DateInput className="field" id="issue_date" name="issue_date" defaultValue={today} min={invoice.issue_date} />
           </div>
           <div className="sm:col-span-2">
             <label className="field-label" htmlFor="notes">{bill ? "Reason" : "Reason (printed on the credit note)"}</label>
