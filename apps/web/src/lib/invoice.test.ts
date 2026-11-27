@@ -23,6 +23,13 @@ describe("invoiceBody", () => {
       fx_rate: "134.5233", number: "A-000123", prices_include_tax: true, lines: [],
     });
   });
+
+  it("leaves the next number shown unsent when it is kept, so the server takes the next free one; a typed one is sent", () => {
+    const kept = invoiceBody(form([["number", "INV-2027-0022"], ["number_suggested", "INV-2027-0022"], ["lines", "[]"]]));
+    expect(kept).not.toHaveProperty("number");
+    expect(kept).not.toHaveProperty("number_suggested");
+    expect(invoiceBody(form([["number", "202601-22"], ["number_suggested", "INV-2027-0022"], ["lines", "[]"]]))).toMatchObject({ number: "202601-22" });
+  });
 });
 
 describe("parseLines", () => {

@@ -12,7 +12,7 @@ use Tests\TestCase;
 
 /**
  * Module 3: suppliers and bills. A bill posts Dr cost, Dr input VAT (VAT-registered companies only), Cr accounts payable,
- * takes the company's own gapless number, keeps the supplier's reference, and warns about likely duplicates.
+ * takes the company's own number when it is saved, keeps the supplier's reference, and warns about likely duplicates.
  */
 final class BillTest extends TestCase
 {
@@ -52,14 +52,16 @@ final class BillTest extends TestCase
     {
         $this->owner()->table('companies')->where('id', $this->c['company'])->update(['vat_registered' => true]);
 
-        $draft = $this->postJson('/api/v1/bills', $this->bill(), $this->h)->assertCreated()
-            ->assertJsonPath('status', 'draft')->assertJsonPath('number', null)->assertJsonPath('total', '1150.00')
+        // Numbered when saved (108): the next in the sequence after the fixture's bills; posting keeps it.
+        $saved = $this->postJson('/api/v1/bills', $this->bill(), $this->h)->assertCreated()
+            ->assertJsonPath('status', 'draft')->assertJsonPath('total', '1150.00')
             ->assertJsonPath('reference', 'ET-55821')->assertJsonPath('warnings', [])
-            ->assertJsonPath('issue_date', '2026-11-10')->assertJsonPath('due_date', '2026-11-25')   // plain dates, not timestamps
-            ->json('id');
+            ->assertJsonPath('issue_date', '2026-11-10')->assertJsonPath('due_date', '2026-11-25');   // plain dates, not timestamps
+        $draft = $saved->json('id');
+        $this->assertMatchesRegularExpression('/^BILL-2027-\d{4}$/', $saved->json('number'));
 
         $bill = $this->postJson("/api/v1/bills/{$draft}/approve", [], $this->h)->assertOk()
-            ->assertJsonPath('status', 'posted')->assertJsonPath('number', 'BILL-2027-0002')   // the fixture's bill is 0001
+            ->assertJsonPath('status', 'posted')->assertJsonPath('number', $saved->json('number'))
             ->assertJsonPath('amount_due', '1150.00');
         $this->assertSame([], $this->owner()->table('einvoice_submissions')->where('document_id', $draft)->get()->all(), 'a bill is not sent to the tax authority');
 
@@ -104,7 +106,9 @@ final class BillTest extends TestCase
         $this->postJson('/api/v1/bills', $this->bill([], ['account_id' => $this->c['sales']]), $this->h)->assertUnprocessable()->assertJsonValidationErrors('lines.0.account_id');
         $this->postJson('/api/v1/bills', $this->bill([], ['account_id' => $this->account('1200')]), $this->h)->assertUnprocessable();  // receivable
         $this->postJson('/api/v1/bills', $this->bill([], ['item_id' => $this->c['item']]), $this->h)->assertCreated();   // a service item on a bill line
-        $this->postJson('/api/v1/bills', $this->bill(['number' => 'B-1']), $this->h)->assertUnprocessable()->assertJsonValidationErrors('number');
+        // Our own number may be typed (QuickBooks' custom transaction numbers), once in any letter case.
+        $this->postJson('/api/v1/bills', $this->bill(['number' => 'B-1']), $this->h)->assertCreated()->assertJsonPath('number', 'B-1');
+        $this->postJson('/api/v1/bills', $this->bill(['number' => 'b-1']), $this->h)->assertUnprocessable()->assertJsonValidationErrors('number');
 
         // One table, but each route finds only its own kind.
         $this->getJson("/api/v1/invoices/{$this->c['bill']}", $this->h)->assertNotFound();

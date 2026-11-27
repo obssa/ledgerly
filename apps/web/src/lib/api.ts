@@ -129,6 +129,8 @@ export interface Numbering {
   prefix: string;
   include_year: boolean;
   padding: number;
+  /** QuickBooks' Custom transaction numbers: a person may type their own number instead of the next one. */
+  allow_custom?: boolean;
   next_number: string;
 }
 

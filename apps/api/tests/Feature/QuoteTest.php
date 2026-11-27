@@ -38,13 +38,14 @@ final class QuoteTest extends TestCase
 
         $this->postJson('/api/v1/quotes', $this->quote($c, ['contact_id' => $b['contact']]), $h)->assertUnprocessable()->assertJsonValidationErrors('contact_id');
         $quote = $this->postJson('/api/v1/quotes', $this->quote($c), $h)->assertCreated()
-            ->assertJsonPath('type', 'quote')->assertJsonPath('status', 'draft')->assertJsonPath('number', null)
+            ->assertJsonPath('type', 'quote')->assertJsonPath('status', 'draft')
             ->assertJsonPath('total', '5250.00')->assertJsonPath('amount_due', '0.00')->assertJsonPath('can.send', true)->json();
         $id = $quote['id'];
 
-        // Sent: it takes its number. Revised while the customer decides: the version they saw is kept, the number stays.
+        // Numbered when saved (108), kept when sent. Revised while the customer decides: the version they saw is kept, the number stays.
         $sent = $this->postJson("/api/v1/quotes/{$id}/send", [], $h)->assertOk()->assertJsonPath('status', 'sent')->json();
-        $this->assertMatchesRegularExpression('/^QT-\d{4}-0001$/', $sent['number']);
+        $this->assertMatchesRegularExpression('/^QT-\d{4}-\d{4}$/', $sent['number']);
+        $this->assertSame($quote['number'], $sent['number']);
         $this->putJson("/api/v1/quotes/{$id}", $this->quote($c, ['lock_version' => $quote['lock_version']]), $h)->assertStatus(409);
         $this->putJson("/api/v1/quotes/{$id}", $this->quote($c, ['lock_version' => $sent['lock_version'], 'reason' => 'Customer asked for 12 bags',
             'lines' => [['description' => 'Roasted beans', 'quantity' => '12', 'unit_price' => '500', 'account_id' => $c['sales'], 'tax_rate_id' => $c['tax_rate']]]]), $h)
@@ -76,7 +77,7 @@ final class QuoteTest extends TestCase
         // Confirmed (numbered SO-), then invoiced: a draft invoice made from the order, for the customer to be billed.
         $this->postJson("/api/v1/sales-orders/{$order}/send", [], $h)->assertNotFound();   // orders are confirmed, not sent
         $confirmed = $this->postJson("/api/v1/sales-orders/{$order}/accept", [], $h)->assertOk()->assertJsonPath('status', 'accepted')->json('number');
-        $this->assertMatchesRegularExpression('/^SO-\d{4}-0001$/', $confirmed);
+        $this->assertMatchesRegularExpression('/^SO-\d{4}-\d{4}$/', $confirmed);
         $invoice = $this->postJson("/api/v1/sales-orders/{$order}/convert", ['to' => 'invoice'], $h)->assertCreated()->assertJsonPath('type', 'invoice')
             ->assertJsonPath('status', 'draft')->json('id');
         $this->getJson("/api/v1/invoices/{$invoice}", $h)->assertOk()->assertJsonPath('source_document_id', $order)->assertJsonPath('total', '6300.00')

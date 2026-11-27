@@ -154,7 +154,8 @@ final class PaymentMadeTest extends TestCase
 
         $this->getJson("/api/v1/suppliers/{$this->supplier}/statement?from=2026-11-01&to=2026-11-30", $this->h)->assertOk()
             ->assertJsonPath('opening', '0.00')
-            ->assertJsonPath('lines.0.source_type', 'bill')->assertJsonPath('lines.0.reference', 'BILL-2027-0002')->assertJsonPath('lines.0.balance', '23000.00')
+            ->assertJsonPath('lines.0.source_type', 'bill')->assertJsonPath('lines.0.reference', $this->owner()->table('documents')->where('id', $this->bill)->value('number'))   // numbered when saved (108)
+            ->assertJsonPath('lines.0.balance', '23000.00')
             ->assertJsonPath('lines.1.source_type', 'payment')->assertJsonPath('lines.1.debit', '10000.00')->assertJsonPath('lines.1.balance', '13000.00')
             ->assertJsonPath('closing', '13000.00');
         $this->getJson("/api/v1/suppliers/{$this->c['contact']}/statement", $this->h)->assertNotFound();

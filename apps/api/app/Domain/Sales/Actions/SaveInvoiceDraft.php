@@ -14,6 +14,7 @@ use App\Domain\Sales\Models\Document;
 use App\Domain\Tax\TaxCalculator;
 use App\Domain\Tenancy\Support\CurrentCompany;
 use Illuminate\Database\QueryException;
+use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -140,25 +141,35 @@ final class SaveInvoiceDraft
     }
 
     /**
-     * Automatic numbering: a draft has no number; it gets one when posted. Manual numbering (pre-printed books):
-     * the number typed on the draft, unique per company and type (database constraint).
+     * The number a document is saved with, as QuickBooks gives it: the one it has already; the next in the sequence
+     * when none is typed (taken now, in this saving transaction); or the person's own ("Custom transaction numbers",
+     * allowed per type), unique whatever its letter case. Manual numbering (pre-printed books): always typed.
      */
     public function draftNumber(array $data, ?Document $document, string $type = 'invoice'): ?string
     {
         $number = isset($data['number']) && trim((string) $data['number']) !== '' ? trim((string) $data['number']) : null;
-        $automatic = $this->numbers->isAutomatic($this->company->id(), $type);
+        $companyId = $this->company->id();
+        $settings = $this->numbers->settings($companyId, $type);
+        $automatic = $settings['mode'] === 'automatic';
+        $noun = match ($type) { 'bill', 'expense', 'quote' => $type, 'vendor_credit' => 'supplier credit', 'credit_note' => 'credit note', 'sales_order' => 'sales order',
+            'purchase_order' => 'purchase order', 'sales_receipt' => 'cash sale', default => 'invoice' };
 
-        $noun = match ($type) { 'bill', 'expense', 'quote' => $type, 'vendor_credit' => 'supplier credit', 'sales_order' => 'sales order', 'sales_receipt' => 'cash sale', default => 'invoice' };
-        if ($automatic && $number !== null) {
-            $when = in_array($type, ['quote', 'sales_order'], true) ? ($type === 'quote' ? 'sent' : 'confirmed') : 'posted';
-            throw ValidationException::withMessages(['number' => [ucfirst($noun) . "s are numbered when they are {$when}. Leave the number empty."]]);
+        // A document saved before keeps its number unless another is typed.
+        if ($document?->number !== null && ($number === null || $number === $document->number)) {
+            return $document->number;
         }
-        if (! $automatic && $number === null) {
-            throw ValidationException::withMessages(['number' => ["Type the {$noun} number."]]);
+        if ($number === null) {
+            if (! $automatic) {
+                throw ValidationException::withMessages(['number' => ["Type the {$noun} number."]]);
+            }
+
+            return $this->numbers->take($this->company->get(), $type, new DateTimeImmutable((string) ($data['issue_date'] ?? $this->company->today())));
         }
-        if ($number !== null && Document::query()->where(['type' => $type, 'number' => $number])
-            ->when($document, fn ($q) => $q->whereKeyNot($document->getKey()))->exists()) {
-            throw ValidationException::withMessages(['number' => ["{$number} is already used by another {$noun}."]]);
+        if ($automatic && ! $settings['allow_custom']) {
+            throw ValidationException::withMessages(['number' => [ucfirst($noun) . 's are numbered in sequence here: keep the number shown, or allow custom numbers in Settings, Numbering.']]);
+        }
+        if (! $this->numbers->isFree($companyId, $type, $number, $document?->getKey())) {
+            throw ValidationException::withMessages(['number' => ["{$number} is already used by another {$noun}: every {$noun} number is different."]]);
         }
 
         return $number;

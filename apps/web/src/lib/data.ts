@@ -344,7 +344,7 @@ export async function getDimensions(): Promise<Dimension[]> {
 /** Numbering of the document types in use so far (invoices, credit notes, bills, expenses). */
 export async function getNumbering(): Promise<Numbering[]> {
   await connection();
-  const types = ["invoice", "credit_note", "bill", "expense"];
+  const types = ["invoice", "credit_note", "sales_receipt", "quote", "sales_order", "bill", "vendor_credit", "purchase_order", "expense"];
   if (isDemoMode()) return demoNumbering;
   return (await withApi((ctx) => ledgerly.numbering(ctx))).data.filter((n) => types.includes(n.doc_type));
 }
@@ -385,6 +385,8 @@ export interface InvoiceOptions {
   baseCurrency: string;
   /** Manual numbering: the number is typed from the invoice book. */
   manualNumbers: boolean;
+  /** Each kind's numbering: the next number in the sequence, and whether a person may type their own (108). */
+  numbers?: Numbering[];
   /** For an expense: the bank, cash and wallet accounts it can be paid from. */
   moneyAccounts?: { id: string; code: string; name: string; currency: string | null }[];
   /** Items to pick on a line, and the warehouses stock lines use. */
@@ -436,6 +438,7 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === numberedAs)?.mode === "manual",
+      numbers: numbering.data,
       items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id, units: i.units ?? [], barcode: i.barcode ?? null })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       projects: await activeProjects(ctx),
@@ -467,6 +470,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       currencies: [currencies.base_currency, ...currencies.data.filter((c) => c.is_enabled).map((c) => c.currency)],
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === "bill")?.mode === "manual",
+      numbers: numbering.data,
       items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id, units: i.units ?? [], tracking: i.tracking ?? "none" })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       projects: await activeProjects(ctx),
@@ -482,7 +486,6 @@ export async function getExpenseOptions(): Promise<InvoiceOptions> {
   const { data } = await withApi((ctx) => ledgerly.accounts(ctx));
   return {
     ...options,
-    manualNumbers: false,
     moneyAccounts: data.filter((a) => a.is_active && ["bank", "cash", "mobile_money"].includes(a.subtype ?? ""))
       .map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })),
   };
@@ -521,7 +524,6 @@ export async function getSalesReceiptOptions(): Promise<InvoiceOptions> {
   const { data } = await withApi((ctx) => ledgerly.accounts(ctx));
   return {
     ...options,
-    manualNumbers: false,
     moneyAccounts: data.filter((a) => a.is_active && ["bank", "cash", "mobile_money"].includes(a.subtype ?? ""))
       .map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })),
   };

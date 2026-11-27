@@ -43,7 +43,8 @@ final class PurchaseOrderTest extends TestCase
         $before = $entries();
         $issued = $this->postJson("/api/v1/purchase-orders/{$id}/issue", [], $h)->assertOk()->assertJsonPath('status', 'accepted')
             ->assertJsonPath('can.bill', true)->assertJsonPath('can.close', false)->json('number');
-        $this->assertMatchesRegularExpression('/^PO-\d{4}-0001$/', $issued);
+        $this->assertMatchesRegularExpression('/^PO-\d{4}-\d{4}$/', $issued);
+        $this->assertSame($po['number'], $issued);   // numbered when saved (108); issuing keeps it
         $this->assertSame(['20.00', '10.00'], [$item()['on_hand'], $item()['on_order']]);
 
         // Each kind stays on its own routes; another company does not find it at all.
