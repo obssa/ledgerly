@@ -73,7 +73,11 @@ export interface CompanySettings {
 /** GET /currencies: the base currency and the foreign currencies a company works in, with each one's latest rate. */
 export interface Currencies {
   base_currency: string;
-  data: { currency: string; is_enabled: boolean; latest_rate: string | null; latest_rate_date: string | null }[];
+  data: { currency: string; is_enabled: boolean; latest_rate: string | null; latest_rate_date: string | null;
+    /** The accounts kept in this currency. */
+    accounts?: { id: string; code: string; name: string }[] }[];
+  /** A rate older than this many days is not used for a new document. */
+  rate_max_age_days?: number;
 }
 
 export interface Account {
@@ -214,7 +218,12 @@ export interface BankRegister {
   to: string;
   opening: string;
   closing: string;
-  lines: { date: string; entry: number; source_type: string; memo: string | null; description: string | null; contact: string | null; in: string; out: string; balance: string }[];
+  lines: { date: string; entry: number; source_type: string; memo: string | null; description: string | null; contact: string | null; in: string; out: string; balance: string;
+    /** A foreign account's line in the company's currency, and the rate it was booked at (none for a revaluation). */
+    amount_base?: string; rate?: string | null }[];
+  /** A foreign account: the company's currency and the balance brought forward in it. */
+  base_currency?: string;
+  opening_base?: string;
 }
 
 /** Module 5: one line of a bank, wallet or cash statement, and how it is explained in the books. */
@@ -361,6 +370,8 @@ export interface ChartAccount {
   is_system: boolean;
   is_money: boolean;
   depth?: number;
+  /** An account kept in another currency: its balance in that currency (sum of its own amounts). */
+  foreign_balance?: string;
 }
 
 /** Module 6: an entry of the books, as listed. */
@@ -1194,7 +1205,9 @@ export interface CustomerStatement {
 export type LedgerLine = { line_id: string; date: string; entry_id: string; entry: number; source_type: string; status: string; memo: string | null; description: string | null;
   contact: string | null; debit: string; credit: string; balance: string; amount?: string; type?: string; number?: string | null; document_id?: string | null;
   payment_id?: string | null; due_date?: string | null; split?: string | null; foreign_amount?: string | null; currency?: string | null; exchange_rate?: string | null;
-  location?: string | null; class?: string | null; project?: string | null; created_by?: string | null; posted_by?: string | null };
+  location?: string | null; class?: string | null; project?: string | null; created_by?: string | null; posted_by?: string | null;
+  /** An account kept in another currency: its running balance in that currency. */
+  foreign_balance?: string };
 
 /** GET /reports/journal: every entry of a period with its lines (QuickBooks' Journal), each line on its account. */
 export interface JournalReport {
@@ -1211,7 +1224,9 @@ export interface GeneralLedger {
   currency: string;
   truncated: boolean;
   accounts: { account_id: string; code: string; name: string; type: string; opening: string; debits: string; credits: string; closing: string;
-    lines: LedgerLine[] }[];
+    lines: LedgerLine[];
+    /** An account kept in another currency: that currency and its balances in it. */
+    currency?: string; foreign_opening?: string; foreign_closing?: string }[];
 }
 
 export interface TrialBalanceRow {
@@ -1221,6 +1236,9 @@ export interface TrialBalanceRow {
   type: string;
   debit: string;
   credit: string;
+  /** An account kept in another currency: that currency and its balance in it at the date. */
+  currency?: string | null;
+  foreign_balance?: string | null;
 }
 
 /** Module 6: what to check before closing the books through a date. */
@@ -1314,7 +1332,7 @@ export interface ProfitAndLoss {
 
 /** Module 10: the balance sheet at a date, with the accounting equation checked. */
 export interface BalanceSheet {
-  sections: Record<"assets" | "liabilities" | "equity", { code: string; name: string; amount: string }[]>;
+  sections: Record<"assets" | "liabilities" | "equity", { code: string; name: string; amount: string; currency?: string; foreign_balance?: string }[]>;
   equation: { assets: string; liabilities: string; equity: string; profit_to_date: string; liabilities_and_equity: string; difference: string; balanced: boolean };
 }
 

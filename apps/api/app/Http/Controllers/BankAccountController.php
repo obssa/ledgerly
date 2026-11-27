@@ -160,13 +160,20 @@ final class BankAccountController extends Controller
             $move = $foreign ? Money::of((string) $r->amount_txn, $bankAccount->currency) : Money::of((string) $r->debit, $base)->minus(Money::of((string) $r->credit, $base));
             $balance = $balance->plus($move);
 
+            // A foreign account's line also in the company's currency, and the rate it was booked at (none for a
+            // revaluation, which changes only the value in the company's currency).
+            $inBase = Money::of((string) $r->debit, $base)->minus(Money::of((string) $r->credit, $base));
+            $rate = $foreign && ! $move->isZero() ? $inBase->amount->dividedBy($move->amount->abs(), 6, \App\Domain\Ledger\Rounding::halfUp())->abs() : null;
+
             return ['date' => $r->date, 'entry' => $r->entry, 'source_type' => $r->source_type, 'memo' => $r->memo, 'description' => $r->description,
                 'contact' => $r->contact, 'in' => $move->isNegative() ? '0.00' : $move->toDecimalString(),
-                'out' => $move->isNegative() ? $move->negated()->toDecimalString() : '0.00', 'balance' => $balance->toDecimalString()];
+                'out' => $move->isNegative() ? $move->negated()->toDecimalString() : '0.00', 'balance' => $balance->toDecimalString(),
+                ...($foreign ? ['amount_base' => $inBase->toDecimalString(), 'rate' => $rate === null ? null : (string) $rate] : [])];
         });
 
         return response()->json(['account' => $this->present($bankAccount, $this->balances([$bankAccount->getKey()])[$bankAccount->getKey()] ?? null), 'currency' => $foreign ? $bankAccount->currency : $base, 'from' => $from, 'to' => $to,
-            'opening' => $foreign ? (string) $opening->txn : (string) $opening->base, 'lines' => $lines, 'closing' => $balance->toDecimalString()]);
+            'opening' => $foreign ? (string) $opening->txn : (string) $opening->base, 'lines' => $lines, 'closing' => $balance->toDecimalString(),
+            ...($foreign ? ['base_currency' => $base, 'opening_base' => (string) $opening->base] : [])]);
     }
 
     /** @param list<string> $ids @return array<string, object{base: string, txn: string}> */

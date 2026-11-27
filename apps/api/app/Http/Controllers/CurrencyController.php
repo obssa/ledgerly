@@ -38,6 +38,10 @@ final class CurrencyController extends Controller
             ->orderBy('currency')->orderByDesc('rate_date')
             ->get()->unique('currency')->keyBy('currency');
 
+        // The accounts kept in each currency (a dollar bank account, a euro wallet), as QuickBooks lists them.
+        $accounts = DB::table('accounts')->where('company_id', $company->getKey())->whereNotNull('currency')->where('is_active', true)
+            ->orderBy('code')->get(['id', 'code', 'name', 'currency'])->groupBy('currency');
+
         $currencies = DB::table('company_currencies')->where('company_id', $company->getKey())
             ->orderBy('currency')->get(['currency', 'is_enabled'])
             ->map(fn ($c) => [
@@ -45,9 +49,12 @@ final class CurrencyController extends Controller
                 'is_enabled' => (bool) $c->is_enabled,
                 'latest_rate' => isset($latest[$c->currency]) ? (string) $latest[$c->currency]->rate : null,
                 'latest_rate_date' => isset($latest[$c->currency]) ? (string) $latest[$c->currency]->rate_date : null,
+                'accounts' => collect($accounts[$c->currency] ?? [])->map(fn ($a) => ['id' => $a->id, 'code' => $a->code, 'name' => $a->name])->values(),
             ]);
 
-        return response()->json(['base_currency' => $company->base_currency, 'data' => $currencies->values()]);
+        return response()->json(['base_currency' => $company->base_currency, 'data' => $currencies->values(),
+            // A rate older than this is not used for a new document (ExchangeRates::MAX_AGE_DAYS).
+            'rate_max_age_days' => \App\Domain\Ledger\ExchangeRates::MAX_AGE_DAYS]);
     }
 
     /** Turns a foreign currency on or off. Off keeps its rates and documents; it only stops new documents using it. */

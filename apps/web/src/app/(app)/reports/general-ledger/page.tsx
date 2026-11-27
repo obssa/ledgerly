@@ -103,7 +103,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
       {gl?.accounts.map((a) => (
         <Card key={a.account_id} className="mb-4 !p-2" label={`${a.code} ${a.name}`}>
           <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-2">
-            <h2 className="text-[15px] font-bold"><Link href={`/accounts/${encodeURIComponent(a.account_id)}`} className="hover:underline"><span className="num">{a.code}</span> {a.name}</Link></h2>
+            <h2 className="text-[15px] font-bold"><Link href={`/accounts/${encodeURIComponent(a.account_id)}`} className="hover:underline"><span className="num">{a.code}</span> {a.name}</Link>{a.currency && <span className="ml-2 text-[12px] font-semibold text-muted">{a.currency}</span>}</h2>
             {a.lines.length > 0 && (
               <Link href={`/journal/reclassify?${new URLSearchParams({ account_id: a.account_id, from: gl.from, to: gl.to }).toString()}`} className="text-[13px] font-semibold text-brand hover:underline print:hidden">
                 Reclassify lines
@@ -115,7 +115,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
               <thead><tr>{cols.map((c) => <th key={c} scope="col" className={align(c).includes("text-right") ? "!text-right" : ""}>{def(c).label}</th>)}</tr></thead>
               <tbody>
                 <tr className="font-semibold">{cols.map((c, i) => (
-                  <td key={c} className={align(c)}>{c === "balance" ? <Balance value={a.opening} /> : i === 0 ? `Brought forward at ${fmtDate(gl.from)}` : ""}</td>
+                  <td key={c} className={align(c)}>{c === "balance" ? <Balance value={a.opening} /> : c === "foreign_balance" && a.foreign_opening ? formatAmount(a.foreign_opening) : c === "currency" && a.currency ? a.currency : i === 0 ? `Brought forward at ${fmtDate(gl.from)}` : ""}</td>
                 ))}</tr>
                 {a.lines.map((l) => {
                   const r = glRow(l);
@@ -126,7 +126,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
                 <tr className="border-t-2 border-ink font-bold">{cols.map((c, i) => (
                   <td key={c} className={align(c)}>
                     {c === "balance" ? <Balance value={a.closing} /> : c === "debit" ? formatAmount(a.debits) : c === "credit" ? formatAmount(a.credits)
-                      : c === "amount" ? formatAmount(net(a.debits, a.credits)) : i === 0 ? `Balance at ${fmtDate(gl.to)}` : ""}
+                      : c === "amount" ? formatAmount(net(a.debits, a.credits)) : c === "foreign_balance" && a.foreign_closing ? formatAmount(a.foreign_closing) : c === "currency" && a.currency ? a.currency : i === 0 ? `Balance at ${fmtDate(gl.to)}` : ""}
                   </td>
                 ))}</tr>
               </tfoot>

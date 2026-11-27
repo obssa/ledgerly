@@ -20,6 +20,8 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
   if (!register) notFound();
   const a = register.account;
   const isCash = a.kind === "cash";
+  // An account kept in another currency: each line also at its rate in the company's currency.
+  const fx = register.base_currency !== undefined;
   const [counts, accounts] = isCash ? await Promise.all([getCashCounts(id), getBankAccounts()]) : [null, null];
   const sources = (accounts?.data ?? []).filter((x) => x.id !== a.id && x.kind !== "undeposited_funds" && x.currency === a.currency && x.is_active);
 
@@ -34,22 +36,23 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
       <Card className="!p-2" label="Register">
         <div className="overflow-x-auto">
           <table className="tbl">
-            <thead><tr><th scope="col">Date</th><th scope="col">Entry</th><th scope="col">What</th><th scope="col">Who</th><th scope="col" className="!text-right">In</th><th scope="col" className="!text-right">Out</th><th scope="col" className="!text-right">Balance</th></tr></thead>
+            <thead><tr><th scope="col">Date</th><th scope="col">Entry</th><th scope="col">What</th><th scope="col">Who</th><th scope="col" className="!text-right">In ({register.currency})</th><th scope="col" className="!text-right">Out ({register.currency})</th><th scope="col" className="!text-right">Balance</th>{fx && <><th scope="col" className="!text-right">Rate</th><th scope="col" className="!text-right">Amount ({register.base_currency})</th></>}</tr></thead>
             <tbody>
-              <tr><td className="num"><Dt v={register.from} /></td><td colSpan={5} className="font-semibold">Brought forward</td><td className="num text-right font-semibold">{formatAmount(register.opening)}</td></tr>
+              <tr><td className="num"><Dt v={register.from} /></td><td colSpan={5} className="font-semibold">Brought forward</td><td className="num text-right font-semibold">{formatAmount(register.opening)}</td>{fx && <><td /><td className="num text-right text-muted">{formatAmount(register.opening_base ?? "0.00")}</td></>}</tr>
               {register.lines.map((l, i) => (
                 <tr key={`${l.entry}-${i}`}>
                   <td className="num"><Dt v={l.date} /></td>
                   <td className="num">#{l.entry}</td>
-                  <td>{l.memo ?? l.description ?? l.source_type}</td>
+                  <td>{l.source_type === "revaluation" ? "Currency revaluation" : l.memo ?? l.description ?? l.source_type}</td>
                   <td>{l.contact ?? "—"}</td>
                   <td className="num text-right">{l.in === "0.00" ? "" : formatAmount(l.in)}</td>
                   <td className="num text-right">{l.out === "0.00" ? "" : formatAmount(l.out)}</td>
                   <td className="num text-right">{formatAmount(l.balance)}</td>
+                  {fx && <><td className="num text-right text-muted">{l.rate ?? "—"}</td><td className="num text-right">{formatAmount(l.amount_base ?? "0.00")}</td></>}
                 </tr>
               ))}
             </tbody>
-            <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={6}>Balance at <Dt v={register.to} /></td><td className="num text-right">{formatMoney(register.closing, register.currency)}</td></tr></tfoot>
+            <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={6}>Balance at <Dt v={register.to} /></td><td className="num text-right">{formatMoney(register.closing, register.currency)}</td>{fx && <><td /><td className="num text-right">{formatMoney(a.balance_base, register.base_currency!)}</td></>}</tr></tfoot>
           </table>
         </div>
       </Card>

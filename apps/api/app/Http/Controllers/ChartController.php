@@ -45,10 +45,17 @@ final class ChartController extends Controller
         $balances = DB::table('account_balances')->where('company_id', $this->current->id())->groupBy('account_id')
             ->select('account_id')->selectRaw('sum(debit - credit)::numeric(20,2)::text AS balance')->pluck('balance', 'account_id');
         $used = DB::table('account_balances')->where('company_id', $this->current->id())->distinct()->pluck('account_id')->flip();
+        // An account kept in another currency: its balance in that currency too (QuickBooks: Bank balance beside the
+        // balance in the company's currency).
+        $base = $this->current->get()->base_currency;
+        $foreignIds = $accounts->filter(fn ($a) => $a->currency !== null && $a->currency !== $base)->map->getKey()->values()->all();
+        $foreign = $foreignIds === [] ? collect() : DB::table('journal_lines')->where('company_id', $this->current->id())->whereIn('account_id', $foreignIds)
+            ->groupBy('account_id')->select('account_id')->selectRaw('sum(amount_txn)::numeric(20,2)::text AS balance')->pluck('balance', 'account_id');
 
         return response()->json([
             'data' => $this->ordered($accounts)->map(fn (array $row) => [
                 ...$this->present($row['account'], $balances[$row['account']->getKey()] ?? '0.00', isset($used[$row['account']->getKey()])),
+                ...(in_array($row['account']->getKey(), $foreignIds, true) ? ['foreign_balance' => $foreign[$row['account']->getKey()] ?? '0.00'] : []),
                 'depth' => $row['depth'],
             ])->values(),
             'kinds' => self::KINDS,

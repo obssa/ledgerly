@@ -30,6 +30,9 @@ export default async function TrialBalancePage({ searchParams }: PageProps<"/rep
   const all = results.every(Boolean) ? (results as NonNullable<(typeof results)[number]>[]) : null;
   const totals = (all ?? []).map((r) => trialTotals(r));
   const lines = all ? trialBalanceLines(all) : [];
+  // Show foreign currency (QuickBooks' option): an account kept in another currency, with that currency and its balance in it at the date.
+  const fx = q.fx === "1";
+  const foreign = new Map((rows ?? []).filter((r) => r.currency).map((r) => [r.code, r]));
   const prefs = { calendar: at.ctx.calendar, dateFormat: at.ctx.dateFormat ?? "DD/MM/YYYY" } as const;
   const compared = dates.length > 1;
   // Each account opens its ledger for the fiscal year up to this date.
@@ -40,8 +43,9 @@ export default async function TrialBalancePage({ searchParams }: PageProps<"/rep
     <>
       <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>}
         title={<>Trial balance {rows && (totals[0]?.balanced ? <Pill tone="good">Balanced</Pill> : <Pill tone="bad">Out of balance</Pill>)}</>}
-        actions={<ExportLink report="trial-balance" params={{ as_of: asOf, ...compareQuery(cmp.slots, null) }} />} />
-      <AsOfFilter picked={at.picked} keep={q} fields={["compare", ...COMPARE_FIELDS]}>
+        actions={<ExportLink report="trial-balance" params={{ as_of: asOf, ...compareQuery(cmp.slots, null), ...(fx ? { fx: "1" } : {}) }} />} />
+      <AsOfFilter picked={at.picked} keep={q} fields={["compare", "fx", ...COMPARE_FIELDS]}>
+        <label className="flex h-[42px] items-center gap-2 text-sm"><input type="checkbox" name="fx" value="1" defaultChecked={fx} className="size-4" /> Show foreign currency</label>
         <CompareFilter slots={cmp.slots} diff="none" asOf />
       </AsOfFilter>
       {!rows || !all ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
@@ -51,20 +55,21 @@ export default async function TrialBalancePage({ searchParams }: PageProps<"/rep
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                {compared && <tr><th colSpan={2} />{dates.map((d) => <th key={d} colSpan={2} scope="colgroup" className="!text-center">{formatDate(d, prefs)}</th>)}</tr>}
-                <tr><th scope="col">Code</th><th scope="col">Account</th>{dates.map((d) => <Fragment key={d}><th scope="col" className="!text-right">Debit</th><th scope="col" className="!text-right">Credit</th></Fragment>)}</tr>
+                {compared && <tr><th colSpan={fx ? 4 : 2} />{dates.map((d) => <th key={d} colSpan={2} scope="colgroup" className="!text-center">{formatDate(d, prefs)}</th>)}</tr>}
+                <tr><th scope="col">Code</th><th scope="col">Account</th>{fx && <><th scope="col">Currency</th><th scope="col" className="!text-right">Foreign balance</th></>}{dates.map((d) => <Fragment key={d}><th scope="col" className="!text-right">Debit</th><th scope="col" className="!text-right">Credit</th></Fragment>)}</tr>
               </thead>
               <tbody>
-                {lines.length === 0 && <tr><td colSpan={2 + 2 * dates.length} className="text-muted">Nothing posted yet.</td></tr>}
+                {lines.length === 0 && <tr><td colSpan={(fx ? 4 : 2) + 2 * dates.length} className="text-muted">Nothing posted yet.</td></tr>}
                 {lines.map((r) => (
                   <tr key={r.code}>
                     <td className="num">{r.code}</td>
                     <td><Link href={`/reports/general-ledger?account_id=${encodeURIComponent(r.account_id)}&from=${from}&to=${asOf}`} className="hover:underline">{r.name}</Link></td>
+                    {fx && <><td className="text-[13px]">{foreign.get(r.code)?.currency ?? ""}</td><td className="num text-right">{foreign.has(r.code) ? formatAmount(foreign.get(r.code)!.foreign_balance ?? "0.00") : ""}</td></>}
                     {r.values.map((v, i) => <td key={i} className="num text-right">{money(v)}</td>)}
                   </tr>
                 ))}
               </tbody>
-              <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={2}>Total</td>
+              <tfoot><tr className="border-t-2 border-ink font-bold"><td colSpan={fx ? 4 : 2}>Total</td>
                 {totals.map((t, i) => <Fragment key={i}><td className="num text-right">{formatAmount(t.debit)}</td><td className="num text-right">{formatAmount(t.credit)}</td></Fragment>)}</tr></tfoot>
             </table>
           </div>

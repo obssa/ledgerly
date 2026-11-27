@@ -33,8 +33,8 @@ final class SavedReports
         'profit-and-loss' => ['by' => ['total', 'month', 'quarter', 'year', 'contact', 'location', 'class', 'project'], 'pct' => ['1'],
             'basis' => ['accrual', 'cash']] + self::COMPARE_RANGE,
         'cash-flow' => ['method' => ['indirect', 'direct']] + self::COMPARE_RANGE,
-        'balance-sheet' => ['pct' => ['1']] + self::COMPARE_AS_OF,
-        'trial-balance' => self::COMPARE_AS_OF,
+        'balance-sheet' => ['pct' => ['1'], 'fx' => ['1']] + self::COMPARE_AS_OF,
+        'trial-balance' => ['fx' => ['1']] + self::COMPARE_AS_OF,
         'general-ledger' => ['account_id' => 'uuid', 'location_id' => 'uuid', 'class_id' => 'uuid', 'project_id' => 'uuid',
             'cols' => ['columns' => ReportService::LEDGER_COLUMNS]],
         // The ageing: summary or detail, QuickBooks' periods (days per period, how many), the detail's columns and grouping.

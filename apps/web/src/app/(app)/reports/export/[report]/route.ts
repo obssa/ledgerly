@@ -51,7 +51,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
       periods: /^\d{1,2}$/.test(q.get("periods") ?? "") ? (q.get("periods") as string) : undefined,
       // The comparisons as the page had them (lib/compare.ts reads them; dates as stored or typed the company's way).
       ...Object.fromEntries(COMPARE_FIELDS.map((k) => [k, /^[A-Za-z0-9_./-]{1,40}$/.test(q.get(k) ?? "") ? (q.get(k) as string) : undefined])) };
-    const cq = Object.fromEntries([...COMPARE_FIELDS, "compare", "pct"].flatMap((k) => (/^[A-Za-z0-9_./-]{1,40}$/.test(q.get(k) ?? "") ? [[k, q.get(k) as string]] : [])));
+    const cq = Object.fromEntries([...COMPARE_FIELDS, "compare", "pct", "fx"].flatMap((k) => (/^[A-Za-z0-9_./-]{1,40}$/.test(q.get(k) ?? "") ? [[k, q.get(k) as string]] : [])));
     const [{ rows, heading, period: periodText }, settings] = await Promise.all([
       exportRows(report as ExportableReport, { from: period.from, to: period.to, as_of: asOf, ...options, cq, periodCtx: period.ctx, calendar: period.ctx.calendar, dateFormat: period.ctx.dateFormat }, ctx),
       ledgerly.companySettings(ctx).catch(() => null),

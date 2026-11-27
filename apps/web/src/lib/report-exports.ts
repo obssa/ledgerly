@@ -135,7 +135,10 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       const cmp = pickAsOfComparisons(p.cq ?? {}, asOf, periodCtx(p));
       const diff = pickDiff(p.cq ?? {}, p.cq?.pct === "1" ? "pct" : "none");
       const results = await Promise.all([asOf, ...cmp.dates.map((d) => d.asOf)].map((d) => ledgerly.balanceSheet(d, ctx)));
-      return { title: "balance-sheet", rows: lineCells(balanceSheetLines(results), [day(p, asOf), ...cmp.dates.map((d) => d.label)], diff) };
+      // Show foreign currency: an account kept in another currency, its balance in that currency.
+      const foreign = new Map([...results[0].sections.assets, ...results[0].sections.liabilities, ...results[0].sections.equity].filter((r) => r.currency).map((r) => [r.code, r]));
+      const fx = p.cq?.fx === "1" ? { header: "Foreign balance", value: (l: { code?: string }) => { const f = l.code ? foreign.get(l.code) : undefined; return f ? `${f.currency} ${f.foreign_balance}` : ""; } } : undefined;
+      return { title: "balance-sheet", rows: lineCells(balanceSheetLines(results), [day(p, asOf), ...cmp.dates.map((d) => d.label)], diff, fx) };
     }
     case "trial-balance": {
       // Each account's debit and credit at the date, and at each date compared with.
@@ -144,9 +147,12 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       const dates = [asOf, ...cmp.dates.map((d) => d.asOf)];
       const results = await Promise.all(dates.map((d) => ledgerly.trialBalance(d, ctx).then((r) => r.data)));
       const compared = dates.length > 1;
-      return { title: "trial-balance", rows: [["Code", "Account", ...dates.flatMap((d) => (compared ? [`Debit ${day(p, d)}`, `Credit ${day(p, d)}`] : ["Debit", "Credit"]))],
-        ...trialBalanceLines(results).map((r) => [r.code, r.name, ...r.values]),
-        ["", "Total", ...results.flatMap((r) => { const t = trialTotals(r); return [t.debit, t.credit]; })]] };
+      const fx = p.cq?.fx === "1";
+      const foreign = new Map(results[0].filter((r) => r.currency).map((r) => [r.code, r]));
+      return { title: "trial-balance", rows: [["Code", "Account", ...(fx ? ["Currency", "Foreign balance"] : []),
+        ...dates.flatMap((d) => (compared ? [`Debit ${day(p, d)}`, `Credit ${day(p, d)}`] : ["Debit", "Credit"]))],
+        ...trialBalanceLines(results).map((r) => [r.code, r.name, ...(fx ? [foreign.get(r.code)?.currency ?? null, foreign.get(r.code)?.foreign_balance ?? null] : []), ...r.values]),
+        ["", "Total", ...(fx ? [null, null] : []), ...results.flatMap((r) => { const t = trialTotals(r); return [t.debit, t.credit]; })]] };
     }
     case "general-ledger": {
       // The same lines as on screen: the location, class and project filters too.

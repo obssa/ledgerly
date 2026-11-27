@@ -1,7 +1,7 @@
 import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { byType, KIND_LABELS, naturalBalance } from "@/lib/chart";
-import { getChart } from "@/lib/data";
+import { getChart, getCurrencies } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { AddAccount } from "./AccountForms";
 
@@ -10,7 +10,9 @@ export const metadata = { title: "Chart of accounts" };
 /** Module 6: the chart of accounts, by type, each account under its parent, with its balance. */
 export default async function ChartPage({ searchParams }: PageProps<"/accounts">) {
   const archived = (await searchParams).archived === "1";
-  const chart = await getChart(archived);
+  const [chart, currencies] = await Promise.all([getChart(archived), getCurrencies().catch(() => null)]);
+  const base = currencies?.base_currency;
+  const foreign = chart.data.some((a) => a.foreign_balance !== undefined);
 
   return (
     <>
@@ -25,7 +27,7 @@ export default async function ChartPage({ searchParams }: PageProps<"/accounts">
           <h2 className="px-3 pt-2 text-[15px] font-bold">{group.label}</h2>
           <div className="overflow-x-auto">
             <table className="tbl">
-              <thead><tr><th scope="col">Code</th><th scope="col">Account</th><th scope="col">Kind</th><th scope="col" className="!text-right">Balance</th></tr></thead>
+              <thead><tr><th scope="col">Code</th><th scope="col">Account</th><th scope="col">Kind</th>{foreign && <><th scope="col">Currency</th><th scope="col" className="!text-right">Foreign balance</th></>}<th scope="col" className="!text-right">{foreign && base ? `Balance (${base})` : "Balance"}</th></tr></thead>
               <tbody>
                 {group.accounts.map((a) => (
                   <tr key={a.id} className={a.is_active ? "" : "text-muted"}>
@@ -34,9 +36,10 @@ export default async function ChartPage({ searchParams }: PageProps<"/accounts">
                       <Link href={a.is_money ? `/banking/${encodeURIComponent(a.id)}` : `/accounts/${encodeURIComponent(a.id)}`} className="font-semibold hover:underline">{a.name}</Link>
                       {a.is_system && <span className="ml-2"><Pill>System</Pill></span>}
                       {!a.is_active && <span className="ml-2"><Pill>Archived</Pill></span>}
-                      {a.currency && <span className="ml-2 text-[12px] text-muted">{a.currency}</span>}
                     </td>
                     <td className="text-[13px] text-muted">{a.kind ? (KIND_LABELS[a.kind] ?? a.kind) : "—"}</td>
+                    {foreign && <><td className="text-[13px]">{a.currency ?? base ?? ""}</td>
+                      <td className="num text-right">{a.foreign_balance !== undefined && a.has_entries ? formatAmount(naturalBalance(a.type, a.foreign_balance)) : ""}</td></>}
                     <td className="num text-right">{a.has_entries ? formatAmount(naturalBalance(a.type, a.balance)) : ""}</td>
                   </tr>
                 ))}
