@@ -62,7 +62,7 @@ final class RecurringInvoiceController extends Controller
         $lines = $invoice->lines()->orderBy('line_no')->get()->map(fn ($l) => array_filter([
             'description' => (string) $l->description, 'quantity' => (string) $l->quantity, 'unit_price' => (string) $l->unit_price,
             'discount_rate' => (string) $l->discount_rate, 'account_id' => (string) $l->account_id, 'tax_rate_id' => $l->tax_rate_id,
-            'item_id' => $l->item_id, 'project_id' => $l->project_id, 'unit_id' => $l->unit_id,
+            'item_id' => $l->item_id, 'project_id' => $l->project_id, 'unit_id' => $l->unit_id, 'class_id' => $l->class_id, 'location_id' => $l->location_id,
         ], fn ($v) => $v !== null))->values()->all();
         $id = (string) Str::uuid7();
         $name = $data['name'] ?? mb_substr(($invoice->contact?->name ?? 'Invoice') . ' · ' . ($lines[0]['description'] ?? 'repeated'), 0, 120);

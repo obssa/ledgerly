@@ -47,7 +47,7 @@ final class BatchInvoices
         $lines = $source->lines()->orderBy('line_no')->get()->map(fn ($l) => array_filter([
             'description' => (string) $l->description, 'quantity' => (string) $l->quantity, 'unit_price' => (string) $l->unit_price,
             'discount_rate' => (string) $l->discount_rate, 'account_id' => (string) $l->account_id, 'tax_rate_id' => $l->tax_rate_id,
-            'item_id' => $l->item_id, 'project_id' => $l->project_id, 'unit_id' => $l->unit_id,
+            'item_id' => $l->item_id, 'project_id' => $l->project_id, 'unit_id' => $l->unit_id, 'class_id' => $l->class_id, 'location_id' => $l->location_id,
         ], fn ($v) => $v !== null))->values()->all();
 
         return DB::transaction(function () use ($source, $customers, $lines, $issueDate, $post, $userId) {

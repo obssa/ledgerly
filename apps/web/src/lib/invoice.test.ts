@@ -37,6 +37,15 @@ describe("invoiceBody", () => {
     expect(invoiceBody(form([["tax_mode", "anything"], ["lines", "[]"]]))).not.toHaveProperty("tax_mode");
   });
 
+  it("sends the class, location and custom fields of the document, and each line's service date, class and location", () => {
+    const lines = JSON.stringify([{ description: "Roasting", quantity: "1", unit_price: "10", account_id: "a1", service_date: "2026-10-31", class_id: "c1", location_id: "", tax_rate_id: "" }]);
+    expect(invoiceBody(form([["class_id", "c9"], ["location_id", ""], ["custom_fields.PO number", " HGK-77 "], ["lines", lines]]))).toMatchObject({
+      class_id: "c9", custom_fields: { "PO number": "HGK-77" },
+      lines: [{ description: "Roasting", quantity: "1", unit_price: "10", account_id: "a1", tax_rate_id: null, service_date: "2026-10-31", class_id: "c1" }],
+    });
+    expect(invoiceBody(form([["lines", "[]"]]))).not.toHaveProperty("custom_fields");
+  });
+
   it("sends the term with the due date it set, and no term when none is chosen", () => {
     expect(invoiceBody(form([["payment_terms_id", "t30"], ["due_date", "2026-12-02"], ["lines", "[]"]]))).toMatchObject({ payment_terms_id: "t30", due_date: "2026-12-02" });
     expect(invoiceBody(form([["payment_terms_id", ""], ["lines", "[]"]]))).not.toHaveProperty("payment_terms_id");

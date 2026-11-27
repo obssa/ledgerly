@@ -2,7 +2,7 @@ import { Dt } from "@/components/Dt";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCompanySettings, getCurrencies, getDimensions, getNumbering, getPaymentTerms, getSubscription } from "@/lib/data";
 import { subscriptionStatus } from "@/lib/subscription";
-import { CompanyProfileForm, CurrenciesPanel, DimensionsPanel, NumberingPanel, PeriodLockForm, TermsPanel } from "./SettingsForms";
+import { CompanyProfileForm, CurrenciesPanel, DimensionsPanel, NumberingPanel, PeriodLockForm, TermsPanel, FormContentPanel } from "./SettingsForms";
 import { LogoCard } from "./LogoCard";
 import { DemoBooks } from "./DemoBooks";
 import { getSession } from "@/lib/session";
@@ -77,6 +77,16 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             </p>
             <NumberingPanel settings={settings} numbering={numbering} />
           </Card>
+
+          <div id="form-content" className="scroll-mt-20">
+            <Card label="Customize forms">
+              <h2 className="text-[19px] font-bold">Customize forms</h2>
+              <p className="mt-1.5 text-sm text-muted">
+                The fields invoices, quotes and cash sales (sales forms) and bills, expenses and orders to suppliers (purchase forms) show, as in QuickBooks.
+              </p>
+              <FormContentPanel settings={settings} />
+            </Card>
+          </div>
 
           <div id="terms" className="scroll-mt-20">
             <Card label="Terms">

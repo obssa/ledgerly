@@ -68,6 +68,7 @@ final class SaveInvoiceRequest extends FormRequest
             'lines.*.batch_number' => ['nullable', 'string', 'max:2000'],   // 074: the batch coming in (a bill) or back (a credit note)
             'lines.*.batch_expires_on' => ['nullable', 'date_format:Y-m-d'],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
+            ...\App\Http\Requests\Concerns\DocumentFieldRules::rules(),   // 111: class, location, custom fields, service date
             // The sales order line an invoice line delivers (067): kept through edits; the database checks it is its order's.
             'lines.*.source_line_id' => ['nullable', 'uuid'],
             'warehouse_id' => ['nullable', 'uuid', Rule::exists('warehouses', 'id')->where('is_active', true)],   // for stock lines

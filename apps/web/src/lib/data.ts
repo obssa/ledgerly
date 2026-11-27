@@ -3,7 +3,7 @@ import type { DocumentHistory } from "./history";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type PnlColumnsBy, type ProfitAndLossColumns, type JournalReport, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type PaymentTerm, type TaxMode, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
+import { ApiError, isDemoMode, ledgerly, type Account, type BankRule, type RecurringInvoice, type CashForecast, type Kpis, type ArAgeing, type BankAccount, type BankRegister, type StatementLines, type FiscalYear, type RevaluationPreview, type RevaluationRun, type CloseChecklist, type GeneralLedger, type PnlColumnsBy, type ProfitAndLossColumns, type JournalReport, type TrialBalanceRow, type JournalRequest, type RecurringJournal, type ReviewQueue, type TaxWorksheet, type TaxReturn, type TaxCalendar, type BalanceSheet, type AuditLog, type ProfitByDimension, type DocumentAnalysis, type CashFlowStatement, type ChangesInEquity, type FinancialHealth, type Project, type ProjectDetail, type TimeEntry, type FixedAssetRegister, type FixedAssetDetail, type AdjustedTrialBalance, type JournalDetail, type JournalRow, type ChartAccount, type CashCount, type ChequeRegister, type Reconciliation, type Reconciliations, type BinCard, type Item, type StockOnHand, type Warehouse, type Bill, type Expense, type WithholdingAdvice, type BillDetail, type Supplier, type Company, type CompanySettings, type Currencies, type Customer, type CustomerStatement, type DemoOptions, type Dimension, type Invoice, type InvoiceDetail, type QuoteDetail, type BackOrders, type PurchaseOrderDetail, type PurchaseOrderSummary, type GoodsReceipt, type GoodsReceiptSummary, type UnbilledGoods, type SalesReceipt, type DeliveryNote, type DeliveryNoteSummary, type UninvoicedGoods, type QuoteKind, type LandedCosts, type TaxDepreciationYear, type PostDatedCheques, type Attachment, type AttachmentKind, type QuoteSummary, type Numbering, type PaymentTerm, type TaxMode, type FormContent, type OpeningBalances, type PaymentReceived, type ProfitAndLoss } from "./api";
 import { paged, type ListQuery, type Paged } from "./lists";
 import type { RealizedGains, UnrealizedGains, TransactionReportData, BankPaymentFile, Bin, LeaseDetail, LeaseRegister, Tag, TagKind, TagReport, TransactionTags, DonorReport, IndustryTemplates, DirectCashFlow, FinancialNotes, ItemAssembly, ExpenseClaim, ExpenseClaimList, PurchaseRequisition, RequisitionList, InvoiceWriteOffs, LateInterestPreview, PriceList, PriceListDetail, ScheduledPayments, ScheduledPaymentDetail } from "./api";
 import { demoCompany, demoCompanySettings, demoCurrencies, demoCustomers, demoDimensions, demoTaxRates, demoNumbering, demoPaymentTerms, demoInvoices, demoProfitAndLoss } from "./demo";
@@ -389,6 +389,10 @@ export interface InvoiceOptions {
   calendar?: "gregorian" | "ethiopian";
   /** 110: the company's default Amounts are for a new document. */
   amountsAre?: TaxMode;
+  /** 111: what the form shows (QuickBooks' Customize), and the active classes and locations to choose from. */
+  formContent?: FormContent;
+  classes?: { id: string; code: string; name: string }[];
+  locations?: { id: string; code: string; name: string }[];
   /** 080: the active price lists, each in its currency, with a price per item it lists. */
   priceLists?: { id: string; currency: string; prices: Record<string, string> }[];
   accounts: { id: string; code: string; name: string }[];
@@ -402,7 +406,7 @@ export interface InvoiceOptions {
   /** For an expense: the bank, cash and wallet accounts it can be paid from. */
   moneyAccounts?: { id: string; code: string; name: string; currency: string | null }[];
   /** Items to pick on a line, and the warehouses stock lines use. */
-  items?: { id: string; name: string; type: string; unit: string; price: string | null; account_id: string | null; units?: { id: string; name: string; factor: string; barcode?: string | null }[]; tracking?: string; barcode?: string | null }[];
+  items?: { id: string; name: string; type: string; unit: string; price: string | null; account_id: string | null; sku?: string | null; units?: { id: string; name: string; factor: string; barcode?: string | null }[]; tracking?: string; barcode?: string | null }[];
   warehouses?: { id: string; name: string }[];
   /** Active projects a line can be tagged with (job costing). */
   projects?: { id: string; code: string; name: string }[];
@@ -411,9 +415,12 @@ export interface InvoiceOptions {
   demo: boolean;
 }
 
-/** Active projects, for tagging document lines. */
-const activeProjects = async (ctx: { token: string; companyId: string }) =>
-  (await ledgerly.dimensions(ctx)).data.filter((d) => d.kind === "project" && d.is_active).map((d) => ({ id: d.id, code: d.code, name: d.name }));
+/** Active projects, classes and locations, for tagging documents and their lines. */
+const activeDimensions = async (ctx: { token: string; companyId: string }) => {
+  const all = (await ledgerly.dimensions(ctx)).data.filter((d) => d.is_active);
+  const of = (kind: string) => all.filter((d) => d.kind === kind).map((d) => ({ id: d.id, code: d.code, name: d.name }));
+  return { projects: of("project"), classes: of("class"), locations: of("location") };
+};
 
 /** What the new-invoice screen offers: active customers, income accounts, sales tax rates in force, currencies. */
 /** What the invoice form offers; a quote or sales order uses the same, with its own numbering mode. */
@@ -432,7 +439,7 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       demo: true,
     };
   }
-  const { today, calendar, amountsAre } = await getCompanyDay();
+  const { today, calendar, amountsAre, formContent } = await getCompanyDay();
   return withApi(async (ctx) => {
     const [customers, accounts, rates, currencies, numbering, items, warehouses, people, terms] = await Promise.all([
       ledgerly.customers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
@@ -443,6 +450,7 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       terms: terms.data,
       calendar,
       amountsAre,
+      formContent,
       customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days, payment_terms_id: c.payment_terms_id ?? null, price_list_id: c.price_list_id ?? null })),
       priceLists: await ledgerly.priceListPrices(ctx).then((r) => r.data, (error) => {
         if (error instanceof ApiError && error.status === 403) return [];
@@ -456,9 +464,9 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === numberedAs)?.mode === "manual",
       numbers: numbering.data,
-      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id, units: i.units ?? [], barcode: i.barcode ?? null })),
+      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id, units: i.units ?? [], barcode: i.barcode ?? null, sku: i.sku ?? null })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
-      projects: await activeProjects(ctx),
+      ...(await activeDimensions(ctx)),
       demo: false,
     };
   });
@@ -470,7 +478,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
   if (isDemoMode()) {
     return { customers: [], accounts: [], taxRates: demoTaxRates, currencies: ["ETB"], baseCurrency: "ETB", manualNumbers: false, demo: true };
   }
-  const { today, calendar, amountsAre } = await getCompanyDay();
+  const { today, calendar, amountsAre, formContent } = await getCompanyDay();
   return withApi(async (ctx) => {
     const [suppliers, accounts, rates, currencies, numbering, items, warehouses, terms] = await Promise.all([
       ledgerly.suppliers({}, ctx), ledgerly.accounts(ctx), ledgerly.taxRates(ctx), ledgerly.currencies(ctx), ledgerly.numbering(ctx),
@@ -480,6 +488,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       terms: terms.data,
       calendar,
       amountsAre,
+      formContent,
       customers: suppliers.data.map((s) => ({ id: s.id, name: s.name, tax_id: s.tax_id, currency: s.currency, payment_terms_days: s.payment_terms_days, payment_terms_id: s.payment_terms_id ?? null, default_account_id: s.default_expense_account_id })),
       accounts: accounts.data
         .filter((a) => a.is_active && (a.type === "expense" || (a.type === "asset" && ["fixed_asset", "prepayment"].includes(a.subtype ?? ""))))
@@ -491,9 +500,9 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === "bill")?.mode === "manual",
       numbers: numbering.data,
-      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id, units: i.units ?? [], tracking: i.tracking ?? "none" })),
+      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id, units: i.units ?? [], tracking: i.tracking ?? "none", sku: i.sku ?? null })),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
-      projects: await activeProjects(ctx),
+      ...(await activeDimensions(ctx)),
       demo: false,
     };
   });
@@ -1708,12 +1717,12 @@ export async function getCompanyToday(): Promise<string> {
 }
 
 /** Today in the company's time zone, the calendar its dates are shown in and how it writes them, from one settings request. */
-export async function getCompanyDay(): Promise<{ today: string; calendar: CompanySettings["calendar"]; dateFormat: DatePrefs["dateFormat"]; timezone: string; amountsAre?: TaxMode }> {
+export async function getCompanyDay(): Promise<{ today: string; calendar: CompanySettings["calendar"]; dateFormat: DatePrefs["dateFormat"]; timezone: string; amountsAre?: TaxMode; formContent?: FormContent }> {
   await connection();
   if (isDemoMode()) return { today: todayIn(demoCompanySettings.timezone), calendar: demoCompanySettings.calendar, dateFormat: pickDateFormat(demoCompanySettings.date_format), timezone: demoCompanySettings.timezone };
   try {
     const settings = await withApi((ctx) => settingsOf(ctx.token, ctx.companyId));
-    return { today: todayIn(settings.timezone), calendar: settings.calendar, dateFormat: pickDateFormat(settings.date_format), timezone: settings.timezone, amountsAre: settings.amounts_are };
+    return { today: todayIn(settings.timezone), calendar: settings.calendar, dateFormat: pickDateFormat(settings.date_format), timezone: settings.timezone, amountsAre: settings.amounts_are, formContent: settings.form_content };
   } catch (error) {
     // A role without company.view still gets a date (Gregorian, DD/MM/YYYY, the defaults); redirects pass through.
     if (error instanceof ApiError) return { today: todayIn(), calendar: "gregorian", dateFormat: DEFAULT_DATE_PREFS.dateFormat, timezone: "" };

@@ -92,6 +92,7 @@ final class SalesReceiptController extends Controller
             'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')->where('is_active', true)],
             'lines.*.unit_id' => ['nullable', 'uuid', Rule::exists('item_units', 'id')->where('is_active', true)],   // 072
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
+            ...\App\Http\Requests\Concerns\DocumentFieldRules::rules(),   // 111: class, location, custom fields, service date
             'lines.*.batch_number' => ['nullable', 'string', 'max:2000'],   // 096: the serial numbers (or batch) sold; empty takes the oldest
         ], ['lines.*.account_id.exists' => 'Choose an income account.']);
 

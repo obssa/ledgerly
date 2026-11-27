@@ -86,6 +86,7 @@ final class CreditNoteController extends Controller
             'lines.*.account_id' => ['required', 'uuid', Rule::exists('accounts', 'id')->where('type', 'income')],
             'lines.*.tax_rate_id' => ['nullable', 'uuid', Rule::exists('tax_rates', 'id')],
             'lines.*.project_id' => ['nullable', 'uuid', Rule::exists('dimensions', 'id')->where('kind', 'project')->where('is_active', true)],
+            ...\App\Http\Requests\Concerns\DocumentFieldRules::rules(),   // 111: class, location, custom fields, service date
             'lines.*.item_id' => ['nullable', 'uuid', Rule::exists('items', 'id')],   // the company's own (row-level security)
             'restock' => ['sometimes', 'boolean'],   // the goods came back into stock (058)
         ], ['notes.required' => 'Say why: the reason is printed on the credit note.']);

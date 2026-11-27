@@ -152,6 +152,8 @@ final class ApproveInvoice
             'tax' => Money::of($line->line_tax, $invoice->currency),
             'tax_account_id' => $taxAccount($line->tax_rate_id),
             'project_id' => $line->project_id,
+            'class_id' => $line->class_id ?? $invoice->class_id,   // 111
+            'location_id' => $line->location_id ?? $invoice->location_id,
         ])->all();
 
         return $this->builder->build(
@@ -198,6 +200,8 @@ final class ApproveInvoice
                 'tax' => $reclaimable ? $tax : Money::zero($bill->currency),
                 'tax_account_id' => $reclaimable ? $vatReceivable : null,
                 'project_id' => $line->project_id,
+                'class_id' => $line->class_id ?? $bill->class_id,   // 111
+                'location_id' => $line->location_id ?? $bill->location_id,
             ];
         }
 

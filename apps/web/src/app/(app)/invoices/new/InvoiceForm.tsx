@@ -4,7 +4,7 @@ import { DateInput } from "@/components/DateInput";
 import Link from "@/components/Link";
 import { startTransition, useActionState, useMemo, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui";
-import type { InvoiceDetail, TaxMode } from "@/lib/api";
+import type { FormField, InvoiceDetail, TaxMode } from "@/lib/api";
 import type { InvoiceOptions } from "@/lib/data";
 import { documentAmounts, lineAmounts } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
@@ -54,7 +54,7 @@ const KIND = {
 } as const;
 
 /** What the form needs from a saved document to edit it: an invoice draft, or a quote or sales order. */
-type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "tax_mode" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
+type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "tax_mode" | "class_id" | "location_id" | "custom_fields" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
   | "warehouse_id" | "number" | "notes" | "lines" | "lock_version"> & { status: string; reference?: string | null };
 
 const METHODS: Record<string, string> = {
@@ -78,6 +78,10 @@ interface Line {
   taxRateId: string;
   accountId: string;
   projectId?: string;
+  /** 111: QuickBooks' Service date, and the line's class and location when tracked per line. */
+  serviceDate?: string;
+  classId?: string;
+  locationId?: string;
   /** The sales order line this invoice line delivers (067): kept through edits. */
   sourceLineId?: string;
   /** 072: another unit of the item; empty is the item's own unit. */
@@ -142,9 +146,18 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const inclusive = mode === "inclusive";
   const untaxed = mode === "out_of_scope";
   const projects = options.projects ?? [];
+  // QuickBooks' Customize (111): the sales or purchase form's fields, and how classes and locations are tracked.
+  const purchase_ = kind === "bill" || kind === "expense" || kind === "purchase_order";
+  const content = options.formContent;
+  const show = (purchase_ ? content?.purchases : content?.sales) ?? ({} as Partial<Record<FormField, boolean>>);
+  const classes = options.classes ?? [];
+  const locations = options.locations ?? [];
+  const classesBy = classes.length > 0 ? content?.track_classes ?? "off" : "off";
+  const locationsBy = locations.length > 0 ? content?.track_locations ?? "off" : "off";
+  const customFields = (content?.custom_fields ?? []).filter((f) => (purchase_ ? f.purchases : f.sales));
   const [lines, setLines] = useState<Line[]>(draft && draft.lines.length > 0
     ? draft.lines.map((l, i) => ({ key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
-        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", sourceLineId: l.source_line_id ?? undefined, unitId: l.unit_id ?? "",
+        taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", serviceDate: l.service_date ?? "", classId: l.class_id ?? "", locationId: l.location_id ?? "", sourceLineId: l.source_line_id ?? undefined, unitId: l.unit_id ?? "",
         batchNumber: l.batch_number ?? "", batchExpires: l.batch_expires_on ?? "" }))
     : [{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const items = options.items ?? [];
@@ -212,7 +225,8 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
       return [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, taxRateId: firstRate, ...filled }];
     });
   };
-  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: untaxed ? null : l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, unit_id: l.unitId || null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}),
+  const linesJson = JSON.stringify(lines.map((l) => ({ description: l.description, quantity: l.quantity, unit_price: l.unitPrice, account_id: l.accountId, tax_rate_id: untaxed ? null : l.taxRateId || null, item_id: l.itemId || null, project_id: l.projectId || null, unit_id: l.unitId || null, service_date: show.service_date ? l.serviceDate || null : null,
+    class_id: classesBy === "line" ? l.classId || null : null, location_id: locationsBy === "line" ? l.locationId || null : null, ...(l.sourceLineId ? { source_line_id: l.sourceLineId } : {}),
     ...(l.batchNumber ? { batch_number: l.batchNumber, batch_expires_on: l.batchExpires || null } : {}) })));
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
   const bad = (name: string) => Boolean(state?.fields?.[name]);
@@ -239,6 +253,10 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
       {quote && <input type="hidden" name="doc_kind" value={kind} />}
       <div className="flex min-w-0 flex-[2_1_560px] flex-col gap-4">
         {state?.error && <p role="alert" className="rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
+        <div className="flex justify-end">
+          {/* QuickBooks' Customize: which fields the form shows, in Settings. */}
+          <Link href="/settings#form-content" className="text-[13px] font-semibold text-primary hover:underline">Customize this form</Link>
+        </div>
         <Card label={`${words.party} and terms`}>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
             <div className="sm:col-span-2">
@@ -367,6 +385,30 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               </select>
               {untaxed && <p className="mt-1.5 text-[13px] text-muted">No tax on any line, and left off the VAT return. Zero-rated or exempt sales take their tax rate instead.</p>}
             </div>
+            {locationsBy === "transaction" && (
+              <div>
+                <label className="field-label" htmlFor="location_id">Location</label>
+                <select className={`field ${bad("location_id") ? "!border-bad" : ""}`} id="location_id" name="location_id" defaultValue={draft?.location_id ?? ""}>
+                  <option value="">—</option>
+                  {locations.map((d) => <option key={d.id} value={d.id}>{d.code} {d.name}</option>)}
+                </select>
+              </div>
+            )}
+            {classesBy === "transaction" && (
+              <div>
+                <label className="field-label" htmlFor="class_id">Class</label>
+                <select className={`field ${bad("class_id") ? "!border-bad" : ""}`} id="class_id" name="class_id" defaultValue={draft?.class_id ?? ""}>
+                  <option value="">—</option>
+                  {classes.map((d) => <option key={d.id} value={d.id}>{d.code} {d.name}</option>)}
+                </select>
+              </div>
+            )}
+            {customFields.map((f, i) => (
+              <div key={f.name}>
+                <label className="field-label" htmlFor={`custom_field_${i}`}>{f.name}</label>
+                <input className="field" id={`custom_field_${i}`} name={`custom_fields.${f.name}`} maxLength={100} defaultValue={draft?.custom_fields?.[f.name] ?? ""} />
+              </div>
+            ))}
           </div>
         </Card>
 
@@ -374,7 +416,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr>{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}<th scope="col">Description</th><th scope="col">Qty</th>{withUnits && <th scope="col">Unit</th>}<th scope="col">Unit price</th>{!untaxed && <th scope="col">Tax</th>}<th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+                <tr>{show.service_date && <th scope="col">Service date</th>}{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}{show.sku && items.length > 0 && kind !== "expense" && <th scope="col">SKU</th>}<th scope="col">Description</th><th scope="col">Qty</th>{withUnits && <th scope="col">Unit</th>}<th scope="col">Unit price</th>{!untaxed && <th scope="col">Tax</th>}<th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}{classesBy === "line" && <th scope="col">Class</th>}{locationsBy === "line" && <th scope="col">Location</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
               </thead>
               <tbody>
                 {lines.map((l, i) => {
@@ -382,6 +424,9 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                   const amt = ok ? lineAmounts({ quantity: plain(l.quantity), unitPrice: plain(l.unitPrice), taxRate: rateOf(l.taxRateId) }, currency, inclusive) : null;
                   return (
                     <tr key={l.key} className={lineError(i) ? "bg-bad-tint" : ""}>
+                      {show.service_date && (
+                        <td><DateInput className="field w-[140px]" aria-label="Service date" value={l.serviceDate ?? ""} onValue={(v) => update(l.key, { serviceDate: v })} /></td>
+                      )}
                       {items.length > 0 && kind !== "expense" && (
                         <td>
                           <select aria-label="Item" className="field w-[150px]" value={l.itemId} onChange={(e) => pickItem(l.key, e.target.value)}>
@@ -390,6 +435,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                           </select>
                         </td>
                       )}
+                      {show.sku && items.length > 0 && kind !== "expense" && <td className="num text-[13px] text-muted">{items.find((it) => it.id === l.itemId)?.sku ?? "—"}</td>}
                       <td>
                         <input aria-label="Description" className="field min-w-[180px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} />
                         {items.find((it) => it.id === l.itemId)?.tracking === "serial" && (
@@ -440,6 +486,22 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                           <select aria-label="Project" className="field w-[150px]" value={l.projectId ?? ""} onChange={(e) => update(l.key, { projectId: e.target.value })}>
                             <option value="">—</option>
                             {projects.map((p) => <option key={p.id} value={p.id}>{p.code} {p.name}</option>)}
+                          </select>
+                        </td>
+                      )}
+                      {classesBy === "line" && (
+                        <td>
+                          <select aria-label="Class" className="field w-[140px]" value={l.classId ?? ""} onChange={(e) => update(l.key, { classId: e.target.value })}>
+                            <option value="">—</option>
+                            {classes.map((d) => <option key={d.id} value={d.id}>{d.code} {d.name}</option>)}
+                          </select>
+                        </td>
+                      )}
+                      {locationsBy === "line" && (
+                        <td>
+                          <select aria-label="Location" className="field w-[140px]" value={l.locationId ?? ""} onChange={(e) => update(l.key, { locationId: e.target.value })}>
+                            <option value="">—</option>
+                            {locations.map((d) => <option key={d.id} value={d.id}>{d.code} {d.name}</option>)}
                           </select>
                         </td>
                       )}

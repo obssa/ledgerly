@@ -19,6 +19,10 @@ export interface InvoiceLineInput {
   /** The batch a bill line brings in (074), by number and expiry. */
   batch_number?: string | null;
   batch_expires_on?: string | null;
+  /** 111: QuickBooks' Service date, and the line's class and location when tracked per line. */
+  service_date?: string | null;
+  class_id?: string | null;
+  location_id?: string | null;
 }
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.replace(/[,\s]/g, "") : "");
@@ -43,6 +47,9 @@ export function parseLines(json: FormDataEntryValue | null): InvoiceLineInput[] 
     ...(str(l?.project_id) ? { project_id: str(l?.project_id) } : {}),
     ...(str(l?.source_line_id) ? { source_line_id: str(l?.source_line_id) } : {}),
     ...(str(l?.unit_id) ? { unit_id: str(l?.unit_id) } : {}),
+    ...(/^\d{4}-\d{2}-\d{2}$/.test(str(l?.service_date)) ? { service_date: str(l?.service_date) } : {}),
+    ...(str(l?.class_id) ? { class_id: str(l?.class_id) } : {}),
+    ...(str(l?.location_id) ? { location_id: str(l?.location_id) } : {}),
     ...(str(l?.batch_number) ? { batch_number: str(l?.batch_number), ...(str(l?.batch_expires_on) ? { batch_expires_on: str(l?.batch_expires_on) } : {}) } : {}),
   }));
 }
@@ -62,6 +69,11 @@ export function invoiceBody(form: FormData): Record<string, unknown> {
   };
   for (const name of ["due_date", "notes", "number", "reference", "paid_from_account_id", "payment_method", "warehouse_id", "salesperson_id", "payment_terms_id"]) if (value(name) !== "") body[name] = value(name);
   if (["exclusive", "inclusive", "out_of_scope"].includes(value("tax_mode"))) body.tax_mode = value("tax_mode");
+  // 111: the class and location of the whole document (when tracked so), and the company's custom fields.
+  for (const name of ["class_id", "location_id"]) if (value(name) !== "") body[name] = value(name);
+  const custom: Record<string, string> = {};
+  for (const [key, v] of form.entries()) if (key.startsWith("custom_fields.") && typeof v === "string") custom[key.slice("custom_fields.".length)] = v.trim();
+  if (Object.keys(custom).length > 0) body.custom_fields = custom;
   // The next number shown, kept as it was: the server takes the next free one when it saves (someone may have taken it meanwhile).
   if (value("number_suggested") !== "" && value("number") === value("number_suggested")) delete body.number;
   if (clean(form.get("fx_rate")) !== "") body.fx_rate = clean(form.get("fx_rate"));
