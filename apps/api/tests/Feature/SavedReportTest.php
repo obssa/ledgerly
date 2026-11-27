@@ -120,6 +120,16 @@ final class SavedReportTest extends TestCase
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'general-ledger', 'options' => ['account_id' => $this->c['rent'], 'location_id' => $other['rent']]]), $this->h)
             ->assertUnprocessable()->assertJsonValidationErrors('options.location_id');
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'cash-flow', 'period' => 'custom', 'to' => '2026-10-31']), $this->h)->assertUnprocessable()->assertJsonValidationErrors('from');
+        // The financial statements keep their comparisons: up to three periods (a quick choice, a preset or dates) and the change columns.
+        $pl = $this->postJson('/api/v1/saved-reports', $body(['report' => 'profit-and-loss', 'period' => 'this_quarter', 'options' => ['basis' => 'cash', 'pct' => '1',
+            'c1' => 'previous_year', 'c2' => 'last_fiscal_year', 'c3' => 'custom', 'c3_from' => '2024-07-01', 'c3_to' => '2024-09-30', 'diff' => 'both']]), $this->h)->assertCreated();
+        $this->assertEquals(['basis' => 'cash', 'pct' => '1', 'c1' => 'previous_year', 'c2' => 'last_fiscal_year', 'c3' => 'custom', 'c3_from' => '2024-07-01',
+            'c3_to' => '2024-09-30', 'diff' => 'both'], $pl->json('options'));
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'balance-sheet', 'options' => ['c1' => 'previous_year', 'c2' => 'custom', 'c2_as_of' => '2025-06-30']]), $this->h)->assertCreated();
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'profit-and-loss', 'options' => ['c1' => 'custom', 'c1_from' => '2026-02-30']]), $this->h)
+            ->assertUnprocessable()->assertJsonValidationErrors('options.c1_from');
+        $this->postJson('/api/v1/saved-reports', $body(['report' => 'balance-sheet', 'options' => ['c1' => 'previous_period']]), $this->h)
+            ->assertUnprocessable()->assertJsonValidationErrors('options.c1');
         $this->postJson('/api/v1/saved-reports', $body(['report' => 'cash-flow', 'period' => 'custom', 'from' => '2026-11-30', 'to' => '2026-10-31']), $this->h)->assertUnprocessable();
 
         // Another member of the company, and another company, see none of it.

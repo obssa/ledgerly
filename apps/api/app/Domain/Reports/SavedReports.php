@@ -28,6 +28,13 @@ final class SavedReports
 
     /** The options each report takes, and the values allowed (a list, or 'uuid'). */
     public const OPTIONS = [
+        // The financial statements keep their comparisons (up to three periods or dates: a quick choice, a preset or
+        // dates), the change columns, and the profit and loss its basis, Display columns by and % of income.
+        'profit-and-loss' => ['by' => ['total', 'month', 'quarter', 'year', 'contact', 'location', 'class', 'project'], 'pct' => ['1'],
+            'basis' => ['accrual', 'cash']] + self::COMPARE_RANGE,
+        'cash-flow' => ['method' => ['indirect', 'direct']] + self::COMPARE_RANGE,
+        'balance-sheet' => ['pct' => ['1']] + self::COMPARE_AS_OF,
+        'trial-balance' => self::COMPARE_AS_OF,
         'general-ledger' => ['account_id' => 'uuid', 'location_id' => 'uuid', 'class_id' => 'uuid', 'project_id' => 'uuid',
             'cols' => ['columns' => ReportService::LEDGER_COLUMNS]],
         // The ageing: summary or detail, QuickBooks' periods (days per period, how many), the detail's columns and grouping.
@@ -45,6 +52,21 @@ final class SavedReports
         'invoice-list' => self::TX_OPTIONS + ['status' => ['open', 'overdue', 'paid', 'draft', 'void']],
         'bill-list' => self::TX_OPTIONS + ['status' => ['open', 'overdue', 'paid', 'draft', 'void']],
     ];
+
+    private const RANGE_KINDS = ['none', 'previous_period', 'previous_year', 'two_years_ago', 'custom', ...ReportPeriods::PRESETS];
+
+    private const AS_OF_KINDS = ['none', 'previous_month', 'previous_quarter', 'previous_year', 'two_years_ago', 'custom', 'yesterday',
+        'end_of_last_week', 'end_of_last_month', 'end_of_last_quarter', 'end_of_last_year', 'end_of_last_fiscal_year'];
+
+    private const DIFFS = ['none', 'amount', 'pct', 'both'];
+
+    private const COMPARE_RANGE = ['diff' => self::DIFFS,
+        'c1' => self::RANGE_KINDS, 'c1_from' => ['date' => true], 'c1_to' => ['date' => true],
+        'c2' => self::RANGE_KINDS, 'c2_from' => ['date' => true], 'c2_to' => ['date' => true],
+        'c3' => self::RANGE_KINDS, 'c3_from' => ['date' => true], 'c3_to' => ['date' => true]];
+
+    private const COMPARE_AS_OF = ['diff' => self::DIFFS, 'c1' => self::AS_OF_KINDS, 'c1_as_of' => ['date' => true],
+        'c2' => self::AS_OF_KINDS, 'c2_as_of' => ['date' => true], 'c3' => self::AS_OF_KINDS, 'c3_as_of' => ['date' => true]];
 
     private const AGEING_OPTIONS = ['view' => ['summary', 'detail'], 'interval' => ['between' => [1, 365]], 'periods' => ['between' => [2, 12]],
         'cols' => ['columns' => ReceivablesReport::DETAIL_COLUMNS], 'group' => ['age', 'name']];

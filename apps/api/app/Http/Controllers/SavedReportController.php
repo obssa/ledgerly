@@ -125,6 +125,9 @@ final class SavedReportController extends Controller
                 // A column list: each one a field of that report, in the order chosen.
                 is_array($allowed) && isset($allowed['columns']) => is_string($value) && $value !== ''
                     && array_diff(explode(',', $value), $allowed['columns']) === [],
+                // A date of a comparison (stored as YYYY-MM-DD, a real day).
+                is_array($allowed) && isset($allowed['date']) => is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1
+                    && \DateTimeImmutable::createFromFormat('!Y-m-d', $value)?->format('Y-m-d') === $value,
                 // A whole number in a range (the ageing's days per period and number of periods).
                 is_array($allowed) && isset($allowed['between']) => is_string($value) && ctype_digit($value)
                     && (int) $value >= $allowed['between'][0] && (int) $value <= $allowed['between'][1],

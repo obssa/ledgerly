@@ -276,6 +276,21 @@ export function rangeLabel(range: Range, cal: DateWords): string {
 
 export const asOfLabel = (iso: string, cal: DateWords) => `As of ${formatDay(iso, cal)}`;
 
+/**
+ * A period's short name for a column header, when it is a whole month, quarter or year of the company's calendar:
+ * "Oct 2026", "Q3 2026", "2026" ("Tikimt 2019" in the Ethiopian calendar). Null for any other period.
+ */
+export function wholePeriodLabel(range: { from: string; to: string }, cal: Calendar): string | null {
+  const a = monthOf(range.from, cal), b = monthOf(range.to, cal);
+  if (range.from !== monthStart(a, cal) || range.to !== monthEnd(b, cal)) return null;
+  const months = (b.y - a.y) * 12 + (b.m - a.m) + 1;
+  const names = cal === "ethiopian" ? ETHIOPIAN_MONTHS : GREGORIAN_MONTHS;
+  if (months === 1) return `${names[a.m - 1].slice(0, cal === "ethiopian" ? undefined : 3)} ${a.y}`;
+  if (months === 3 && (a.m - 1) % 3 === 0) return `Q${(a.m - 1) / 3 + 1} ${a.y}`;
+  if (months === 12 && a.m === 1) return String(a.y);
+  return null;
+}
+
 /** Presets with both ends: for reports that need a start and an end (ratios over a number of days). */
 export const CLOSED_RANGE_PRESETS: readonly RangePreset[] = RANGE_PRESETS.map((p) => p.key).filter((k) => k !== "all" && !k.startsWith("since_"));
 

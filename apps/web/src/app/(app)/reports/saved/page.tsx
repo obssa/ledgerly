@@ -9,8 +9,9 @@ import { RemoveSavedReport, SavedReportForm } from "./SavedReportForms";
 
 export const metadata = { title: "Saved reports" };
 
-// A word, a column list ("date,number,name"), a whole number (the ageing periods) or an id; the API checks each against its list.
-const OPTION = /^[a-z_,]{1,400}$|^[0-9]{1,3}$|^[0-9a-f-]{36}$/;
+// A word, a column list ("date,number,name"), a whole number (the ageing periods), an id or a date (a comparison's);
+// the API checks each against its list.
+const OPTION = /^[a-z_,]{1,400}$|^[0-9]{1,3}$|^[0-9a-f-]{36}$|^\d{4}-\d{2}-\d{2}$/;
 
 /** Module 10: your saved reports, each opened for its period today, and the ones emailed to you weekly or monthly. */
 export default async function SavedReportsPage({ searchParams }: PageProps<"/reports/saved">) {

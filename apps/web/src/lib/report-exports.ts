@@ -4,9 +4,11 @@ import { ledgerly } from "./api";
 import { DISPLAY_BY, columnsRequest, percentOf, pickDisplayBy } from "./pnlColumns";
 import type { Calendar } from "./periods";
 import { formatDate, pickDateFormat } from "./dates";
-import { periodLabel, previousPeriod, samePeriodLastYear } from "./reports";
-import { shiftDay } from "./periods";
-import { perUnit, percentChange } from "./decimal";
+import { perUnit } from "./decimal";
+import { pickAsOfComparisons, pickDiff, pickRangeComparisons, periodColumnLabel } from "./compare";
+import { balanceSheetLines, cashFlowLines, directCashFlowLines, lineCells, profitAndLossLines, trialBalanceLines } from "./compareLines";
+import { trialTotals } from "./ledger";
+import type { PeriodContext } from "./periods";
 import { STATEMENT_DEFAULTS, statementColumns, statementRow } from "./ledgerColumns";
 import { AGE_COLUMNS, AGE_DEFAULTS, AGE_FOREIGN, DEFAULT_BUCKETS, ageRows, bucketLabel, groupAgeRows, pickPeriods, type AgeColumn, type AgeRow } from "./ageing";
 import { chooseColumns, withoutUnusedForeign } from "./columns";
@@ -19,7 +21,7 @@ import type { Cell } from "./csv";
  */
 
 type Ctx = { token: string; companyId: string };
-type Params = { from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
+type Params = { cq?: Record<string, string>; periodCtx?: PeriodContext; from?: string; to?: string; as_of?: string; kind?: string; group?: string; account_id?: string; action?: string; user_id?: string; warehouse_id?: string;
   rows?: string; columns?: string; measure?: string; account_type?: string; project_id?: string; location_id?: string; class_id?: string;
   cols?: string; sort?: string; dir?: string; status?: string; view?: string; interval?: string; periods?: string; source?: string; by?: string; pct?: string; calendar?: Calendar; dateFormat?: string; compare?: string; basis?: string; open?: string; method?: string; weeks?: string; contact_id?: string };
 /** A report's rows; a heading or period line when the report names them itself (a statement's customer, a forecast's weeks). */
@@ -32,6 +34,9 @@ export const EXPORTABLE = ["profit-and-loss", "balance-sheet", "trial-balance", 
 export type ExportableReport = (typeof EXPORTABLE)[number];
 
 type Ageing = Awaited<ReturnType<typeof ledgerly.arAgeing>>;
+
+/** The company's period context, for comparisons (the export route passes it; Gregorian today otherwise). */
+const periodCtx = (p: Params): PeriodContext => p.periodCtx ?? { today: new Date().toISOString().slice(0, 10), calendar: p.calendar ?? "gregorian", fiscalStartMonth: 1 };
 
 /** A date inside a line of text, written the company's way. */
 const day = (p: Params, iso: string) => formatDate(iso, { calendar: p.calendar ?? "gregorian", dateFormat: pickDateFormat(p.dateFormat) });
@@ -89,45 +94,35 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
           return { title: "profit-and-loss", rows };
         }
       }
-      // As on screen: against the period before or the same period last year (a closed period only), on the
-      // accrual or cash basis.
-      const before = p.from && p.to && p.open !== "1" ? (p.compare === "year" ? samePeriodLastYear(p.from, p.to) : previousPeriod(p.from, p.to)) : null;
-      const pl = await ledgerly.profitAndLoss({ from: p.from ?? "", to: p.to ?? "", ...(before ? { compare_from: before.from, compare_to: before.to } : {}),
-        ...(p.basis === "cash" ? { basis: "cash" as const } : {}) }, ctx);
-      const share = (v: string): Cell[] => (pct ? [percentOf(v, pl.totals.income.current)] : []);
-      const amounts = (v: { current: string; previous: string | null }): Cell[] => [v.current, ...(before ? [v.previous] : []), ...share(v.current)];
-      const rows: Cell[][] = [["Section", "Code", "Account", "This period", ...(before ? [periodLabel(before.from, before.to)] : []), ...(pct ? ["% of income"] : [])]];
-      for (const [section, list] of [["Income", pl.sections.income], ["Cost of goods sold", pl.sections.cost_of_sales], ["Expenses", pl.sections.expenses]] as const) {
-        for (const r of list) rows.push([section, r.code, r.name, ...amounts(r)]);
-      }
-      rows.push(["Gross profit", null, null, ...amounts(pl.totals.gross_profit)], ["Net profit", null, null, ...amounts(pl.totals.net_profit)]);
-      return { title: "profit-and-loss", rows };
+      // As on screen: the period, then each comparison (the previous period unless the page chose otherwise; an open
+      // period has none), on the accrual or cash basis, with the change columns asked for.
+      const cmp = pickRangeComparisons(p.cq ?? {}, { from: p.open === "1" ? null : p.from ?? null, to: p.open === "1" ? null : p.to ?? null }, periodCtx(p), ["previous_period"]);
+      const diff = pickDiff(p.cq ?? {}, "pct");
+      const results = await Promise.all([{ from: p.from ?? "", to: p.to ?? "" }, ...cmp.periods].map((r) =>
+        ledgerly.profitAndLoss({ from: r.from, to: r.to, ...(p.basis === "cash" ? { basis: "cash" as const } : {}) }, ctx)));
+      const own = p.from && p.to && p.open !== "1" ? periodColumnLabel({ from: p.from, to: p.to }, periodCtx(p)) : "This period";
+      const income = results[0].totals.income.current;
+      return { title: "profit-and-loss", rows: lineCells(profitAndLossLines(results), [cmp.periods.length ? own : "Amount", ...cmp.periods.map((c) => c.label)], diff,
+        pct ? { header: "% of income", value: (l) => (l.values[0] === null ? "—" : percentOf(l.values[0], income)) } : undefined) };
     }
     case "balance-sheet": {
-      // Against the same date a month, quarter or year earlier when the page compared, every account in either; % change.
+      // As on screen: the date, then each date compared with, every account in any of them, the change columns asked for.
       const asOf = p.as_of ?? p.to ?? "";
-      const back = ({ month: 1, quarter: 3, year: 12 } as Record<string, number>)[p.compare ?? ""];
-      const then = back ? shiftDay(asOf, -back, p.calendar ?? "gregorian") : null;
-      const pct = Boolean(then) && p.pct === "1";
-      const [bs, prior] = await Promise.all([ledgerly.balanceSheet(asOf, ctx), then ? ledgerly.balanceSheet(then, ctx) : Promise.resolve(null)]);
-      const change = (a: string | null, b: string | null): Cell[] => (pct ? [percentChange(a ?? "0.00", b)] : []);
-      const rows: Cell[][] = [["Section", "Code", "Account", asOf, ...(prior && then ? [then] : []), ...(pct ? ["% change"] : [])]];
-      for (const [section, key] of [["Assets", "assets"], ["Liabilities", "liabilities"], ["Equity", "equity"]] as const) {
-        const now = new Map(bs.sections[key].map((r) => [r.code, r]));
-        const earlier = new Map((prior?.sections[key] ?? []).map((r) => [r.code, r]));
-        for (const code of [...new Set([...now.keys(), ...earlier.keys()])].sort()) {
-          rows.push([section, code, (now.get(code) ?? earlier.get(code))!.name, now.get(code)?.amount ?? null, ...(prior ? [earlier.get(code)?.amount ?? null] : []),
-            ...change(now.get(code)?.amount ?? null, earlier.get(code)?.amount ?? null)]);
-        }
-      }
-      rows.push(["Equity", null, "Profit not yet closed to retained earnings", bs.equation.profit_to_date, ...(prior ? [prior.equation.profit_to_date] : []),
-        ...change(bs.equation.profit_to_date, prior?.equation.profit_to_date ?? null)],
-        ["Check", null, "Difference", bs.equation.difference, ...(prior ? [prior.equation.difference] : []), ...(pct ? [null] : [])]);
-      return { title: "balance-sheet", rows };
+      const cmp = pickAsOfComparisons(p.cq ?? {}, asOf, periodCtx(p));
+      const diff = pickDiff(p.cq ?? {}, p.cq?.pct === "1" ? "pct" : "none");
+      const results = await Promise.all([asOf, ...cmp.dates.map((d) => d.asOf)].map((d) => ledgerly.balanceSheet(d, ctx)));
+      return { title: "balance-sheet", rows: lineCells(balanceSheetLines(results), [day(p, asOf), ...cmp.dates.map((d) => d.label)], diff) };
     }
     case "trial-balance": {
-      const tb = await ledgerly.trialBalance(p.as_of ?? p.to ?? "", ctx);
-      return { title: "trial-balance", rows: [["Code", "Account", "Type", "Debit", "Credit"], ...tb.data.map((r) => [r.code, r.name, r.type, r.debit, r.credit])] };
+      // Each account's debit and credit at the date, and at each date compared with.
+      const asOf = p.as_of ?? p.to ?? "";
+      const cmp = pickAsOfComparisons(p.cq ?? {}, asOf, periodCtx(p));
+      const dates = [asOf, ...cmp.dates.map((d) => d.asOf)];
+      const results = await Promise.all(dates.map((d) => ledgerly.trialBalance(d, ctx).then((r) => r.data)));
+      const compared = dates.length > 1;
+      return { title: "trial-balance", rows: [["Code", "Account", ...dates.flatMap((d) => (compared ? [`Debit ${day(p, d)}`, `Credit ${day(p, d)}`] : ["Debit", "Credit"]))],
+        ...trialBalanceLines(results).map((r) => [r.code, r.name, ...r.values]),
+        ["", "Total", ...results.flatMap((r) => { const t = trialTotals(r); return [t.debit, t.credit]; })]] };
     }
     case "general-ledger": {
       // The same lines as on screen: the location, class and project filters too.
@@ -160,27 +155,18 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: "journal", rows };
     }
     case "cash-flow": {
+      // As on screen: the period, then each comparison, indirect or direct method.
+      const cmp = pickRangeComparisons(p.cq ?? {}, { from: p.open === "1" ? null : p.from ?? null, to: p.open === "1" ? null : p.to ?? null }, periodCtx(p));
+      const diff = pickDiff(p.cq ?? {}, "none");
+      const ranges = [{ from: p.from ?? "", to: p.to ?? "" }, ...cmp.periods];
+      const own = p.from && p.to && p.open !== "1" ? periodColumnLabel({ from: p.from, to: p.to }, periodCtx(p)) : "This period";
+      const headers = [cmp.periods.length ? own : "Amount", ...cmp.periods.map((c) => c.label)];
       if (p.method === "direct") {
-        // The direct method: what the cash accounts received and paid, by what it was for, and each line's accounts.
-        const d = await ledgerly.directCashFlow({ from: p.from, to: p.to }, ctx);
-        const rows: Cell[][] = [["Line", "Code", "Account", "Amount"]];
-        for (const l of d.lines) {
-          rows.push([l.label, null, null, l.amount]);
-          for (const a of l.accounts) rows.push([null, a.code, a.name, a.amount]);
-        }
-        rows.push(["Cash from operating activities", null, null, d.totals.operating], ["Cash from investing activities", null, null, d.totals.investing],
-          ["Cash from financing activities", null, null, d.totals.financing], ["Net change", null, null, d.net_change],
-          ["Cash at the start", null, null, d.opening_cash], ["Cash at the end", null, null, d.closing_cash]);
-        return { title: "cash-flow-direct", rows };
+        const results = await Promise.all(ranges.map((r) => ledgerly.directCashFlow({ from: r.from, to: r.to }, ctx)));
+        return { title: "cash-flow-direct", rows: lineCells(directCashFlowLines(results), headers, diff) };
       }
-      const cf = await ledgerly.cashFlow({ from: p.from, to: p.to }, ctx);
-      const rows: Cell[][] = [["Section", "Code", "Line", "Amount"], ["Operating", null, "Net profit for the period", cf.net_profit]];
-      for (const [section, key] of [["Operating", "operating"], ["Investing", "investing"], ["Financing", "financing"]] as const) {
-        for (const l of cf.sections[key]) rows.push([section, l.code, l.name, l.amount]);
-        rows.push([section, null, `Cash from ${section.toLowerCase()} activities`, cf.totals[key]]);
-      }
-      rows.push(["Cash", null, "Net change", cf.net_change], ["Cash", null, "At the start", cf.opening_cash], ["Cash", null, "At the end", cf.closing_cash]);
-      return { title: "cash-flow", rows };
+      const results = await Promise.all(ranges.map((r) => ledgerly.cashFlow({ from: r.from, to: r.to }, ctx)));
+      return { title: "cash-flow", rows: lineCells(cashFlowLines(results), headers, diff) };
     }
     case "changes-in-equity": {
       const s = await ledgerly.changesInEquity({ from: p.from, to: p.to }, ctx);

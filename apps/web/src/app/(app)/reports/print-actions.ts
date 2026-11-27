@@ -2,6 +2,7 @@
 
 import { ledgerly } from "@/lib/api";
 import { EXPORTABLE } from "@/lib/report-exports";
+import { COMPARE_FIELDS } from "@/lib/compare";
 import { isDate } from "@/lib/reports";
 import { getSession } from "@/lib/session";
 
@@ -16,7 +17,10 @@ export async function recordPrint(report: string, params: Record<string, string 
   const word = (v?: string) => (v && /^[a-z_]{1,20}$/.test(v) ? v : undefined);
   const uuid = (v?: string) => (v && /^[0-9a-f-]{36}$/.test(v) ? v : undefined);
   const options = Object.fromEntries(Object.entries({ kind: word(params.kind), group: word(params.group), account_id: uuid(params.account_id),
-    action: word(params.action), user_id: uuid(params.user_id), warehouse_id: uuid(params.warehouse_id) }).filter(([, v]) => v !== undefined));
+    action: word(params.action), user_id: uuid(params.user_id), warehouse_id: uuid(params.warehouse_id),
+    // What the page showed: its basis, method, columns and comparisons (each checked against its own list by the API).
+    by: word(params.by), pct: params.pct === "1" ? "1" : undefined, basis: word(params.basis), method: word(params.method),
+    ...Object.fromEntries(COMPARE_FIELDS.map((k) => [k, params[k] && /^[A-Za-z0-9_./-]{1,40}$/.test(params[k]!) ? params[k] : undefined])) }).filter(([, v]) => v !== undefined));
   const dates = POINT_IN_TIME.includes(report)
     ? { as_of: isDate(params.as_of) ? params.as_of : undefined }
     : { from: isDate(params.from) ? params.from : undefined, to: isDate(params.to) ? params.to : undefined };
