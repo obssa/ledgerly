@@ -24,7 +24,7 @@ export default async function SalesReceiptsPage({ searchParams }: PageProps<"/sa
           <table className="tbl">
             <thead>
               <tr>
-                <th scope="col">Number</th><th scope="col">Date</th><th scope="col">Customer</th><th scope="col">Slip</th><th scope="col">Received into</th>
+                <th scope="col">Date</th><th scope="col">No.</th><th scope="col">Customer</th><th scope="col">Reference no.</th><th scope="col">Deposit to</th>
                 <th scope="col" className="!text-right">Amount</th>
               </tr>
             </thead>
@@ -32,11 +32,11 @@ export default async function SalesReceiptsPage({ searchParams }: PageProps<"/sa
               {receipts.length === 0 && <tr><td colSpan={6} className="text-muted">No cash sales yet. A sale paid on the spot is recorded here, without an invoice to collect.</td></tr>}
               {receipts.map((r) => (
                 <tr key={r.id}>
+                  <td className="num">{r.issue_date}</td>
                   <td className="num font-semibold">
                     <Link href={`/sales-receipts/${encodeURIComponent(r.id)}`} className="hover:underline">{r.number ?? "—"}</Link>
                     {r.status === "void" && <> <Pill>Void</Pill></>}
                   </td>
-                  <td className="num">{r.issue_date}</td>
                   <td>{r.contact.name}</td>
                   <td className="num">{r.reference ?? "—"}</td>
                   <td>{r.paid_from ? `${r.paid_from.code} ${r.paid_from.name}` : "—"}</td>

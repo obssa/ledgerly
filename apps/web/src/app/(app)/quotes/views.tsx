@@ -15,8 +15,8 @@ import { QuoteActions } from "./QuoteActions";
  */
 
 export const WORDS = {
-  quote: { title: "Quotes", one: "Quote", path: "/quotes", newLabel: "+ New quote", until: "Valid until" },
-  sales_order: { title: "Sales orders", one: "Sales order", path: "/sales-orders", newLabel: "+ New sales order", until: "Deliver by" },
+  quote: { title: "Quotes", one: "Quote", path: "/quotes", newLabel: "+ New quote", until: "Expiration date" },
+  sales_order: { title: "Sales orders", one: "Sales order", path: "/sales-orders", newLabel: "+ New sales order", until: "Delivery date" },
 } as const;
 
 export function statusOf(kind: QuoteKind, status: QuoteStatus): { label: string; tone: "neutral" | "good" | "warn" | "bad" | "brand" } {
@@ -57,19 +57,19 @@ export async function QuoteList({ kind, q = {} }: { kind: QuoteKind; q?: Record<
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Number</th><th scope="col">Customer</th><th scope="col">Issued</th><th scope="col">{w.until}</th><th scope="col">Status</th><th scope="col" className="!text-right">Total</th></tr>
+                <tr><th scope="col">Date</th><th scope="col">No.</th><th scope="col">Customer</th><th scope="col">{w.until}</th><th scope="col" className="!text-right">Amount</th><th scope="col">Status</th></tr>
               </thead>
               <tbody>
                 {rows.map((q) => {
                   const s = statusOf(kind, q.status);
                   return (
                     <tr key={q.id}>
+                      <td className="num">{q.issue_date}</td>
                       <td className="num font-semibold"><Link href={`${w.path}/${encodeURIComponent(q.id)}`} className="hover:underline">{q.number ?? <span className="text-muted">Draft</span>}</Link></td>
                       <td>{q.contact.name}</td>
-                      <td>{q.issue_date}</td>
-                      <td>{q.due_date ?? "—"}</td>
-                      <td><Pill tone={s.tone}>{s.label}</Pill></td>
+                      <td className="num">{q.due_date ?? "—"}</td>
                       <td className="num text-right">{formatMoney(q.total, q.currency)}</td>
+                      <td><Pill tone={s.tone}>{s.label}</Pill></td>
                     </tr>
                   );
                 })}
@@ -193,10 +193,10 @@ function QuoteBody({ doc }: { doc: QuoteDetail }) {
           {doc.contact.tax_id && <div className="num text-[13px] text-muted">TIN {doc.contact.tax_id}</div>}
         </div>
         <div className="text-right">
-          <div><span className="text-muted">Issued</span> <span className="num">{doc.issue_date}</span></div>
+          <div><span className="text-muted">{w.one} date</span> <span className="num">{doc.issue_date}</span></div>
           <div><span className="text-muted">{w.until}</span> <span className="num">{doc.due_date ?? "—"}</span></div>
           {doc.salesperson && <div><span className="text-muted">Salesperson</span> {doc.salesperson.name}</div>}
-          {Number(doc.fx_rate) !== 1 && <div className="text-muted">Rate <span className="num">{doc.fx_rate}</span></div>}
+          {Number(doc.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{doc.fx_rate}</span></div>}
         </div>
       </div>
       <div className="mt-5 overflow-x-auto">

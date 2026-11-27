@@ -43,10 +43,10 @@ async function Quote({ searchParams }: Pick<PageProps<"/quote">, "searchParams">
       <h1 className="text-[22px] font-extrabold tracking-tight">{view.company.name}</h1>
       {view.company.tin && <p className="num text-[12px] text-muted">TIN {view.company.tin}</p>}
       <dl className="mt-3 grid grid-cols-2 gap-1 text-[13px]">
-        <dt className="text-muted">Quote</dt><dd className="num text-right font-semibold">{q.number}</dd>
-        <dt className="text-muted">For</dt><dd className="text-right">{view.customer}</dd>
-        <dt className="text-muted">Issued</dt><dd className="num text-right">{q.issue_date}</dd>
-        {q.valid_until && <><dt className="text-muted">Valid until</dt><dd className="num text-right">{q.valid_until}</dd></>}
+        <dt className="text-muted">Quote no.</dt><dd className="num text-right font-semibold">{q.number}</dd>
+        <dt className="text-muted">Customer</dt><dd className="text-right">{view.customer}</dd>
+        <dt className="text-muted">Quote date</dt><dd className="num text-right">{q.issue_date}</dd>
+        {q.valid_until && <><dt className="text-muted">Expiration date</dt><dd className="num text-right">{q.valid_until}</dd></>}
       </dl>
       <ul className="mt-3 divide-y divide-line border-y border-line text-[13px]">
         {q.lines.map((l, i) => (

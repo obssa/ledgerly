@@ -1,7 +1,8 @@
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getBill, getCompanySettings, getDocumentHistory, getLandedCosts, getMoneyAccounts, getOpenBills } from "@/lib/data";
+import { getBill, getCompanySettings, getCompanyToday, getDocumentHistory, getLandedCosts, getMoneyAccounts, getOpenBills } from "@/lib/data";
+import { creditStatus, paymentStatus } from "@/lib/docStatus";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { ApiError } from "@/lib/api";
 import { ApplyCredit } from "../../invoices/[id]/ApplyCredit";
@@ -15,15 +16,6 @@ import { DocumentHistoryPanel } from "@/components/DocumentHistoryPanel";
 
 export const metadata = { title: "Bill" };
 
-const STATUS: Record<string, { label: string; tone: "neutral" | "good" | "warn" | "bad" | "brand" }> = {
-  draft: { label: "Draft", tone: "neutral" },
-  awaiting_approval: { label: "Awaiting approval", tone: "warn" },
-  posted: { label: "To pay", tone: "brand" },
-  part_paid: { label: "Part paid", tone: "warn" },
-  paid: { label: "Paid", tone: "good" },
-  void: { label: "Void", tone: "neutral" },
-};
-
 /** One bill: the supplier and where they are paid, the lines and totals, possible duplicates, and what can be done next. */
 export default async function BillPage({ params, searchParams }: PageProps<"/bills/[id]">) {
   const { id } = await params;
@@ -33,9 +25,8 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
     getCompanySettings().catch((error: unknown) => { if (error instanceof ApiError) return null; throw error; })]);
   if (!bill) notFound();
   const credit = bill.type === "vendor_credit";
-  const status = credit && bill.status === "paid" ? { label: "Applied", tone: "good" as const }
-    : credit && ["posted", "part_paid"].includes(bill.status) ? { label: "Credit left", tone: "warn" as const }
-    : STATUS[bill.status] ?? { label: bill.status, tone: "neutral" as const };
+  // In QuickBooks' words: "Overdue 12 days", "Due in 30 days", "Partially paid"; a supplier credit "Unapplied" or "Applied".
+  const status = credit ? creditStatus(bill) : paymentStatus(bill, await getCompanyToday());
   const payout = bill.contact.payout ?? {};
   const kind = credit ? "Supplier credit" : "Bill";
   const canApply = credit && Boolean(bill.can.apply) && ["posted", "part_paid"].includes(bill.status) && bill.amount_due !== "0.00" && !bill.demo;
@@ -83,15 +74,15 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
               <div className="text-[13px] text-muted">Supplier</div>
               <Link href={`/suppliers/${encodeURIComponent(bill.contact.id)}`} className="font-bold hover:underline">{bill.contact.name}</Link>
               {bill.contact.tax_id && <div className="num text-[13px] text-muted">TIN {bill.contact.tax_id}</div>}
-              <div className="mt-1 text-[13px]">{credit ? "Their credit note" : "Their invoice"} <span className="num font-semibold">{bill.reference ?? "—"}</span></div>
+              <div className="mt-1 text-[13px]">{credit ? "Supplier credit no." : "Supplier invoice no."} <span className="num font-semibold">{bill.reference ?? "—"}</span></div>
               {credit && bill.original && (
-                <div className="mt-1 text-[13px]">Corrects <Link href={`/bills/${encodeURIComponent(bill.original.id)}`} className="num font-semibold hover:underline">{bill.original.number}</Link></div>
+                <div className="mt-1 text-[13px]">Original bill <Link href={`/bills/${encodeURIComponent(bill.original.id)}`} className="num font-semibold hover:underline">{bill.original.number}</Link></div>
               )}
             </div>
             <div className="text-right">
-              <div><span className="text-muted">Issued</span> <span className="num">{bill.issue_date}</span></div>
-              <div><span className="text-muted">Due</span> <span className="num">{bill.due_date ?? "—"}</span></div>
-              {Number(bill.fx_rate) !== 1 && <div className="text-muted">Rate <span className="num">{bill.fx_rate}</span></div>}
+              <div><span className="text-muted">{credit ? "Supplier credit date" : "Bill date"}</span> <span className="num">{bill.issue_date}</span></div>
+              {!credit && <div><span className="text-muted">Due date</span> <span className="num">{bill.due_date ?? "—"}</span></div>}
+              {Number(bill.fx_rate) !== 1 && <div className="text-muted">Exchange rate <span className="num">{bill.fx_rate}</span></div>}
             </div>
           </div>
           <div className="mt-5 overflow-x-auto">
@@ -116,7 +107,7 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
             <div className="flex justify-between py-1"><dt>Subtotal</dt><dd className="num">{formatAmount(bill.subtotal)}</dd></div>
             <div className="flex justify-between py-1"><dt>Tax</dt><dd className="num">{formatAmount(bill.tax_total)}</dd></div>
             <div className="mt-1 flex justify-between border-t-2 border-ink pt-2 text-lg font-extrabold"><dt>Total</dt><dd className="num">{formatMoney(bill.total, bill.currency)}</dd></div>
-            <div className="flex justify-between py-1 font-semibold"><dt>{credit ? "Credit left" : "Still to pay"}</dt><dd className="num">{formatMoney(bill.amount_due, bill.currency)}</dd></div>
+            <div className="flex justify-between py-1 font-semibold"><dt>{credit ? "Remaining credit" : "Balance due"}</dt><dd className="num">{formatMoney(bill.amount_due, bill.currency)}</dd></div>
           </dl>
           {bill.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{bill.notes}</p>}
         {bill.match && bill.match.lines.length > 0 && (

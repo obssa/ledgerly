@@ -59,8 +59,8 @@ export function ScheduleForm({ supplier, currency, bills, accounts, today, initi
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col" className="w-10"><span className="sr-only">Pay</span></th><th scope="col">Bill</th><th scope="col">Their reference</th>
-                  <th scope="col">Due</th><th scope="col" className="!text-right">Still to pay</th><th scope="col" className="!text-right">Pay on the day</th></tr>
+                <tr><th scope="col" className="w-10"><span className="sr-only">Pay</span></th><th scope="col">Bill</th><th scope="col">Supplier invoice no.</th>
+                  <th scope="col">Due date</th><th scope="col" className="!text-right">Open balance</th><th scope="col" className="!text-right">Pay on the day</th></tr>
               </thead>
               <tbody>
                 {bills.map((b, i) => (

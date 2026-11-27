@@ -23,7 +23,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
           <table className="tbl">
             <thead>
               <tr>
-                <th scope="col">Number</th><th scope="col">Date</th><th scope="col">Paid to</th><th scope="col">Receipt</th><th scope="col">Paid from</th>
+                <th scope="col">Date</th><th scope="col">No.</th><th scope="col">Payee</th><th scope="col">Receipt no.</th><th scope="col">Payment account</th>
                 <th scope="col" className="!text-right">Amount</th>
               </tr>
             </thead>
@@ -31,11 +31,11 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
               {expenses.length === 0 && <tr><td colSpan={6} className="text-muted">No expenses yet.</td></tr>}
               {expenses.map((e) => (
                 <tr key={e.id}>
+                  <td className="num">{e.issue_date}</td>
                   <td className="num font-semibold">
                     <Link href={`/expenses/${encodeURIComponent(e.id)}`} className="hover:underline">{e.number}</Link>
                     {e.status === "void" && <> <Pill>Void</Pill></>}
                   </td>
-                  <td className="num">{e.issue_date}</td>
                   <td>{e.contact.name}</td>
                   <td className="num">{e.reference ?? "—"}</td>
                   <td>{e.paid_from ? `${e.paid_from.code} ${e.paid_from.name}` : "—"}</td>

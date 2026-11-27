@@ -42,7 +42,7 @@ export default async function ScheduledPaymentPage({ params, searchParams }: Pag
           <Card className="!p-2" label="Bills">
             <div className="overflow-x-auto">
               <table className="tbl">
-                <thead><tr><th scope="col">Bill</th><th scope="col">Their reference</th><th scope="col">Due</th><th scope="col" className="!text-right">Still to pay</th>
+                <thead><tr><th scope="col">Bill</th><th scope="col">Supplier invoice no.</th><th scope="col">Due date</th><th scope="col" className="!text-right">Open balance</th>
                   <th scope="col" className="!text-right">This payment</th></tr></thead>
                 <tbody>
                   {plan.bills.length === 0 && <tr><td colSpan={5} className="text-muted">No bills.</td></tr>}

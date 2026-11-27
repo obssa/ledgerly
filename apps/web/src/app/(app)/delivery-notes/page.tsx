@@ -27,14 +27,14 @@ export default async function DeliveryNotesPage({ searchParams }: PageProps<"/de
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Number</th><th scope="col">Delivered</th><th scope="col">Customer</th><th scope="col">Sales order</th>
-                  <th scope="col">Waybill</th><th scope="col">From</th><th scope="col">Status</th></tr>
+                <tr><th scope="col">Date</th><th scope="col">No.</th><th scope="col">Customer</th><th scope="col">Sales order</th>
+                  <th scope="col">Waybill no.</th><th scope="col">Warehouse</th><th scope="col">Status</th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td className="num font-semibold"><Link href={`/delivery-notes/${encodeURIComponent(r.id)}`} className="hover:underline">{r.number}</Link></td>
                     <td className="num">{r.delivered_on}</td>
+                    <td className="num font-semibold"><Link href={`/delivery-notes/${encodeURIComponent(r.id)}`} className="hover:underline">{r.number}</Link></td>
                     <td>{r.customer}</td>
                     <td className="num"><Link href={`/sales-orders/${encodeURIComponent(r.sales_order_id)}`} className="hover:underline">{r.order_number ?? "—"}</Link></td>
                     <td className="num">{r.reference ?? "—"}</td>

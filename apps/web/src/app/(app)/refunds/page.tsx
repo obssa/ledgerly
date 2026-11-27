@@ -20,15 +20,15 @@ export default async function RefundsPage({ searchParams }: PageProps<"/refunds"
       <Card className="!p-2" label="Refunds">
         <div className="overflow-x-auto">
           <table className="tbl">
-            <thead><tr><th scope="col">Date</th><th scope="col">To or from</th><th scope="col">Way</th><th scope="col">Credit</th><th scope="col">Reference</th><th scope="col" className="!text-right">Amount</th></tr></thead>
+            <thead><tr><th scope="col">Date</th><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Applied to</th><th scope="col">Reference no.</th><th scope="col" className="!text-right">Amount</th></tr></thead>
             <tbody>
               {refunds.length === 0 && <tr><td colSpan={6} className="text-muted">No refunds yet. Refund a credit note, a supplier credit or an overpayment from its page.</td></tr>}
               {refunds.map((r) => (
                 <tr key={r.id}>
                   <td className="num"><Link href={`/refunds/${encodeURIComponent(r.id)}`} className="hover:underline">{r.payment_date}</Link></td>
                   <td>{r.contact?.name}{r.status === "reversed" && <> <Pill tone="bad">Reversed</Pill></>}</td>
-                  <td>{r.direction === "out" ? "Paid to the customer" : "Received from the supplier"}</td>
-                  <td className="num">{r.allocations?.[0]?.document?.number ?? "A payment's unused part"}</td>
+                  <td>{r.direction === "out" ? "Customer refund" : "Supplier refund"}</td>
+                  <td className="num">{r.allocations?.[0]?.document?.number ?? "Unapplied payment"}</td>
                   <td className="num">{r.reference ?? "—"}</td>
                   <td className="num text-right font-semibold">{formatMoney(r.amount, r.currency)}</td>
                 </tr>

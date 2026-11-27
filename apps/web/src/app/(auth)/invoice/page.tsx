@@ -42,10 +42,10 @@ async function Invoice({ searchParams }: Pick<PageProps<"/invoice">, "searchPara
       <h1 className="text-[22px] font-extrabold tracking-tight">{view.company.name}</h1>
       {view.company.tin && <p className="num text-[12px] text-muted">TIN {view.company.tin}</p>}
       <dl className="mt-3 grid grid-cols-2 gap-1 text-[13px]">
-        <dt className="text-muted">Invoice</dt><dd className="num text-right font-semibold">{i.number}</dd>
-        <dt className="text-muted">For</dt><dd className="text-right">{view.customer}</dd>
-        <dt className="text-muted">Issued</dt><dd className="num text-right">{i.issue_date}</dd>
-        {i.due_date && <><dt className="text-muted">Due</dt><dd className="num text-right">{i.due_date}</dd></>}
+        <dt className="text-muted">Invoice no.</dt><dd className="num text-right font-semibold">{i.number}</dd>
+        <dt className="text-muted">Bill to</dt><dd className="text-right">{view.customer}</dd>
+        <dt className="text-muted">Invoice date</dt><dd className="num text-right">{i.issue_date}</dd>
+        {i.due_date && <><dt className="text-muted">Due date</dt><dd className="num text-right">{i.due_date}</dd></>}
       </dl>
       <ul className="mt-3 divide-y divide-line border-y border-line text-[13px]">
         {i.lines.map((l, n) => (
@@ -56,10 +56,10 @@ async function Invoice({ searchParams }: Pick<PageProps<"/invoice">, "searchPara
         ))}
       </ul>
       <dl className="mt-2 text-[13px]">
-        <div className="flex justify-between"><dt>Before tax</dt><dd className="num">{formatAmount(i.subtotal)}</dd></div>
+        <div className="flex justify-between"><dt>Subtotal</dt><dd className="num">{formatAmount(i.subtotal)}</dd></div>
         <div className="flex justify-between"><dt>Tax</dt><dd className="num">{formatAmount(i.tax_total)}</dd></div>
         <div className="mt-1 flex justify-between border-t border-ink pt-1 font-bold"><dt>Total</dt><dd className="num">{formatMoney(i.total, i.currency)}</dd></div>
-        <div className="mt-1 flex justify-between text-[16px] font-extrabold"><dt>{i.paid ? "Paid" : "Still due"}</dt><dd className="num">{i.paid ? "In full" : formatMoney(i.amount_due, i.currency)}</dd></div>
+        <div className="mt-1 flex justify-between text-[16px] font-extrabold"><dt>{i.paid ? "Paid" : "Balance due"}</dt><dd className="num">{i.paid ? "In full" : formatMoney(i.amount_due, i.currency)}</dd></div>
       </dl>
       {i.notes && <p className="mt-3 whitespace-pre-line text-[13px]">{i.notes}</p>}
       {!i.paid && view.company.payment_details && (

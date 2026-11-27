@@ -26,7 +26,7 @@ export default async function RequisitionsPage({ searchParams }: PageProps<"/pur
         </p>
         {list.data.length === 0 ? <p className="text-sm text-muted">No requests yet.</p> : (
           <table className="tbl">
-            <thead><tr><th scope="col">Asked</th><th scope="col">By</th><th scope="col">For</th><th scope="col">Needed by</th><th scope="col">Status</th></tr></thead>
+            <thead><tr><th scope="col">Date</th><th scope="col">Requested by</th><th scope="col">Description</th><th scope="col">Needed by</th><th scope="col">Status</th></tr></thead>
             <tbody>
               {list.data.map((r) => (
                 <tr key={r.id}>

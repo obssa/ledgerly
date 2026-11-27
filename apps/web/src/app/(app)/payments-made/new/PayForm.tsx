@@ -74,7 +74,7 @@ export function PayForm({ options }: { options: PayOptions & { supplier: NonNull
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Bill</th><th scope="col">Their reference</th><th scope="col">Due</th><th scope="col" className="!text-right">To pay</th><th scope="col" className="!text-right">Pay now</th></tr>
+                <tr><th scope="col">Bill</th><th scope="col">Supplier invoice no.</th><th scope="col">Due date</th><th scope="col" className="!text-right">Open balance</th><th scope="col" className="!text-right">Pay now</th></tr>
               </thead>
               <tbody>
                 {bills.map((b, i) => (

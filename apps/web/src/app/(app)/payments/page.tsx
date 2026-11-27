@@ -1,6 +1,7 @@
 import { ListPager, ListPeriod } from "@/components/ListPeriod";
 import { listQuery } from "@/lib/lists";
 import Link from "@/components/Link";
+import { appliedTo, methodLabel } from "@/lib/docStatus";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getPaymentsReceived, getReportPeriod } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
@@ -21,7 +22,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
         <div className="overflow-x-auto">
           <table className="tbl">
             <thead>
-              <tr><th scope="col">Date</th><th scope="col">Customer</th><th scope="col">Method</th><th scope="col">Reference</th><th scope="col">Invoices</th><th scope="col" className="!text-right">Amount</th></tr>
+              <tr><th scope="col">Date</th><th scope="col">Customer</th><th scope="col">Payment method</th><th scope="col">Reference no.</th><th scope="col">Applied to</th><th scope="col" className="!text-right">Amount</th></tr>
             </thead>
             <tbody>
               {payments.length === 0 && <tr><td colSpan={6} className="text-muted">No payments yet.</td></tr>}
@@ -29,9 +30,9 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
                 <tr key={p.id}>
                   <td className="num"><Link href={`/payments/${encodeURIComponent(p.id)}`} className="hover:underline">{p.payment_date}</Link></td>
                   <td>{p.contact?.name}{p.status === "reversed" && <> <Pill tone="bad">Reversed</Pill></>}</td>
-                  <td>{p.method.replace("_", " ")}</td>
+                  <td>{methodLabel(p.method)}</td>
                   <td className="num">{p.reference ?? "—"}</td>
-                  <td>{p.allocations_count ?? 0}</td>
+                  <td>{appliedTo(p.allocations_count, "invoice")}</td>
                   <td className="num text-right font-semibold">{formatMoney(p.amount, p.currency)}</td>
                 </tr>
               ))}
