@@ -97,11 +97,11 @@ export function trialBalanceLines(results: TrialBalanceRow[][]): { code: string;
 }
 
 /** The lines as a file's rows: Code, Account, a column per period, then the change columns asked for. */
-export function lineCells(lines: Line[], headers: string[], diff: Diff, extra?: { header: string; value: (l: Line) => string }): Cell[][] {
+export function lineCells(lines: Line[], headers: string[], diff: Diff, extra?: { header: string; value: (l: Line) => string }, first = "Account"): Cell[][] {
   const compared = headers.length > 1;
   const amount = compared && (diff === "amount" || diff === "both");
   const pct = compared && (diff === "pct" || diff === "both");
-  const rows: Cell[][] = [["Code", "Account", ...headers, ...(extra ? [extra.header] : []), ...(amount ? ["Change"] : []), ...(pct ? ["% change"] : [])]];
+  const rows: Cell[][] = [["Code", first, ...headers, ...(extra ? [extra.header] : []), ...(amount ? ["Change"] : []), ...(pct ? ["% change"] : [])]];
   for (const l of lines.filter(shows)) {
     if (l.kind === "heading") { rows.push([null, l.label]); continue; }
     rows.push([l.code ?? null, l.label, ...l.values, ...(extra ? [extra.value(l)] : []), ...(amount ? [amountChange(l.values)] : []), ...(pct ? [pctChange(l.values)] : [])]);

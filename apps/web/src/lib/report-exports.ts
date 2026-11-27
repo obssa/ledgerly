@@ -7,6 +7,7 @@ import { formatDate, pickDateFormat } from "./dates";
 import { perUnit } from "./decimal";
 import { pickAsOfComparisons, pickDiff, pickRangeComparisons, periodColumnLabel } from "./compare";
 import { balanceSheetLines, cashFlowLines, directCashFlowLines, lineCells, profitAndLossLines, trialBalanceLines } from "./compareLines";
+import { measureLines } from "./compareLinesMeasure";
 import { trialTotals } from "./ledger";
 import type { PeriodContext } from "./periods";
 import { STATEMENT_DEFAULTS, statementColumns, statementRow } from "./ledgerColumns";
@@ -37,6 +38,29 @@ type Ageing = Awaited<ReturnType<typeof ledgerly.arAgeing>>;
 
 /** The company's period context, for comparisons (the export route passes it; Gregorian today otherwise). */
 const periodCtx = (p: Params): PeriodContext => p.periodCtx ?? { today: new Date().toISOString().slice(0, 10), calendar: p.calendar ?? "gregorian", fiscalStartMonth: 1 };
+
+/**
+ * A report of one figure per row compared with other periods, as its page does: null when it is not compared. The
+ * rows joined across the periods, a column per period, and the change columns asked for.
+ */
+async function comparedRange<R, T>(p: Params, fetch: (from: string, to: string) => Promise<R>, rows: (r: R) => readonly T[], key: (t: T) => string,
+  value: (t: T) => string, label: (t: T) => string, total: { label: string; value: (r: R) => string } | undefined, first: string): Promise<Cell[][] | null> {
+  const open = p.open === "1";
+  const cmp = pickRangeComparisons(p.cq ?? {}, { from: open ? null : p.from ?? null, to: open ? null : p.to ?? null }, periodCtx(p));
+  if (cmp.periods.length === 0) return null;
+  const results = await Promise.all([{ from: p.from ?? "", to: p.to ?? "" }, ...cmp.periods].map((r) => fetch(r.from, r.to)));
+  const own = p.from && p.to && !open ? periodColumnLabel({ from: p.from, to: p.to }, periodCtx(p)) : "This period";
+  return lineCells(measureLines(results, rows, key, value, label, total), [own, ...cmp.periods.map((c) => c.label)], pickDiff(p.cq ?? {}, "pct"), undefined, first);
+}
+
+/** The same for a report at a date, compared with other dates. */
+async function comparedAsOf<R, T>(p: Params, asOf: string, fetch: (date: string) => Promise<R>, rows: (r: R) => readonly T[], key: (t: T) => string,
+  value: (t: T) => string, label: (t: T) => string, total: { label: string; value: (r: R) => string } | undefined, first: string): Promise<Cell[][] | null> {
+  const cmp = pickAsOfComparisons(p.cq ?? {}, asOf, periodCtx(p));
+  if (cmp.dates.length === 0) return null;
+  const results = await Promise.all([asOf, ...cmp.dates.map((d) => d.asOf)].map((d) => fetch(d)));
+  return lineCells(measureLines(results, rows, key, value, label, total), [day(p, asOf), ...cmp.dates.map((d) => d.label)], pickDiff(p.cq ?? {}, "pct"), undefined, first);
+}
 
 /** A date inside a line of text, written the company's way. */
 const day = (p: Params, iso: string) => formatDate(iso, { calendar: p.calendar ?? "gregorian", dateFormat: pickDateFormat(p.dateFormat) });
@@ -169,12 +193,19 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: "cash-flow", rows: lineCells(cashFlowLines(results), headers, diff) };
     }
     case "changes-in-equity": {
+      const compared = await comparedRange(p, (from, to) => ledgerly.changesInEquity({ from, to }, ctx), (x) => x.lines, (l) => l.code ?? l.name, (l) => l.closing,
+        (l) => l.name, { label: "Total equity", value: (x) => x.closing }, "Equity at the end");
+      if (compared) return { title: "changes-in-equity", rows: compared };
       const s = await ledgerly.changesInEquity({ from: p.from, to: p.to }, ctx);
       return { title: "changes-in-equity", rows: [["Code", "Equity", "At the start", "Movement", "At the end"], ...s.lines.map((l) => [l.code, l.name, l.opening, l.movement, l.closing]),
         [null, "Total equity", s.opening, s.movement, s.closing]] };
     }
     case "profit-by-dimension": {
-      const r = await ledgerly.profitByDimension({ kind: p.kind ?? "location", from: p.from, to: p.to }, ctx);
+      const kind = p.kind ?? "location";
+      const compared = await comparedRange(p, (from, to) => ledgerly.profitByDimension({ kind, from, to }, ctx), (x) => x.rows, (x) => x.id ?? "none", (x) => x.profit,
+        (x) => `${x.code ? `${x.code} ` : ""}${x.name}`, { label: "Total profit", value: (x) => x.totals.profit }, `Profit by ${kind}`);
+      if (compared) return { title: `profit-by-${kind}`, rows: compared };
+      const r = await ledgerly.profitByDimension({ kind, from: p.from, to: p.to }, ctx);
       return { title: `profit-by-${r.kind}`, rows: [["Code", r.kind, "Income", "Cost of sales", "Expenses", "Profit", "Margin %"],
         ...r.rows.map((x) => [x.code, x.name, x.income, x.cost_of_sales, x.expenses, x.profit, x.margin]),
         [null, "Total", r.totals.income, r.totals.cost_of_sales, r.totals.expenses, r.totals.profit, null]] };
@@ -192,6 +223,10 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
         ...(list.length > 0 ? [cols.map((c, i) => (i === 0 ? "Total" : sum[c] ?? null))] : [])] };
     }
     case "custom": {
+      const o = { rows: p.rows, columns: p.columns, measure: p.measure, account_type: p.account_type, project_id: p.project_id, location_id: p.location_id, class_id: p.class_id };
+      const compared = await comparedRange(p, (from, to) => ledgerly.customReport({ from, to, ...o }, ctx), (x) => x.rows, (x) => x.key ?? "none", (x) => x.total,
+        (x) => `${x.code ? `${x.code} ` : ""}${x.label}`, { label: "Total", value: (x) => x.total }, "Row");
+      if (compared) return { title: `custom-by-${p.rows ?? "account"}`, rows: compared };
       const r = await ledgerly.customReport({ from: p.from, to: p.to, rows: p.rows, columns: p.columns, measure: p.measure, account_type: p.account_type,
         project_id: p.project_id, location_id: p.location_id, class_id: p.class_id }, ctx);
       const many = r.columns.length > 1;
@@ -200,7 +235,12 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
     }
     case "sales":
     case "purchases": {
-      const r = await ledgerly.documentAnalysis(report, { group: p.group ?? "contact", from: p.from, to: p.to }, ctx);
+      // Compared by customer, supplier, item or salesperson (months do not line up across periods).
+      const group = p.group ?? "contact";
+      const compared = group === "month" ? null : await comparedRange(p, (from, to) => ledgerly.documentAnalysis(report, { group, from, to }, ctx), (x) => x.rows,
+        (x) => x.key ?? "none", (x) => x.amount, (x) => x.label, { label: "Total", value: (x) => x.totals.amount }, "Name");
+      if (compared) return { title: `${report}-by-${group}`, rows: compared };
+      const r = await ledgerly.documentAnalysis(report, { group, from: p.from, to: p.to }, ctx);
       const heading = ({ contact: report === "sales" ? "Customer" : "Supplier", item: "Item", month: "Month", salesperson: "Salesperson" } as Record<string, string>)[r.group] ?? r.group;
       return { title: `${report}-by-${r.group}`, rows: [[heading, "Quantity", "Documents", "Amount", "Tax", "Share %"],
         ...r.rows.map((x) => [x.label, x.quantity, x.documents, x.amount, x.tax, x.share]), ["Total", null, null, r.totals.amount, r.totals.tax, null]] };
@@ -237,6 +277,9 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
       return { title: "cash-forecast", rows, period: `The next ${weeks} weeks, from ${day(p, f.as_of)}` };
     }
     case "inventory-valuation": {
+      const compared = await comparedAsOf(p, p.as_of ?? p.to ?? "", (d) => ledgerly.inventoryValuation(d, ctx), (x) => x.rows, (r) => `${r.item_id}|${r.warehouse}`,
+        (r) => r.value, (r) => `${r.name}${r.sku ? ` (${r.sku})` : ""} · ${r.warehouse}`, { label: "Total", value: (x) => x.stock_value }, "Item · warehouse");
+      if (compared) return { title: "inventory-valuation", rows: compared };
       const v = await ledgerly.inventoryValuation(p.as_of, ctx);
       return { title: "inventory-valuation", rows: [["SKU", "Item", "Unit", "Warehouse", "Quantity", "Average cost", "Value"],
         ...v.rows.map((r) => [r.sku, r.name, r.unit, r.warehouse, r.quantity, perUnit(r.value, r.quantity), r.value]),
@@ -266,7 +309,12 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
     case "ar-ageing": case "ap-ageing": {
       // The periods asked for (days per period, how many); the detail when the page showed it.
       const periods = pickPeriods({ interval: p.interval, periods: p.periods });
-      const r = report === "ar-ageing" ? await ledgerly.arAgeing(p.as_of, ctx, periods) : await ledgerly.apAgeing(p.as_of, ctx, periods);
+      // The summary compared: what each customer (or supplier) owes at each date.
+      const owed = (d?: string) => (report === "ar-ageing" ? ledgerly.arAgeing(d, ctx, periods) : ledgerly.apAgeing(d, ctx, periods));
+      const compared = p.view === "detail" ? null : await comparedAsOf(p, p.as_of ?? p.to ?? "", owed, (x) => x.rows, (x) => x.contact_id, (x) => x.total, (x) => x.name,
+        { label: "Total", value: (x) => x.totals.total ?? "0.00" }, report === "ar-ageing" ? "Customer" : "Supplier");
+      if (compared) return { title: report, rows: compared };
+      const r = await owed(p.as_of);
       if (p.view === "detail") return ageingDetail(report, r, p, report === "ap-ageing" ? "Advances and credits not used" : "Credit not used");
       return ageing(report, r);
     }

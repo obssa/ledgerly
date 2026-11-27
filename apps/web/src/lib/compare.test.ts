@@ -100,3 +100,15 @@ describe("a statement with a column per period", () => {
     expect(mergeRows([[{ k: "a" }], [{ k: "b" }, { k: "a" }]], (x) => x.k, () => "1.00", (x) => x.k).map((l) => l.key)).toEqual(["a", "b"]);
   });
 });
+
+describe("a report of one figure per row, compared", () => {
+  it("joins the rows by their key, with a total line", async () => {
+    const { measureLines } = await import("./compareLinesMeasure");
+    type R = { rows: { key: string | null; label: string; amount: string }[]; total: string };
+    const now: R = { rows: [{ key: "c1", label: "Sheger Hotel", amount: "900.00" }, { key: null, label: "Walk-in", amount: "100.00" }], total: "1000.00" };
+    const then: R = { rows: [{ key: "c2", label: "Abebe Cafe", amount: "300.00" }, { key: "c1", label: "Sheger Hotel", amount: "500.00" }], total: "800.00" };
+    const lines = measureLines([now, then], (r) => r.rows, (x) => x.key ?? "none", (x) => x.amount, (x) => x.label, { label: "Total", value: (r) => r.total });
+    expect(lines.map((l) => [l.label, l.values])).toEqual([["Sheger Hotel", ["900.00", "500.00"]], ["Walk-in", ["100.00", null]], ["Abebe Cafe", [null, "300.00"]], ["Total", ["1000.00", "800.00"]]]);
+    expect(lineCells(lines, ["2026", "2025"], "pct", undefined, "Customer")[0]).toEqual(["Code", "Customer", "2026", "2025", "% change"]);
+  });
+});
