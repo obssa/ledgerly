@@ -29,3 +29,6 @@ export const saleItemOption = (i: Item): ItemOption => ({
 export const purchaseItemOption = (i: Item): ItemOption => ({
   id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id, units: i.units ?? [], tracking: i.tracking ?? "none", sku: i.sku ?? null,
 });
+
+/** An account in a form's list: what the list shows and what "+ Add new" hands back. */
+export type AccountOption = { id: string; code: string; name: string };

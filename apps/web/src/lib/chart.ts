@@ -31,3 +31,34 @@ export function byType<T extends { type: AccountType }>(accounts: T[]): { type: 
     .map((type) => ({ type, label: TYPE_LABELS[type], accounts: accounts.filter((a) => a.type === type) }))
     .filter((g) => g.accounts.length > 0);
 }
+
+/**
+ * QuickBooks' "+ Add new" in an account list: the kinds of account a form may add, each with the code range it takes
+ * its next free code from (the IFRS for SMEs chart's: income 4xxx, cost of sales 5xxx, expenses 6xxx, assets 1xxx).
+ */
+export const NEW_ACCOUNT_CHOICES = {
+  sales: { type: "income", kind: "sales", label: "Income", from: 4000, to: 4899 },
+  other_income: { type: "income", kind: "other_income", label: "Other income", from: 4900, to: 4999 },
+  operating: { type: "expense", kind: "operating", label: "Expense", from: 6000, to: 6999 },
+  cogs: { type: "expense", kind: "cogs", label: "Cost of sales", from: 5000, to: 5999 },
+  fixed_asset: { type: "asset", kind: "fixed_asset", label: "Fixed asset", from: 1500, to: 1599 },
+  prepayment: { type: "asset", kind: "prepayment", label: "Prepayment", from: 1400, to: 1499 },
+} as const satisfies Record<string, { type: AccountType; kind: string; label: string; from: number; to: number }>;
+
+export type NewAccountChoice = keyof typeof NEW_ACCOUNT_CHOICES;
+
+/** What a sales form's account list may add, and what a purchase form's may. */
+export const SALE_ACCOUNT_CHOICES: NewAccountChoice[] = ["sales", "other_income"];
+export const COST_ACCOUNT_CHOICES: NewAccountChoice[] = ["operating", "cogs", "fixed_asset", "prepayment"];
+
+/**
+ * The next free code in a range: the next ten after the highest code used in it (6900 → 6910), or the first free
+ * number when the tens are full; null when the range is full. Codes outside it (or not numbers) are left alone.
+ */
+export function nextAccountCode(codes: string[], from: number, to: number): string | null {
+  const taken = new Set(codes.filter((c) => /^\d+$/.test(c)).map(Number).filter((n) => n >= from && n <= to));
+  const top = Math.max(from - 10, ...taken);
+  for (let n = Math.floor(top / 10) * 10 + 10; n <= to; n += 10) if (!taken.has(n)) return String(n);
+  for (let n = from; n <= to; n++) if (!taken.has(n)) return String(n);
+  return null;
+}

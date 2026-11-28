@@ -3,11 +3,12 @@
 import Link from "@/components/Link";
 import { useEffect, useId, useRef, useState, useTransition, type InputHTMLAttributes, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { quickAddContact, quickAddItem, type Added } from "@/app/(app)/quick-add-actions";
+import { quickAddAccount, quickAddContact, quickAddItem, type Added } from "@/app/(app)/quick-add-actions";
 import type { PaymentTerm } from "@/lib/api";
-import type { ContactOption, ItemOption } from "@/lib/options";
+import { NEW_ACCOUNT_CHOICES, SALE_ACCOUNT_CHOICES, COST_ACCOUNT_CHOICES, type NewAccountChoice } from "@/lib/chart";
+import type { AccountOption, ContactOption, ItemOption } from "@/lib/options";
 
-/** The value of the "+ Add new" choice at the top of a customer, supplier or product/service list. */
+/** The value of the "+ Add new" choice at the top of a customer, supplier, product/service or account list. */
 export const ADD_NEW = "__add_new__";
 
 /**
@@ -29,7 +30,9 @@ function QuickDialog({ title, intro, submit, pending, state, onSave, onClose, mo
     d.querySelector<HTMLInputElement>("input[name=name]")?.focus();
   }, []);
   return createPortal(
-    <dialog ref={dialog} aria-labelledby={heading} onClose={onClose}
+    // React passes a dialog's close up through portals too: a New account dialog over New product or service closing
+    // must not close the one under it, so each dialog answers only its own.
+    <dialog ref={dialog} aria-labelledby={heading} onClose={(e) => { if (e.target === e.currentTarget) onClose(); }}
       className="m-auto max-h-[calc(100dvh-32px)] w-[min(560px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-line bg-surface p-0 text-ink shadow-[0_24px_64px_rgba(12,36,32,0.28)] backdrop:bg-[#0c2420]/40 backdrop:backdrop-blur-[2px]">
       <form noValidate className="flex max-h-[calc(100dvh-32px)] flex-col" onSubmit={(e) => {
         e.preventDefault();
@@ -120,9 +123,9 @@ export function AddContact({ side, terms, currencies, baseCurrency, onAdded, onC
 const ITEM_TYPES: [string, string][] = [["service", "Service"], ["non_inventory", "Non-stock product"], ["inventory", "Stock product"]];
 
 /** A new product or service: what it is, its price (or cost) and where it posts; units and stock on its own page. */
-export function AddItem({ side, accounts, account, onAdded, onClose }: {
-  side: "sale" | "purchase"; accounts: { id: string; code: string; name: string }[]; account: string;
-  onAdded: (item: ItemOption) => void; onClose: () => void;
+export function AddItem({ side, accounts, account, onAdded, onAccountAdded, onClose }: {
+  side: "sale" | "purchase"; accounts: AccountOption[]; account: string;
+  onAdded: (item: ItemOption) => void; onAccountAdded?: (account: AccountOption) => void; onClose: () => void;
 }) {
   const [state, setState] = useState<Added<ItemOption>>();
   const [pending, start] = useTransition();
@@ -145,17 +148,84 @@ export function AddItem({ side, accounts, account, onAdded, onClose }: {
       </div>
       <Text id={`${id}-sku`} name="sku" label="SKU (optional)" state={state} maxLength={60} />
       <Text id={`${id}-price`} name="price" label={side === "sale" ? "Sales price" : "Cost"} state={state} inputMode="decimal" placeholder="0.00" />
-      {accounts.length > 0 && (
-        <div>
-          <label className="field-label" htmlFor={`${id}-account`}>{side === "sale" ? "Income account" : "Expense account"}</label>
-          <select className={`field ${state?.fields?.account_id ? "!border-bad" : ""}`} id={`${id}-account`} name="account_id" defaultValue={account}>
-            {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
-          </select>
-        </div>
-      )}
+      <AccountSelect id={`${id}-account`} name="account_id" label={side === "sale" ? "Income account" : "Expense account"} accounts={accounts}
+        defaultValue={account} choices={side === "sale" ? SALE_ACCOUNT_CHOICES : COST_ACCOUNT_CHOICES} invalid={Boolean(state?.fields?.account_id)}
+        onAdded={onAccountAdded} />
       {type === "inventory" && (
         <p className="col-span-full text-[13px] text-muted">Its stock starts at zero. Add opening stock, units and reorder levels on its page under Products and services.</p>
       )}
     </QuickDialog>
+  );
+}
+
+const byCode = (a: AccountOption, b: AccountOption) => a.code.localeCompare(b.code, undefined, { numeric: true });
+
+/** Adds a new account to a list and keeps it in code order, as the chart of accounts lists them. */
+export const withAccount = (list: AccountOption[], added: AccountOption) => [...list.filter((a) => a.id !== added.id), added].sort(byCode);
+
+/**
+ * A new account, QuickBooks' "+ Add new" in an account list: its name, its kind (income on a sales form; expense,
+ * cost of sales or asset on a purchase form) and its code, the next free one unless typed. The rest (the account it
+ * sits under) on the chart of accounts.
+ */
+export function AddAccount({ choices, onAdded, onClose }: {
+  choices: NewAccountChoice[]; onAdded: (account: AccountOption) => void; onClose: () => void;
+}) {
+  const [state, setState] = useState<Added<AccountOption>>();
+  const [pending, start] = useTransition();
+  const id = useId();
+  return (
+    <QuickDialog title="New account" intro="Added to your chart of accounts and chosen here." submit="Save account" pending={pending} state={state} onClose={onClose}
+      more={<Link href="/accounts" target="_blank" className="text-[13px] font-semibold text-primary hover:underline">Chart of accounts ↗</Link>}
+      onSave={(form) => start(async () => {
+        const result = await quickAddAccount(choices, form);
+        if (result.added) onAdded(result.added);
+        else setState(result);
+      })}>
+      <Text id={`${id}-name`} name="name" label="Account name" state={state} wide required maxLength={120} />
+      <div>
+        <label className="field-label" htmlFor={`${id}-choice`}>Account type</label>
+        <select className={`field ${state?.fields?.choice ? "!border-bad" : ""}`} id={`${id}-choice`} name="choice" defaultValue={choices[0]}>
+          {choices.map((c) => <option key={c} value={c}>{NEW_ACCOUNT_CHOICES[c].label}</option>)}
+        </select>
+      </div>
+      <Text id={`${id}-code`} name="code" label="Code (optional)" state={state} maxLength={20} placeholder="Next free code" />
+    </QuickDialog>
+  );
+}
+
+/**
+ * An account list with QuickBooks' "+ Add new" at its top: the new account joins the list and is chosen. For forms
+ * whose fields are read when they are sent; a document's lines keep their own state and use AddAccount directly.
+ */
+export function AccountSelect({ id, name, label, accounts, defaultValue = "", choices, none, canAdd = true, invalid, hint, onAdded, className }: {
+  id: string; name: string; label: string; accounts: AccountOption[]; defaultValue?: string; choices: NewAccountChoice[];
+  /** The empty choice's words, when the account may be left empty. */
+  none?: string; canAdd?: boolean; invalid?: boolean; hint?: ReactNode; onAdded?: (account: AccountOption) => void; className?: string;
+}) {
+  const [list, setList] = useState(accounts);
+  const [value, setValue] = useState(defaultValue || (none === undefined ? accounts[0]?.id ?? "" : ""));
+  const [adding, setAdding] = useState(false);
+  return (
+    <div className={className}>
+      <label className="field-label" htmlFor={id}>{label}</label>
+      <select className={`field ${invalid ? "!border-bad" : ""}`} id={id} name={name} value={value} aria-invalid={invalid || undefined}
+        onChange={(e) => (e.target.value === ADD_NEW ? setAdding(true) : setValue(e.target.value))}>
+        {/* Nothing chosen yet (an empty list): a blank first choice, so "+ Add new" is never sent as the account. */}
+        {(none !== undefined || value === "") && <option value="">{none ?? "Choose an account"}</option>}
+        {canAdd && <option value={ADD_NEW}>+ Add new</option>}
+        {list.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+      </select>
+      {hint}
+      {adding && (
+        <AddAccount choices={choices} onClose={() => setAdding(false)}
+          onAdded={(a) => {
+            setList((l) => withAccount(l, a));
+            setValue(a.id);
+            setAdding(false);
+            onAdded?.(a);
+          }} />
+      )}
+    </div>
   );
 }

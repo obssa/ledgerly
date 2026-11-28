@@ -3,15 +3,16 @@
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { customerBody } from "@/lib/customers";
+import { NEW_ACCOUNT_CHOICES, nextAccountCode, type NewAccountChoice } from "@/lib/chart";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
-import { customerOption, purchaseItemOption, saleItemOption, supplierOption, type ContactOption, type ItemOption } from "@/lib/options";
+import { customerOption, purchaseItemOption, saleItemOption, supplierOption, type AccountOption, type ContactOption, type ItemOption } from "@/lib/options";
 import { getSession } from "@/lib/session";
 import { supplierBody } from "@/lib/suppliers";
 
 /*
- * QuickBooks' "+ Add new" on a document form: a customer, supplier or product or service added without leaving the
+ * QuickBooks' "+ Add new" on a form: a customer, supplier, product or service or account added without leaving the
  * form. The same API calls as the full screens, so the API checks who may add one (contacts.create,
- * inventory.items), validates it and records it in the audit log. What comes back is the new entry in the form's
+ * inventory.items, accounting.chart), validates it and records it in the audit log. What comes back is the new entry in the form's
  * own shape, which the form adds to its list and chooses.
  */
 
@@ -79,5 +80,28 @@ export async function quickAddItem(side: "sale" | "purchase", form: FormData): P
       return { ...state, fields };
     }
     return state;
+  }
+}
+
+/**
+ * A new account in the chart, of one of the kinds the form's list may add (an income account on a sales form, an
+ * expense, cost of sales or asset account on a purchase form). Left empty, its code is the next free one in its range.
+ */
+export async function quickAddAccount(choices: NewAccountChoice[], form: FormData): Promise<Added<AccountOption>> {
+  const ctx = await context();
+  const key = text(form, "choice") as NewAccountChoice | undefined;
+  if (!key || !choices.includes(key) || !(key in NEW_ACCOUNT_CHOICES)) return { error: "Choose the kind of account.", fields: { choice: ["Choose the kind of account."] } };
+  const choice = NEW_ACCOUNT_CHOICES[key];
+  try {
+    let code = text(form, "code");
+    if (!code) {
+      const chart = await ledgerly.accounts(ctx);
+      code = nextAccountCode(chart.data.map((a) => a.code), choice.from, choice.to) ?? undefined;
+      if (!code) return { error: `Every code from ${choice.from} to ${choice.to} is used. Type a code for it.`, fields: { code: ["Type a code."] } };
+    }
+    const account = await ledgerly.addAccount({ code, name: text(form, "name") ?? "", type: choice.type, kind: choice.kind }, ctx);
+    return { added: { id: account.id, code: account.code, name: account.name } };
+  } catch (error) {
+    return refusal(error, "accounts to the chart");
   }
 }

@@ -29,6 +29,8 @@ function itemBody(form: FormData): Record<string, unknown> {
   if (form.has("barcode")) body.barcode = text(form, "barcode") || null;   // 085
   for (const name of ["sale_price", "purchase_price", "reorder_point", "max_level"]) if (form.has(name)) body[name] = amount(text(form, name)) || null;
   if (form.has("preferred_supplier_id")) body.preferred_supplier_id = text(form, "preferred_supplier_id") || null;   // 075
+  // QuickBooks' Income account and Expense account: what its lines on invoices, and on bills and expenses, post to.
+  for (const name of ["income_account_id", "expense_account_id"]) if (form.has(name)) body[name] = text(form, name) || null;
   return body;
 }
 

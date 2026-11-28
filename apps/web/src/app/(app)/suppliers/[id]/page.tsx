@@ -1,6 +1,7 @@
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
+import { isDemoMode } from "@/lib/api";
 import { getCostAccounts, getPaymentTerms, getSupplier } from "@/lib/data";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { ArchiveSupplier, SupplierForm } from "../SupplierForm";
@@ -46,7 +47,7 @@ export default async function SupplierPage({ params }: PageProps<"/suppliers/[id
           )}
         </Card>
         <Card className="min-w-0 flex-[2_1_560px]" label="Supplier details">
-          <SupplierForm supplier={supplier} accounts={accounts} readOnly={!editable} terms={terms} />
+          <SupplierForm supplier={supplier} accounts={accounts} readOnly={!editable} terms={terms} canAddAccount={!isDemoMode()} />
           {!editable && !supplier.demo && <p className="mt-4 text-sm text-muted">Only an accountant, bookkeeper, owner or admin can change a supplier.</p>}
         </Card>
       </div>
