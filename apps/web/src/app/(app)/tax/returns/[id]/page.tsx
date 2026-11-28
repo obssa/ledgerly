@@ -17,7 +17,7 @@ export default async function TaxReturnPage({ params }: PageProps<"/tax/returns/
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/tax" className="hover:underline">Tax centre</Link> / Return</>}
+      <PageTitle crumbs={<>Return</>}
         title={<>{label}, <span className="num">{r.period_start}</span> to <span className="num">{r.period_end}</span> {r.settled_on ? <Pill tone="good">Paid</Pill> : <Pill tone="warn">Filed, not paid</Pill>}</>} />
       <Card className="mb-4" label="Return">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">

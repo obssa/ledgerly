@@ -24,7 +24,7 @@ export default async function EditScheduledPaymentPage({ params }: PageProps<"/p
 
   return (
     <>
-      <PageTitle eyebrow={<Link href={`/payments-made/scheduled/${encodeURIComponent(plan.id)}`} className="hover:underline">Money out / Scheduled payments / {plan.contact.name}</Link>}
+      <PageTitle crumbs={[<Link key="plan" href={`/payments-made/scheduled/${encodeURIComponent(plan.id)}`} className="hover:underline">{plan.contact.name}</Link>, "Edit"]}
         title="Edit scheduled payment" />
       <ScheduleForm supplier={plan.contact} currency={plan.currency} today={plan.today} bills={bills}
         accounts={paymentAccounts(options.accounts, plan.currency, options.baseCurrency)}

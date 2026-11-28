@@ -20,7 +20,7 @@ export default async function ImportPage({ searchParams }: PageProps<"/import">)
   const link = (key: string) => `/import?kind=${key}${from ? `&from=${from}` : ""}`;
   return (
     <>
-      <PageTitle eyebrow="Setup" title="Import from a spreadsheet" />
+      <PageTitle title="Import from a spreadsheet" />
       <Segmented label="What to import" items={(Object.keys(IMPORT_KINDS) as (keyof typeof IMPORT_KINDS)[]).map((key) => (
         { key, href: link(key), label: IMPORT_KINDS[key].label, active: key === kind }
       ))} />

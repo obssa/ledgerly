@@ -42,7 +42,7 @@ export default async function BillPage({ params, searchParams }: PageProps<"/bil
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / {kind}</>}
+        crumbs={<>{kind}</>}
         title={<>{kind} {bill.number ? <span className="num">{bill.number}</span> : "(draft)"} <Pill tone={status.tone}>{status.label}</Pill></>}
         actions={credit || bill.demo ? undefined
           : ["draft", "awaiting_approval"].includes(bill.status) && bill.can.edit ? <Link href={`/bills/${encodeURIComponent(bill.id)}/edit`} className="btn">Edit draft</Link>

@@ -67,6 +67,7 @@ use App\Http\Controllers\LeaseController;
 use App\Http\Controllers\LogoController;
 use App\Http\Controllers\LedgerController;
 use App\Http\Controllers\MfaController;
+use App\Http\Controllers\ContactStatementsController;
 use App\Http\Controllers\NumberingController;
 use App\Http\Controllers\PaymentTermController;
 use App\Http\Controllers\OpeningBalanceController;
@@ -200,6 +201,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('company/export', [CompanyExportController::class, 'download']);
                 Route::post('invoices/{invoice}/remind', [InvoiceController::class, 'remind']);
                 Route::post('invoices/{invoice}/email', [InvoiceController::class, 'email']);
+                Route::post('customer-statements/email', [ContactStatementsController::class, 'email']);
                 Route::post('quotes/{quote}/email', [QuoteController::class, 'email']);
                 Route::post('company/logo', [LogoController::class, 'store']);   // 100: not changed in the shared demo
                 Route::post('company/logo/remove', [LogoController::class, 'remove']);
@@ -400,6 +402,8 @@ Route::prefix('v1')->group(function () {
             Route::post('suppliers', [SupplierController::class, 'store']);
             Route::get('suppliers/{supplier}', [SupplierController::class, 'show']);
             Route::get('suppliers/{supplier}/statement', [SupplierController::class, 'statement']);
+            Route::get('customer-statements', [ContactStatementsController::class, 'customers']);   // QuickBooks' Create statements
+            Route::get('supplier-statements', [ContactStatementsController::class, 'suppliers']);
             Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
 
             // Purchase orders (068): issued to a supplier, billed in parts, closed or cancelled; nothing posts.

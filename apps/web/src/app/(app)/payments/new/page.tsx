@@ -11,7 +11,7 @@ export default async function ReceivePaymentPage({ searchParams }: PageProps<"/p
 
   return (
     <>
-      <PageTitle eyebrow="Money in / Payments received" title="Receive a payment" />
+      <PageTitle title="Receive a payment" />
       <Card className="mb-4 max-w-[720px]" label="Customer">
         <form className="flex flex-wrap items-end gap-2.5">
           <div className="min-w-[240px] flex-1">

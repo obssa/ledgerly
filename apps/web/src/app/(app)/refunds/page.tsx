@@ -16,7 +16,7 @@ export default async function RefundsPage({ searchParams }: PageProps<"/refunds"
   const refunds = await getRefunds(listQuery(q, period.picked));
   return (
     <>
-      <PageTitle eyebrow="Money in and out" title="Refunds" />
+      <PageTitle title="Refunds" />
       <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Refunds">
         <div className="overflow-x-auto">

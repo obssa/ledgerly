@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle } from "@/components/ui";
 import { getRecurringInvoices } from "@/lib/data";
@@ -12,7 +11,7 @@ export default async function RecurringInvoicesPage() {
   if (!data) notFound();
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / Recurring</>} title="Recurring invoices" />
+      <PageTitle title="Recurring invoices" />
       <p className="mb-4 max-w-[760px] text-sm text-muted">
         Each makes an ordinary invoice on its dates, posted or left as a draft, as the person who set it up or last resumed it. To set one up, open an
         invoice and choose &ldquo;Repeat this invoice&rdquo;.

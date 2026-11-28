@@ -18,7 +18,7 @@ export default async function GoodsReceiptPage({ params }: PageProps<"/goods-rec
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / <Link href="/goods-received" className="hover:underline">Goods received</Link> / {r.number}</>}
+        crumbs={<><Link href="/goods-received" className="hover:underline">Goods received</Link> › {r.number}</>}
         title={<>Goods received <span className="num">{r.number}</span> {r.status === "void" ? <Pill>Void</Pill> : <Pill tone="good">Received</Pill>}</>}
       />
       <div className="flex flex-wrap items-start gap-4">

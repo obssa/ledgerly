@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { redirect } from "next/navigation";
 import { Card, PageTitle } from "@/components/ui";
 import { getExpenseClaims } from "@/lib/data";
@@ -12,7 +11,7 @@ export default async function NewExpenseClaimPage() {
   if (!claims) redirect("/no-access");
   return (
     <>
-      <PageTitle eyebrow={<Link href="/expense-claims" className="hover:underline">Expense claims</Link>} title="New expense claim" />
+      <PageTitle title="New expense claim" />
       <Card className="max-w-[900px]" label="New expense claim">
         <NewClaimForm accounts={claims.options.accounts} taxRates={claims.options.tax_rates} />
       </Card>

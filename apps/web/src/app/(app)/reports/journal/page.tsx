@@ -59,7 +59,7 @@ export default async function JournalReportPage({ searchParams }: PageProps<"/re
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>} title="Journal report"
+      <PageTitle crumbs={<>Ledger</>} title="Journal report"
         actions={<ExportLink report="journal" params={{ ...exportPeriod(period.picked), source: source || undefined, cols: custom ? cols.join(",") : undefined }} />} />
       <DateRangeFilter picked={period.picked} keep={{ cols: custom ? cols.join(",") : undefined }} fields={["source"]}>
         <div>

@@ -20,7 +20,7 @@ export default async function RecurringJournalPage({ params }: PageProps<"/journ
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/journal/recurring" className="hover:underline">Recurring journals</Link> / {t.name}</>}
+      <PageTitle crumbs={<>{t.name}</>}
         title={<>{t.name} <Pill tone={t.is_active ? "good" : t.last_error ? "bad" : "neutral"}>{t.is_active ? "Running" : "Paused"}</Pill></>} />
       {t.last_error && (
         <p role="alert" className="mb-4 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">Paused because: {t.last_error}</p>

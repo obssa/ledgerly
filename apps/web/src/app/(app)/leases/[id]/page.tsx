@@ -19,7 +19,7 @@ export default async function LeasePage({ params }: PageProps<"/leases/[id]">) {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/leases" className="hover:underline">Leases</Link> / <span className="num">{l.code}</span></>}
+      <PageTitle crumbs={<><span className="num">{l.code}</span></>}
         title={<>{l.name} {l.status === "ended" && <Pill>Ended</Pill>}</>} />
       <Card className="mb-4" label="Lease">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">

@@ -17,7 +17,7 @@ export default async function SalesReceiptsPage({ searchParams }: PageProps<"/sa
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / Cash sales</>} title="Cash sales"
+      <PageTitle title="Cash sales"
         actions={<Link href="/sales-receipts/new" className="btn btn-primary">+ Record a cash sale</Link>} />
       <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Cash sales">

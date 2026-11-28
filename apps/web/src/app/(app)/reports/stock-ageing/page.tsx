@@ -23,7 +23,7 @@ export default async function StockAgeingPage({ searchParams }: PageProps<"/repo
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Inventory" title="Stock ageing" actions={<ExportLink report="stock-ageing" params={{ as_of: asOf, warehouse_id: warehouseId }} />} />
+      <PageTitle title="Stock ageing" actions={<ExportLink report="stock-ageing" params={{ as_of: asOf, warehouse_id: warehouseId }} />} />
       <AsOfFilter picked={at.picked} keep={q} fields={["warehouse_id"]}>
         <div className="min-w-[180px]"><label className="field-label" htmlFor="warehouse_id">Warehouse</label>
           <select className="field" id="warehouse_id" name="warehouse_id" defaultValue={warehouseId ?? ""}><option value="">All warehouses</option>

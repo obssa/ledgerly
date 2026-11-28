@@ -23,8 +23,8 @@ export default async function ReconcilePage({ params }: PageProps<"/banking/[id]
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / <Link href={`/banking/${encodeURIComponent(id)}`} className="hover:underline">
-          <span className="num">{account.code}</span> {account.name}</Link> / Reconcile</>}
+        crumbs={<><Link href={`/banking/${encodeURIComponent(id)}`} className="hover:underline">
+          <span className="num">{account.code}</span> {account.name}</Link> › Reconcile</>}
         title="Reconcile"
       />
       <AccountTabs id={id} current="reconcile" />

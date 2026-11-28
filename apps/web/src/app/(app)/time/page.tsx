@@ -18,7 +18,7 @@ export default async function TimesheetsPage({ searchParams }: PageProps<"/time"
 
   return (
     <>
-      <PageTitle eyebrow="Operations" title="Timesheets" />
+      <PageTitle title="Timesheets" />
       {!entries || !options ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (
         <>
           <Card className="mb-4" label="Log hours">

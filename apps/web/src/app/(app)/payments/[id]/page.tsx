@@ -23,7 +23,7 @@ export default async function PaymentPage({ params }: PageProps<"/payments/[id]"
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/payments" className="hover:underline">Payments received</Link> / Payment</>}
+        crumbs={<>Payment</>}
         title={<>{formatMoney(payment.amount, payment.currency)} from {payment.contact?.name} {payment.bounced_on ? <Pill tone="bad">Bounced</Pill> : payment.status === "reversed" ? <Pill tone="bad">Reversed</Pill> : <Pill tone="good">Recorded</Pill>}</>}
       />
       <div className="flex flex-wrap items-start gap-4">

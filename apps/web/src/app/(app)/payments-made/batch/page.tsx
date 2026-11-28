@@ -14,7 +14,7 @@ export default async function BatchPaymentsPage() {
     .sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999"));
   return (
     <>
-      <PageTitle eyebrow="Money out / Payments made" title="Pay bills in a batch" actions={<Link href="/payments-made/new" className="btn">Pay one supplier</Link>} />
+      <PageTitle title="Pay bills in a batch" actions={<Link href="/payments-made/new" className="btn">Pay one supplier</Link>} />
       <Card className="max-w-[1000px]" label="Pay run">
         <p className="mb-4 text-sm text-muted">
           Tick the bills to pay now, all or part of each. Each supplier gets one payment from the account chosen, with the tax withheld from them

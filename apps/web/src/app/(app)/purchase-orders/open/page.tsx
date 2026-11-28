@@ -13,7 +13,7 @@ export default async function OpenPurchaseOrdersPage() {
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / <Link href="/purchase-orders" className="hover:underline">Purchase orders</Link> / Still to come</>}
+        crumbs={<><Link href="/purchase-orders" className="hover:underline">Purchase orders</Link> › Still to come</>}
         title="Still to come from suppliers"
       />
       {open === null ? <Card><p className="text-sm text-muted">Not available in the demo.</p></Card> : (

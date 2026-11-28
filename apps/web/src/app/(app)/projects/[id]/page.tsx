@@ -40,7 +40,7 @@ export default async function ProjectPage({ params, searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/projects" className="hover:underline">Projects</Link> / <span className="num">{p.code}</span></>}
+      <PageTitle crumbs={<><span className="num">{p.code}</span></>}
         title={<>{p.name} <Pill tone={p.status === "active" ? "good" : p.status === "on_hold" ? "warn" : "neutral"}>{STATUS[p.status] ?? p.status}</Pill></>} />
       <DateRangeFilter picked={range.picked} keep={q} fields={[]}>
         {(period.from || period.to) && <Link href={`/projects/${encodeURIComponent(p.id)}`} className="btn">All time</Link>}

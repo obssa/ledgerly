@@ -19,7 +19,7 @@ export default async function PostDatedChequesPage() {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / Cheques</>} title="Post-dated cheques" />
+      <PageTitle title="Post-dated cheques" />
       {data === null ? <p className="text-sm text-muted">Not available in the demo.</p> : (
         <div className="flex flex-wrap items-start gap-4">
           <div className="flex min-w-0 flex-[2_1_620px] flex-col gap-4">

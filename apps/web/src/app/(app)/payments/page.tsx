@@ -17,7 +17,7 @@ export default async function PaymentsPage({ searchParams }: PageProps<"/payment
 
   return (
     <>
-      <PageTitle eyebrow="Money in" title="Payments received" actions={<Link href="/payments/new" className="btn btn-primary">+ Receive a payment</Link>} />
+      <PageTitle title="Payments received" actions={<Link href="/payments/new" className="btn btn-primary">+ Receive a payment</Link>} />
       <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Payments received">
         <div className="overflow-x-auto">

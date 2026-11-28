@@ -8,7 +8,7 @@ export default async function NewItemPage() {
   const suppliers = await getSupplierChoices();
   return (
     <>
-      <PageTitle eyebrow="Products and services" title="New item" />
+      <PageTitle title="New item" />
       <Card className="max-w-[900px]" label="New item"><ItemForm suppliers={suppliers} /></Card>
     </>
   );

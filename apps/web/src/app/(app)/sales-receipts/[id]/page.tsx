@@ -21,7 +21,7 @@ export default async function SalesReceiptPage({ params }: PageProps<"/sales-rec
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/sales-receipts" className="hover:underline">Cash sales</Link> / Cash sale</>}
+        crumbs={<>Cash sale</>}
         title={<>Cash sale <span className="num">{receipt.number}</span> {voided ? <Pill>Void</Pill> : <Pill tone="good">Paid</Pill>}</>}
       />
       <div className="flex flex-wrap items-start gap-4">

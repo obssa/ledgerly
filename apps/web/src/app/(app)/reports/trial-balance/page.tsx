@@ -41,7 +41,7 @@ export default async function TrialBalancePage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>}
+      <PageTitle
         title={<>Trial balance {rows && (totals[0]?.balanced ? <Pill tone="good">Balanced</Pill> : <Pill tone="bad">Out of balance</Pill>)}</>}
         actions={<ExportLink report="trial-balance" params={{ as_of: asOf, ...compareQuery(cmp.slots, null), ...(fx ? { fx: "1" } : {}) }} />} />
       <AsOfFilter picked={at.picked} keep={q} fields={["compare", "fx", ...COMPARE_FIELDS]}>

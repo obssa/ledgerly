@@ -24,7 +24,7 @@ export default async function UnrealizedGainsPage({ searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Foreign currency" title="Unrealized gains and losses"
+      <PageTitle title="Unrealized gains and losses"
         actions={<><Link href={`/revaluation?as_of=${encodeURIComponent(at.asOf)}`} className="btn">Revalue foreign balances</Link><ExportLink report="unrealized-gains" params={{ as_of: at.asOf }} /></>} />
       <AsOfFilter picked={at.picked} keep={q} />
       <div className="flex flex-wrap items-start gap-4">

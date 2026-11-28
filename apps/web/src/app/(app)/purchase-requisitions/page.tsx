@@ -18,7 +18,7 @@ export default async function RequisitionsPage({ searchParams }: PageProps<"/pur
   if (!list) redirect("/no-access");
   return (
     <>
-      <PageTitle eyebrow="Money out" title="Purchase requisitions" actions={<Link href="/purchase-requisitions/new" className="btn btn-primary">+ Ask for something</Link>} />
+      <PageTitle title="Purchase requisitions" actions={<Link href="/purchase-requisitions/new" className="btn btn-primary">+ Ask for something</Link>} />
       <ListPeriod picked={period.picked} />
       <Card className="max-w-[1000px]" label="Purchase requisitions">
         <p className="mb-3 text-sm text-muted">

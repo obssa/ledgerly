@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "@/components/Link";
+import { PageCrumbs } from "@/components/app-shell/PageCrumbs";
 
 export function Card({ children, className = "", label }: { children: ReactNode; className?: string; label?: string }) {
   return (
@@ -50,11 +51,18 @@ export function Segmented({ items, label, size = "md", className = "" }: { items
   );
 }
 
-export function PageTitle({ eyebrow, title, actions, description }: { eyebrow?: ReactNode; title: ReactNode; actions?: ReactNode; description?: ReactNode }) {
+/**
+ * A page's title. Over it, the page's one breadcrumb (PageCrumbs): its place in the menu, then `crumbs`, the page's
+ * own last steps (a document's number, Edit), each a step. `kicker` replaces the breadcrumb where a page has none
+ * (the home page's date).
+ */
+export function PageTitle({ crumbs, kicker, title, actions, description }: {
+  crumbs?: ReactNode | ReactNode[]; kicker?: ReactNode; title: ReactNode; actions?: ReactNode; description?: ReactNode;
+}) {
   return (
     <div className="mb-5 mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
-        {eyebrow && <div className="text-[13px] font-medium text-muted">{eyebrow}</div>}
+        {kicker ? <div className="text-[13px] font-medium text-muted">{kicker}</div> : <PageCrumbs trail={crumbs} />}
         <h1 className="mt-1 text-[26px] font-bold leading-tight tracking-[-0.02em]">{title}</h1>
         {description && <p className="mt-1.5 max-w-[68ch] text-sm text-muted">{description}</p>}
       </div>

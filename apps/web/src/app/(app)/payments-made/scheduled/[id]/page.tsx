@@ -24,7 +24,7 @@ export default async function ScheduledPaymentPage({ params, searchParams }: Pag
 
   return (
     <>
-      <PageTitle eyebrow={<Link href="/payments-made/scheduled" className="hover:underline">Money out / Scheduled payments</Link>}
+      <PageTitle
         title={<>{plan.contact.name} <span className="num text-muted">{formatMoney(plan.amount, plan.currency)}</span></>}
         actions={open && plan.can.pay ? <Link href={`/payments-made/scheduled/${encodeURIComponent(plan.id)}/edit`} className="btn">Edit</Link> : undefined} />
 

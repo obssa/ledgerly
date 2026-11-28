@@ -16,7 +16,7 @@ export default async function ChartPage({ searchParams }: PageProps<"/accounts">
 
   return (
     <>
-      <PageTitle eyebrow="Books" title="Chart of accounts"
+      <PageTitle title="Chart of accounts"
         actions={<>
           {!chart.demo && <Link href="/accounts/industry" className="btn">Industry accounts</Link>}
           <Link href={archived ? "/accounts" : "/accounts?archived=1"} className="btn">{archived ? "Hide archived" : "Show archived"}</Link>

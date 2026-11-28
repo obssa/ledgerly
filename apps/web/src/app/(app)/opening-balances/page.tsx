@@ -18,7 +18,7 @@ export default async function OpeningBalancesPage() {
   if (data === null) {
     return (
       <>
-        <PageTitle eyebrow="Books" title="Opening balances" />
+        <PageTitle title="Opening balances" />
         <Card className="max-w-[820px]"><p className="text-sm text-muted">Not available in the demo.</p></Card>
       </>
     );
@@ -33,7 +33,7 @@ export default async function OpeningBalancesPage() {
   return (
     <>
       <PageTitle
-        eyebrow="Books"
+       
         title="Opening balances"
         actions={opening.journal_entry ? <Pill tone="good">Posted as entry {opening.journal_entry.number}</Pill> : <Pill tone="warn">Not entered yet</Pill>}
       />

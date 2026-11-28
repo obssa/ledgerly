@@ -21,16 +21,15 @@ export function statusOf(status: PurchaseOrderStatus): { label: string; tone: "n
   } as const)[status] ?? { label: status, tone: "neutral" };
 }
 
-const eyebrow = (last?: string) => (
-  <><Link href="/bills" className="hover:underline">Bills and purchases</Link> / {last ? <><Link href="/purchase-orders" className="hover:underline">Purchase orders</Link> / {last}</> : "Purchase orders"}</>
-);
+/** The breadcrumb's last step under Purchase orders (PageCrumbs): New, Edit, the order's number; none on the list. */
+const eyebrow = (last?: string) => last;
 
 export async function PurchaseOrderList({ q = {} }: { q?: Record<string, string | string[] | undefined> } = {}) {
   const period = await getReportPeriod(q, "all");
   const rows = await getPurchaseOrders(listQuery(q, period.picked));
   return (
     <>
-      <PageTitle eyebrow={eyebrow()} title="Purchase orders" actions={<>
+      <PageTitle crumbs={eyebrow()} title="Purchase orders" actions={<>
         <Link href="/purchase-orders/open" className="btn">Still to come</Link>
         <Link href="/purchase-orders/new" className="btn btn-primary">+ New purchase order</Link>
       </>} />
@@ -72,7 +71,7 @@ export async function NewPurchaseOrder() {
   const options = await getBillOptions();
   return (
     <>
-      <PageTitle eyebrow={eyebrow("New")} title={<>New purchase order <Pill>Draft</Pill></>} />
+      <PageTitle crumbs={eyebrow("New")} title={<>New purchase order <Pill>Draft</Pill></>} />
       <InvoiceForm options={options} kind="purchase_order" />
     </>
   );
@@ -85,7 +84,7 @@ export async function EditPurchaseOrder({ id }: { id: string }) {
   const s = statusOf(doc.status);
   return (
     <>
-      <PageTitle eyebrow={eyebrow("Edit")} title={<>{doc.status === "draft" ? "Edit" : "Revise"} purchase order {doc.number && <span className="num">{doc.number}</span>} <Pill tone={s.tone}>{s.label}</Pill></>} />
+      <PageTitle crumbs={eyebrow("Edit")} title={<>{doc.status === "draft" ? "Edit" : "Revise"} purchase order {doc.number && <span className="num">{doc.number}</span>} <Pill tone={s.tone}>{s.label}</Pill></>} />
       {doc.status !== "draft" && (
         <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
           The supplier has this order. Saving keeps the earlier version, with what changed, and the number stays.
@@ -108,7 +107,7 @@ export async function PurchaseOrderView({ id, saved }: { id: string; saved?: boo
   return (
     <>
       <PageTitle
-        eyebrow={eyebrow(doc.number ?? "Draft")}
+        crumbs={eyebrow(doc.number ?? "Draft")}
         title={<>Purchase order {doc.number ? <span className="num">{doc.number}</span> : "(draft)"} <Pill tone={s.tone}>{s.label}</Pill></>}
         actions={doc.can.edit ? <Link href={`/purchase-orders/${encodeURIComponent(doc.id)}/edit`} className="btn">{doc.status === "draft" ? "Edit draft" : "Revise"}</Link> : undefined}
       />

@@ -18,7 +18,7 @@ export default async function RefundPage({ params }: PageProps<"/refunds/[id]">)
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/refunds" className="hover:underline">Refunds</Link> / Refund</>}
+        crumbs={<>Refund</>}
         title={<>{formatMoney(refund.amount, refund.currency)} {out ? "to" : "from"} {refund.contact?.name} {refund.status === "reversed" ? <Pill tone="bad">Reversed</Pill> : <Pill tone="good">Recorded</Pill>}</>}
       />
       <div className="flex flex-wrap items-start gap-4">

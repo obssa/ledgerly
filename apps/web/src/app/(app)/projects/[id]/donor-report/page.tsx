@@ -19,7 +19,7 @@ export default async function DonorReportPage({ params, searchParams }: PageProp
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/projects" className="hover:underline">Projects</Link> / <Link href={back} className="num hover:underline">{r.project.code}</Link></>}
+      <PageTitle crumbs={<><Link href={back} className="num hover:underline">{r.project.code}</Link></>}
         title="Donor report" />
       <DateRangeFilter picked={period.picked} keep={q} fields={[]}>
 

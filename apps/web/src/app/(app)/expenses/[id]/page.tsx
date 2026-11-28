@@ -20,7 +20,7 @@ export default async function ExpensePage({ params, searchParams }: PageProps<"/
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/expenses" className="hover:underline">Expenses</Link> / Expense</>}
+        crumbs={<>Expense</>}
         title={<>Expense <span className="num">{expense.number}</span> {voided ? <Pill>Void</Pill> : <Pill tone="good">Paid</Pill>}</>}
       />
       <div className="flex flex-wrap items-start gap-4">

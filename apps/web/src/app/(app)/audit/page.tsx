@@ -23,7 +23,7 @@ export default async function AuditLogPage({ searchParams }: PageProps<"/audit">
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Audit" title="Audit log"
+      <PageTitle title="Audit log"
         actions={log ? <ExportLink report="audit-log" params={{ ...exportPeriod(period.picked), action: filters.action, user_id: filters.user_id }} /> : undefined} />
       {!log ? <p className="text-[14px] text-muted">The audit log is not available in the demo.</p> : (
         <>

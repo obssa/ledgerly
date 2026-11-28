@@ -19,7 +19,7 @@ export default async function FinancialHealthPage({ searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Financial health" />
+      <PageTitle title="Financial health" />
       <DateRangeFilter picked={period.picked} keep={q} allowed={CLOSED_RANGE_PRESETS} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/financial-health" />

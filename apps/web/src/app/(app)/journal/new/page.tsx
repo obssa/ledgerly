@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getJournalOptions } from "@/lib/data";
 import { journalAccounts } from "@/lib/journal";
@@ -12,7 +11,7 @@ export default async function NewJournalPage() {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/journal" className="hover:underline">Journal entries</Link> / New</>} title="New journal entry" />
+      <PageTitle title="New journal entry" />
       {!options ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <Card label="Entry">
           <NewJournal accounts={journalAccounts(options.accounts, options.baseCurrency)} dimensions={options.dimensions} />

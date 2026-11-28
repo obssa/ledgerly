@@ -51,7 +51,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / {kind}</>}
+        crumbs={<>{kind}</>}
         title={<>{kind} {invoice.number ? <span className="num">{invoice.number}</span> : "(draft)"} <span className="print:hidden"><Pill tone={status.tone}>{status.label}</Pill></span></>}
         actions={["posted", "part_paid", "paid"].includes(invoice.status)
           ? <>{!creditNote && invoice.can.correct && !invoice.demo && <Link href={`/invoices/${encodeURIComponent(invoice.id)}/edit`} className="btn print:hidden">Edit</Link>}<a href={`/invoices/${encodeURIComponent(invoice.id)}/pdf`} className="btn print:hidden">Download PDF</a><PrintInvoice /></>

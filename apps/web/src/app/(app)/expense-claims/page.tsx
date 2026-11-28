@@ -23,7 +23,7 @@ export default async function ExpenseClaimsPage({ searchParams }: PageProps<"/ex
   if (!claims) redirect("/no-access");
   return (
     <>
-      <PageTitle eyebrow="Money out" title="Expense claims" actions={<Link href="/expense-claims/new" className="btn btn-primary">+ New claim</Link>} />
+      <PageTitle title="Expense claims" actions={<Link href="/expense-claims/new" className="btn btn-primary">+ New claim</Link>} />
       <ListPeriod picked={period.picked} />
       <Card className="max-w-[1000px]" label="Expense claims">
         <p className="mb-3 text-sm text-muted">

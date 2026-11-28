@@ -38,7 +38,7 @@ export default async function ReconciliationPage({ params }: PageProps<"/banking
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / <Link href={back} className="hover:underline">
+        crumbs={<><Link href={back} className="hover:underline">
           <span className="num">{r.account.code}</span> {r.account.name}: reconcile</Link></>}
         title={<>Statement to <span className="num"><Dt v={r.statement_date} /></span> {r.status === "completed" ? <Pill tone="good">Reconciled</Pill> : r.status === "undone" ? <Pill>Undone</Pill> : <Pill tone="warn">In progress</Pill>}</>}
       />

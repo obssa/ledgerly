@@ -75,7 +75,7 @@ export async function AgeingReport({ kind, q }: { kind: "invoice" | "bill"; q: Q
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / {k.eyebrow}</>} title={`${k.short} ageing ${detail ? "detail" : "summary"}`}
+      <PageTitle title={`${k.short} ageing ${detail ? "detail" : "summary"}`}
         actions={<ExportLink report={k.report} params={keep} />} />
       {ageing === null ? (
         <Card><p className="text-sm text-muted">Not available in the demo.</p></Card>

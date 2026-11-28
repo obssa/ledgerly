@@ -38,6 +38,7 @@ export const SECTIONS: NavSection[] = [
       { href: "/payments", label: "Payments received", keywords: "receipts collections receive money" },
       { href: "/credit-notes", label: "Credit notes", keywords: "returns credit memo" },
       { href: "/refunds", label: "Refunds", keywords: "money back customer" },
+      { href: "/customers/statements", label: "Statements", keywords: "customer statements balance forward open item send" },
     ],
   },
   {
@@ -55,6 +56,7 @@ export const SECTIONS: NavSection[] = [
       { href: "/payments-made/bank-file", label: "Bank payment file", keywords: "csv transfer upload", tabHidden: true },
       { href: "/expenses", label: "Expenses", keywords: "spend direct costs receipts" },
       { href: "/expense-claims", label: "Expense claims", keywords: "staff reimbursements" },
+      { href: "/suppliers/statements", label: "Statements", keywords: "supplier statements reconcile what we owe" },
     ],
   },
   {

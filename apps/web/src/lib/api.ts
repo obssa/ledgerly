@@ -126,6 +126,19 @@ export interface OpeningDocument {
   status: string;
 }
 
+/** QuickBooks' Create statements: the kind, the period and who. */
+export type StatementType = "balance_forward" | "open_item" | "transaction";
+export interface StatementsQuery { type?: StatementType; from?: string; to?: string; contact_id?: string; who?: "balance" | "overdue" | "all" }
+export interface ContactStatementLine {
+  date: string; type: string; reference: string | null; document_id: string | null; memo?: string | null; due_date: string | null;
+  days_overdue?: number; charge?: string; payment?: string; amount: string; total?: string; balance: string | null;
+}
+export interface ContactStatements {
+  type: StatementType; from: string; to: string; currency: string; buckets: string[]; more: boolean;
+  statements: { contact: { id: string; name: string; tax_id: string | null; email: string | null }; opening: string | null; closing: string;
+    ageing: Record<string, string>; lines: ContactStatementLine[] }[];
+}
+
 /** QuickBooks' Customize (111): what the sales and purchase forms show, how classes and locations are tracked, custom fields. */
 export interface FormContent {
   sales: Record<FormField, boolean>;
@@ -2002,6 +2015,11 @@ export const ledgerly = {
     api<TransactionReportData>("reports/transactions", { ...ctx, query: q }),
   arAgeing: (asOf: string | undefined, ctx: RequestOptions, periods: { interval?: number; periods?: number } = {}) =>
     api<ArAgeing>("reports/ar-ageing", { ...ctx, query: { as_of: asOf, ...ageingQuery(periods) } }),
+  /** QuickBooks' Create statements: customers' or suppliers' statements for a period. */
+  contactStatements: (side: "customer" | "supplier", q: StatementsQuery, ctx: RequestOptions) =>
+    api<ContactStatements>(`${side}-statements`, { ...ctx, query: { ...q } as Record<string, string | undefined> }),
+  emailStatements: (body: StatementsQuery & { contact_ids: string[]; note?: string }, ctx: RequestOptions) =>
+    api<{ sent: { id: string; name: string; sent_to: string }[]; skipped: { id: string; name: string; reason: "no_email" | "just_sent" }[] }>("customer-statements/email", { ...ctx, method: "POST", body }),
   customerStatement: (id: string, q: { from?: string; to?: string }, ctx: RequestOptions) =>
     api<CustomerStatement>(`customers/${encodeURIComponent(id)}/statement`, { ...ctx, query: q }),
   suppliers: (q: { search?: string; include_archived?: string }, ctx: RequestOptions) =>

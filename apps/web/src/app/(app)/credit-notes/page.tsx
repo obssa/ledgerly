@@ -18,7 +18,7 @@ export default async function CreditNotesPage({ searchParams }: PageProps<"/cred
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / Credit notes</>} title="Credit notes" />
+      <PageTitle title="Credit notes" />
       <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Credit notes">
         <div className="overflow-x-auto">

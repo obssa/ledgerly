@@ -62,7 +62,7 @@ export default async function BinCardPage({ searchParams }: PageProps<"/inventor
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href={`/products/${encodeURIComponent(item.id)}`} className="hover:underline">{item.name}</Link> / Bin card</>}
+      <PageTitle crumbs={<><Link href={`/products/${encodeURIComponent(item.id)}`} className="hover:underline">{item.name}</Link> › Bin card</>}
         title={<>Bin card · {warehouse?.name ?? "Warehouse"}</>} />
       <DateRangeFilter picked={period.picked} keep={{ cols: custom ? cols.join(",") : undefined }} fields={["item", "warehouse"]}>
         <input type="hidden" name="item" value={itemId} /><input type="hidden" name="warehouse" value={warehouseId} />

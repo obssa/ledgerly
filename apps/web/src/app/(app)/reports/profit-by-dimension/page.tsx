@@ -34,7 +34,7 @@ export default async function ProfitByDimensionPage({ searchParams }: PageProps<
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Profit by location, class or project" actions={<ExportLink report="profit-by-dimension" params={{ kind, ...exportPeriod(period.picked), ...compareQuery(cmp.slots, diff) }} />} />
+      <PageTitle title="Profit by location, class or project" actions={<ExportLink report="profit-by-dimension" params={{ kind, ...exportPeriod(period.picked), ...compareQuery(cmp.slots, diff) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["kind", ...COMPARE_FIELDS]}>
         <div><label className="field-label" htmlFor="kind">By</label>
           <select className="field" id="kind" name="kind" defaultValue={kind}>{KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>

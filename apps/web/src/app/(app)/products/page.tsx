@@ -16,7 +16,7 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
 
   return (
     <>
-      <PageTitle eyebrow="Money in" title="Products and services"
+      <PageTitle title="Products and services"
         actions={<><Link href="/sales-orders/back-orders" className="btn">Back-orders</Link>{can.edit && !demo && <Link href="/products/new" className="btn btn-primary">+ New item</Link>}</>} />
       <form className="mb-4 flex flex-wrap items-end gap-2.5" role="search">
         <div className="min-w-[240px] flex-1"><label className="field-label" htmlFor="q">Search by name or SKU</label><input className="field" id="q" name="q" defaultValue={search} /></div>

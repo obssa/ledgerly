@@ -29,7 +29,7 @@ export default async function ChangesReport({ searchParams }: PageProps<"/report
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Audit" title="Changes" description="Every edit, void and credit of an invoice or bill: who made it, when, why, and exactly what changed." />
+      <PageTitle title="Changes" description="Every edit, void and credit of an invoice or bill: who made it, when, why, and exactly what changed." />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/changes" />
         <div className="min-w-0 flex-[4_1_560px]">

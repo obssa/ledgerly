@@ -23,7 +23,7 @@ export default async function PaymentMadePage({ params, searchParams }: PageProp
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/payments-made" className="hover:underline">Payments made</Link> / Payment</>}
+        crumbs={<>Payment</>}
         title={<>{formatMoney(payment.amount, payment.currency)} to {payment.contact?.name} {payment.status === "reversed" ? <Pill tone="bad">Reversed</Pill> : <Pill tone="good">Recorded</Pill>}</>}
       />
       {cash === "over" && (

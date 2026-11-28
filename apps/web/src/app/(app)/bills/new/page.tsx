@@ -9,7 +9,7 @@ export default async function NewBillPage() {
 
   return (
     <>
-      <PageTitle eyebrow="Bills and purchases / New bill" title={<>New bill <Pill>Draft</Pill></>} />
+      <PageTitle title={<>New bill <Pill>Draft</Pill></>} />
       <InvoiceForm options={options} kind="bill" />
     </>
   );

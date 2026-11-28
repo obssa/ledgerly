@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getAssetOptions } from "@/lib/data";
 import { AssetForm } from "../AssetForms";
@@ -11,7 +10,7 @@ export default async function NewAssetPage() {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/fixed-assets" className="hover:underline">Fixed assets</Link> / New</>} title="Register an asset" />
+      <PageTitle title="Register an asset" />
       {!options ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <Card label="Asset"><AssetForm options={options} /></Card>
       )}

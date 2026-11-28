@@ -37,7 +37,7 @@ export default async function BalanceSheetPage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Balance sheet" actions={<ExportLink report="balance-sheet" params={params} />} />
+      <PageTitle title="Balance sheet" actions={<ExportLink report="balance-sheet" params={params} />} />
       <AsOfFilter picked={at.picked} keep={q} fields={["compare", "pct", "fx", ...COMPARE_FIELDS]}>
         <label className="flex h-[42px] items-center gap-2 text-sm"><input type="checkbox" name="fx" value="1" defaultChecked={fx} className="size-4" /> Show foreign currency</label>
         <CompareFilter slots={cmp.slots} diff={diff} asOf />

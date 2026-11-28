@@ -30,7 +30,7 @@ export default async function ChangesInEquityPage({ searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Changes in equity" actions={<ExportLink report="changes-in-equity" params={{ ...exportPeriod(period.picked), ...compareQuery(cmp.slots, diff) }} />} />
+      <PageTitle title="Changes in equity" actions={<ExportLink report="changes-in-equity" params={{ ...exportPeriod(period.picked), ...compareQuery(cmp.slots, diff) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={COMPARE_FIELDS}>
         <CompareFilter slots={cmp.slots} diff={diff} />
       </DateRangeFilter>

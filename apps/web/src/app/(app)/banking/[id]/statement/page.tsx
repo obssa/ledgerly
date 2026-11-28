@@ -26,8 +26,8 @@ export default async function StatementPage({ params, searchParams }: PageProps<
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / <Link href={`/banking/${encodeURIComponent(id)}`} className="hover:underline">
-          <span className="num">{lines.account.code}</span> {lines.account.name}</Link> / Statement</>}
+        crumbs={<><Link href={`/banking/${encodeURIComponent(id)}`} className="hover:underline">
+          <span className="num">{lines.account.code}</span> {lines.account.name}</Link> › Statement</>}
         title="Statement"
       />
       <AccountTabs id={id} current="statement" />

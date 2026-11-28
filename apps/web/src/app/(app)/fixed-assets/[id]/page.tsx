@@ -17,7 +17,7 @@ export default async function FixedAssetPage({ params }: PageProps<"/fixed-asset
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/fixed-assets" className="hover:underline">Fixed assets</Link> / <span className="num">{a.code}</span></>}
+      <PageTitle crumbs={<><span className="num">{a.code}</span></>}
         title={<>{a.name} {a.status === "disposed" && <Pill>Disposed</Pill>}</>} />
       <Card className="mb-4" label="Asset">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">

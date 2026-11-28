@@ -25,7 +25,7 @@ export default async function ReviewQueuePage({ searchParams }: PageProps<"/jour
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/journal" className="hover:underline">Journal entries</Link> / Review</>} title="Review queue" />
+      <PageTitle title="Review queue" />
       {!queue ? <p className="text-[14px] text-muted">Not available in the demo, or check the dates.</p> : (
         <>
           <DateRangeFilter picked={period.picked} keep={q} allowed={CLOSED_RANGE_PRESETS} fields={["reviewed"]}>

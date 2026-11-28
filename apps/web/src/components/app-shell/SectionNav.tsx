@@ -6,29 +6,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { CREATE, activeHref, locate } from "@/lib/navigation";
 import { Icon } from "./Icon";
 
-/** Where this page sits: Sales › Invoices. */
-export function Breadcrumb() {
-  return (
-    <Suspense fallback={<span className="h-5" />}>
-      <CurrentBreadcrumb />
-    </Suspense>
-  );
-}
-
-function CurrentBreadcrumb() {
-  const pathname = usePathname();
-  const here = locate(pathname);
-  if (!here || here.section.id === "home") return <span className="text-[13px] font-semibold text-muted">Overview</span>;
-  const deeper = pathname !== here.item.href;
-  return (
-    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-muted">
-      <span className="truncate">{here.section.label}</span>
-      <Icon name="chevron" className="size-3.5" />
-      {deeper ? <Link href={here.item.href} className="truncate text-muted no-underline hover:text-ink">{here.item.label}</Link> : <span className="truncate text-ink" aria-current="page">{here.item.label}</span>}
-    </nav>
-  );
-}
-
 /**
  * The pages of the section being worked in, as tabs across the top: from Invoices to Payments received to Credit
  * notes without going back to the menu.

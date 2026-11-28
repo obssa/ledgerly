@@ -10,7 +10,7 @@ export default async function TagsPage() {
   const t = await getTags();
   return (
     <>
-      <PageTitle eyebrow="Books" title="Tags" actions={<Link href="/reports/by-tag" className="btn">Profit by tag</Link>} />
+      <PageTitle title="Tags" actions={<Link href="/reports/by-tag" className="btn">Profit by tag</Link>} />
       {!t ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <Card className="max-w-[760px]" label="Tags">
           <p className="mb-3 text-[13px] text-muted">

@@ -15,7 +15,7 @@ export default async function SuppliersPage({ searchParams }: PageProps<"/suppli
   return (
     <>
       <PageTitle
-        eyebrow="Money out"
+       
         title="Suppliers"
         actions={can.create && !demo ? <Link href="/suppliers/new" className="btn btn-primary">+ New supplier</Link> : undefined}
       />
