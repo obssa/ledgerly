@@ -15,7 +15,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "server-only": "^0.0.1",
-    "unpdf": "1.9.1"
+    "unpdf": "2.2.2"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
