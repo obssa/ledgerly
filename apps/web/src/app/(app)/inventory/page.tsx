@@ -27,7 +27,7 @@ export default async function InventoryPage() {
           <Card className="!p-2" label="Stock on hand">
             <div className="overflow-x-auto">
               <table className="tbl">
-                <thead><tr><th scope="col">Item</th><th scope="col">Warehouse</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Average cost</th><th scope="col" className="!text-right">Value</th><th scope="col"><span className="sr-only">Bin card</span></th></tr></thead>
+                <thead><tr><th scope="col">Product</th><th scope="col">Warehouse</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Average cost</th><th scope="col" className="!text-right">Value</th><th scope="col"><span className="sr-only">Bin card</span></th></tr></thead>
                 <tbody>
                   {stock.data.length === 0 && <tr><td colSpan={6} className="text-muted">Nothing on hand.</td></tr>}
                   {stock.data.map((r) => (

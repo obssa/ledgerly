@@ -25,12 +25,12 @@ export function RunningLow({ rows, warehouses }: { rows: Row[]; warehouses: { id
   return (
     <form action={action}>
       <h2 className="mb-1 text-[15px] font-bold text-warn">Running low</h2>
-      <p className="mb-2 text-[13px] text-muted">On hand, plus on order, less what open sales orders hold. Tick what to order: it becomes a draft purchase order to each item&apos;s supplier.</p>
+      <p className="mb-2 text-[13px] text-muted">On hand, plus on order, less what open sales orders hold. Tick what to order: it becomes a draft purchase order to each product&apos;s supplier.</p>
       {state?.error && <p role="alert" className="mb-2 rounded-lg bg-bad-tint px-3 py-2 text-[13px] font-semibold text-bad">{state.error}</p>}
       <div className="overflow-x-auto">
         <table className="tbl">
           <thead>
-            <tr><th scope="col"><span className="sr-only">Order</span></th><th scope="col">Item</th><th scope="col" className="!text-right">On hand</th>
+            <tr><th scope="col"><span className="sr-only">Order</span></th><th scope="col">Product</th><th scope="col" className="!text-right">On hand</th>
               <th scope="col" className="!text-right">On order</th><th scope="col" className="!text-right">Held</th><th scope="col" className="!text-right">Reorder at</th>
               <th scope="col">Supplier</th><th scope="col" className="!text-right">Order</th></tr>
           </thead>

@@ -14,8 +14,8 @@ function Message({ state }: { state: FormState | undefined }) {
 }
 
 const TYPES: Record<string, string> = {
-  inventory: "Stock item (kept in stock, with a bin card)", non_inventory: "Non-stock item", service: "Service",
-  bundle: "Bundle (sold as one, made of other items)",
+  inventory: "Stock product (kept in stock, with a bin card)", non_inventory: "Non-stock product", service: "Service",
+  bundle: "Bundle (sold as one, made of other products and services)",
 };
 
 /** New item, or the details of one. Type is fixed once the item has stock moves (the API says so). */
@@ -27,7 +27,7 @@ export function ItemForm({ item, readOnly = false, suppliers = [] }: { item?: It
       <Message state={state} />
       {item && <input type="hidden" name="id" value={item.id} />}
       <fieldset disabled={readOnly} className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-[18px]">
-        <legend className="sr-only">Item</legend>
+        <legend className="sr-only">Product or service</legend>
         <Field name="name" label="Name" defaultValue={item?.name} invalid={bad("name")} />
         <Field name="sku" label="SKU or code" defaultValue={item?.sku ?? ""} invalid={bad("sku")} />
         <Field name="barcode" label="Barcode (optional)" defaultValue={item?.barcode ?? ""} invalid={bad("barcode")} />
@@ -51,7 +51,7 @@ export function ItemForm({ item, readOnly = false, suppliers = [] }: { item?: It
           <p className="mt-1 text-[12px] text-muted">Who a suggested purchase order goes to.</p>
         </div>
         <div>
-          <label className="field-label" htmlFor="costing">Costing (stock items)</label>
+          <label className="field-label" htmlFor="costing">Costing (stock products)</label>
           <select className={`field ${bad("costing") ? "!border-bad" : ""}`} id="costing" name="costing" defaultValue={item?.costing ?? "average"}>
             <option value="average">Weighted average</option>
             <option value="fifo">FIFO (first in, first out)</option>
@@ -59,7 +59,7 @@ export function ItemForm({ item, readOnly = false, suppliers = [] }: { item?: It
           <p className="mt-1 text-[12px] text-muted">Chosen before the first stock move, and kept.</p>
         </div>
         <div>
-          <label className="field-label" htmlFor="tracking">Batches or serial numbers (stock items)</label>
+          <label className="field-label" htmlFor="tracking">Batches or serial numbers (stock products)</label>
           <select className={`field ${bad("tracking") ? "!border-bad" : ""}`} id="tracking" name="tracking" defaultValue={item?.tracking ?? "none"}>
             <option value="none">Not tracked</option>
             <option value="batch">Tracked by batch, with expiry</option>
@@ -68,7 +68,7 @@ export function ItemForm({ item, readOnly = false, suppliers = [] }: { item?: It
           <p className="mt-1 text-[12px] text-muted">Batches: food, medicine, chemicals. Serial numbers: phones, machines, anything with a warranty. Chosen before the first stock move, and kept.</p>
         </div>
       </fieldset>
-      {!readOnly && <button type="submit" className="btn btn-primary mt-6" disabled={pending}>{pending ? "Saving…" : item ? "Save item" : "Add item"}</button>}
+      {!readOnly && <button type="submit" className="btn btn-primary mt-6" disabled={pending}>{pending ? "Saving…" : item ? "Save" : "Add product or service"}</button>}
     </form>
   );
 }
@@ -128,7 +128,7 @@ export function TransferStock({ items, warehouses }: { items: { id: string; name
     <form action={action} noValidate className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] items-end gap-3">
       <div className="col-span-full"><Message state={state} /></div>
       <div>
-        <label className="field-label" htmlFor="t_item">Item</label>
+        <label className="field-label" htmlFor="t_item">Product</label>
         <select className="field" id="t_item" name="item_id">{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
       </div>
       <div>
@@ -160,7 +160,7 @@ export function IssueToProject({ items, warehouses, projects, costAccounts }: {
     <form action={action} noValidate className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] items-end gap-3">
       <div className="col-span-full"><Message state={state} /></div>
       <div>
-        <label className="field-label" htmlFor="i_item">Item</label>
+        <label className="field-label" htmlFor="i_item">Product</label>
         <select className="field" id="i_item" name="item_id">{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
       </div>
       <div>

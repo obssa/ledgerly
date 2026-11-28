@@ -67,7 +67,7 @@ export function BinRow({ bin, stock, manage }: { bin: Bin; stock: { id: string; 
                     ))}
                   </div>
                 </fieldset>
-                <div><button type="submit" className="btn" disabled={keeping}>{keeping ? "Saving…" : "Save items"}</button></div>
+                <div><button type="submit" className="btn" disabled={keeping}>{keeping ? "Saving…" : "Save products"}</button></div>
               </form>
             )}
             <form action={toggle}>

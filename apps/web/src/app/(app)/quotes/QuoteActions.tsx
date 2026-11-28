@@ -66,7 +66,7 @@ export function QuoteActions({ doc }: { doc: QuoteDetail }) {
                   inputMode="decimal" pattern="\d+(\.\d{1,2})?" aria-describedby="leave-help" />
               </div>
             ))}
-            <p id="leave-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that does not go now. Only stock items go on a delivery note.</p>
+            <p id="leave-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that does not go now. Only stock products go on a delivery note.</p>
           </fieldset>
           <label className="field-label mt-2" htmlFor="delivered-note">Note (optional)</label>
           <input className="field" id="delivered-note" name="note" maxLength={500} />

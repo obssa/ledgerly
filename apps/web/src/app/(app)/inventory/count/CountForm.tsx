@@ -19,7 +19,7 @@ export function CountForm({ warehouseId, binId, showBins, lines }: {
       {state?.notice && <p role="status" className="mx-3 mt-2 rounded-lg bg-good-tint px-3 py-2 text-[13px] font-semibold text-good">{state.notice}</p>}
       <div className="overflow-x-auto">
         <table className="tbl">
-          <thead><tr>{showBins && <th scope="col">Bin</th>}<th scope="col">Item</th><th scope="col" className="!text-right">In the books</th><th scope="col">Counted</th></tr></thead>
+          <thead><tr>{showBins && <th scope="col">Bin</th>}<th scope="col">Product</th><th scope="col" className="!text-right">In the books</th><th scope="col">Counted</th></tr></thead>
           <tbody>
             {lines.map((l) => (
               <tr key={l.id}>

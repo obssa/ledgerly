@@ -67,7 +67,7 @@ export function PricesEditor({ list, items, readOnly }: { list: PriceListDetail;
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-[12px] text-muted"><th className="py-2 pr-3">Item</th><th className="py-2 pr-3 text-right">Own price</th><th className="py-2 text-right">Price on this list ({list.currency})</th></tr>
+            <tr className="text-left text-[12px] text-muted"><th className="py-2 pr-3">Product/service</th><th className="py-2 pr-3 text-right">Own price</th><th className="py-2 text-right">Price on this list ({list.currency})</th></tr>
           </thead>
           <tbody>
             {items.map((i) => (

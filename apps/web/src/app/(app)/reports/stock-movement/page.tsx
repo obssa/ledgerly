@@ -36,7 +36,7 @@ export default async function StockMovementPage({ searchParams }: PageProps<"/re
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead>
-                  <tr><th scope="col">Item</th><th scope="col" className="!text-right">Opening</th><th scope="col" className="!text-right">In</th>
+                  <tr><th scope="col">Product</th><th scope="col" className="!text-right">Opening</th><th scope="col" className="!text-right">In</th>
                     <th scope="col" className="!text-right">Out</th><th scope="col" className="!text-right">Of it sold</th><th scope="col" className="!text-right">Closing</th>
                     <th scope="col" className="!text-right">Closing value</th></tr>
                 </thead>

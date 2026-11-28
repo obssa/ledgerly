@@ -17,18 +17,18 @@ export default async function ProductsPage({ searchParams }: PageProps<"/product
   return (
     <>
       <PageTitle title="Products and services"
-        actions={<><Link href="/sales-orders/back-orders" className="btn">Back-orders</Link>{can.edit && !demo && <Link href="/products/new" className="btn btn-primary">+ New item</Link>}</>} />
+        actions={<><Link href="/sales-orders/back-orders" className="btn">Back-orders</Link>{can.edit && !demo && <Link href="/products/new" className="btn btn-primary">+ New product or service</Link>}</>} />
       <form className="mb-4 flex flex-wrap items-end gap-2.5" role="search">
         <div className="min-w-[240px] flex-1"><label className="field-label" htmlFor="q">Search by name or SKU</label><input className="field" id="q" name="q" defaultValue={search} /></div>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="archived" value="1" defaultChecked={archived === "1"} className="size-4" /> Include archived</label>
         <button type="submit" className="btn">Search</button>
       </form>
-      <Card className="!p-2" label="Items">
+      <Card className="!p-2" label="Products and services">
         <div className="overflow-x-auto">
           <table className="tbl">
             <thead><tr><th scope="col">Name</th><th scope="col">SKU</th><th scope="col">Type</th><th scope="col" className="!text-right">Sale price</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Reserved</th><th scope="col" className="!text-right">Available</th><th scope="col" className="!text-right">On order</th><th scope="col" className="!text-right">Value</th></tr></thead>
             <tbody>
-              {data.length === 0 && <tr><td colSpan={9} className="text-muted">{search ? "No item matches." : "No items yet."}</td></tr>}
+              {data.length === 0 && <tr><td colSpan={9} className="text-muted">{search ? "No product or service matches." : "No products or services yet."}</td></tr>}
               {data.map((i) => {
                 const low = i.type === "inventory" && i.reorder_point !== null && parse(i.on_hand ?? "0") <= parse(i.reorder_point);
                 return (

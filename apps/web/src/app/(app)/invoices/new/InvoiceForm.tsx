@@ -6,6 +6,8 @@ import { startTransition, useActionState, useEffect, useMemo, useRef, useState, 
 import { useRouter } from "next/navigation";
 import { addressText } from "@/lib/address";
 import { Card } from "@/components/ui";
+import { ADD_NEW, AddContact, AddItem } from "@/components/QuickAdd";
+import type { ContactOption, ItemOption } from "@/lib/options";
 import type { FormField, InvoiceDetail, TaxMode } from "@/lib/api";
 import type { InvoiceOptions } from "@/lib/data";
 import { discountedAmounts, lineAmounts, parse } from "@/lib/decimal";
@@ -122,16 +124,19 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const firstAccount = options.accounts[0]?.id ?? "";
 
   const [customerId, setCustomerId] = useState(draft?.contact.id ?? "");
+  // QuickBooks' "+ Add new": customers (or suppliers) and products or services added from the form join its lists.
+  const [contacts, setContacts] = useState(options.customers);
+  const [adding, setAdding] = useState<null | { what: "contact" } | { what: "item"; line: number }>(null);
   const [issueDate, setIssueDate] = useState(draft?.issue_date ?? today);
   // QuickBooks' Terms (109), on invoices and bills: the term sets the due date from the date, in the company's calendar;
   // changing the customer brings their usual term, changing the date or the term sets it again; a date typed stands.
   const termed = kind === "invoice" || kind === "bill";
   const terms = options.terms ?? [];
   const calendar = options.calendar ?? "gregorian";
-  const dueBy = (date: string, id: string, contactId: string): string => {
+  const dueBy = (date: string, id: string, contactId: string, among: ContactOption[] = contacts): string => {
     const term = terms.find((t) => t.id === id);
     if (term) return termDueDate(date, term, calendar);
-    const contact = options.customers.find((c) => c.id === contactId);
+    const contact = among.find((c) => c.id === contactId);
     return contact ? addDays(date, contact.payment_terms_days) : "";
   };
   const [termId, setTermId] = useState(draft ? draft.payment_terms_id ?? "" : "");
@@ -179,19 +184,21 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
         taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", serviceDate: l.service_date ?? "", classId: l.class_id ?? "", locationId: l.location_id ?? "", sourceLineId: l.source_line_id ?? undefined, unitId: l.unit_id ?? "",
         batchNumber: l.batch_number ?? "", batchExpires: l.batch_expires_on ?? "" }))
     : [{ key: 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
-  const items = options.items ?? [];
+  const [items, setItems] = useState(options.items ?? []);
+  // Products and services are offered on every line but an expense's; in the demo, only when it has some.
+  const itemsShown = kind !== "expense" && (items.length > 0 || !options.demo);
   const withUnits = kind !== "expense" && items.some((i) => (i.units ?? []).length > 0);   // 072: the Unit column only when an item has units
   // A bundle's stock parts leave too (073): it needs a warehouse as a stock item does.
   const stockLine = lines.some((l) => ["inventory", "bundle"].includes(items.find((i) => i.id === l.itemId)?.type ?? ""));
   /** 080: the customer's price list price for the item in this currency, else the item's own price. */
   const priceOf = (item: { id: string; price: string | null }) => {
-    const listId = options.customers.find((c) => c.id === customerId)?.price_list_id;
+    const listId = contacts.find((c) => c.id === customerId)?.price_list_id;
     const list = listId ? options.priceLists?.find((p) => p.id === listId && p.currency === currency) : undefined;
     return list?.prices[item.id] ?? item.price;
   };
   /** Picking an item fills the line from it; the person can still change what was filled. */
-  const pickItem = (key: number, itemId: string) => {
-    const item = items.find((i) => i.id === itemId);
+  const pickItem = (key: number, itemId: string, added?: ItemOption) => {
+    const item = added ?? items.find((i) => i.id === itemId);
     setLines((ls) => ls.map((l) => (l.key !== key ? l : {
       ...l, itemId, unitId: "",
       ...(item ? { description: item.name, unitPrice: priceOf(item) ?? l.unitPrice, accountId: item.account_id && options.accounts.some((a) => a.id === item.account_id) ? item.account_id : l.accountId } : {}),
@@ -209,7 +216,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
     }));
   };
 
-  const customer = options.customers.find((c) => c.id === customerId);
+  const customer = contacts.find((c) => c.id === customerId);
   const rateOf = (id: string) => (untaxed ? "0" : options.taxRates.find((t) => t.id === id)?.rate ?? "0");
   const valid = lines.filter((l) => isDecimal(l.quantity) && isDecimal(l.unitPrice));
   const totals = useMemo(
@@ -239,6 +246,24 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   }, [next, router]);
   if (next && !sending) setSending(true);
 
+  /** Choosing a customer (or supplier) fills the form from them: email, addresses, terms, currency, usual account. */
+  const chooseContact = (c: ContactOption | undefined) => {
+    setCustomerId(c?.id ?? "");
+    setEmailTo(c?.email ?? "");
+    setBillTo(addressText(c?.address));
+    setShipTo(addressText(c?.delivery_address ?? c?.address));
+    if (termed) {
+      const usual = c?.payment_terms_id && terms.some((t) => t.id === c.payment_terms_id) ? c.payment_terms_id : "";
+      setTermId(usual);
+      setDue(c ? dueBy(issueDate, usual, c.id, [c]) : "");
+    }
+    if (c?.currency && options.currencies.includes(c.currency)) setCurrency(c.currency);
+    // A supplier's usual expense account goes on the lines that still have the first account.
+    const usual = c?.default_account_id;
+    if (usual && options.accounts.some((a) => a.id === usual)) {
+      setLines((ls) => ls.map((l) => (l.accountId === firstAccount ? { ...l, accountId: usual } : l)));
+    }
+  };
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
   const removeLine = (key: number) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
@@ -247,7 +272,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const scan = (code: string) => {
     const hit = findBarcode(items, code);
     if (!hit) {
-      setScanned(code.trim() === "" ? null : `No item has barcode ${code.trim()}.`);
+      setScanned(code.trim() === "" ? null : `No product or service has barcode ${code.trim()}.`);
       return;
     }
     setScanned(null);
@@ -271,7 +296,8 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const lineError = (i: number) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k.startsWith(`lines.${i}.`)));
   const bad = (name: string) => Boolean(state?.fields?.[name]);
 
-  if (options.customers.length === 0) {
+  // Only the demo, which cannot add one, stops here; anywhere else the first one is added from the form.
+  if (contacts.length === 0 && options.demo) {
     return (
       <Card label={`No ${words.parties} yet`}>
         <p className="text-sm">Add a {words.who} first. <Link href={words.newParty} className="font-bold text-brand">New {words.who}</Link></p>
@@ -292,6 +318,23 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
       startTransition(() => action(data));
     }} noValidate className="flex flex-wrap items-start gap-4">
       <input type="hidden" name="lines" value={linesJson} />
+      {adding?.what === "contact" && (
+        <AddContact side={words.who} terms={terms} currencies={options.currencies} baseCurrency={options.baseCurrency} onClose={() => setAdding(null)}
+          onAdded={(c) => {
+            setContacts((cs) => [...cs, c].sort((a, b) => a.name.localeCompare(b.name)));
+            chooseContact(c);
+            setAdding(null);
+          }} />
+      )}
+      {adding?.what === "item" && (
+        <AddItem side={purchase_ ? "purchase" : "sale"} accounts={options.accounts} onClose={() => setAdding(null)}
+          account={lines.find((l) => l.key === adding.line)?.accountId || firstAccount}
+          onAdded={(item) => {
+            setItems((is) => [...is, item].sort((a, b) => a.name.localeCompare(b.name)));
+            pickItem(adding.line, item.id, item);
+            setAdding(null);
+          }} />
+      )}
       {draft && <input type="hidden" name="id" value={draft.id} />}
       {draft?.lock_version && <input type="hidden" name="lock_version" value={String(draft.lock_version)} />}
       {quote && <input type="hidden" name="doc_kind" value={kind} />}
@@ -307,25 +350,12 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               <label className="field-label" htmlFor="contact_id">{words.party}</label>
               <select className={`field ${bad("contact_id") ? "!border-bad" : ""}`} id="contact_id" name="contact_id" value={customerId}
                 onChange={(e) => {
-                  setCustomerId(e.target.value);
-                  const c = options.customers.find((x) => x.id === e.target.value);
-                  setEmailTo(c?.email ?? "");
-                  setBillTo(addressText(c?.address));
-                  setShipTo(addressText(c?.delivery_address ?? c?.address));
-                  if (termed) {
-                    const usual = c?.payment_terms_id && terms.some((t) => t.id === c.payment_terms_id) ? c.payment_terms_id : "";
-                    setTermId(usual);
-                    setDue(c ? dueBy(issueDate, usual, c.id) : "");
-                  }
-                  if (c?.currency && options.currencies.includes(c.currency)) setCurrency(c.currency);
-                  // A supplier's usual expense account goes on the lines that still have the first account.
-                  const usual = c?.default_account_id;
-                  if (usual && options.accounts.some((a) => a.id === usual)) {
-                    setLines((ls) => ls.map((l) => (l.accountId === firstAccount ? { ...l, accountId: usual } : l)));
-                  }
+                  if (e.target.value === ADD_NEW) setAdding({ what: "contact" });
+                  else chooseContact(contacts.find((x) => x.id === e.target.value));
                 }}>
                 <option value="">Choose a {words.who}</option>
-                {options.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {!options.demo && <option value={ADD_NEW}>+ Add new</option>}
+                {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {customer && <p className="mt-1.5 text-[13px] text-muted">{customer.tax_id ? <>TIN <span className="num">{customer.tax_id}</span> · </> : "No TIN · "}Usual terms: {terms.find((t) => t.id === customer.payment_terms_id)?.name ?? `${customer.payment_terms_days} days`}</p>}
             </div>
@@ -493,7 +523,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr>{show.service_date && <th scope="col">Service date</th>}{items.length > 0 && kind !== "expense" && <th scope="col">Item</th>}{show.sku && items.length > 0 && kind !== "expense" && <th scope="col">SKU</th>}<th scope="col">Description</th><th scope="col">Qty</th>{withUnits && <th scope="col">Unit</th>}<th scope="col">Unit price</th>{!untaxed && <th scope="col">Tax</th>}<th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}{classesBy === "line" && <th scope="col">Class</th>}{locationsBy === "line" && <th scope="col">Location</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
+                <tr>{show.service_date && <th scope="col">Service date</th>}{itemsShown && <th scope="col">Product/service</th>}{show.sku && itemsShown && <th scope="col">SKU</th>}<th scope="col">Description</th><th scope="col">Qty</th>{withUnits && <th scope="col">Unit</th>}<th scope="col">Unit price</th>{!untaxed && <th scope="col">Tax</th>}<th scope="col">{words.account}</th>{projects.length > 0 && <th scope="col">Project</th>}{classesBy === "line" && <th scope="col">Class</th>}{locationsBy === "line" && <th scope="col">Location</th>}<th scope="col" className="!text-right">Amount</th><th scope="col"><span className="sr-only">Remove</span></th></tr>
               </thead>
               <tbody>
                 {lines.map((l, i) => {
@@ -504,15 +534,17 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                       {show.service_date && (
                         <td><DateInput className="field w-[140px]" aria-label="Service date" value={l.serviceDate ?? ""} onValue={(v) => update(l.key, { serviceDate: v })} /></td>
                       )}
-                      {items.length > 0 && kind !== "expense" && (
+                      {itemsShown && (
                         <td>
-                          <select aria-label="Item" className="field w-[150px]" value={l.itemId} onChange={(e) => pickItem(l.key, e.target.value)}>
+                          <select aria-label="Product/service" className="field w-[170px]" value={l.itemId}
+                            onChange={(e) => (e.target.value === ADD_NEW ? setAdding({ what: "item", line: l.key }) : pickItem(l.key, e.target.value))}>
                             <option value="">—</option>
+                            {!options.demo && <option value={ADD_NEW}>+ Add new</option>}
                             {items.map((it) => <option key={it.id} value={it.id}>{it.name}{it.type === "inventory" ? " (stock)" : ""}</option>)}
                           </select>
                         </td>
                       )}
-                      {show.sku && items.length > 0 && kind !== "expense" && <td className="num text-[13px] text-muted">{items.find((it) => it.id === l.itemId)?.sku ?? "—"}</td>}
+                      {show.sku && itemsShown && <td className="num text-[13px] text-muted">{items.find((it) => it.id === l.itemId)?.sku ?? "—"}</td>}
                       <td>
                         <input aria-label="Description" className="field min-w-[180px]" value={l.description} onChange={(e) => update(l.key, { description: e.target.value })} />
                         {items.find((it) => it.id === l.itemId)?.tracking === "serial" && (
@@ -728,7 +760,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             {kind === "invoice"
               ? "Where e-invoicing applies, posting also sends it to the tax authority."
               : kind === "sales_receipt"
-                ? "Recorded and posted at once: the money is already in. Stock items leave at their cost."
+                ? "Recorded and posted at once: the money is already in. Stock products leave at their cost."
                 : "VAT is reclaimable only when the company is VAT-registered; otherwise it is part of the cost."}
           </p>
         </Card>

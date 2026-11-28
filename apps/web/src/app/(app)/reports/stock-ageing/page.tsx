@@ -46,7 +46,7 @@ export default async function StockAgeingPage({ searchParams }: PageProps<"/repo
               <div className="px-3 pt-3"><ReportHeader title="Stock ageing" period={asOfLabel(r.as_of, at.ctx)} filters={[r.warehouse?.name ?? "All warehouses", "Values at cost"]} /></div>
               <div className="overflow-x-auto">
                 <table className="tbl">
-                  <thead><tr><th scope="col">Item</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Value</th>
+                  <thead><tr><th scope="col">Product</th><th scope="col" className="!text-right">On hand</th><th scope="col" className="!text-right">Value</th>
                     <th scope="col">Last sold</th><th scope="col">Last received</th><th scope="col" className="!text-right">Days since sale</th><th scope="col">Band</th></tr></thead>
                   <tbody>
                     {r.rows.length === 0 && <tr><td colSpan={7} className="text-muted">Nothing on hand at this date.</td></tr>}

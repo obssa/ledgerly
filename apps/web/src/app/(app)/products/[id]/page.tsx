@@ -10,7 +10,7 @@ import { AssemblyPanel } from "./AssemblyPanel";
 import { VariantsPanel } from "./VariantsPanel";
 import { BinLocations } from "./BinLocations";
 
-export const metadata = { title: "Item" };
+export const metadata = { title: "Product or service" };
 
 /** One item: what is on hand in each warehouse (with its bin card), its details, and stock adjustments. */
 export default async function ItemPage({ params }: PageProps<"/products/[id]">) {
@@ -26,7 +26,7 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
 
   return (
     <>
-      <PageTitle crumbs={<>Item</>}
+      <PageTitle crumbs={<>Product or service</>}
         title={<>{item.name} {!item.is_active && <Pill>Archived</Pill>}</>} />
       <div className="flex max-w-[1100px] flex-wrap items-start gap-4">
         {stock && (
@@ -53,7 +53,7 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
             )}
           </Card>
         )}
-        <Card className="min-w-0 flex-[2_1_520px]" label="Item details">
+        <Card className="min-w-0 flex-[2_1_520px]" label="Details">
           <ItemForm item={item} readOnly={!item.can?.edit} suppliers={suppliers} />
         </Card>
         {(item.tracking === "batch" || item.tracking === "serial") && (

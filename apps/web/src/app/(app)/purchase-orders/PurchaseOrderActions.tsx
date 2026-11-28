@@ -60,7 +60,7 @@ export function PurchaseOrderActions({ doc, today }: { doc: PurchaseOrderDetail;
                 <DateInput className="field !w-[140px] text-[13px]" aria-label={`Expiry of ${l.description}`} name={`expires_${l.id}`} />
               </div>
             ))}
-            <p id="receive-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that did not come. Only stock items are received. Batch and expiry: for items tracked by batch.</p>
+            <p id="receive-help" className="mt-1 text-[12px] text-muted">Type 0 for a line that did not come. Only stock products are received. Batch and expiry: for products tracked by batch.</p>
           </fieldset>
           <label className="field-label mt-2" htmlFor="received-note">Note (optional)</label>
           <input className="field" id="received-note" name="note" maxLength={500} />

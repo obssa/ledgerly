@@ -247,7 +247,7 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
         (x) => x.key ?? "none", (x) => x.amount, (x) => x.label, { label: "Total", value: (x) => x.totals.amount }, "Name");
       if (compared) return { title: `${report}-by-${group}`, rows: compared };
       const r = await ledgerly.documentAnalysis(report, { group, from: p.from, to: p.to }, ctx);
-      const heading = ({ contact: report === "sales" ? "Customer" : "Supplier", item: "Item", month: "Month", salesperson: "Salesperson" } as Record<string, string>)[r.group] ?? r.group;
+      const heading = ({ contact: report === "sales" ? "Customer" : "Supplier", item: "Product/service", month: "Month", salesperson: "Salesperson" } as Record<string, string>)[r.group] ?? r.group;
       return { title: `${report}-by-${r.group}`, rows: [[heading, "Quantity", "Documents", "Amount", "Tax", "Share %"],
         ...r.rows.map((x) => [x.label, x.quantity, x.documents, x.amount, x.tax, x.share]), ["Total", null, null, r.totals.amount, r.totals.tax, null]] };
     }
@@ -266,7 +266,7 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
     }
     case "stock-movement": {
       const r = await ledgerly.stockMovement({ from: p.from, to: p.to, warehouse_id: p.warehouse_id }, ctx);
-      return { title: "stock-movement", rows: [["SKU", "Item", "Unit", "Opening quantity", "Opening value", "In quantity", "In value", "Out quantity", "Out value",
+      return { title: "stock-movement", rows: [["SKU", "Product", "Unit", "Opening quantity", "Opening value", "In quantity", "In value", "Out quantity", "Out value",
         "Sold quantity", "Closing quantity", "Closing value"],
         ...r.rows.map((x) => [x.item.sku, x.item.name, x.item.unit, x.opening_qty, x.opening_value, x.in_qty, x.in_value, x.out_qty, x.out_value, x.sold_qty,
           x.closing_qty, x.closing_value]),
@@ -287,7 +287,7 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
         (r) => r.value, (r) => `${r.name}${r.sku ? ` (${r.sku})` : ""} · ${r.warehouse}`, { label: "Total", value: (x) => x.stock_value }, "Item · warehouse");
       if (compared) return { title: "inventory-valuation", rows: compared };
       const v = await ledgerly.inventoryValuation(p.as_of, ctx);
-      return { title: "inventory-valuation", rows: [["SKU", "Item", "Unit", "Warehouse", "Quantity", "Average cost", "Value"],
+      return { title: "inventory-valuation", rows: [["SKU", "Product", "Unit", "Warehouse", "Quantity", "Average cost", "Value"],
         ...v.rows.map((r) => [r.sku, r.name, r.unit, r.warehouse, r.quantity, perUnit(r.value, r.quantity), r.value]),
         ["Total", null, null, null, null, null, v.stock_value], ["Inventory account", null, null, null, null, null, v.inventory_account],
         ["Difference", null, null, null, null, null, v.difference]] };
@@ -308,7 +308,7 @@ export async function exportRows(report: ExportableReport, p: Params, ctx: Ctx):
     }
     case "stock-ageing": {
       const r = await ledgerly.stockAgeing({ as_of: p.as_of, warehouse_id: p.warehouse_id }, ctx);
-      return { title: "stock-ageing", rows: [["SKU", "Item", "Unit", "Quantity", "Value", "Last sold", "Last received", "Days since sale", "Band"],
+      return { title: "stock-ageing", rows: [["SKU", "Product", "Unit", "Quantity", "Value", "Last sold", "Last received", "Days since sale", "Band"],
         ...r.rows.map((x) => [x.item.sku, x.item.name, x.item.unit, x.quantity, x.value, x.last_sold_on, x.last_received_on, x.days_since_sale, x.band]),
         ["Total", null, null, null, r.total_value, null, null, null, null]] };
     }

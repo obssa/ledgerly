@@ -21,7 +21,7 @@ export default async function PriceListsPage() {
             <p className="text-sm text-muted">No price lists yet.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead><tr className="text-left text-[12px] text-muted"><th className="py-2 pr-3">Name</th><th className="py-2 pr-3">Currency</th><th className="py-2 pr-3 text-right">Items</th><th className="py-2 text-right">Customers</th></tr></thead>
+              <thead><tr className="text-left text-[12px] text-muted"><th className="py-2 pr-3">Name</th><th className="py-2 pr-3">Currency</th><th className="py-2 pr-3 text-right">Products and services</th><th className="py-2 text-right">Customers</th></tr></thead>
               <tbody>
                 {lists.data.map((l) => (
                   <tr key={l.id} className="border-t border-line">
