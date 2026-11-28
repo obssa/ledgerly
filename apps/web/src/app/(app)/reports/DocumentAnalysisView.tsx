@@ -15,7 +15,7 @@ import { ExportLink, ReportsNav } from "./ReportsNav";
 /** Sales or purchases in a period by customer or supplier, item or month (credits taken off, base currency). */
 export async function DocumentAnalysisView({ side, q }: { side: "sales" | "purchases"; q: Record<string, string | string[] | undefined> }) {
   const party = side === "sales" ? "Customer" : "Supplier";
-  const groups: [string, string][] = [["contact", party], ["item", "Item"], ["month", "Month"], ...(side === "sales" ? [["salesperson", "Salesperson"] as [string, string]] : [])];
+  const groups: [string, string][] = [["contact", party], ["item", "Product/service"], ["month", "Month"], ...(side === "sales" ? [["salesperson", "Salesperson"] as [string, string]] : [])];
   const group = groups.some(([g]) => g === q.group) ? (q.group as string) : "contact";
   const period = await getReportPeriod(q);
   const cmp = pickRangeComparisons(group === "month" ? { c1: "none" } : q, period.picked, period.ctx);

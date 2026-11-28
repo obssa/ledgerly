@@ -45,7 +45,7 @@ export function CustomerForm({ customer, readOnly = false, priceLists = [], term
           <div>
             <SelectLabel id="price_list_id" label="Price list" />
             <select className="field" id="price_list_id" name="price_list_id" defaultValue={customer?.price_list_id ?? ""}>
-              <option value="">None (each item&apos;s own price)</option>
+              <option value="">None (each product&apos;s own price)</option>
               {priceLists.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.currency})</option>)}
               {customer?.price_list_id && !priceLists.some((l) => l.id === customer.price_list_id) && <option value={customer.price_list_id}>A list no longer in use</option>}
             </select>

@@ -39,7 +39,7 @@ export function AssemblyPanel({ itemId, itemName, assembly, choices, warehouses 
               <div key={r.key} className="flex items-center gap-2">
                 <select aria-label={`Part ${i + 1}`} className="field min-w-0 flex-1" name={`part_item_${i}`} value={r.itemId}
                   onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, itemId: e.target.value } : x)))}>
-                  <option value="">Choose a stock item</option>
+                  <option value="">Choose a stock product</option>
                   {choices.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <input aria-label={`Quantity of part ${i + 1} in one`} className="field num !w-[84px] text-right" name={`part_qty_${i}`} inputMode="decimal" value={r.quantity}

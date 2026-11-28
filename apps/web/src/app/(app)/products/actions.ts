@@ -164,7 +164,7 @@ export async function orderLowStock(_: FormState | undefined, form: FormData): P
     const m = /^order_([0-9a-f-]{36})$/.exec(key);
     if (m && value === "on") lines.push({ item_id: m[1], quantity: amount(text(form, `qty_${m[1]}`)) });
   }
-  if (lines.length === 0) return { error: "Tick the items to order." };
+  if (lines.length === 0) return { error: "Tick the products to order." };
   let made: { id: string }[];
   try {
     made = (await ledgerly.orderLowStock({ warehouse_id: text(form, "warehouse_id") ?? "", lines }, ctx)).data;
@@ -244,7 +244,7 @@ export async function countStock(_: FormState | undefined, form: FormData): Prom
   for (const [key, value] of form.entries()) {
     if (typeof value === "string" && key.startsWith("count_") && value.trim() !== "") counted.push({ item_id: key.slice(6), quantity: amount(value) });
   }
-  if (counted.length === 0) return { error: "Enter the quantity counted for at least one item." };
+  if (counted.length === 0) return { error: "Enter the quantity counted for at least one product." };
   let result: { differences: unknown[]; net: string };
   try {
     result = await ledgerly.countStock({ warehouse_id: text(form, "warehouse_id") ?? "", date: text(form, "date") ?? "", counted,
@@ -253,5 +253,5 @@ export async function countStock(_: FormState | undefined, form: FormData): Prom
     return refusal(error);
   }
   refresh();
-  return { notice: result.differences.length === 0 ? "Counted: everything agrees with the books." : `Counted: ${result.differences.length} item${result.differences.length === 1 ? "" : "s"} adjusted, ${result.net} net, posted.` };
+  return { notice: result.differences.length === 0 ? "Counted: everything agrees with the books." : `Counted: ${result.differences.length} product${result.differences.length === 1 ? "" : "s"} adjusted, ${result.net} net, posted.` };
 }

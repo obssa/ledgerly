@@ -39,7 +39,7 @@ export default async function GoodsReceiptPage({ params }: PageProps<"/goods-rec
           <div className="mt-5 overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Order line</th><th scope="col">Item</th><th scope="col" className="!text-right">Quantity</th><th scope="col" className="!text-right">Value at the order&apos;s cost</th></tr>
+                <tr><th scope="col">Order line</th><th scope="col">Product</th><th scope="col" className="!text-right">Quantity</th><th scope="col" className="!text-right">Value at the order&apos;s cost</th></tr>
               </thead>
               <tbody>
                 {r.lines.map((l) => (

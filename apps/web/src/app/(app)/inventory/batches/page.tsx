@@ -23,12 +23,12 @@ export default async function BatchesPage({ searchParams }: PageProps<"/inventor
       ]} />
       <Card className="!p-2" label="Batches">
         {rows.length === 0 ? (
-          <p className="p-3 text-sm text-muted">{days === undefined ? "No stock held by batch. Set an item to be tracked by batch before its first stock move." : `Nothing on hand expires within ${days} days.`}</p>
+          <p className="p-3 text-sm text-muted">{days === undefined ? "No stock held by batch. Set a product to be tracked by batch before its first stock move." : `Nothing on hand expires within ${days} days.`}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Item</th><th scope="col">Batch</th><th scope="col">Expires</th><th scope="col">Warehouse</th><th scope="col" className="!text-right">On hand</th></tr>
+                <tr><th scope="col">Product</th><th scope="col">Batch</th><th scope="col">Expires</th><th scope="col">Warehouse</th><th scope="col" className="!text-right">On hand</th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (

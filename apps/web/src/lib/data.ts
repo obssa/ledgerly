@@ -1,4 +1,5 @@
 import "server-only";
+import { customerOption, purchaseItemOption, saleItemOption, supplierOption } from "@/lib/options";
 import type { DocumentHistory } from "./history";
 import { cache } from "react";
 import { redirect } from "next/navigation";
@@ -463,8 +464,7 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       amountsAre,
       formContent,
       tags: await activeTags(ctx),
-      customers: customers.data.map((c) => ({ id: c.id, name: c.name, tax_id: c.tax_id, currency: c.currency, payment_terms_days: c.payment_terms_days, payment_terms_id: c.payment_terms_id ?? null, price_list_id: c.price_list_id ?? null,
-        email: c.email, address: c.address ?? null, delivery_address: c.delivery_address ?? null })),
+      customers: customers.data.map(customerOption),
       priceLists: await ledgerly.priceListPrices(ctx).then((r) => r.data, (error) => {
         if (error instanceof ApiError && error.status === 403) return [];
         throw error;
@@ -480,7 +480,7 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === numberedAs)?.mode === "manual",
       numbers: numbering.data,
-      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.sale_price, account_id: i.income_account_id, units: i.units ?? [], barcode: i.barcode ?? null, sku: i.sku ?? null })),
+      items: items.data.map(saleItemOption),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       ...(await activeDimensions(ctx)),
       demo: false,
@@ -506,7 +506,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       amountsAre,
       formContent,
       tags: await activeTags(ctx),
-      customers: suppliers.data.map((s) => ({ id: s.id, name: s.name, tax_id: s.tax_id, currency: s.currency, payment_terms_days: s.payment_terms_days, payment_terms_id: s.payment_terms_id ?? null, default_account_id: s.default_expense_account_id, email: s.email, address: s.address ?? null })),
+      customers: suppliers.data.map(supplierOption),
       accounts: accounts.data
         .filter((a) => a.is_active && (a.type === "expense" || (a.type === "asset" && ["fixed_asset", "prepayment"].includes(a.subtype ?? ""))))
         .map((a) => ({ id: a.id, code: a.code, name: a.name })),
@@ -517,7 +517,7 @@ export async function getBillOptions(): Promise<InvoiceOptions> {
       baseCurrency: currencies.base_currency,
       manualNumbers: numbering.data.find((n) => n.doc_type === "bill")?.mode === "manual",
       numbers: numbering.data,
-      items: items.data.map((i) => ({ id: i.id, name: i.name, type: i.type, unit: i.unit, price: i.purchase_price, account_id: i.expense_account_id, units: i.units ?? [], tracking: i.tracking ?? "none", sku: i.sku ?? null })),
+      items: items.data.map(purchaseItemOption),
       warehouses: warehouses.data.filter((w) => w.is_active).map((w) => ({ id: w.id, name: w.name })),
       ...(await activeDimensions(ctx)),
       demo: false,

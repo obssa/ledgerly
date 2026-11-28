@@ -77,8 +77,8 @@ export function CreditNoteForm({ invoice, taxRates, projects = [] }: {
                   {bill ? "The goods went back to the supplier" : "The goods came back into stock"}
                   <span className="block text-[13px] font-normal text-muted">
                     {bill
-                      ? "Stock items on this credit leave the warehouse they came into, at today's average cost; leave it off for a price correction on goods you keep."
-                      : "Stock items on this credit note return to the warehouse they left from, at the cost they left with; leave it off for a price correction."}
+                      ? "Stock products on this credit leave the warehouse they came into, at today's average cost; leave it off for a price correction on goods you keep."
+                      : "Stock products on this credit note return to the warehouse they left from, at the cost they left with; leave it off for a price correction."}
                   </span>
                 </span>
               </label>

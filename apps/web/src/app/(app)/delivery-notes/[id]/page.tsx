@@ -38,7 +38,7 @@ export default async function DeliveryNotePage({ params }: PageProps<"/delivery-
           <div className="mt-5 overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th scope="col">Order line</th><th scope="col">Item</th><th scope="col" className="!text-right">Quantity</th></tr>
+                <tr><th scope="col">Order line</th><th scope="col">Product</th><th scope="col" className="!text-right">Quantity</th></tr>
               </thead>
               <tbody>
                 {n.lines.map((l) => (

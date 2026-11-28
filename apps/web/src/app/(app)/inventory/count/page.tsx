@@ -45,7 +45,7 @@ export default async function CountStockPage({ searchParams }: PageProps<"/inven
         ]} />
       )}
       <Card className="!p-2" label="Count sheet">
-        {lines.length === 0 ? <p className="p-3 text-sm text-muted">{bin ? `Nothing is kept in bin ${bin.code} yet: give it its items on the bins page.` : "No stock items to count."}</p>
+        {lines.length === 0 ? <p className="p-3 text-sm text-muted">{bin ? `Nothing is kept in bin ${bin.code} yet: give it its products on the bins page.` : "No stock products to count."}</p>
           : <CountForm key={bin?.id ?? warehouse.id} warehouseId={warehouse.id} binId={bin?.id} showBins={!bin && here.length > 0} lines={lines} />}
       </Card>
     </>

@@ -70,7 +70,7 @@ export default async function BinCardPage({ searchParams }: PageProps<"/inventor
       <ColumnCustomizer defs={BIN_COLUMNS} cols={cols} keep={keep} moveHref={(next) => href({ cols: next.join(",") })} resetHref={href({})} />
       <Card className="!p-2" label="Bin card">
         <div className="px-3 pt-3">
-          <ReportHeader title="Bin card" period={rangeLabel(period.picked, period.ctx)} filters={[`Item: ${item.name}`, warehouse ? `Warehouse: ${warehouse.name}` : null]} />
+          <ReportHeader title="Bin card" period={rangeLabel(period.picked, period.ctx)} filters={[`Product: ${item.name}`, warehouse ? `Warehouse: ${warehouse.name}` : null]} />
         </div>
         <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Bin card">
           <table className="tbl">

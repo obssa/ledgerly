@@ -52,7 +52,7 @@ export async function setBinItems(_: FormState | undefined, form: FormData): Pro
   try {
     const b = await ledgerly.setBinItems(text(form, "id") ?? "", form.getAll("item_ids").map(String), ctx);
     refresh();
-    return { notice: `${b.items.length} item${b.items.length === 1 ? "" : "s"} kept in ${b.code}.` };
+    return { notice: `${b.items.length} product${b.items.length === 1 ? "" : "s"} kept in ${b.code}.` };
   } catch (error) {
     return refusal(error);
   }
