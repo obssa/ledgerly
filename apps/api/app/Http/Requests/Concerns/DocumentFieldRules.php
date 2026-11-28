@@ -37,6 +37,11 @@ final class DocumentFieldRules
             'ship_date' => ['nullable', 'date_format:Y-m-d'],
             'tracking_number' => ['nullable', 'string', 'max:60'],
             'message_on_statement' => ['nullable', 'string', 'max:500'],
+            // 113: QuickBooks' discount (before tax) and deposit, on sales documents.
+            'discount_type' => ['nullable', Rule::in(['percent', 'amount'])],
+            'discount_value' => ['nullable', 'required_with:discount_type', 'decimal:0,6', 'min:0', 'max:999999999999999999'],
+            'deposit_amount' => ['nullable', 'decimal:0,2', 'min:0', 'max:999999999999999999'],
+            'deposit_account_id' => ['nullable', 'uuid'],   // checked when saved: a money account in the invoice's currency
         ];
     }
 

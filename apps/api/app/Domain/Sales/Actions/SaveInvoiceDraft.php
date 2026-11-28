@@ -62,6 +62,13 @@ final class SaveInvoiceDraft
             $data['salesperson_id'] = in_array($type, ['invoice', 'credit_note', 'sales_receipt'], true) ? $this->salesperson($data, $document, $original) : null;
 
             self::refuseBundlesBought($type, $data['lines'] ?? []);
+            // 113: a discount on sales documents, a deposit on an invoice only.
+            if (! in_array($type, self::DISCOUNTED, true)) {
+                unset($data['discount_type'], $data['discount_value']);
+            }
+            if ($type !== 'invoice') {
+                unset($data['deposit_amount'], $data['deposit_account_id']);
+            }
             $calc = $this->calculate($data);
             if ($type === 'bill') {
                 $calc['lines'] = $this->stockLinesToInventory($calc['lines']);
@@ -249,8 +256,34 @@ final class SaveInvoiceDraft
      *
      * @return array{header: array<string, mixed>, lines: list<array<string, mixed>>, totals: array{subtotal: string, tax_total: string, total: string}}
      */
+    /** 113: the documents a discount may be given on (QuickBooks: sales forms). */
+    public const DISCOUNTED = ['invoice', 'sales_receipt', 'quote', 'sales_order'];
+
     /** 112: the document's own addresses, email, shipping and statement message. */
     public const CONTACT_FIELDS = ['billing_address', 'shipping_address', 'email_to', 'email_cc', 'email_bcc', 'ship_via', 'ship_date', 'tracking_number', 'message_on_statement'];
+
+    /**
+     * The deposit taken with an invoice (113): no more than its total, into one of the company's active bank, cash or
+     * mobile-money accounts in the invoice's currency (row-level security scopes the lookup).
+     *
+     * @return array{amount: string, account_id: ?string}
+     */
+    private function deposit(array $data, string $currency, Money $total): array
+    {
+        $amount = isset($data['deposit_amount']) && $data['deposit_amount'] !== '' ? Money::of((string) $data['deposit_amount'], $currency)->roundToCurrency() : Money::zero($currency);
+        if ($amount->isZero()) {
+            return ['amount' => '0.00', 'account_id' => null];
+        }
+        if ($total->minus($amount)->isNegative()) {
+            throw ValidationException::withMessages(['deposit_amount' => ['The deposit is more than the invoice total.']]);
+        }
+        $account = \App\Domain\Ledger\Models\Account::query()->where('is_active', true)->whereIn('subtype', ['bank', 'cash', 'mobile_money'])->find($data['deposit_account_id'] ?? null);
+        if ($account === null || ($account->currency ?? $this->company->get()->base_currency) !== $currency) {
+            throw ValidationException::withMessages(['deposit_account_id' => ["Choose a bank, cash or mobile-money account in {$currency} for the deposit."]]);
+        }
+
+        return ['amount' => $amount->toDecimalString(), 'account_id' => $account->getKey()];
+    }
 
     /** Exclusive, inclusive or out of scope (110): tax_mode when given, else prices_include_tax. */
     public static function taxMode(array $data): string
@@ -277,11 +310,13 @@ final class SaveInvoiceDraft
 
         $amounts = [];
         $lineRows = [];
+        $lineRates = [];
         foreach (array_values($data['lines']) as $i => $line) {
             if ($outOfScope) {
                 $line['tax_rate_id'] = null;
             }
             $rate = isset($line['tax_rate_id']) ? (string) ($rates[$line['tax_rate_id']] ?? '0') : '0';
+            $lineRates[] = $rate;
             $result = $this->tax->line(
                 Money::of($line['unit_price'], $currency),
                 (string) $line['quantity'],
@@ -312,7 +347,21 @@ final class SaveInvoiceDraft
             ];
         }
 
+        // 113: a discount on the whole document, before tax, shared out over the lines (TaxCalculator::discount).
+        if (($data['discount_type'] ?? null) === 'percent' && bccomp((string) ($data['discount_value'] ?? '0'), '100', 6) > 0) {
+            throw ValidationException::withMessages(['discount_value' => ['A discount is at most 100%.']]);
+        }
+        $discount = $this->tax->discount($amounts, $lineRates, $data['discount_type'] ?? null,
+            isset($data['discount_value']) && $data['discount_value'] !== '' ? (string) $data['discount_value'] : null, $currency);
+        if (! $discount['discount']->isZero()) {
+            $amounts = $discount['lines'];
+            foreach ($lineRows as $i => $row) {
+                $lineRows[$i] = [...$row, 'line_subtotal' => $amounts[$i]->subtotal->toDecimalString(), 'line_tax' => $amounts[$i]->tax->toDecimalString(),
+                    'discount_share' => $discount['shares'][$i]->toDecimalString()];
+            }
+        }
         $totals = $this->tax->document($amounts, $currency);
+        $deposit = $this->deposit($data, $currency, $totals->total);
 
         return [
             'header' => [
@@ -341,6 +390,12 @@ final class SaveInvoiceDraft
                 // 112: addresses as printed, who it is emailed to, how it ships, the statement's message; empty is none.
                 // Only those sent: a field the form does not show leaves what the draft has.
                 ...array_map(fn ($v) => $v === null || trim((string) $v) === '' ? null : trim((string) $v), array_intersect_key($data, array_flip(self::CONTACT_FIELDS))),
+                // 113: the discount as asked for and as given, and the deposit with the account it went into.
+                'discount_type' => $discount['discount']->isZero() ? null : $data['discount_type'],
+                'discount_value' => $discount['discount']->isZero() ? null : (string) $data['discount_value'],
+                'discount_total' => $discount['discount']->toDecimalString(),
+                'deposit_amount' => $deposit['amount'],
+                'deposit_account_id' => $deposit['account_id'],
                 // Only the custom fields the company has, each a short text; empty ones are not kept.
                 'custom_fields' => array_filter(array_intersect_key(array_map(fn ($v) => $v === null ? '' : trim((string) $v), (array) ($data['custom_fields'] ?? [])),
                     array_flip(array_column($form['custom_fields'], 'name'))), fn (string $v) => $v !== ''),

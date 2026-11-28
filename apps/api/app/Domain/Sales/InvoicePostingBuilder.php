@@ -89,7 +89,10 @@ final class InvoicePostingBuilder
             : JournalLineDraft::debit($receivableAccountId, $receivableBase, $receivableTxn, $documentNumber, $customerId));
 
         foreach ($creditLines as [$accountId, $base, $txn, $dimensions]) {
-            $draft->add($controlOnCredit
+            // A negative amount (a discount given, 113) is on the control account's own side.
+            $onCredit = $controlOnCredit !== $txn->isNegative();
+            [$base, $txn] = $txn->isNegative() ? [$base->negated(), $txn->negated()] : [$base, $txn];
+            $draft->add($onCredit
                 ? JournalLineDraft::debit($accountId, $base, $txn, $documentNumber, $customerId, $dimensions)
                 : JournalLineDraft::credit($accountId, $base, $txn, $documentNumber, $customerId, $dimensions));
         }

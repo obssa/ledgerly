@@ -8,7 +8,7 @@ import { addressText } from "@/lib/address";
 import { Card } from "@/components/ui";
 import type { FormField, InvoiceDetail, TaxMode } from "@/lib/api";
 import type { InvoiceOptions } from "@/lib/data";
-import { documentAmounts, lineAmounts } from "@/lib/decimal";
+import { discountedAmounts, lineAmounts, parse } from "@/lib/decimal";
 import { formatAmount, formatMoney } from "@/lib/format";
 import { createBill } from "../../bills/actions";
 import { createExpense } from "../../expenses/actions";
@@ -56,7 +56,7 @@ const KIND = {
 } as const;
 
 /** What the form needs from a saved document to edit it: an invoice draft, or a quote or sales order. */
-type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "tax_mode" | "class_id" | "location_id" | "custom_fields" | "billing_address" | "shipping_address" | "email_to" | "email_cc" | "email_bcc" | "ship_via" | "ship_date" | "tracking_number" | "message_on_statement" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
+type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "tax_mode" | "class_id" | "location_id" | "custom_fields" | "billing_address" | "shipping_address" | "email_to" | "email_cc" | "email_bcc" | "ship_via" | "ship_date" | "tracking_number" | "message_on_statement" | "discount_type" | "discount_value" | "deposit_amount" | "deposit_account_id" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
   | "warehouse_id" | "number" | "notes" | "lines" | "lock_version"> & { status: string; reference?: string | null };
 
 const METHODS: Record<string, string> = {
@@ -168,6 +168,12 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const files = useRef<File[]>([]);
   const router = useRouter();
   const [sending, setSending] = useState(false);
+  // 113: QuickBooks' discount before tax (sales forms) and deposit (invoices), when on in Customize.
+  const discountable = sale && Boolean(show.discount);
+  const [discountType, setDiscountType] = useState<"percent" | "amount">(draft?.discount_type ?? "percent");
+  const [discountValue, setDiscountValue] = useState(draft?.discount_value ? String(Number(draft.discount_value)) : "");
+  const depositable = kind === "invoice" && Boolean(show.deposit);
+  const [deposit, setDeposit] = useState(draft?.deposit_amount && Number(draft.deposit_amount) > 0 ? draft.deposit_amount : "");
   const [lines, setLines] = useState<Line[]>(draft && draft.lines.length > 0
     ? draft.lines.map((l, i) => ({ key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
         taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", serviceDate: l.service_date ?? "", classId: l.class_id ?? "", locationId: l.location_id ?? "", sourceLineId: l.source_line_id ?? undefined, unitId: l.unit_id ?? "",
@@ -207,9 +213,10 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const rateOf = (id: string) => (untaxed ? "0" : options.taxRates.find((t) => t.id === id)?.rate ?? "0");
   const valid = lines.filter((l) => isDecimal(l.quantity) && isDecimal(l.unitPrice));
   const totals = useMemo(
-    () => documentAmounts(valid.map((l) => ({ quantity: plain(l.quantity), unitPrice: plain(l.unitPrice), taxRate: rateOf(l.taxRateId) })), currency, inclusive),
+    () => discountedAmounts(valid.map((l) => ({ quantity: plain(l.quantity), unitPrice: plain(l.unitPrice), taxRate: rateOf(l.taxRateId) })), currency, inclusive,
+      discountable && discountValue.trim() !== "" ? { type: discountType, value: plain(discountValue).replace(/%/g, "") } : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lines, mode, currency],
+    [lines, mode, currency, discountable, discountType, discountValue],
   );
 
   const next = state?.next;
@@ -597,10 +604,48 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
             </div>
             <dl className="flex-[0_1_320px] text-sm">
               <div className="flex justify-between py-1.5"><dt>Subtotal</dt><dd className="num">{formatAmount(totals.subtotal, currency)}</dd></div>
+              {discountable && (
+                <div className="flex items-center justify-between gap-2 py-1.5">
+                  <dt className="flex items-center gap-2">
+                    <label htmlFor="discount_type" className="sr-only">Discount as</label>
+                    <select className="field !w-auto !py-1 text-[13px]" id="discount_type" name="discount_type" value={discountType} onChange={(e) => setDiscountType(e.target.value as "percent" | "amount")}>
+                      <option value="percent">Discount percent</option>
+                      <option value="amount">Discount value</option>
+                    </select>
+                    <label htmlFor="discount_value" className="sr-only">Discount</label>
+                    <input className={`field num !w-[90px] !py-1 text-right ${bad("discount_value") ? "!border-bad" : ""}`} id="discount_value" name="discount_value" inputMode="decimal"
+                      value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} placeholder={discountType === "percent" ? "%" : "0.00"} />
+                  </dt>
+                  <dd className="num">{totals.discount > 0n ? `−${formatAmount(totals.discount, currency)}` : "—"}</dd>
+                </div>
+              )}
+              {totals.discount > 0n && <div className="flex justify-between py-1.5"><dt>Taxable subtotal</dt><dd className="num">{formatAmount(totals.taxable, currency)}</dd></div>}
               {untaxed
                 ? <div className="flex justify-between py-1.5 text-muted"><dt>Out of scope of tax</dt><dd>No tax</dd></div>
                 : <div className="flex justify-between py-1.5"><dt>Tax</dt><dd className="num">{formatAmount(totals.tax, currency)}</dd></div>}
               <div className="mt-1.5 flex justify-between border-t-2 border-ink pt-3 text-lg font-extrabold"><dt>Total</dt><dd className="num font-semibold">{formatMoney(totals.total, currency)}</dd></div>
+              {depositable && (
+                <>
+                  <div className="mt-2 flex items-center justify-between gap-2 py-1.5">
+                    <dt><label htmlFor="deposit_amount">Deposit</label></dt>
+                    <dd><input className={`field num !w-[120px] !py-1 text-right ${bad("deposit_amount") ? "!border-bad" : ""}`} id="deposit_amount" name="deposit_amount" inputMode="decimal"
+                      value={deposit} onChange={(e) => setDeposit(e.target.value)} placeholder="0.00" /></dd>
+                  </div>
+                  {deposit.trim() !== "" && Number(plain(deposit)) > 0 && (
+                    <div className="py-1.5">
+                      <label className="field-label" htmlFor="deposit_account_id">Deposit received into</label>
+                      <select className={`field ${bad("deposit_account_id") ? "!border-bad" : ""}`} id="deposit_account_id" name="deposit_account_id" defaultValue={draft?.deposit_account_id ?? ""}>
+                        <option value="">Choose an account</option>
+                        {(options.moneyAccounts ?? []).filter((a) => (a.currency ?? options.baseCurrency) === currency).map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1.5 font-semibold">
+                    <dt>Balance due</dt>
+                    <dd className="num">{formatMoney(isDecimal(deposit) ? totals.total - parse(plain(deposit)) : totals.total, currency)}</dd>
+                  </div>
+                </>
+              )}
             </dl>
           </div>
         </Card>

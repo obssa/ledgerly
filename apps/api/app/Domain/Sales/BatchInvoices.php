@@ -58,7 +58,7 @@ final class BatchInvoices
                         'contact_id' => $customer->getKey(), 'issue_date' => $issueDate,
                         'due_date' => PaymentTerms::forContact($customer->getKey(), $issueDate, (string) $this->current->get()->calendar),   // 109
                         'payment_terms_id' => $customer->payment_terms_id,
-                        'currency' => $source->currency, 'prices_include_tax' => (bool) $source->prices_include_tax, 'tax_mode' => $source->tax_mode, 'warehouse_id' => $source->warehouse_id,
+                        'currency' => $source->currency, 'prices_include_tax' => (bool) $source->prices_include_tax, 'tax_mode' => $source->tax_mode, 'discount_type' => $source->discount_type, 'discount_value' => $source->discount_value === null ? null : (string) $source->discount_value, 'warehouse_id' => $source->warehouse_id,
                         'notes' => $source->notes, 'lines' => $lines,
                     ], null, $userId);
                     $invoice = $post ? $this->approve->handle($draft->refresh(), $userId) : $draft->refresh();

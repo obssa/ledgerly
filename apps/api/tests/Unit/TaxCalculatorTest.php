@@ -70,4 +70,29 @@ final class TaxCalculatorTest extends TestCase
         $this->assertSame('15.00', $line->tax->toDecimalString());
         $this->assertSame('214.99', $line->total->toDecimalString());
     }
+
+    /** The same cases as apps/web/src/lib/decimal.test.ts (discountedAmounts): the server and the web app agree. */
+    public function test_a_document_discount_is_shared_over_the_lines_before_tax(): void
+    {
+        $calc = new TaxCalculator();
+        $sum = function (array $r): array {
+            $doc = (new TaxCalculator())->document($r['lines'], 'ETB');
+
+            return [$r['discount']->toDecimalString(), array_map(fn (Money $m) => $m->toDecimalString(), $r['shares']), $doc->subtotal->toDecimalString(), $doc->tax->toDecimalString(), $doc->total->toDecimalString()];
+        };
+        $l = fn (string $amount) => $calc->line(Money::of($amount, 'ETB'), '1', '0', '0.15');
+
+        // 10% of 1,000.00: 60.00 and 40.00 off, VAT on what is left.
+        $this->assertSame(['100.00', ['60.00', '40.00'], '900.00', '135.00', '1035.00'], $sum($calc->discount([$l('600'), $l('400')], ['0.15', '0.15'], 'percent', '10', 'ETB')));
+        // 100.00 off three equal lines: the last takes the rounding.
+        $this->assertSame(['100.00', ['33.33', '33.33', '33.34'], '200.00', '30.00', '230.00'],
+            $sum($calc->discount([$l('100'), $l('100'), $l('100')], ['0.15', '0.15', '0.15'], 'amount', '100', 'ETB')));
+        // Never more than the lines.
+        $this->assertSame('300.00', $calc->discount([$l('300')], ['0.15'], 'amount', '500', 'ETB')['discount']->toDecimalString());
+        // A negative line takes no share.
+        $neg = $calc->discount([$calc->line(Money::of('500', 'ETB'), '1'), $calc->line(Money::of('-100', 'ETB'), '1')], ['0', '0'], 'percent', '10', 'ETB');
+        $this->assertSame(['50.00', ['50.00', '0.00'], '350.00', '0.00', '350.00'], $sum($neg));
+        // None: as it was.
+        $this->assertSame(['0.00', ['0.00'], '600.00', '90.00', '690.00'], $sum($calc->discount([$l('600')], ['0.15'], null, null, 'ETB')));
+    }
 }

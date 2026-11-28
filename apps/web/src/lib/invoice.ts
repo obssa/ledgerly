@@ -69,6 +69,15 @@ export function invoiceBody(form: FormData): Record<string, unknown> {
   };
   for (const name of ["due_date", "notes", "number", "reference", "paid_from_account_id", "payment_method", "warehouse_id", "salesperson_id", "payment_terms_id"]) if (value(name) !== "") body[name] = value(name);
   if (["exclusive", "inclusive", "out_of_scope"].includes(value("tax_mode"))) body.tax_mode = value("tax_mode");
+  // 113: a discount before tax (none when its value is empty), and a deposit with the account it goes into.
+  if (form.has("discount_type")) {
+    const amount = value("discount_value").replace(/[,\s%]/g, "");
+    Object.assign(body, amount === "" || Number(amount) === 0 ? { discount_type: null, discount_value: null } : { discount_type: value("discount_type") === "amount" ? "amount" : "percent", discount_value: amount });
+  }
+  if (form.has("deposit_amount")) {
+    const deposit = value("deposit_amount").replace(/[,\s]/g, "");
+    Object.assign(body, deposit === "" || Number(deposit) === 0 ? { deposit_amount: "0", deposit_account_id: null } : { deposit_amount: deposit, deposit_account_id: value("deposit_account_id") || null });
+  }
   // 111: the class and location of the whole document (when tracked so), and the company's custom fields.
   for (const name of ["class_id", "location_id"]) if (value(name) !== "") body[name] = value(name);
   // 112: shown on the form, they are sent even when emptied (an empty one clears it).

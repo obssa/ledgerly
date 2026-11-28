@@ -838,6 +838,8 @@ export interface InvoiceLine {
   item_id?: string | null;
   /** The project the line is tagged with (job costing), if any. */
   project_id?: string | null;
+  /** 113: its share of the document's discount (line_subtotal is after it). */
+  discount_share?: string;
   /** 111: its service date, and its class and location when tracked per line. */
   service_date?: string | null;
   class_id?: string | null;
@@ -893,6 +895,12 @@ export interface Invoice {
   ship_date?: string | null;
   tracking_number?: string | null;
   message_on_statement?: string | null;
+  /** 113: the discount before tax as asked for and as given (subtotal is after it), and the deposit taken with it. */
+  discount_type?: "percent" | "amount" | null;
+  discount_value?: string | null;
+  discount_total?: string;
+  deposit_amount?: string;
+  deposit_account_id?: string | null;
   currency: string;
   subtotal: string;
   tax_total: string;

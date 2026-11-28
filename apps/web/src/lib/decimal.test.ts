@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CURRENCIES, documentAmounts, lineAmounts, parse, toString } from "./decimal";
+import { CURRENCIES, discountedAmounts, documentAmounts, lineAmounts, parse, toString } from "./decimal";
 import { formatAmount, formatLongDate, toEthiopian } from "./format";
 
 // Same cases as apps/api/tests/Unit/TaxCalculatorTest.php: browser preview and API must agree.
@@ -75,5 +75,19 @@ describe("formatting", () => {
     expect(CURRENCIES.length).toBeGreaterThan(140);
     expect(new Set(CURRENCIES).size).toBe(CURRENCIES.length);
     for (const c of ["ETB", "USD", "EUR", "BRL", "INR", "JPY"]) expect(CURRENCIES).toContain(c);
+  });
+});
+
+describe("discountedAmounts", () => {
+  // The same cases as apps/api/tests/Unit/TaxCalculatorTest.php: the web app and the server agree.
+  const l = (amount: string, taxRate = "0.15") => ({ quantity: "1", unitPrice: amount, taxRate });
+  const s = (r: ReturnType<typeof discountedAmounts>) => [toString(r.discount), toString(r.taxable), toString(r.tax), toString(r.total)];
+  it("shares a document discount over the lines before tax", () => {
+    expect(s(discountedAmounts([l("600"), l("400")], "ETB", false, { type: "percent", value: "10" }))).toEqual(["100.00", "900.00", "135.00", "1035.00"]);
+    expect(s(discountedAmounts([l("100"), l("100"), l("100")], "ETB", false, { type: "amount", value: "100" }))).toEqual(["100.00", "200.00", "30.00", "230.00"]);
+    expect(toString(discountedAmounts([l("300")], "ETB", false, { type: "amount", value: "500" }).discount)).toBe("300.00");
+    expect(s(discountedAmounts([l("500", "0"), l("-100", "0")], "ETB", false, { type: "percent", value: "10" }))).toEqual(["50.00", "350.00", "0.00", "350.00"]);
+    expect(s(discountedAmounts([l("600")], "ETB", false, null))).toEqual(["0.00", "600.00", "90.00", "690.00"]);
+    expect(toString(discountedAmounts([l("600")], "ETB", false, { type: "percent", value: "" }).discount)).toBe("0.00");
   });
 });
