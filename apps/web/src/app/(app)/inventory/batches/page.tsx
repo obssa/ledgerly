@@ -16,7 +16,7 @@ export default async function BatchesPage({ searchParams }: PageProps<"/inventor
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/inventory" className="hover:underline">Stock on hand</Link> / Batches</>} title="Batches and expiry" />
+      <PageTitle title="Batches and expiry" />
       <Segmented label="Expiring within" size="sm" items={[
         { key: "all", href: "/inventory/batches", label: "All on hand", active: days === undefined },
         ...WINDOWS.map((d) => ({ key: String(d), href: `/inventory/batches?within=${d}`, label: `Expiring within ${d} days`, active: days === d })),

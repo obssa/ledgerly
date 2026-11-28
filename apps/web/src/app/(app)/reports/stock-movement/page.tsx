@@ -21,7 +21,7 @@ export default async function StockMovementPage({ searchParams }: PageProps<"/re
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Inventory" title="Stock movement" actions={<ExportLink report="stock-movement" params={{ ...exportPeriod(period.picked), warehouse_id: warehouseId }} />} />
+      <PageTitle title="Stock movement" actions={<ExportLink report="stock-movement" params={{ ...exportPeriod(period.picked), warehouse_id: warehouseId }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["warehouse_id"]}>
         <div className="min-w-[180px]"><label className="field-label" htmlFor="warehouse_id">Warehouse</label>
           <select className="field" id="warehouse_id" name="warehouse_id" defaultValue={warehouseId ?? ""}><option value="">All warehouses</option>

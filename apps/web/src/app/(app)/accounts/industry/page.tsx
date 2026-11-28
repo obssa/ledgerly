@@ -22,7 +22,7 @@ export default async function IndustryAccountsPage({ searchParams }: PageProps<"
   if (!t) {
     return (
       <>
-        <PageTitle eyebrow="Books / Chart of accounts" title="Industry accounts" />
+        <PageTitle title="Industry accounts" />
         <p className="text-[14px] text-muted">Not available in the demo.</p>
       </>
     );
@@ -32,7 +32,7 @@ export default async function IndustryAccountsPage({ searchParams }: PageProps<"
 
   return (
     <>
-      <PageTitle eyebrow="Books / Chart of accounts" title="Industry accounts"
+      <PageTitle title="Industry accounts"
         actions={<Link href="/accounts" className="btn">Chart of accounts</Link>} />
       <div className="flex flex-wrap items-start gap-4">
         <nav aria-label="Industries" className="flex min-w-[220px] flex-[1_1_220px] flex-col gap-1 text-[14px]">

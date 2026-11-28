@@ -19,7 +19,7 @@ export default async function CustomerPage({ params }: PageProps<"/customers/[id
   return (
     <>
       <PageTitle
-        eyebrow="Money in / Customers"
+       
         title={<>{customer.name} {!customer.is_active && <Pill>Archived</Pill>}</>}
         actions={editable ? <ArchiveCustomer customer={customer} /> : undefined}
       />

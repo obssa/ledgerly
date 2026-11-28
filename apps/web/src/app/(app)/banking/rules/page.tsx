@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle } from "@/components/ui";
 import { getBankRules } from "@/lib/data";
@@ -18,7 +17,7 @@ export default async function BankRulesPage({ searchParams }: PageProps<"/bankin
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / Bank rules</>} title="Bank rules" />
+      <PageTitle title="Bank rules" />
       <p className="mb-4 max-w-[760px] text-sm text-muted">
         A rule says how a kind of statement line is categorised: the monthly bank charge, the rent, the mobile-money fee. Lines to review that a rule fits show it,
         and &ldquo;Apply the rules&rdquo; on a statement categorises them all. Rules are tried by priority, the lowest first.

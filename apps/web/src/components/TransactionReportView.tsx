@@ -58,7 +58,7 @@ export async function TransactionReportView({ report, q }: { report: TxReport; q
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Transactions" title={def.title} actions={<ExportLink report={report} params={{ ...exportPeriod(period.picked), ...chosen }} />} />
+      <PageTitle title={def.title} actions={<ExportLink report={report} params={{ ...exportPeriod(period.picked), ...chosen }} />} />
       <DateRangeFilter picked={period.picked} keep={{ ...chosen }} fields={["status"]}>
         {def.statuses && (
           <div><label className="field-label" htmlFor="status">Status</label>

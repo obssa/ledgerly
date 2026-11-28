@@ -17,7 +17,7 @@ export default async function DeliveryNotePage({ params }: PageProps<"/delivery-
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / <Link href="/delivery-notes" className="hover:underline">Delivery notes</Link> / {n.number}</>}
+        crumbs={<><Link href="/delivery-notes" className="hover:underline">Delivery notes</Link> › {n.number}</>}
         title={<>Delivery note <span className="num">{n.number}</span> {n.status === "void" ? <Pill>Void</Pill> : <Pill tone="good">Delivered</Pill>}</>}
       />
       <div className="flex flex-wrap items-start gap-4">

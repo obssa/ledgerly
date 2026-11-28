@@ -73,7 +73,7 @@ export default async function GeneralLedgerPage({ searchParams }: PageProps<"/re
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Ledger</>} title="General ledger"
+      <PageTitle title="General ledger"
         actions={<ExportLink report="general-ledger" params={{ ...exportPeriod(period.picked), account_id: filters.account_id, location_id: filters.location_id, class_id: filters.class_id, project_id: filters.project_id,
           cols: custom ? cols.join(",") : undefined }} />} />
       <DateRangeFilter picked={period.picked} keep={{ ...q, cols: custom ? cols.join(",") : undefined, col: undefined, customize: undefined }} fields={["account_id", "location_id", "class_id", "project_id"]}>

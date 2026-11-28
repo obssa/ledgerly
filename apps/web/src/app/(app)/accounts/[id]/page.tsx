@@ -18,7 +18,7 @@ export default async function AccountPage({ params }: PageProps<"/accounts/[id]"
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/accounts" className="hover:underline">Chart of accounts</Link> / {TYPE_LABELS[account.type]}</>}
+      <PageTitle crumbs={<>{TYPE_LABELS[account.type]}</>}
         title={<><span className="num">{account.code}</span> {account.name} {account.is_system && <Pill>System</Pill>} {!account.is_active && <Pill>Archived</Pill>}</>} />
       <Card className="mb-4 max-w-[1000px]" label="Account">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">

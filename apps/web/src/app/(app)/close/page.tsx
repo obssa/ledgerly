@@ -19,7 +19,7 @@ export default async function ClosePage({ searchParams }: PageProps<"/close">) {
 
   return (
     <>
-      <PageTitle eyebrow="Books" title="Close the books" />
+      <PageTitle title="Close the books" />
       {!checklist ? <p className="text-[14px] text-muted">Closing the books is for accountants, owners and admins (and not available in the demo).</p> : (
         <>
           <form className="mb-4 flex flex-wrap items-end gap-2.5">

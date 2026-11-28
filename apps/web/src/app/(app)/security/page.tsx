@@ -16,7 +16,7 @@ export default async function SecurityPage() {
 
   return (
     <>
-      <PageTitle eyebrow="Your account" title="Sign-in security" />
+      <PageTitle title="Sign-in security" />
       <Card className="max-w-[820px]" label="Authenticator app">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[19px] font-bold">Authenticator app</h2>

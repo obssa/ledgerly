@@ -16,7 +16,7 @@ export default async function DeliveryNotesPage({ searchParams }: PageProps<"/de
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / Delivery notes</>}
+       
         title="Delivery notes"
         actions={<Link href="/delivery-notes/uninvoiced" className="btn">Delivered, not invoiced</Link>}
       />

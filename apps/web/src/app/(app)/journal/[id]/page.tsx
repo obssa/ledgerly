@@ -34,7 +34,7 @@ export default async function JournalEntryPage({ params, searchParams }: PagePro
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/journal" className="hover:underline">Journal entries</Link> / Entry</>}
+      <PageTitle crumbs={<>Entry</>}
         title={<>Entry <span className="num">#{e.number}</span> {e.status === "reversed" ? <Pill>Reversed</Pill> : <Pill tone="good">Posted</Pill>}</>} />
       <Card className="mb-4" label="Entry">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">

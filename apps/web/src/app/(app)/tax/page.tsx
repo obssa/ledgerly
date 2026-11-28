@@ -25,7 +25,7 @@ export default async function TaxCentrePage({ searchParams }: PageProps<"/tax">)
 
   return (
     <>
-      <PageTitle eyebrow="Compliance" title="Tax centre" />
+      <PageTitle title="Tax centre" />
       <Segmented label="Return" items={KINDS.map(([v, l]) => ({ key: v, href: v === "vat" ? "/tax" : `/tax?kind=${v}`, label: l, active: kind === v }))} />
       {!centre ? (
         <p className="text-[14px] text-muted">

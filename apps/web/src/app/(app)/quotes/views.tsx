@@ -33,9 +33,8 @@ export function statusOf(kind: QuoteKind, status: QuoteStatus): { label: string;
   } as const)[status] ?? { label: status, tone: "neutral" };
 }
 
-const eyebrow = (kind: QuoteKind, last?: string) => (
-  <><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / {last ? <><Link href={WORDS[kind].path} className="hover:underline">{WORDS[kind].title}</Link> / {last}</> : WORDS[kind].title}</>
-);
+/** The breadcrumb's last step under Quotes or Sales orders (PageCrumbs): New, Edit, the number; none on the list. */
+const eyebrow = (_kind: QuoteKind, last?: string) => last;
 
 export async function QuoteList({ kind, q = {} }: { kind: QuoteKind; q?: Record<string, string | string[] | undefined> }) {
   const period = await getReportPeriod(q, "all");
@@ -44,7 +43,7 @@ export async function QuoteList({ kind, q = {} }: { kind: QuoteKind; q?: Record<
 
   return (
     <>
-      <PageTitle eyebrow={eyebrow(kind)} title={w.title} actions={<>
+      <PageTitle crumbs={eyebrow(kind)} title={w.title} actions={<>
         {kind === "sales_order" && <Link href="/sales-orders/back-orders" className="btn">Back-orders</Link>}
         <Link href={`${w.path}/new`} className="btn btn-primary">{w.newLabel}</Link>
       </>} />
@@ -88,7 +87,7 @@ export async function NewQuote({ kind }: { kind: QuoteKind }) {
   const options = await getInvoiceOptions(kind);
   return (
     <>
-      <PageTitle eyebrow={eyebrow(kind, "New")} title={<>New {WORDS[kind].one.toLowerCase()} <Pill>Draft</Pill></>} />
+      <PageTitle crumbs={eyebrow(kind, "New")} title={<>New {WORDS[kind].one.toLowerCase()} <Pill>Draft</Pill></>} />
       <InvoiceForm options={options} kind={kind} />
     </>
   );
@@ -103,7 +102,7 @@ export async function EditQuote({ kind, id }: { kind: QuoteKind; id: string }) {
 
   return (
     <>
-      <PageTitle eyebrow={eyebrow(kind, "Edit")} title={<>{doc.status === "draft" ? "Edit" : "Revise"} {WORDS[kind].one.toLowerCase()} {doc.number && <span className="num">{doc.number}</span>} <Pill tone={s.tone}>{s.label}</Pill></>} />
+      <PageTitle crumbs={eyebrow(kind, "Edit")} title={<>{doc.status === "draft" ? "Edit" : "Revise"} {WORDS[kind].one.toLowerCase()} {doc.number && <span className="num">{doc.number}</span>} <Pill tone={s.tone}>{s.label}</Pill></>} />
       {doc.status !== "draft" && (
         <p role="status" className="mb-4 rounded-lg bg-warn-tint px-3 py-2 text-[13px] font-semibold text-warn">
           {kind === "quote" ? "The customer has this quote." : "This order is confirmed."} Saving keeps the earlier version, with what changed, and the number stays.
@@ -123,7 +122,7 @@ export async function QuoteView({ kind, id, saved }: { kind: QuoteKind; id: stri
   return (
     <>
       <PageTitle
-        eyebrow={eyebrow(kind, doc.number ?? "Draft")}
+        crumbs={eyebrow(kind, doc.number ?? "Draft")}
         title={<>{w.one} {doc.number ? <span className="num">{doc.number}</span> : "(draft)"} <Pill tone={s.tone}>{s.label}</Pill></>}
         actions={doc.can.edit ? <Link href={`${w.path}/${encodeURIComponent(doc.id)}/edit`} className="btn">{doc.status === "draft" ? "Edit draft" : "Revise"}</Link> : undefined}
       />

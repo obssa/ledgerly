@@ -23,7 +23,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
   return (
     <>
-      <PageTitle eyebrow="Company setup" title="Company settings" />
+      <PageTitle title="Company settings" />
 
       <div className="flex max-w-[1100px] flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_560px]" label="Company profile">

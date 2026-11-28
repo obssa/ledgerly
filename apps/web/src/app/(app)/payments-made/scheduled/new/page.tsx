@@ -15,7 +15,7 @@ export default async function SchedulePaymentPage({ searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow="Money out / Scheduled payments" title="Schedule a payment"
+      <PageTitle title="Schedule a payment"
         description="Plan a supplier payment for a later day. Nothing is recorded until you confirm the money went out." />
       <Card className="mb-4 max-w-[720px]" label="Supplier">
         <form className="flex flex-wrap items-end gap-2.5">

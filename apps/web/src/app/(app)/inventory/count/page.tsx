@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { Card, PageTitle, Segmented } from "@/components/ui";
 import { getBins, getItems, getStock, getWarehouses } from "@/lib/data";
 import { CountForm } from "./CountForm";
@@ -18,7 +17,7 @@ export default async function CountStockPage({ searchParams }: PageProps<"/inven
   if (!warehouse || !stock || items.demo) {
     return (
       <>
-        <PageTitle eyebrow={<><Link href="/inventory" className="hover:underline">Inventory</Link> / Count</>} title="Count stock" />
+        <PageTitle title="Count stock" />
         <p className="text-sm text-muted">{items.demo ? "Not available in the demo." : "Add a warehouse first."}</p>
       </>
     );
@@ -35,7 +34,7 @@ export default async function CountStockPage({ searchParams }: PageProps<"/inven
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/inventory" className="hover:underline">Inventory</Link> / Count</>} title={`Count stock: ${warehouse.name}${bin ? `, bin ${bin.code}` : ""}`} />
+      <PageTitle title={`Count stock: ${warehouse.name}${bin ? `, bin ${bin.code}` : ""}`} />
       {active.length > 1 && (
         <Segmented label="Warehouse" items={active.map((w) => ({ key: w.id, href: href(w.id), label: w.name, active: w.id === warehouse.id }))} />
       )}

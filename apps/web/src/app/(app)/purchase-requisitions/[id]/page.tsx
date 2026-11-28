@@ -17,7 +17,7 @@ export default async function RequisitionPage({ params }: PageProps<"/purchase-r
   const status = REQUISITION_STATUS[r.status] ?? { label: r.status, tone: "neutral" as const };
   return (
     <>
-      <PageTitle eyebrow={<Link href="/purchase-requisitions" className="hover:underline">Purchase requisitions</Link>} title={<>{r.reason} <Pill tone={status.tone}>{status.label}</Pill></>} />
+      <PageTitle title={<>{r.reason} <Pill tone={status.tone}>{status.label}</Pill></>} />
       <div className="flex flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_560px]" label="What was asked for">
           <p className="mb-3 text-sm text-muted">Asked by {r.requested_by_name} on <span className="num"><Dt v={r.created_at} /></span>{r.needed_by && <>, needed by <span className="num">{r.needed_by}</span></>}.</p>

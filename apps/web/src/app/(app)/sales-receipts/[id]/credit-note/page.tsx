@@ -15,7 +15,7 @@ export default async function CashSaleCreditNotePage({ params }: PageProps<"/sal
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href={`/sales-receipts/${encodeURIComponent(receipt.id)}`} className="hover:underline">Cash sale <span className="num">{receipt.number}</span></Link> / Credit note</>}
+        crumbs={<><Link href={`/sales-receipts/${encodeURIComponent(receipt.id)}`} className="hover:underline">Cash sale <span className="num">{receipt.number}</span></Link> › Credit note</>}
         title={<>Credit note for <span className="num">{receipt.number}</span></>}
       />
       {receipt.status !== "void" ? (

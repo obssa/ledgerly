@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getCustomers } from "@/lib/data";
 import { ProjectForm } from "../ProjectForm";
@@ -11,7 +10,7 @@ export default async function NewProjectPage() {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/projects" className="hover:underline">Projects</Link> / New</>} title="New project" />
+      <PageTitle title="New project" />
       <Card label="Project">
         <ProjectForm customers={customers.data.map((c) => ({ id: c.id, name: c.name }))} />
       </Card>

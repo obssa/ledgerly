@@ -26,7 +26,7 @@ export default async function SavedReportsPage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Saved" title="Saved and scheduled reports" />
+      <PageTitle title="Saved and scheduled reports" />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/saved" />
         {saved === null ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (

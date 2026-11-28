@@ -28,7 +28,7 @@ export default async function RealizedGainsPage({ searchParams }: PageProps<"/re
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Foreign currency" title="Realized gains and losses" actions={<ExportLink report="realized-gains" params={{ ...exportPeriod(period.picked) }} />} />
+      <PageTitle title="Realized gains and losses" actions={<ExportLink report="realized-gains" params={{ ...exportPeriod(period.picked) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} />
       <div className="flex flex-wrap items-start gap-4">
         <ReportsNav current="/reports/exchange-gains" />

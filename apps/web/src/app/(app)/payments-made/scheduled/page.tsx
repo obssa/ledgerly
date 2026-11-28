@@ -22,7 +22,7 @@ export default async function ScheduledPaymentsPage({ searchParams }: PageProps<
 
   return (
     <>
-      <PageTitle eyebrow="Money out" title="Scheduled payments"
+      <PageTitle title="Scheduled payments"
         description="Supplier payments planned for a later day. Nothing is in the books until someone confirms the money went out."
         actions={list?.can.pay ? <Link href="/payments-made/scheduled/new" className="btn btn-primary">+ Schedule a payment</Link> : undefined} />
 

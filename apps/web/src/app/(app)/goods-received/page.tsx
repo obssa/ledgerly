@@ -17,7 +17,7 @@ export default async function GoodsReceivedPage({ searchParams }: PageProps<"/go
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / Goods received</>}
+       
         title="Goods received"
         actions={<Link href="/goods-received/unbilled" className="btn">Received, not billed</Link>}
       />

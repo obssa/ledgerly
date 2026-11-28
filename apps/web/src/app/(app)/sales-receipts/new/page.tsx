@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { PageTitle } from "@/components/ui";
 import { getSalesReceiptOptions } from "@/lib/data";
 import { InvoiceForm } from "../../invoices/new/InvoiceForm";
@@ -10,7 +9,7 @@ export default async function NewSalesReceiptPage() {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/sales-receipts" className="hover:underline">Cash sales</Link> / New</>} title="Record a cash sale" />
+      <PageTitle title="Record a cash sale" />
       <InvoiceForm options={options} kind="sales_receipt" />
     </>
   );

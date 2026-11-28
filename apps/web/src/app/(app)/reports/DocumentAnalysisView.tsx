@@ -32,7 +32,7 @@ export async function DocumentAnalysisView({ side, q }: { side: "sales" | "purch
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Customers and suppliers" title={side === "sales" ? "Sales analysis" : "Purchases analysis"} actions={<ExportLink report={side} params={{ group, ...exportPeriod(period.picked), ...(group !== "month" ? compareQuery(cmp.slots, diff) : {}) }} />} />
+      <PageTitle title={side === "sales" ? "Sales analysis" : "Purchases analysis"} actions={<ExportLink report={side} params={{ group, ...exportPeriod(period.picked), ...(group !== "month" ? compareQuery(cmp.slots, diff) : {}) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["group", ...COMPARE_FIELDS]}>
         <div><label className="field-label" htmlFor="group">By</label>
           <select className="field" id="group" name="group" defaultValue={group}>{groups.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>

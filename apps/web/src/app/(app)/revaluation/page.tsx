@@ -35,7 +35,7 @@ export default async function RevaluationPage({ searchParams }: PageProps<"/reva
 
   return (
     <>
-      <PageTitle eyebrow="Books" title="Currency revaluation" />
+      <PageTitle title="Currency revaluation" />
       {!runs ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <>
           {runs.can.revalue && (

@@ -14,7 +14,7 @@ export default async function PriceListPage({ params }: PageProps<"/products/pri
   const readOnly = !list.can.manage;
   return (
     <>
-      <PageTitle eyebrow="Money in / Price lists" title={<>{list.name} {!list.is_active && <Pill>Archived</Pill>}</>}
+      <PageTitle title={<>{list.name} {!list.is_active && <Pill>Archived</Pill>}</>}
         actions={<Link href="/products/price-lists" className="btn">All price lists</Link>} />
       <div className="flex max-w-[1100px] flex-wrap items-start gap-4">
         <Card className="min-w-0 flex-[2_1_560px]" label="Prices">

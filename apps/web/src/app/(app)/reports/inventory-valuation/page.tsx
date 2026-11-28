@@ -33,7 +33,7 @@ export default async function InventoryValuationPage({ searchParams }: PageProps
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/reports" className="hover:underline">Reports</Link> / Inventory</>} title="Inventory valuation" actions={<ExportLink report="inventory-valuation" params={{ as_of: asOf, ...compareQuery(cmp.slots, diff) }} />} />
+      <PageTitle title="Inventory valuation" actions={<ExportLink report="inventory-valuation" params={{ as_of: asOf, ...compareQuery(cmp.slots, diff) }} />} />
       {v === null ? <Card><p className="text-sm text-muted">Not available in the demo.</p></Card> : (
         <>
           <AsOfFilter picked={at.picked} keep={q} fields={COMPARE_FIELDS}>

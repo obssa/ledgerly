@@ -14,7 +14,7 @@ export default async function NewCreditNotePage({ params }: PageProps<"/invoices
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href={`/invoices/${encodeURIComponent(invoice.id)}`} className="hover:underline">Invoice <span className="num">{invoice.number}</span></Link> / Credit note</>}
+        crumbs={<><Link href={`/invoices/${encodeURIComponent(invoice.id)}`} className="hover:underline">Invoice <span className="num">{invoice.number}</span></Link> › Credit note</>}
         title={<>Credit note for <span className="num">{invoice.number}</span></>}
       />
       {["posted", "part_paid", "paid"].includes(invoice.status) ? (

@@ -11,7 +11,7 @@ export default async function LeasesPage() {
   const r = await getLeases();
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/fixed-assets" className="hover:underline">Fixed assets</Link> / Leases</>} title="Leases"
+      <PageTitle title="Leases"
         actions={r?.can.manage ? <Link href="/leases/new" className="btn btn-primary">Set up a lease</Link> : undefined} />
       {!r ? <p className="text-[14px] text-muted">Not available in the demo or for your role.</p> : (
         <>

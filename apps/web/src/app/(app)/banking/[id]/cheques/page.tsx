@@ -27,8 +27,8 @@ export default async function ChequesPage({ params, searchParams }: PageProps<"/
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / <Link href={`/banking/${encodeURIComponent(id)}`} className="hover:underline">
-          <span className="num">{a.code}</span> {a.name}</Link> / Cheques</>}
+        crumbs={<><Link href={`/banking/${encodeURIComponent(id)}`} className="hover:underline">
+          <span className="num">{a.code}</span> {a.name}</Link> › Cheques</>}
         title="Cheques"
       />
       <AccountTabs id={id} current="cheques" kind="bank" />

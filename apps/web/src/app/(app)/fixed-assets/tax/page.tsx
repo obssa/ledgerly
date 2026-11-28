@@ -23,7 +23,7 @@ export default async function TaxDepreciationPage({ searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/fixed-assets" className="hover:underline">Fixed assets</Link> / Tax</>} title="Tax depreciation" />
+      <PageTitle title="Tax depreciation" />
       {year === null ? (
         <p className="text-sm text-muted">Not available in the demo.</p>
       ) : (

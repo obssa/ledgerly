@@ -24,7 +24,7 @@ export default async function NotesPackPage({ searchParams }: PageProps<"/report
   if (!notes) {
     return (
       <>
-        <PageTitle eyebrow="Reports / Financial statements" title="Financial statements and notes" />
+        <PageTitle title="Financial statements and notes" />
         <p className="text-[14px] text-muted">Not available in the demo, for your role, or for that period.</p>
       </>
     );
@@ -36,7 +36,7 @@ export default async function NotesPackPage({ searchParams }: PageProps<"/report
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Financial statements and notes" actions={<PrintPack />} />
+      <PageTitle title="Financial statements and notes" actions={<PrintPack />} />
       <div className="print:hidden"><DateRangeFilter picked={period.picked} keep={q} /></div>
       <div className="flex max-w-[900px] flex-col gap-4">
         <Card label="Cover">

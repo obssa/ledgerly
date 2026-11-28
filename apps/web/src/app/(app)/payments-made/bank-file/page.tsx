@@ -23,7 +23,7 @@ export default async function BankPaymentFilePage({ searchParams }: PageProps<"/
   const accounts = await getBankAccounts();
   const money = accounts.data.filter((a) => a.is_active && (method === "mobile_money" ? a.kind === "mobile_money" : a.kind === "bank"));
   const account = money.find((a) => a.id === q.account) ?? money[0];
-  const title = <PageTitle eyebrow={<><Link href="/payments-made" className="hover:underline">Payments made</Link> / Bank file</>} title="Bank payment file" />;
+  const title = <PageTitle title="Bank payment file" />;
   if (accounts.demo) return <>{title}<p className="text-[14px] text-muted">Not available in the demo.</p></>;
   if (!account) return <>{title}<p className="text-[14px] text-muted">Add a {method === "mobile_money" ? "mobile money" : "bank"} account first.</p></>;
   const file = await getBankPaymentFile({ date, account_id: account.id, method });

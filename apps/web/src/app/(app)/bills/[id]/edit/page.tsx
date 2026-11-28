@@ -22,7 +22,7 @@ export default async function EditBillPage({ params }: PageProps<"/bills/[id]/ed
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / <Link href={back} className="hover:underline">{bill.number ?? "Draft"}</Link> / Edit</>}
+        crumbs={<><Link href={back} className="hover:underline">{bill.number ?? "Draft"}</Link> › Edit</>}
         title={draft ? <>Edit bill <Pill>Draft</Pill></> : <>Edit bill <span className="num">{bill.number}</span> <Pill tone="brand">Posted</Pill></>}
       />
       <InvoiceForm options={options} kind="bill" draft={bill as unknown as Parameters<typeof InvoiceForm>[0]["draft"]} />

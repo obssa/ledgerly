@@ -17,7 +17,7 @@ export default async function SupplierPage({ params }: PageProps<"/suppliers/[id
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/suppliers" className="hover:underline">Suppliers</Link> / Supplier</>}
+        crumbs={<>Supplier</>}
         title={<>{supplier.name} {!supplier.is_active && <Pill>Archived</Pill>}</>}
         actions={editable ? <ArchiveSupplier supplier={supplier} /> : undefined}
       />

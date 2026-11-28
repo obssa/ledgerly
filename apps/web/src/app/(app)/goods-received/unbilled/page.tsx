@@ -12,7 +12,7 @@ export default async function UnbilledGoodsPage() {
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / <Link href="/goods-received" className="hover:underline">Goods received</Link> / Received, not billed</>}
+        crumbs={<><Link href="/goods-received" className="hover:underline">Goods received</Link> › Received, not billed</>}
         title="Received, not billed"
       />
       <Card className="!p-2" label="Goods received not invoiced">

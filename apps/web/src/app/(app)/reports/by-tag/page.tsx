@@ -31,7 +31,7 @@ export default async function ProfitByTagPage({ searchParams }: PageProps<"/repo
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Profit by tag" actions={<Link href="/tags" className="btn">Manage tags</Link>} />
+      <PageTitle title="Profit by tag" actions={<Link href="/tags" className="btn">Manage tags</Link>} />
       <DateRangeFilter picked={period.picked} keep={q} fields={COMPARE_FIELDS}>
         <CompareFilter slots={cmp.slots} diff={diff} />
       </DateRangeFilter>

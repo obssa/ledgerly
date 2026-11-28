@@ -19,7 +19,7 @@ export default async function PaymentsMadePage({ searchParams }: PageProps<"/pay
 
   return (
     <>
-      <PageTitle eyebrow="Money out" title="Payments made" actions={<><Link href="/refunds" className="btn">Refunds</Link><Link href="/payments-made/bank-file" className="btn">Bank file</Link><Link href="/payments-made/new" className="btn btn-primary">+ Pay bills</Link></>} />
+      <PageTitle title="Payments made" actions={<><Link href="/refunds" className="btn">Refunds</Link><Link href="/payments-made/bank-file" className="btn">Bank file</Link><Link href="/payments-made/new" className="btn btn-primary">+ Pay bills</Link></>} />
       {due.length > 0 && (
         <p role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-warn-tint px-3 py-2 text-[13.5px] font-semibold text-warn">
           <span>Scheduled payments due: {due.map((t) => `${t.due_count} (${formatMoney(t.due, t.currency)})`).join(" · ")}. Confirm them once the money has gone out.</span>

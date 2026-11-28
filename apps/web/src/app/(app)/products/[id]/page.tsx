@@ -26,7 +26,7 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/products" className="hover:underline">Products and services</Link> / Item</>}
+      <PageTitle crumbs={<>Item</>}
         title={<>{item.name} {!item.is_active && <Pill>Archived</Pill>}</>} />
       <div className="flex max-w-[1100px] flex-wrap items-start gap-4">
         {stock && (

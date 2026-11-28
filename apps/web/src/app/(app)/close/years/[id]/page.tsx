@@ -21,7 +21,7 @@ export default async function AuditAdjustmentsPage({ params }: PageProps<"/close
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/close" className="hover:underline">Close the books</Link> / Audit</>}
+      <PageTitle crumbs={<>Audit</>}
         title={<>Year to <span className="num"><Dt v={year.ends_on} /></span> {year.adjustments_closed_at ? <Pill tone="good">Audit signed off</Pill> : year.status === "closed" ? <Pill tone="warn">Open for audit adjustments</Pill> : <Pill>Not closed</Pill>}</>} />
       <Card className="mb-4 !p-2" label="Adjusted trial balance">
         <h2 className="px-3 pt-2 text-[15px] font-bold">Adjusted trial balance at <span className="num"><Dt v={year.ends_on} /></span>, before the close</h2>

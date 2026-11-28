@@ -27,7 +27,7 @@ export default async function BankAccountPage({ params, searchParams }: PageProp
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/banking" className="hover:underline">Banking and cash</Link> / Account</>}
+      <PageTitle crumbs={<>Account</>}
         title={<><span className="num">{a.code}</span> {a.name} {!a.is_active && <Pill>Archived</Pill>}</>} />
       <AccountTabs id={a.id} current="register" kind={a.kind} />
       <DateRangeFilter picked={period.picked} keep={q} fields={[]}>

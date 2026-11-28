@@ -20,7 +20,7 @@ export default async function BankingPage() {
 
   return (
     <>
-      <PageTitle eyebrow="Operations" title="Banking and cash" />
+      <PageTitle title="Banking and cash" />
       <Card className="!p-2" label="Accounts">
         <div className="overflow-x-auto">
           <table className="tbl">

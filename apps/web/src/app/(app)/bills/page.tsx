@@ -21,7 +21,7 @@ export default async function BillsPage({ searchParams }: PageProps<"/bills">) {
 
   return (
     <>
-      <PageTitle eyebrow="Money out" title="Bills and purchases"
+      <PageTitle title="Bills and purchases"
         actions={<Link href="/bills/new" className="btn btn-primary">+ New bill</Link>} />
       <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Bills">

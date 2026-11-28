@@ -1,4 +1,3 @@
-import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getJournalOptions } from "@/lib/data";
 import { journalAccounts } from "@/lib/journal";
@@ -12,7 +11,7 @@ export default async function NewRecurringJournalPage() {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/journal/recurring" className="hover:underline">Recurring journals</Link> / New</>} title="New recurring journal" />
+      <PageTitle crumbs={<>New</>} title="New recurring journal" />
       {!options ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <Card label="Recurring journal">
           <RecurringForm accounts={journalAccounts(options.accounts, options.baseCurrency)} dimensions={options.dimensions} />

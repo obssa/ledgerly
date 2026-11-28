@@ -11,7 +11,7 @@ export default async function UninvoicedGoodsPage() {
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / <Link href="/delivery-notes" className="hover:underline">Delivery notes</Link> / Delivered, not invoiced</>}
+        crumbs={<><Link href="/delivery-notes" className="hover:underline">Delivery notes</Link> › Delivered, not invoiced</>}
         title="Delivered, not invoiced"
       />
       <Card className="!p-2" label="Goods delivered not invoiced">

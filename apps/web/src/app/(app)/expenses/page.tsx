@@ -17,7 +17,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
 
   return (
     <>
-      <PageTitle eyebrow="Money out" title="Expenses" actions={<Link href="/expenses/new" className="btn btn-primary">+ Record an expense</Link>} />
+      <PageTitle title="Expenses" actions={<Link href="/expenses/new" className="btn btn-primary">+ Record an expense</Link>} />
       <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Expenses">
         <div className="overflow-x-auto">

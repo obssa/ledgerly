@@ -16,7 +16,7 @@ export default async function RecurringJournalsPage() {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/journal" className="hover:underline">Journal entries</Link> / Recurring</>} title="Recurring journals"
+      <PageTitle title="Recurring journals"
         actions={list.can.create ? <Link href="/journal/recurring/new" className="btn btn-primary">New recurring journal</Link> : undefined} />
       {list.can.create && (
         <div className="mb-4 flex flex-wrap items-center gap-3">

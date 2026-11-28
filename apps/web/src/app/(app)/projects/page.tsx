@@ -14,7 +14,7 @@ export default async function ProjectsPage() {
 
   return (
     <>
-      <PageTitle eyebrow="Operations" title="Projects" actions={list?.can.manage ? <Link href="/projects/new" className="btn btn-primary">New project</Link> : undefined} />
+      <PageTitle title="Projects" actions={list?.can.manage ? <Link href="/projects/new" className="btn btn-primary">New project</Link> : undefined} />
       {!list ? <p className="text-[14px] text-muted">Not available in the demo, or for your role.</p> : (
         <Card className="!p-2" label="Projects">
           <div className="overflow-x-auto">

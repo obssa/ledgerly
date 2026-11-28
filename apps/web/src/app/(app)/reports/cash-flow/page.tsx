@@ -38,7 +38,7 @@ export default async function CashFlowPage({ searchParams }: PageProps<"/reports
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Cash flow statement"
+      <PageTitle title="Cash flow statement"
         actions={<ExportLink report="cash-flow" params={{ ...exportPeriod(period.picked), ...shown, ...(direct ? { method: "direct" } : {}) }} />} />
       <DateRangeFilter picked={period.picked} keep={params} fields={COMPARE_FIELDS}>
         <CompareFilter slots={cmp.slots} diff={diff} />

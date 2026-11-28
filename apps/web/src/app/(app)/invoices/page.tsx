@@ -33,7 +33,7 @@ export default async function InvoicesPage({ searchParams }: PageProps<"/invoice
   return (
     <>
       <PageTitle
-        eyebrow="Money in"
+       
         title="Sales and invoices"
         actions={<Link href="/invoices/new" className="btn btn-primary">+ New invoice</Link>}
       />

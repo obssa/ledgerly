@@ -15,7 +15,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
   return (
     <>
       <PageTitle
-        eyebrow="Money in"
+       
         title="Customers"
         actions={can.create && !demo ? <Link href="/customers/new" className="btn btn-primary">+ New customer</Link> : undefined}
       />

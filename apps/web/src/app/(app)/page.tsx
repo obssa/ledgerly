@@ -91,7 +91,7 @@ export default async function OverviewPage() {
   return (
     <>
       <PageTitle
-        eyebrow={formatLongDate(today, { calendar, dateFormat })}
+        kicker={formatLongDate(today, { calendar, dateFormat })}
         title={firstName ? `${greeting(hour)}, ${firstName}` : greeting(hour)}
         description="Where the business stands today: cash, who owes whom, and what the next weeks look like."
         actions={

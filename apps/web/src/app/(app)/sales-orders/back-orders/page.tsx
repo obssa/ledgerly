@@ -17,7 +17,7 @@ export default async function BackOrdersPage() {
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href="/invoices" className="hover:underline">Sales and invoices</Link> / <Link href="/sales-orders" className="hover:underline">Sales orders</Link> / Back-orders</>}
+        crumbs={<><Link href="/sales-orders" className="hover:underline">Sales orders</Link> › Back-orders</>}
         title="Back-orders"
         actions={<Link href="/products" className="btn">Products and services</Link>}
       />

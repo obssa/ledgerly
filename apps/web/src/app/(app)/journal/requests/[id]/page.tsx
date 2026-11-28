@@ -18,7 +18,7 @@ export default async function JournalRequestPage({ params }: PageProps<"/journal
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/journal" className="hover:underline">Journal entries</Link> / Approval</>}
+      <PageTitle crumbs={<>Approval</>}
         title={<>{r.memo} <Pill tone={STATUS[r.status][1]}>{STATUS[r.status][0]}</Pill></>} />
       <Card className="mb-4" label="Request">
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 text-sm">

@@ -26,7 +26,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
 
   return (
     <>
-      <PageTitle eyebrow="Books" title="Journal entries" actions={<>
+      <PageTitle title="Journal entries" actions={<>
         {journal.can.create && <Link href="/journal/new" className="btn btn-primary">New journal entry</Link>}
       </>} />
       {requests.data.length > 0 && (

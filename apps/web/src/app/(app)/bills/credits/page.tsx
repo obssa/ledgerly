@@ -18,7 +18,7 @@ export default async function SupplierCreditsPage({ searchParams }: PageProps<"/
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/bills" className="hover:underline">Bills and purchases</Link> / Supplier credits</>} title="Supplier credits" />
+      <PageTitle title="Supplier credits" />
       <ListPeriod picked={period.picked} />
       <Card className="!p-2" label="Supplier credits">
         <div className="overflow-x-auto">

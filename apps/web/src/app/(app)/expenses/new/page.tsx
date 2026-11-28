@@ -9,7 +9,7 @@ export default async function NewExpensePage() {
 
   return (
     <>
-      <PageTitle eyebrow="Expenses / New expense" title="Record an expense" />
+      <PageTitle title="Record an expense" />
       <InvoiceForm options={options} kind="expense" />
     </>
   );

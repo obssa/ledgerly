@@ -46,7 +46,7 @@ export default async function CustomReportPage({ searchParams }: PageProps<"/rep
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Management" title="Custom report" actions={<ExportLink report="custom" params={{ ...o, ...exportPeriod(period.picked), ...compareQuery(cmp.slots, diff) }} />} />
+      <PageTitle title="Custom report" actions={<ExportLink report="custom" params={{ ...o, ...exportPeriod(period.picked), ...compareQuery(cmp.slots, diff) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["account_type", "class_id", "columns", "location_id", "measure", "project_id", "rows", ...COMPARE_FIELDS]}>
         {select("rows", "Rows", CUSTOM_ROWS, o.rows)}
         {select("columns", "Columns", CUSTOM_COLUMNS, o.columns)}

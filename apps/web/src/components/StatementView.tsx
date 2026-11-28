@@ -58,7 +58,7 @@ export async function StatementView({ party, id, q }: { party: "customer" | "sup
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href={base} className="hover:underline">{who.name}</Link> / Statement</>}
+      <PageTitle crumbs={[<Link key="who" href={base} className="hover:underline">{who.name}</Link>, "Statement"]}
         title={<>Statement · <span className="num"><Dt v={data.from} /></span> to <span className="num"><Dt v={data.to} /></span></>}
         actions={<ExportLink report={payable ? "supplier-statement" : "customer-statement"} params={{ ...exportPeriod(period.picked), contact_id: id }} />} />
       <DateRangeFilter picked={period.picked} keep={{ cols: custom ? cols.join(",") : undefined }} fields={[]} />

@@ -59,7 +59,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
 
   return (
     <>
-      <PageTitle eyebrow="Reports / Financial statements" title="Profit and loss"
+      <PageTitle title="Profit and loss"
         actions={<ExportLink report="profit-and-loss" params={{ ...exportPeriod(period.picked), ...shown, ...(cash ? { basis: "cash" } : {}) }} />} />
       <DateRangeFilter picked={period.picked} keep={q} fields={["by", "pct", "compare", ...COMPARE_FIELDS]}>
         <div>

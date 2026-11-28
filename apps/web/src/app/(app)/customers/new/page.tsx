@@ -8,7 +8,7 @@ export default async function NewCustomerPage() {
   const [priceLists, terms] = await Promise.all([getPriceListChoices(), getPaymentTerms(true)]);
   return (
     <>
-      <PageTitle eyebrow="Money in / Customers" title="New customer" />
+      <PageTitle title="New customer" />
       <Card className="max-w-[900px]" label="New customer">
         <CustomerForm priceLists={priceLists} terms={terms} />
       </Card>

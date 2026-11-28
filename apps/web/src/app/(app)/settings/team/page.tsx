@@ -1,5 +1,4 @@
 import { Dt } from "@/components/Dt";
-import Link from "@/components/Link";
 import { Card, PageTitle, Pill } from "@/components/ui";
 import { getMembers } from "@/lib/data";
 import { roleSummary } from "@/lib/team";
@@ -15,7 +14,7 @@ export default async function TeamPage() {
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/settings" className="hover:underline">Settings</Link> / Team</>} title="Team" />
+      <PageTitle title="Team" />
       {!team ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <>
           <Card className="mb-4" label="Invite someone">

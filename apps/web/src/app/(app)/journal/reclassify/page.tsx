@@ -1,6 +1,5 @@
 import { Dt } from "@/components/Dt";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
-import Link from "@/components/Link";
 import { Card, PageTitle } from "@/components/ui";
 import { getGeneralLedger, getJournalOptions, getReportPeriod } from "@/lib/data";
 import { journalAccounts } from "@/lib/journal";
@@ -21,7 +20,7 @@ export default async function ReclassifyPage({ searchParams }: PageProps<"/journ
 
   return (
     <>
-      <PageTitle eyebrow={<><Link href="/journal" className="hover:underline">Journal entries</Link> / Reclassify</>} title="Reclassify lines" />
+      <PageTitle crumbs={<>Reclassify</>} title="Reclassify lines" />
       {!options ? <p className="text-[14px] text-muted">Not available in the demo.</p> : (
         <>
           <DateRangeFilter picked={period.picked} keep={q} fields={["account_id"]}>

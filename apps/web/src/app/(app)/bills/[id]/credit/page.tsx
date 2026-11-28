@@ -15,7 +15,7 @@ export default async function NewSupplierCreditPage({ params }: PageProps<"/bill
   return (
     <>
       <PageTitle
-        eyebrow={<><Link href={`/bills/${encodeURIComponent(bill.id)}`} className="hover:underline">Bill <span className="num">{bill.number}</span></Link> / Supplier credit</>}
+        crumbs={<><Link href={`/bills/${encodeURIComponent(bill.id)}`} className="hover:underline">Bill <span className="num">{bill.number}</span></Link> › Supplier credit</>}
         title={<>Supplier credit for <span className="num">{bill.number}</span></>}
       />
       {["posted", "part_paid", "paid"].includes(bill.status) ? (
