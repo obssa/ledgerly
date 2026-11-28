@@ -22,6 +22,7 @@ class DocumentLine extends Model
         'unit_id',   // 072: the database fills unit_name and unit_factor from it
         'batch_number', 'batch_expires_on',   // 074: the batch a bill or credit-note line brings in
         'service_date', 'class_id', 'location_id',   // 111
+        'discount_share',   // 113: its share of the document's discount
     ];
 
     protected function casts(): array

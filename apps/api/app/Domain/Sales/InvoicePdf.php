@@ -67,6 +67,8 @@ final class InvoicePdf
         }
         $due = $invoice->type === 'invoice' && in_array($invoice->status, ['posted', 'part_paid', 'paid'], true)
             ? '<tr><td>Still due</td><td class="n">' . $e($invoice->currency) . ' ' . $money($invoice->amount_due) . '</td></tr>' : '';
+        // 113: the deposit taken with it, above what is still due.
+        $due = (bccomp((string) $invoice->deposit_amount, '0', 2) > 0 ? '<tr><td>Deposit</td><td class="n">-' . $money($invoice->deposit_amount) . '</td></tr>' : '') . $due;
 
         return '<!doctype html><html><head><meta charset="utf-8"><style>'
             . 'body{font-family:Helvetica,sans-serif;font-size:10.5pt;color:#111}h1{font-size:18pt;margin:0 0 4pt}.muted{color:#555}'
@@ -103,7 +105,12 @@ final class InvoicePdf
             . '</tr></table>'
             . '<table><thead><tr><th>Description</th><th class="n">Qty</th><th class="n">Unit price</th><th class="n">Tax</th><th class="n">Amount</th></tr></thead>'
             . '<tbody>' . $rows . '</tbody></table>'
-            . '<table class="totals"><tr><td>Subtotal</td><td class="n">' . $money($invoice->subtotal) . '</td></tr>'
+            // 113: a discount before tax: the subtotal before it, the discount, and what tax is worked out on.
+            . '<table class="totals">' . (bccomp((string) $invoice->discount_total, '0', 2) > 0
+                ? '<tr><td>Subtotal</td><td class="n">' . $money(bcadd((string) $invoice->subtotal, (string) $invoice->discount_total, 2)) . '</td></tr>'
+                    . '<tr><td>Discount' . ($invoice->discount_type === 'percent' ? ' (' . $e(rtrim(rtrim((string) $invoice->discount_value, '0'), '.')) . '%)' : '') . '</td><td class="n">-' . $money($invoice->discount_total) . '</td></tr>'
+                    . '<tr><td>Taxable subtotal</td><td class="n">' . $money($invoice->subtotal) . '</td></tr>'
+                : '<tr><td>Subtotal</td><td class="n">' . $money($invoice->subtotal) . '</td></tr>')
             // 110: an invoice out of scope of tax says so instead of a tax line.
             . ($invoice->out_of_scope ? '<tr><td>Out of scope of tax</td><td class="n"></td></tr>' : '<tr><td>Tax</td><td class="n">' . $money($invoice->tax_total) . '</td></tr>')
             . '<tr class="total"><td>Total</td><td class="n">' . $e($invoice->currency) . ' ' . $money($invoice->total) . '</td></tr>' . $due . '</table>'

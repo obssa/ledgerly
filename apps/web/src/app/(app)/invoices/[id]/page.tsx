@@ -7,6 +7,7 @@ import { Card, PageTitle, Pill } from "@/components/ui";
 import { getCompanySettings, getCompanyToday, getDocumentHistory, getInvoice, getMoneyAccounts, getOpenInvoices, getLateInterest, getWriteOffs, getCustomerChoices } from "@/lib/data";
 import { creditStatus, paymentStatus } from "@/lib/docStatus";
 import { formatAmount, formatMoney } from "@/lib/format";
+import { parse } from "@/lib/decimal";
 import { RefundPanel } from "../../refunds/RefundPanel";
 import { ApplyCredit } from "./ApplyCredit";
 import { Reminders } from "./Reminders";
@@ -41,6 +42,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const status = creditNote ? creditStatus(invoice) : paymentStatus(invoice, await getCompanyToday());
   const submission = invoice.einvoice_submissions?.[0];
   const kind = creditNote ? "Credit note" : "Invoice";
+  const discounted = Number(invoice.discount_total ?? 0) > 0;
   const canApply = creditNote && invoice.can.apply && ["posted", "part_paid"].includes(invoice.status) && Number(invoice.amount_due) > 0 && !invoice.demo;
   const openInvoices = canApply ? await getOpenInvoices(invoice.contact.id, invoice.currency) : [];
   const canRefund = creditNote && Boolean(invoice.can.refund) && ["posted", "part_paid"].includes(invoice.status) && invoice.amount_due !== "0.00" && !invoice.demo;
@@ -127,9 +129,17 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             </table>
           </div>
           <dl className="ml-auto mt-4 max-w-[320px] text-sm">
-            <div className="flex justify-between py-1"><dt>Subtotal</dt><dd className="num">{formatAmount(invoice.subtotal)}</dd></div>
+            {/* 113: before the discount, the discount, and what tax is worked out on. */}
+            {discounted ? (
+              <>
+                <div className="flex justify-between py-1"><dt>Subtotal</dt><dd className="num">{formatAmount(parse(invoice.subtotal) + parse(invoice.discount_total ?? "0"))}</dd></div>
+                <div className="flex justify-between py-1"><dt>Discount{invoice.discount_type === "percent" && invoice.discount_value ? ` (${Number(invoice.discount_value)}%)` : ""}</dt><dd className="num">−{formatAmount(invoice.discount_total ?? "0")}</dd></div>
+                <div className="flex justify-between py-1"><dt>Taxable subtotal</dt><dd className="num">{formatAmount(invoice.subtotal)}</dd></div>
+              </>
+            ) : <div className="flex justify-between py-1"><dt>Subtotal</dt><dd className="num">{formatAmount(invoice.subtotal)}</dd></div>}
             <div className="flex justify-between py-1"><dt>Tax</dt><dd className="num">{formatAmount(invoice.tax_total)}</dd></div>
             <div className="mt-1 flex justify-between border-t-2 border-ink pt-2 text-lg font-extrabold"><dt>Total</dt><dd className="num">{formatMoney(invoice.total, invoice.currency)}</dd></div>
+            {Number(invoice.deposit_amount ?? 0) > 0 && <div className="flex justify-between py-1"><dt>Deposit</dt><dd className="num">−{formatAmount(invoice.deposit_amount ?? "0")}</dd></div>}
             <div className="flex justify-between py-1 font-semibold"><dt>{creditNote ? "Remaining credit" : "Balance due"}</dt><dd className="num">{formatMoney(invoice.amount_due, invoice.currency)}</dd></div>
           </dl>
           {invoice.notes && <p className="mt-4 whitespace-pre-line text-sm text-muted">{invoice.notes}</p>}

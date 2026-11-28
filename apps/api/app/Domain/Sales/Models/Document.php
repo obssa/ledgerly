@@ -23,6 +23,7 @@ class Document extends Model
         'language', 'notes', 'location_id', 'custom_fields', 'created_by', 'original_document_id', 'reference',
         'paid_from_account_id', 'payment_method', 'warehouse_id', 'salesperson_id', 'payment_terms_id', 'out_of_scope', 'class_id',
         'billing_address', 'shipping_address', 'email_to', 'email_cc', 'email_bcc', 'ship_via', 'ship_date', 'tracking_number', 'message_on_statement',
+        'discount_type', 'discount_value', 'discount_total', 'deposit_amount', 'deposit_account_id',
     ];
 
     /** 110: read back as QuickBooks' Amounts are. */

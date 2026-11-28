@@ -470,6 +470,9 @@ export async function getInvoiceOptions(numberedAs: "invoice" | "quote" | "sales
         throw error;
       }),
       accounts: accounts.data.filter((a) => a.type === "income" && a.is_active).map((a) => ({ id: a.id, code: a.code, name: a.name })),
+      // 113: where a deposit is received.
+      moneyAccounts: accounts.data.filter((a) => a.is_active && ["bank", "cash", "mobile_money"].includes(a.subtype ?? ""))
+        .map((a) => ({ id: a.id, code: a.code, name: a.name, currency: a.currency })),
       taxRates: rates.data
         .filter((r) => r.kind !== "withholding" && r.effective_from <= today && (r.effective_to === null || r.effective_to >= today))
         .map((r) => ({ id: r.id, code: r.code, name: r.name, rate: r.rate })),

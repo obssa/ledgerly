@@ -5971,6 +5971,52 @@ BEGIN
   RAISE NOTICE 'PASS T137 a document''s addresses, email, shipping and statement message are kept within their lengths';
 END $$;
 
+-- T138: a discount is whole (a percentage up to 100, or an amount); a deposit goes into one of the company's money
+-- accounts and is no more than the total; a deposit payment is its invoice's (113). Company A as f1: bank a10, sales
+-- a40, customer c1. Rolled back.
+DO $$
+DECLARE inv uuid; quote uuid;
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due, discount_type, discount_value, discount_total,
+                           deposit_amount, deposit_account_id)
+      VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 900, 900, 0, 'percent', 10, 100,
+              200, '00000000-0000-0000-0000-000000000a10') RETURNING id INTO inv;
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due)
+      VALUES (app_company_id(), 'quote', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0) RETURNING id INTO quote;
+    BEGIN
+      UPDATE documents SET discount_value = 150 WHERE id = inv;
+      RAISE EXCEPTION 'FAIL T138a: a discount of more than 100 percent';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      UPDATE documents SET discount_type = NULL WHERE id = inv;
+      RAISE EXCEPTION 'FAIL T138b: a discount value without its kind';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      UPDATE documents SET deposit_account_id = NULL WHERE id = inv;
+      RAISE EXCEPTION 'FAIL T138c: a deposit without the account it went into';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      UPDATE documents SET deposit_amount = 901 WHERE id = inv;
+      RAISE EXCEPTION 'FAIL T138d: a deposit larger than the total';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      UPDATE documents SET deposit_account_id = '00000000-0000-0000-0000-000000000a40' WHERE id = inv;
+      RAISE EXCEPTION 'FAIL T138e: a deposit into an income account';
+    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO payments (company_id, direction, contact_id, account_id, payment_date, method, currency, amount, deposit_document_id)
+        VALUES (app_company_id(), 'in', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000a10', '2027-11-10', 'cash', 'ETB', 200, quote);
+      RAISE EXCEPTION 'FAIL T138f: a deposit payment named a quote';
+    EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+    RAISE EXCEPTION 'T138 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T138 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T138 a discount is whole, a deposit goes into a money account and belongs to its invoice';
+END $$;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN

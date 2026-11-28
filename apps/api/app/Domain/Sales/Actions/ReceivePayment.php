@@ -82,6 +82,7 @@ final class ReceivePayment
                 'amount' => $amount->toDecimalString(), 'fee' => $fee->toDecimalString(), 'withholding' => $withholding->toDecimalString(),
                 'account_amount' => $moved?->toDecimalString(),
                 'provider_txn_id' => $data['provider_txn_id'] ?? null,
+                'deposit_document_id' => $data['deposit_document_id'] ?? null,   // 113: the deposit taken with this invoice
                 'cheque_number' => ($data['method'] ?? null) === 'cheque' ? ($data['cheque_number'] ?? null) : null,
                 'withholding_certificate' => $withholding->isZero() ? null : ($data['withholding_certificate'] ?? null),
             ]);

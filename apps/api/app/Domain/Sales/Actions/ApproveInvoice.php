@@ -116,6 +116,18 @@ final class ApproveInvoice
                 }
             }
 
+            // 113: the deposit taken with it, received now and applied to it (QuickBooks); the balance due is the rest.
+            if ($invoice->type === 'invoice' && bccomp((string) $invoice->deposit_amount, '0', 2) > 0) {
+                $account = Account::query()->findOrFail($invoice->deposit_account_id);
+                app(ReceivePayment::class)->handle([
+                    'contact_id' => $invoice->contact_id, 'account_id' => $account->getKey(), 'payment_date' => $invoice->issue_date->format('Y-m-d'),
+                    'method' => match ($account->subtype) { 'cash' => 'cash', 'mobile_money' => 'mobile_money', default => 'bank_transfer' },
+                    'reference' => 'Deposit on ' . $invoice->number, 'currency' => $invoice->currency, 'fx_rate' => (string) $invoice->fx_rate,
+                    'amount' => (string) $invoice->deposit_amount, 'deposit_document_id' => $invoice->getKey(),
+                    'allocations' => [['invoice_id' => $invoice->getKey(), 'amount' => (string) $invoice->deposit_amount]],
+                ], (string) $userId);
+            }
+
             // A cash sale is registered like an invoice (082).
             if (in_array($invoice->type, ['invoice', 'credit_note', 'sales_receipt'], true) && ($connector = $this->connectors->forCountry($company->country_code))) {
                 $submission = EInvoiceSubmission::query()->create([
@@ -146,15 +158,21 @@ final class ApproveInvoice
             default => 'vat_payable',
         })->getKey();
 
+        // 113: income before the discount; the discount itself to the company's Discounts given account (QuickBooks).
         $lines = $invoice->lines->map(fn ($line) => [
             'income_account_id' => $line->account_id,
-            'subtotal' => Money::of($line->line_subtotal, $invoice->currency),
+            'subtotal' => Money::of($line->line_subtotal, $invoice->currency)->plus(Money::of((string) ($line->discount_share ?? '0'), $invoice->currency)),
             'tax' => Money::of($line->line_tax, $invoice->currency),
             'tax_account_id' => $taxAccount($line->tax_rate_id),
             'project_id' => $line->project_id,
             'class_id' => $line->class_id ?? $invoice->class_id,   // 111
             'location_id' => $line->location_id ?? $invoice->location_id,
         ])->all();
+        if (bccomp((string) $invoice->discount_total, '0', 2) > 0) {
+            $lines[] = ['income_account_id' => \App\Domain\Sales\DiscountsGiven::account($company)->getKey(),
+                'subtotal' => Money::of((string) $invoice->discount_total, $invoice->currency)->negated(), 'tax' => Money::zero($invoice->currency),
+                'tax_account_id' => null, 'class_id' => $invoice->class_id, 'location_id' => $invoice->location_id];
+        }
 
         return $this->builder->build(
             companyId: $company->getKey(),

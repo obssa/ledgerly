@@ -123,6 +123,39 @@ export function lineAmounts(line: LineInput, _currency?: string, inclusive = fal
   return { subtotal: gross, tax, total: gross + tax };
 }
 
+/** A discount on the whole document (113): a percentage of the subtotal, or an amount. */
+export interface DocumentDiscount { type: "percent" | "amount"; value: string }
+
+/**
+ * QuickBooks' discount before tax, as the API gives it (TaxCalculator::discount): shared out over the positive lines in
+ * proportion, the last one taking the rounding, each line's tax worked out again on what is left. `subtotal` is before
+ * the discount; `total` is what is charged.
+ */
+export function discountedAmounts(lines: LineInput[], currency?: string, inclusive = false, discount?: DocumentDiscount | null): Amounts & { discount: Scaled; taxable: Scaled } {
+  const each = lines.map((l) => lineAmounts(l, currency, inclusive));
+  const subtotal = each.reduce((t, a) => t + a.subtotal, 0n);
+  const base = each.reduce((t, a) => (a.subtotal > 0n ? t + a.subtotal : t), 0n);
+  let wanted = 0n;
+  if (discount && base > 0n && /^\d+(\.\d+)?$/.test(discount.value.trim())) {
+    wanted = discount.type === "percent" ? divRound(base * parseRate(discount.value), RATE_FACTOR * 100n) : parse(discount.value);
+  }
+  const off = wanted > base ? base : wanted;
+  if (off === 0n) {
+    const tax = each.reduce((t, a) => t + a.tax, 0n);
+    return { subtotal, discount: 0n, taxable: subtotal, tax, total: subtotal + tax };
+  }
+  const positive = each.map((a, i) => (a.subtotal > 0n ? i : -1)).filter((i) => i >= 0);
+  const last = positive[positive.length - 1];
+  let given = 0n;
+  let tax = 0n;
+  each.forEach((a, i) => {
+    const share = !positive.includes(i) ? 0n : i === last ? off - given : divRound(off * a.subtotal, base);
+    given += share;
+    tax += divRound((a.subtotal - share) * parseRate(lines[i].taxRate ?? "0"), RATE_FACTOR);
+  });
+  return { subtotal, discount: off, taxable: subtotal - off, tax, total: subtotal - off + tax };
+}
+
 export function documentAmounts(lines: LineInput[], currency?: string, inclusive = false): Amounts {
   return lines.reduce<Amounts>(
     (sum, l) => {
