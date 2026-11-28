@@ -197,7 +197,10 @@ final class InvoiceController extends Controller
         }
         $company = $this->current->get();
         $contact = DB::table('contacts')->where(['company_id' => $company->getKey(), 'id' => $invoice->contact_id])->first(['name', 'email']);
-        $to = trim((string) ($contact->email ?? ''));
+        // 112: the invoice's own To (else the customer's address), with its Cc and Bcc.
+        $split = [\App\Http\Requests\Concerns\DocumentFieldRules::class, 'split'];
+        $recipients = $split($invoice->email_to) ?: $split($contact->email ?? '');
+        $to = $recipients[0] ?? '';
         if ($to === '') {
             throw \Illuminate\Validation\ValidationException::withMessages(['invoice' => ['The customer has no email address: add one to send the invoice.']]);
         }
@@ -210,7 +213,7 @@ final class InvoiceController extends Controller
         $invoice->load(['lines', 'einvoiceSubmissions']);
         $money = fn ($v) => number_format((float) $v, 2);
         $clearance = $invoice->einvoiceSubmissions->firstWhere('status', 'cleared')?->clearance_number;
-        \Illuminate\Support\Facades\Notification::route('mail', [$to => (string) $contact->name])->notify(new \App\Notifications\InvoiceSent(
+        \Illuminate\Support\Facades\Notification::route('mail', array_fill_keys($recipients, (string) $contact->name))->notify(new \App\Notifications\InvoiceSent(
             company: (string) ($company->trading_name ?: $company->legal_name), companyTin: $company->tin ? (string) $company->tin : null,
             replyTo: $company->email ? (string) $company->email : null, customer: (string) $contact->name, number: (string) $invoice->number,
             kind: $invoice->type, issueDate: (string) \App\Support\DateFormat::format($invoice->issue_date, $company), dueDate: \App\Support\DateFormat::format($invoice->due_date, $company), currency: (string) $invoice->currency,
@@ -219,11 +222,12 @@ final class InvoiceController extends Controller
             subtotal: $money($invoice->subtotal), tax: $money($invoice->tax_total), total: $money($invoice->total), amountDue: $money($invoice->amount_due),
             clearance: $clearance ? (string) $clearance : null, note: $data['note'] ?? null,
             pdf: app(\App\Domain\Sales\InvoicePdf::class)->render($company, $invoice),   // the invoice itself, attached
+            cc: $split($invoice->email_cc), bcc: $split($invoice->email_bcc),
         ));
         app(\App\Domain\Audit\AuditLogger::class)->record($company->getKey(), 'invoice_emailed', $invoice->type, $invoice->getKey(), null,
-            ['sent_to' => $to, 'number' => $invoice->number], userId: $request->user()->getKey());
+            ['sent_to' => implode(', ', $recipients), 'cc' => $invoice->email_cc, 'bcc' => $invoice->email_bcc, 'number' => $invoice->number], userId: $request->user()->getKey());
 
-        return response()->json(['sent_to' => $to]);
+        return response()->json(['sent_to' => implode(', ', $recipients)]);
     }
 
     /** Module 2: a posted invoice or credit note as a PDF file, as printed (InvoicePdf). */

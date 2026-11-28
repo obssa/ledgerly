@@ -33,6 +33,8 @@ final class InvoiceSent extends Notification
         public readonly ?string $note,
         public readonly ?string $link = null,   // a quote's link to see it and answer it online (065)
         public readonly ?string $pdf = null,    // the document as a PDF file, attached
+        /** @var list<string> */ public readonly array $cc = [],    // 112: the document's Cc and Bcc
+        /** @var list<string> */ public readonly array $bcc = [],
     ) {
     }
 
@@ -70,6 +72,13 @@ final class InvoiceSent extends Notification
             $mail->action('See the quote and accept or decline it', $this->link);
         }
         $mail->salutation("Kind regards,\n{$this->company}" . ($this->companyTin ? "\nTIN {$this->companyTin}" : ''));
+
+        if ($this->cc !== []) {
+            $mail->cc($this->cc);
+        }
+        if ($this->bcc !== []) {
+            $mail->bcc($this->bcc);
+        }
 
         return $this->replyTo ? $mail->replyTo($this->replyTo, $this->company) : $mail;
     }

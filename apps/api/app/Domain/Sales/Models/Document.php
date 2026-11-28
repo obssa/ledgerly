@@ -22,6 +22,7 @@ class Document extends Model
         'type', 'number', 'contact_id', 'issue_date', 'due_date', 'currency', 'fx_rate', 'prices_include_tax',
         'language', 'notes', 'location_id', 'custom_fields', 'created_by', 'original_document_id', 'reference',
         'paid_from_account_id', 'payment_method', 'warehouse_id', 'salesperson_id', 'payment_terms_id', 'out_of_scope', 'class_id',
+        'billing_address', 'shipping_address', 'email_to', 'email_cc', 'email_bcc', 'ship_via', 'ship_date', 'tracking_number', 'message_on_statement',
     ];
 
     /** 110: read back as QuickBooks' Amounts are. */
@@ -32,6 +33,7 @@ class Document extends Model
         return [
             'issue_date' => 'date:Y-m-d',   // sent as 2026-11-16, not a timestamp
             'due_date' => 'date:Y-m-d',
+            'ship_date' => 'date:Y-m-d',
             'prices_include_tax' => 'boolean',
             'out_of_scope' => 'boolean',
             'custom_fields' => 'array',

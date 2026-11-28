@@ -6,6 +6,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
+import { afterSave } from "@/lib/afterSave";
 import { invoiceBody } from "@/lib/invoice";
 import { getSession } from "@/lib/session";
 
@@ -60,15 +61,19 @@ export async function createInvoice(_: FormState | undefined, form: FormData): P
     return refusal(error);
   }
   if (form.get("intent") === "correct") redirect(`/invoices/${encodeURIComponent(id)}?corrected=1`);
+  // 112: its tags now; files chosen on the form go up from the browser before the page opens.
+  const pending = await afterSave("invoice", id, form, ctx, `/invoices/${encodeURIComponent(id)}`);
   if (form.get("intent") === "approve") {
     try {
       await ledgerly.approveInvoice(id, ctx);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) redirect("/sign-in");
       // The draft is saved. A fixed flag, never text in the URL: the invoice page says so, and Approve there says why.
+      if (pending?.next) return { next: { ...pending.next, href: `${pending.next.href}?posted=0` } };
       redirect(`/invoices/${encodeURIComponent(id)}?posted=0`);
     }
   }
+  if (pending) return pending;
   redirect(`/invoices/${encodeURIComponent(id)}`);
 }
 

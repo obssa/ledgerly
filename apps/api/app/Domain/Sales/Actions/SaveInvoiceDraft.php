@@ -249,6 +249,9 @@ final class SaveInvoiceDraft
      *
      * @return array{header: array<string, mixed>, lines: list<array<string, mixed>>, totals: array{subtotal: string, tax_total: string, total: string}}
      */
+    /** 112: the document's own addresses, email, shipping and statement message. */
+    public const CONTACT_FIELDS = ['billing_address', 'shipping_address', 'email_to', 'email_cc', 'email_bcc', 'ship_via', 'ship_date', 'tracking_number', 'message_on_statement'];
+
     /** Exclusive, inclusive or out of scope (110): tax_mode when given, else prices_include_tax. */
     public static function taxMode(array $data): string
     {
@@ -335,6 +338,9 @@ final class SaveInvoiceDraft
                 'salesperson_id' => $data['salesperson_id'] ?? null,   // sales documents only (044)
                 'class_id' => $perDocument('track_classes') ? ($data['class_id'] ?? null) : null,
                 'location_id' => $perDocument('track_locations') ? ($data['location_id'] ?? null) : null,
+                // 112: addresses as printed, who it is emailed to, how it ships, the statement's message; empty is none.
+                // Only those sent: a field the form does not show leaves what the draft has.
+                ...array_map(fn ($v) => $v === null || trim((string) $v) === '' ? null : trim((string) $v), array_intersect_key($data, array_flip(self::CONTACT_FIELDS))),
                 // Only the custom fields the company has, each a short text; empty ones are not kept.
                 'custom_fields' => array_filter(array_intersect_key(array_map(fn ($v) => $v === null ? '' : trim((string) $v), (array) ($data['custom_fields'] ?? [])),
                     array_flip(array_column($form['custom_fields'], 'name'))), fn (string $v) => $v !== ''),

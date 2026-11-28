@@ -248,6 +248,7 @@ final class QuoteWorkflow
                 'class_id' => $source->class_id,   // 111
                 'location_id' => $source->location_id,
                 'custom_fields' => $source->custom_fields,
+                ...array_map(fn ($v) => $v instanceof \DateTimeInterface ? $v->format('Y-m-d') : $v, $source->only(SaveInvoiceDraft::CONTACT_FIELDS)),   // 112
                 'reference' => null,
                 'lines' => $lines->map(fn ($l) => [
                     'description' => (string) $l->description,

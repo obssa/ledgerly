@@ -27,6 +27,38 @@ final class DocumentFieldRules
             'lines.*.service_date' => ['nullable', 'date_format:Y-m-d'],
             'lines.*.class_id' => $dimension('class'),
             'lines.*.location_id' => $dimension('location'),
+            // 112: who it goes to and where, how it ships, and the customer's statement message.
+            'billing_address' => ['nullable', 'string', 'max:500'],
+            'shipping_address' => ['nullable', 'string', 'max:500'],
+            'email_to' => ['nullable', 'string', 'max:500', self::emails()],
+            'email_cc' => ['nullable', 'string', 'max:500', self::emails()],
+            'email_bcc' => ['nullable', 'string', 'max:500', self::emails()],
+            'ship_via' => ['nullable', 'string', 'max:60'],
+            'ship_date' => ['nullable', 'date_format:Y-m-d'],
+            'tracking_number' => ['nullable', 'string', 'max:60'],
+            'message_on_statement' => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    /** Addresses separated by commas or semicolons, each a valid email, ten at most. */
+    public static function emails(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            $list = self::split((string) $value);
+            if (count($list) > 10) {
+                $fail('Ten addresses at most.');
+            }
+            foreach ($list as $email) {
+                if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                    $fail("{$email} is not an email address.");
+                }
+            }
+        };
+    }
+
+    /** @return list<string> */
+    public static function split(?string $value): array
+    {
+        return array_values(array_filter(array_map('trim', preg_split('/[,;]+/', (string) $value) ?: []), fn (string $e) => $e !== ''));
     }
 }

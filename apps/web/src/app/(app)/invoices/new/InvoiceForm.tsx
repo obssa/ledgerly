@@ -2,7 +2,9 @@
 import { DateInput } from "@/components/DateInput";
 
 import Link from "@/components/Link";
-import { startTransition, useActionState, useMemo, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { addressText } from "@/lib/address";
 import { Card } from "@/components/ui";
 import type { FormField, InvoiceDetail, TaxMode } from "@/lib/api";
 import type { InvoiceOptions } from "@/lib/data";
@@ -54,7 +56,7 @@ const KIND = {
 } as const;
 
 /** What the form needs from a saved document to edit it: an invoice draft, or a quote or sales order. */
-type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "tax_mode" | "class_id" | "location_id" | "custom_fields" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
+type Draft = Pick<InvoiceDetail, "id" | "contact" | "issue_date" | "due_date" | "payment_terms_id" | "tax_mode" | "class_id" | "location_id" | "custom_fields" | "billing_address" | "shipping_address" | "email_to" | "email_cc" | "email_bcc" | "ship_via" | "ship_date" | "tracking_number" | "message_on_statement" | "currency" | "fx_rate" | "prices_include_tax" | "salesperson_id"
   | "warehouse_id" | "number" | "notes" | "lines" | "lock_version"> & { status: string; reference?: string | null };
 
 const METHODS: Record<string, string> = {
@@ -155,6 +157,17 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const classesBy = classes.length > 0 ? content?.track_classes ?? "off" : "off";
   const locationsBy = locations.length > 0 ? content?.track_locations ?? "off" : "off";
   const customFields = (content?.custom_fields ?? []).filter((f) => (purchase_ ? f.purchases : f.sales));
+  // 112: who it goes to and where, filled from the customer (or supplier) and changed per document, as QuickBooks does.
+  const sale = !purchase_;
+  const [emailTo, setEmailTo] = useState(draft ? draft.email_to ?? "" : "");
+  const [billTo, setBillTo] = useState(draft ? draft.billing_address ?? "" : "");
+  const [shipTo, setShipTo] = useState(draft ? draft.shipping_address ?? "" : "");
+  // Tags and files chosen while creating (112): tags go with the save; files go up from here once it is saved.
+  const attachable = !draft && (kind === "invoice" || kind === "bill" || kind === "expense");
+  const tags = attachable && show.tags !== false ? options.tags ?? [] : [];
+  const files = useRef<File[]>([]);
+  const router = useRouter();
+  const [sending, setSending] = useState(false);
   const [lines, setLines] = useState<Line[]>(draft && draft.lines.length > 0
     ? draft.lines.map((l, i) => ({ key: i + 1, itemId: l.item_id ?? "", description: l.description, quantity: l.quantity, unitPrice: l.unit_price,
         taxRateId: l.tax_rate_id ?? "", accountId: l.account_id, projectId: l.project_id ?? "", serviceDate: l.service_date ?? "", classId: l.class_id ?? "", locationId: l.location_id ?? "", sourceLineId: l.source_line_id ?? undefined, unitId: l.unit_id ?? "",
@@ -198,6 +211,26 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lines, mode, currency],
   );
+
+  const next = state?.next;
+  useEffect(() => {
+    if (!next) return;
+    let gone = false;
+    (async () => {
+      for (const file of files.current) {
+        const body = new FormData();
+        body.append("kind", next.kind);
+        body.append("document_id", next.id);
+        body.append("file", file, file.name);
+        // The upload route answers with a redirect to the document; the next file follows all the same.
+        await fetch("/attachments/upload", { method: "POST", body, redirect: "manual" }).catch(() => undefined);
+      }
+      files.current = [];
+      if (!gone) router.push(next.href);
+    })();
+    return () => { gone = true; };
+  }, [next, router]);
+  if (next && !sending) setSending(true);
 
   const update = (key: number, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = () => setLines((ls) => [...ls, { key: Math.max(0, ...ls.map((l) => l.key)) + 1, itemId: "", description: "", quantity: "1", unitPrice: "", taxRateId: firstRate, accountId: firstAccount }]);
@@ -245,6 +278,10 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
     <form onSubmit={(e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       const data = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
+      // Files are not sent with the save: they go to the upload route once the document exists (112).
+      files.current = data.getAll("new_files").filter((f): f is File => f instanceof File && f.size > 0);
+      data.delete("new_files");
+      if (files.current.length > 0) data.set("attach_pending", "1");
       startTransition(() => action(data));
     }} noValidate className="flex flex-wrap items-start gap-4">
       <input type="hidden" name="lines" value={linesJson} />
@@ -265,6 +302,9 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                 onChange={(e) => {
                   setCustomerId(e.target.value);
                   const c = options.customers.find((x) => x.id === e.target.value);
+                  setEmailTo(c?.email ?? "");
+                  setBillTo(addressText(c?.address));
+                  setShipTo(addressText(c?.delivery_address ?? c?.address));
                   if (termed) {
                     const usual = c?.payment_terms_id && terms.some((t) => t.id === c.payment_terms_id) ? c.payment_terms_id : "";
                     setTermId(usual);
@@ -282,6 +322,36 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
               </select>
               {customer && <p className="mt-1.5 text-[13px] text-muted">{customer.tax_id ? <>TIN <span className="num">{customer.tax_id}</span> · </> : "No TIN · "}Usual terms: {terms.find((t) => t.id === customer.payment_terms_id)?.name ?? `${customer.payment_terms_days} days`}</p>}
             </div>
+            {sale && kind !== "sales_receipt" && (
+              <div>
+                <label className="field-label" htmlFor="email_to">Customer email</label>
+                <input className={`field ${bad("email_to") ? "!border-bad" : ""}`} id="email_to" name="email_to" type="text" inputMode="email" value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)} placeholder="Separate addresses with a comma" />
+              </div>
+            )}
+            {sale && kind !== "sales_receipt" && show.email_cc_bcc && (
+              <>
+                <Field name="email_cc" label="Cc" defaultValue={draft?.email_cc ?? ""} invalid={bad("email_cc")} />
+                <Field name="email_bcc" label="Bcc" defaultValue={draft?.email_bcc ?? ""} invalid={bad("email_bcc")} />
+              </>
+            )}
+            {kind !== "expense" && <div>
+              <label className="field-label" htmlFor="billing_address">{sale ? "Billing address" : "Mailing address"}</label>
+              <textarea className={`field min-h-[72px] ${bad("billing_address") ? "!border-bad" : ""}`} id="billing_address" name="billing_address" maxLength={500}
+                value={billTo} onChange={(e) => setBillTo(e.target.value)} />
+            </div>}
+            {sale && show.shipping && (
+              <>
+                <div>
+                  <label className="field-label" htmlFor="shipping_address">Ship to</label>
+                  <textarea className={`field min-h-[72px] ${bad("shipping_address") ? "!border-bad" : ""}`} id="shipping_address" name="shipping_address" maxLength={500}
+                    value={shipTo} onChange={(e) => setShipTo(e.target.value)} />
+                </div>
+                <Field name="ship_via" label="Ship via" defaultValue={draft?.ship_via ?? ""} invalid={bad("ship_via")} />
+                <Field name="ship_date" label="Shipping date" type="date" defaultValue={draft?.ship_date ?? ""} invalid={bad("ship_date")} />
+                <Field name="tracking_number" label="Tracking no." defaultValue={draft?.tracking_number ?? ""} invalid={bad("tracking_number")} />
+              </>
+            )}
             {kind === "bill" && <Field name="reference" label="Supplier's invoice number" hint="As printed on their invoice" defaultValue={draft?.reference ?? ""} invalid={bad("reference")} />}
             {onTheSpot && (
               <>
@@ -535,8 +605,32 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
           </div>
         </Card>
         <Card label="Notes">
-          <label className="field-label" htmlFor="notes">{words.notes}</label>
+          <label className="field-label" htmlFor="notes">{sale && kind !== "sales_receipt" ? `Message on ${words.noun}` : words.notes}</label>
           <textarea className="field min-h-[72px]" id="notes" name="notes" maxLength={2000} defaultValue={draft?.notes ?? ""} />
+          {sale && show.message_on_statement && (
+            <>
+              <label className="field-label mt-3" htmlFor="message_on_statement">Message on statement</label>
+              <textarea className="field min-h-[56px]" id="message_on_statement" name="message_on_statement" maxLength={500} defaultValue={draft?.message_on_statement ?? ""}
+                aria-describedby="message_on_statement_hint" />
+              <p id="message_on_statement_hint" className="mt-1.5 text-[13px] text-muted">What the customer&apos;s statement says for this {words.noun}.</p>
+            </>
+          )}
+          {tags.length > 0 && (
+            <fieldset className="mt-3">
+              <legend className="field-label">Tags</legend>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {tags.map((t) => <label key={t.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name="tag_ids" value={t.id} className="size-4" />{t.name}</label>)}
+              </div>
+            </fieldset>
+          )}
+          {attachable && show.attachments !== false && (
+            <div className="mt-3">
+              <label className="field-label" htmlFor="new_files">Attachments</label>
+              <input className="field" id="new_files" name="new_files" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" aria-describedby="new_files_hint" />
+              <p id="new_files_hint" className="mt-1.5 text-[13px] text-muted">PDF, PNG, JPEG or WebP, up to 10 MB each. Sent once the {words.noun} is saved.</p>
+            </div>
+          )}
+          {sending && <p role="status" className="mt-3 text-[13px] font-semibold text-muted">Saved. Sending the files…</p>}
         </Card>
       </div>
 

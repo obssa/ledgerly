@@ -49,7 +49,7 @@ final class CustomerController extends Controller
                 ->where('name', 'ilike', '%' . addcslashes($s, '%_\\') . '%')
                 ->orWhere('tax_id', $s)))
             ->orderByRaw('lower(name)')->limit(500)
-            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'payment_terms_id', 'credit_limit', 'is_active', 'price_list_id']);
+            ->get(['id', 'name', 'tax_id', 'email', 'phone', 'currency', 'payment_terms_days', 'payment_terms_id', 'credit_limit', 'is_active', 'price_list_id', 'address', 'delivery_address']);   // 112: the addresses a new invoice is filled from
 
         $balances = $this->balances($customers->pluck('id')->all());
 

@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, ledgerly } from "@/lib/api";
 import { formStateFromError, text, type FormState } from "@/lib/forms";
+import { afterSave } from "@/lib/afterSave";
 import { invoiceBody } from "@/lib/invoice";
 import { getSession } from "@/lib/session";
 
@@ -34,6 +35,9 @@ export async function createExpense(_: FormState | undefined, form: FormData): P
   } catch (error) {
     return refusal(error);
   }
+  // 112: its tags now; files chosen on the form go up from the browser before the page opens.
+  const pending = await afterSave("expense", id, form, ctx, `/expenses/${encodeURIComponent(id)}`);
+  if (pending) return pending;
   redirect(`/expenses/${encodeURIComponent(id)}`);
 }
 

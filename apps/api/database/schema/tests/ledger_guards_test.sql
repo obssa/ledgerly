@@ -5944,6 +5944,33 @@ BEGIN
   RAISE NOTICE 'PASS T136 a document''s and a line''s class and location are the company''s own';
 END $$;
 
+-- T137: a document's addresses, email, shipping and statement message (112) are kept within their lengths. Company A
+-- as f1, customer c1. Rolled back. (Posted, they are frozen with the rest of the row: 005, T12.)
+DO $$
+BEGIN
+  BEGIN
+    PERFORM set_config('app.company_id', '00000000-0000-0000-0000-00000000000a', true), set_config('app.user_id', '00000000-0000-0000-0000-0000000000f1', true);
+    INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due, billing_address, shipping_address,
+                           email_to, email_cc, ship_via, ship_date, tracking_number, message_on_statement)
+      VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0, E'Bole Road\nAddis Ababa', E'Warehouse 4\nAdama',
+              'ap@example.test', 'owner@example.test', 'Ethiopian Cargo', '2027-11-11', 'ET-778', 'Coffee for the November event');
+    BEGIN
+      INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due, ship_via)
+        VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0, repeat('x', 61));
+      RAISE EXCEPTION 'FAIL T137a: a ship via longer than 60 characters was kept';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    BEGIN
+      INSERT INTO documents (company_id, type, contact_id, issue_date, currency, subtotal, total, amount_due, email_bcc)
+        VALUES (app_company_id(), 'invoice', '00000000-0000-0000-0000-0000000000c1', '2027-11-10', 'ETB', 0, 0, 0, repeat('x', 501));
+      RAISE EXCEPTION 'FAIL T137b: a Bcc list longer than 500 characters was kept';
+    EXCEPTION WHEN check_violation THEN NULL; END;
+    RAISE EXCEPTION 'T137 done';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'T137 done' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE 'PASS T137 a document''s addresses, email, shipping and statement message are kept within their lengths';
+END $$;
+
 -- T45: demo accounts are written only by the owner role, each is an active member of its demo company with its
 -- role, and never joins another company (018). Uses c3 of company C (a bookkeeper since T26).
 DO $$ BEGIN
