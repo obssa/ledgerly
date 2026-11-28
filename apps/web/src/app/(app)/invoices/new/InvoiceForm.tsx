@@ -6,7 +6,8 @@ import { startTransition, useActionState, useEffect, useMemo, useRef, useState, 
 import { useRouter } from "next/navigation";
 import { addressText } from "@/lib/address";
 import { Card } from "@/components/ui";
-import { ADD_NEW, AddContact, AddItem } from "@/components/QuickAdd";
+import { ADD_NEW, AddAccount, AddContact, AddItem, withAccount } from "@/components/QuickAdd";
+import { COST_ACCOUNT_CHOICES, SALE_ACCOUNT_CHOICES } from "@/lib/chart";
 import type { ContactOption, ItemOption } from "@/lib/options";
 import type { FormField, InvoiceDetail, TaxMode } from "@/lib/api";
 import type { InvoiceOptions } from "@/lib/data";
@@ -124,9 +125,10 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
   const firstAccount = options.accounts[0]?.id ?? "";
 
   const [customerId, setCustomerId] = useState(draft?.contact.id ?? "");
-  // QuickBooks' "+ Add new": customers (or suppliers) and products or services added from the form join its lists.
+  // QuickBooks' "+ Add new": customers (or suppliers), products or services and accounts added from the form join its lists.
   const [contacts, setContacts] = useState(options.customers);
-  const [adding, setAdding] = useState<null | { what: "contact" } | { what: "item"; line: number }>(null);
+  const [accounts, setAccounts] = useState(options.accounts);
+  const [adding, setAdding] = useState<null | { what: "contact" } | { what: "item" | "account"; line: number }>(null);
   const [issueDate, setIssueDate] = useState(draft?.issue_date ?? today);
   // QuickBooks' Terms (109), on invoices and bills: the term sets the due date from the date, in the company's calendar;
   // changing the customer brings their usual term, changing the date or the term sets it again; a date typed stands.
@@ -201,7 +203,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
     const item = added ?? items.find((i) => i.id === itemId);
     setLines((ls) => ls.map((l) => (l.key !== key ? l : {
       ...l, itemId, unitId: "",
-      ...(item ? { description: item.name, unitPrice: priceOf(item) ?? l.unitPrice, accountId: item.account_id && options.accounts.some((a) => a.id === item.account_id) ? item.account_id : l.accountId } : {}),
+      ...(item ? { description: item.name, unitPrice: priceOf(item) ?? l.unitPrice, accountId: item.account_id && accounts.some((a) => a.id === item.account_id) ? item.account_id : l.accountId } : {}),
     })));
   };
   /** 072: another unit of the item; the price follows from the item's own price times the unit's size. */
@@ -260,7 +262,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
     if (c?.currency && options.currencies.includes(c.currency)) setCurrency(c.currency);
     // A supplier's usual expense account goes on the lines that still have the first account.
     const usual = c?.default_account_id;
-    if (usual && options.accounts.some((a) => a.id === usual)) {
+    if (usual && accounts.some((a) => a.id === usual)) {
       setLines((ls) => ls.map((l) => (l.accountId === firstAccount ? { ...l, accountId: usual } : l)));
     }
   };
@@ -280,7 +282,7 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
     const unit = hit.unitId ? item.units?.find((u) => u.id === hit.unitId) : undefined;
     const base = priceOf(item);
     const price = base ? (Number(base) * (unit ? Number(unit.factor) : 1)).toFixed(2) : "";
-    const account = item.account_id && options.accounts.some((a) => a.id === item.account_id) ? item.account_id : firstAccount;
+    const account = item.account_id && accounts.some((a) => a.id === item.account_id) ? item.account_id : firstAccount;
     setLines((ls) => {
       const same = ls.find((l) => l.itemId === hit.itemId && (l.unitId || "") === (hit.unitId ?? ""));
       if (same) return ls.map((l) => (l.key === same.key ? { ...l, quantity: String(Number(plain(l.quantity) || "0") + 1) } : l));
@@ -327,11 +329,20 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
           }} />
       )}
       {adding?.what === "item" && (
-        <AddItem side={purchase_ ? "purchase" : "sale"} accounts={options.accounts} onClose={() => setAdding(null)}
+        <AddItem side={purchase_ ? "purchase" : "sale"} accounts={accounts} onClose={() => setAdding(null)}
           account={lines.find((l) => l.key === adding.line)?.accountId || firstAccount}
+          onAccountAdded={(a) => setAccounts((as) => withAccount(as, a))}
           onAdded={(item) => {
             setItems((is) => [...is, item].sort((a, b) => a.name.localeCompare(b.name)));
             pickItem(adding.line, item.id, item);
+            setAdding(null);
+          }} />
+      )}
+      {adding?.what === "account" && (
+        <AddAccount choices={purchase_ ? COST_ACCOUNT_CHOICES : SALE_ACCOUNT_CHOICES} onClose={() => setAdding(null)}
+          onAdded={(a) => {
+            setAccounts((as) => withAccount(as, a));
+            update(adding.line, { accountId: a.id });
             setAdding(null);
           }} />
       )}
@@ -586,8 +597,11 @@ export function InvoiceForm({ options, kind = "invoice", draft }: { options: Inv
                         </td>
                       )}
                       <td>
-                        <select aria-label={words.account} className="field w-[160px]" value={l.accountId} onChange={(e) => update(l.key, { accountId: e.target.value })}>
-                          {options.accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+                        <select aria-label={words.account} className="field w-[160px]" value={l.accountId}
+                          onChange={(e) => (e.target.value === ADD_NEW ? setAdding({ what: "account", line: l.key }) : update(l.key, { accountId: e.target.value }))}>
+                          {l.accountId === "" && <option value="">—</option>}
+                          {!options.demo && <option value={ADD_NEW}>+ Add new</option>}
+                          {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
                         </select>
                       </td>
                       {projects.length > 0 && (

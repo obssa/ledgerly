@@ -2,6 +2,9 @@
 import { DateInput } from "@/components/DateInput";
 
 import { useActionState } from "react";
+import { AccountSelect } from "@/components/QuickAdd";
+import { COST_ACCOUNT_CHOICES, SALE_ACCOUNT_CHOICES } from "@/lib/chart";
+import type { AccountOption } from "@/lib/options";
 import type { Item } from "@/lib/api";
 import type { FormState } from "@/lib/forms";
 import { adjustStock, createItem, createWarehouse, saveItem, transferStock, issueStock } from "./actions";
@@ -19,7 +22,11 @@ const TYPES: Record<string, string> = {
 };
 
 /** New item, or the details of one. Type is fixed once the item has stock moves (the API says so). */
-export function ItemForm({ item, readOnly = false, suppliers = [] }: { item?: Item; readOnly?: boolean; suppliers?: { id: string; name: string }[] }) {
+export function ItemForm({ item, readOnly = false, suppliers = [], accounts }: {
+  item?: Item; readOnly?: boolean; suppliers?: { id: string; name: string }[];
+  /** Its income and expense accounts to choose from, and whether "+ Add new" may add one (not in the demo). */
+  accounts?: { income: AccountOption[]; cost: AccountOption[]; canAdd: boolean };
+}) {
   const [state, action, pending] = useActionState(item ? saveItem : createItem, undefined);
   const bad = (n: string) => Boolean(state?.fields?.[n]);
   return (
@@ -39,7 +46,19 @@ export function ItemForm({ item, readOnly = false, suppliers = [] }: { item?: It
         </div>
         <Field name="unit" label="Unit" defaultValue={item?.unit ?? "each"} hint="each, kg, bag, carton" />
         <Field name="sale_price" label="Sale price" defaultValue={item?.sale_price ?? ""} invalid={bad("sale_price")} />
+        {accounts && (
+          <AccountSelect id="income_account_id" name="income_account_id" label="Income account" accounts={accounts.income}
+            defaultValue={item?.income_account_id ?? ""} none="None: choose on each invoice" choices={SALE_ACCOUNT_CHOICES}
+            canAdd={accounts.canAdd && !readOnly} invalid={bad("income_account_id")}
+            hint={<p className="mt-1 text-[12px] text-muted">Where its sales go on invoices and sales receipts.</p>} />
+        )}
         <Field name="purchase_price" label="Purchase price" defaultValue={item?.purchase_price ?? ""} invalid={bad("purchase_price")} />
+        {accounts && (
+          <AccountSelect id="expense_account_id" name="expense_account_id" label="Expense account" accounts={accounts.cost}
+            defaultValue={item?.expense_account_id ?? ""} none="None: choose on each bill" choices={COST_ACCOUNT_CHOICES}
+            canAdd={accounts.canAdd && !readOnly} invalid={bad("expense_account_id")}
+            hint={<p className="mt-1 text-[12px] text-muted">Where its cost goes on bills and expenses.</p>} />
+        )}
         <Field name="reorder_point" label="Reorder when on hand falls to" defaultValue={item?.reorder_point ?? ""} invalid={bad("reorder_point")} />
         <Field name="max_level" label="Order back up to" defaultValue={item?.max_level ?? ""} invalid={bad("max_level")} hint="The maximum level a suggested order brings it to" />
         <div>

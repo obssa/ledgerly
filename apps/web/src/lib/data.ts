@@ -960,6 +960,26 @@ export async function getCostAccounts(): Promise<{ id: string; code: string; nam
   return data.filter((a) => a.is_active && (a.type === "expense" || a.type === "asset")).map((a) => ({ id: a.id, code: a.code, name: a.name }));
 }
 
+/**
+ * A product or service's accounts (QuickBooks' Income account and Expense account): income accounts for its sales,
+ * and the expense, cost of sales and asset accounts for its purchases. An archived one it still names stays listed.
+ * In the demo there are none, and nothing to add one to.
+ */
+export async function getItemAccounts(keep: (string | null | undefined)[] = []): Promise<{
+  income: { id: string; code: string; name: string }[]; cost: { id: string; code: string; name: string }[]; canAdd: boolean;
+}> {
+  await connection();
+  if (isDemoMode()) return { income: [], cost: [], canAdd: false };
+  const { data } = await withApi((ctx) => ledgerly.accounts(ctx));
+  const listed = data.filter((a) => a.is_active || keep.includes(a.id));
+  const option = (a: Account) => ({ id: a.id, code: a.code, name: a.name });
+  return {
+    income: listed.filter((a) => a.type === "income").map(option),
+    cost: listed.filter((a) => a.type === "expense" || (a.type === "asset" && ["fixed_asset", "prepayment"].includes(a.subtype ?? ""))).map(option),
+    canAdd: true,
+  };
+}
+
 /** A page of the list for a period (lib/lists.ts); every row, newest first, when none is given. */
 export async function getSupplierCredits(q: ListQuery = {}) {
   await connection();

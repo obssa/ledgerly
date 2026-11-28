@@ -1,9 +1,11 @@
 "use client";
 
 import { useActionState, useId } from "react";
+import { AccountSelect } from "@/components/QuickAdd";
 import { TermsSelect } from "@/components/TermsSelect";
 import type { PaymentTerm, Supplier } from "@/lib/api";
 import { CURRENCIES } from "@/lib/decimal";
+import { COST_ACCOUNT_CHOICES } from "@/lib/chart";
 import type { FormState } from "@/lib/forms";
 import { WITHHOLDING_SHOWN } from "@/lib/suppliers";
 import { createSupplier, saveSupplier, setSupplierActive } from "./actions";
@@ -15,9 +17,11 @@ function Message({ state }: { state: FormState | undefined }) {
 }
 
 /** New supplier (no `supplier`) or edit. Read-only when the role cannot edit; the API checks again. */
-export function SupplierForm({ supplier, accounts, readOnly = false, terms = [] }: {
+export function SupplierForm({ supplier, accounts, readOnly = false, terms = [], canAddAccount = false }: {
   supplier?: Supplier; accounts: { id: string; code: string; name: string }[]; readOnly?: boolean;
   terms?: PaymentTerm[];
+  /** QuickBooks' "+ Add new" in the account list (not in the demo). */
+  canAddAccount?: boolean;
 }) {
   const [state, action, pending] = useActionState(supplier ? saveSupplier : createSupplier, undefined);
   const bad = (name: string) => Boolean(state?.fields && Object.keys(state.fields).some((k) => k === name || k.startsWith(`${name}.`)));
@@ -42,14 +46,9 @@ export function SupplierForm({ supplier, accounts, readOnly = false, terms = [] 
             {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        <div className="sm:col-span-2">
-          <label className="field-label" htmlFor="default_expense_account_id">Usual expense account</label>
-          <select className={`field ${bad("default_expense_account_id") ? "!border-bad" : ""}`} id="default_expense_account_id" name="default_expense_account_id"
-            defaultValue={supplier?.default_expense_account_id ?? ""}>
-            <option value="">None: choose on each bill</option>
-            {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
-          </select>
-        </div>
+        <AccountSelect className="sm:col-span-2" id="default_expense_account_id" name="default_expense_account_id" label="Usual expense account"
+          accounts={accounts} defaultValue={supplier?.default_expense_account_id ?? ""} none="None: choose on each bill"
+          choices={COST_ACCOUNT_CHOICES} canAdd={canAddAccount && !readOnly} invalid={bad("default_expense_account_id")} />
       </fieldset>
 
       <h3 className="mb-3 mt-6 text-[15px] font-bold">Where to pay them</h3>

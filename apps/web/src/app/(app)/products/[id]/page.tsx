@@ -1,7 +1,7 @@
 import Link from "@/components/Link";
 import { notFound } from "next/navigation";
 import { Card, PageTitle, Pill } from "@/components/ui";
-import { getItem, getItemAssembly, getItems, getSupplierChoices, getWarehouses, getDateFormatter } from "@/lib/data";
+import { getItem, getItemAccounts, getItemAssembly, getItems, getSupplierChoices, getWarehouses, getDateFormatter } from "@/lib/data";
 import { formatAmount } from "@/lib/format";
 import { AdjustStock, ItemForm } from "../ItemForms";
 import { ItemUnits } from "./ItemUnits";
@@ -18,6 +18,7 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
   const { id } = await params;
   const [item, warehouses, suppliers] = await Promise.all([getItem(id), getWarehouses(), getSupplierChoices()]);
   if (!item) notFound();
+  const accounts = await getItemAccounts([item.income_account_id, item.expense_account_id]);
   const stock = item.type === "inventory";
   const choices = item.type === "bundle" ? (await getItems({})).data.filter((i) => i.type !== "bundle" && i.id !== item.id) : [];
   // 087: a stock item counted without batches may be assembled from other stock items.
@@ -54,7 +55,7 @@ export default async function ItemPage({ params }: PageProps<"/products/[id]">) 
           </Card>
         )}
         <Card className="min-w-0 flex-[2_1_520px]" label="Details">
-          <ItemForm item={item} readOnly={!item.can?.edit} suppliers={suppliers} />
+          <ItemForm item={item} readOnly={!item.can?.edit} suppliers={suppliers} accounts={accounts} />
         </Card>
         {(item.tracking === "batch" || item.tracking === "serial") && (
           <Card className="min-w-0 flex-[1_1_300px]" label={item.tracking === "serial" ? "Serial numbers" : "Batches"}>
